@@ -1,17 +1,26 @@
+import { serve } from "@hono/node-server";
+import { loadConfig, type AppConfig } from "./config.js";
+import { createApp } from "./http/app.js";
+
 export { loadConfig, type AppConfig } from "./config.js";
+export { createApp } from "./http/app.js";
+export { startRun } from "./runs/create-run.js";
+export { runPipeline } from "./runs/runner.js";
+export * from "./types.js";
+export * from "./agent/artifacts.js";
 
 export interface StartServerOptions {
   port?: number;
+  hostname?: string;
 }
 
-/** Placeholder until Task 4 wires Hono + node-server. */
 export async function startServer(options: StartServerOptions = {}): Promise<void> {
-  const { loadConfig } = await import("./config.js");
   const cfg = loadConfig();
   const port = options.port ?? cfg.port;
-  console.log(`bugfix-agent: server stub listening intent on 127.0.0.1:${port} (Task 4 will bind)`);
-}
+  const hostname = options.hostname ?? "127.0.0.1";
+  const app = createApp();
 
-export function createApp(): never {
-  throw new Error("createApp not implemented yet (Task 4)");
+  serve({ fetch: app.fetch, port, hostname }, (info) => {
+    console.log(`bugfix-agent listening on http://${hostname}:${info.port}`);
+  });
 }
