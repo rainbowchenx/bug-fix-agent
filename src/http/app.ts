@@ -1,8 +1,13 @@
 import { Hono } from "hono";
 import { startRun } from "../runs/create-run.js";
+import type { RunnerOptions } from "../runs/runner.js";
 import { readMeta, readReport } from "../runs/store.js";
 
-export function createApp(): Hono {
+export interface CreateAppOptions {
+  runner?: RunnerOptions;
+}
+
+export function createApp(options: CreateAppOptions = {}): Hono {
   const app = new Hono();
 
   app.get("/health", (c) => c.json({ ok: true }));
@@ -15,7 +20,7 @@ export function createApp(): Hono {
       return c.json({ error: "Invalid JSON body" }, 400);
     }
     try {
-      const result = await startRun(body);
+      const result = await startRun(body, options.runner);
       return c.json(result, 202);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

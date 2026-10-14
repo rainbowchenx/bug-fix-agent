@@ -31,9 +31,23 @@ describe("runs API", () => {
     if (workDir) await rm(workDir, { recursive: true, force: true });
   });
 
-  it("POST /v1/runs then GET reaches completed with empty report", async () => {
+  it("POST /v1/runs then GET reaches completed with report", async () => {
     workDir = await mkdtemp(path.join(tmpdir(), "bugfix-api-"));
-    const app = createApp();
+    const app = createApp({
+      runner: {
+        handlers: {
+          ensureRepo: async () => ({
+            repoPath: path.join(workDir, "repos", "app"),
+            headSha: "sha",
+          }),
+          analyzeCluster: async () => ({
+            status: "unfixed",
+            reasonCode: "not_actionable",
+            reasonDetail: "stub analyze for API smoke",
+          }),
+        },
+      },
+    });
 
     const health = await app.request("/health");
     expect(health.status).toBe(200);
