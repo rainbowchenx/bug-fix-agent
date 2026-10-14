@@ -60,9 +60,10 @@ describe("runs API", () => {
     const final = await waitForCompleted(app, created.runId, workDir);
     expect(final.status).toBe("completed");
     const report = final.report as {
-      summary: { fixed: number; unfixed: number };
+      summary: { fixed: number; unfixed: number; totalClusters: number };
     };
     expect(report.summary.fixed).toBe(0);
-    expect(report.summary.unfixed).toBe(0);
+    expect(report.summary.totalClusters).toBe(1);
+    expect(report.summary.unfixed).toBe(1);
   });
 });
