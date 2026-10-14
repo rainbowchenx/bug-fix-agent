@@ -17,6 +17,8 @@ import type {
   RunReport,
   UnfixedCluster,
 } from "../types.js";
+import { mergeMcpConfig } from "../mcp/load-config.js";
+import { defaultSkillsDir } from "../agent/sdk-runner.js";
 import { ensureRepo } from "../workspace/git.js";
 import { runDir } from "../workspace/paths.js";
 import {
@@ -113,12 +115,20 @@ async function processCluster(args: {
     };
   }
 
+  const mcpServers = await mergeMcpConfig({
+    workDir: args.workDir,
+    runMcp: args.options?.mcp,
+  });
+  const skillsDir = defaultSkillsDir();
+
   const analyze = h.analyzeCluster ?? analyzeCluster;
   const analysis = await analyze({
     cluster: args.cluster,
     defects: clusterDefects,
     repoPath,
     userPrompt: args.userPrompt,
+    mcpServers,
+    skillsDir,
   });
 
   if (analysis.rootCause) {

@@ -22,7 +22,7 @@ export async function prepareRepo(
     const { stdout, stderr } = await execFn(command, {
       cwd: repoPath,
       maxBuffer: 8 * 1024 * 1024,
-      shell: true,
+      shell: process.platform === "win32" ? "cmd.exe" : "/bin/sh",
     });
     return { ok: true, logTail: `${stdout}\n${stderr}`.trim().slice(-4000) };
   } catch (err) {

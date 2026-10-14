@@ -14,6 +14,8 @@ export interface AnalyzeClusterInput {
   defects: Defect[];
   repoPath: string;
   userPrompt?: string;
+  mcpServers?: Record<string, unknown>;
+  skillsDir?: string;
   /** Test seam / offline mode */
   mockArtifacts?: {
     rootCause: RootCauseArtifact;
@@ -81,6 +83,8 @@ export async function analyzeCluster(
         prompt: buildAnalyzePrompt(input),
         mode: "analyze",
         maxTurns: 25,
+        mcpServers: input.mcpServers,
+        skillsDir: input.skillsDir,
       });
       rootCause = parseRootCause(parseLabeled(text, "ROOT_CAUSE"));
       try {

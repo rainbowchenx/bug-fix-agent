@@ -8,6 +8,12 @@ export { startRun } from "./runs/create-run.js";
 export { runPipeline } from "./runs/runner.js";
 export * from "./types.js";
 export * from "./agent/artifacts.js";
+export { listBuiltinSkills, filterSkills } from "./skills/manifest.js";
+export { mergeMcpConfig, expandEnvVars } from "./mcp/load-config.js";
+export { noopStorage } from "./storage/noop.js";
+export { createHttpStorage } from "./storage/http.js";
+export { safeSync } from "./storage/adapter.js";
+export type { StorageAdapter, StorageSyncMode } from "./storage/adapter.js";
 
 export interface StartServerOptions {
   port?: number;

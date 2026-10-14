@@ -27,7 +27,7 @@ export async function runVerify(
     const { stdout, stderr } = await execFn(command, {
       cwd: repoPath,
       maxBuffer: 4 * 1024 * 1024,
-      shell: true,
+      shell: process.platform === "win32" ? "cmd.exe" : "/bin/sh",
     });
     const log = `${stdout}\n${stderr}`.trim();
     return { ok: true, command, logTail: log.slice(-4000) };
