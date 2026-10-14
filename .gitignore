@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.tgz
+.env
+.env.local
+.DS_Store
+coverage/
+.bugfix-runs/
+*.log
+.turbo/
+.vitest/

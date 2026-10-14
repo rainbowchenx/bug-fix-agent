@@ -1,0 +1,55 @@
+{
+  "name": "bugfix-agent",
+  "version": "0.1.0",
+  "description": "Local dual-outcome bugfix agent for Dify batch runs",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "bugfix-agent": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "skills",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev:serve": "tsx src/cli.ts serve",
+    "prepack": "npm run build"
+  },
+  "keywords": [
+    "bugfix",
+    "agent",
+    "claude",
+    "dify",
+    "gitlab"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.299",
+    "@hono/node-server": "^2.1.5",
+    "dotenv": "^18.0.7",
+    "hono": "^4.13.13",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.15",
+    "typescript": "5.8.3",
+    "vitest": "^5.0.4"
+  }
+}

@@ -1,0 +1,92 @@
+﻿import enum
+
+CODING_PAYLOAD_TYPES = frozenset({"select_solution", "create_branch", "create_pr"})
+
+# ``Repository.provider`` values for the GitHub integrations Seer PR iteration
+# supports. Use with ``provider__in=`` when filtering repositories; for a Seer
+# PR-state lookup pass the specific repo's ``provider`` instead.
+SEER_GITHUB_PROVIDERS = ("integrations:github", "integrations:github_enterprise")
+
+
+class FixabilityScoreThresholds(enum.Enum):
+    SUPER_HIGH = 0.76
+    HIGH = 0.66
+    MEDIUM = 0.40
+    LOW = 0.25
+    SUPER_LOW = 0.0
+
+    def to_str(self) -> str:
+        """
+        Return the string representation of the fixability score threshold.
+        """
+        return self.name.lower()
+
+    @classmethod
+    def from_str(self, name: str) -> "FixabilityScoreThresholds | None":
+        """
+        Return the fixability score threshold from a string representation.
+        """
+        name = name.upper()
+        return self[name] if name in self.__members__ else None
+
+
+class AutofixAutomationTuningSettings(enum.StrEnum):
+    OFF = "off"
+    SUPER_LOW = "super_low"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    ALWAYS = "always"
+
+
+class AutofixStatus(str, enum.Enum):
+    COMPLETED = "COMPLETED"
+    ERROR = "ERROR"
+    PROCESSING = "PROCESSING"
+    NEED_MORE_INFORMATION = "NEED_MORE_INFORMATION"
+    CANCELLED = "CANCELLED"
+    WAITING_FOR_USER_RESPONSE = "WAITING_FOR_USER_RESPONSE"
+
+
+class AutofixReferrer(enum.StrEnum):
+    GROUP_AUTOFIX_ENDPOINT = "api.group_ai_autofix"
+    ISSUE_SUMMARY_POST_PROCESS_FIXABILITY = "issue_summary.post_process_fixability"
+    SLACK = "slack"
+    ON_COMPLETION_HOOK = "autofix.on_completion_hook"
+    AGENTIC_TRIAGE = "night_shift"
+    NIGHT_SHIFT = AGENTIC_TRIAGE
+    CLI = "api.cli"
+    LINEAR_AGENT = "api.linear_agent"
+    MCP = "api.mcp"
+    WEB = "api.web"
+    # Unprefixed because Seer Explorer's autofix lib sends this literal, and the value has to
+    # match it or every Explorer-started run records itself as UNKNOWN.
+    SEER_EXPLORER = "seer_explorer"
+    GITHUB_PR_COMMENT = "github.pr_comment"
+    GITHUB_PR_REVIEW = "github.pr_review"
+    GITHUB_CHECK_SUITE = "github.check_suite"
+    UNKNOWN = "unknown"
+
+
+class SeerAutomationSource(enum.Enum):
+    ISSUE_DETAILS = "issue_details"
+    POST_PROCESS = "post_process"
+    AGENTIC_TRIAGE = "night_shift"
+    NIGHT_SHIFT = AGENTIC_TRIAGE
+    FIRST_ASSIGNMENT = "first_assignment"
+
+
+class CodingAgentStatus(enum.StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+    @classmethod
+    def from_cursor_status(cls, cursor_status: str) -> "CodingAgentStatus | None":
+        status_mapping = {
+            "FINISHED": cls.COMPLETED,
+            "ERROR": cls.FAILED,
+        }
+
+        return status_mapping.get(cursor_status.upper(), None)
