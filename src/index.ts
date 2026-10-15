@@ -14,6 +14,9 @@ export { noopStorage } from "./storage/noop.js";
 export { createHttpStorage } from "./storage/http.js";
 export { safeSync } from "./storage/adapter.js";
 export type { StorageAdapter, StorageSyncMode } from "./storage/adapter.js";
+export { checkScopeLock, extractAllowedFiles } from "./pipeline/scope-lock.js";
+export { buildKnownIssuesDetail } from "./pipeline/known-issues.js";
+export { FAILURE_MODES } from "./pipeline/failure-modes.js";
 
 export interface StartServerOptions {
   port?: number;

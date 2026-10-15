@@ -5,9 +5,11 @@ import { analyzeCluster } from "../pipeline/analyze.js";
 import { aggregateDefects } from "../pipeline/aggregate.js";
 import { deliverFix } from "../pipeline/deliver.js";
 import { implementCluster, shouldContinueIterate } from "../pipeline/implement.js";
+import { buildKnownIssuesDetail } from "../pipeline/known-issues.js";
 import { normalizeDefects } from "../pipeline/normalize.js";
 import { prepareRepo } from "../pipeline/prepare.js";
 import { buildReport } from "../pipeline/report.js";
+import { checkScopeLock } from "../pipeline/scope-lock.js";
 import { resolveVerifyPlan, runVerify } from "../pipeline/verify.js";
 import type {
   Cluster,
@@ -210,7 +212,7 @@ async function processCluster(args: {
   while (true) {
     iteration += 1;
     try {
-      await implement({
+      const impl = await implement({
         cluster: args.cluster,
         repoPath,
         rootCause: analysis.rootCause,
@@ -218,6 +220,25 @@ async function processCluster(args: {
         verifyLogTail: lastLog || undefined,
         iteration,
       });
+      const scope =
+        impl.scopeOk === false
+          ? { ok: false, violations: impl.scopeViolations }
+          : checkScopeLock(impl.changedFiles ?? [], analysis.solution);
+      if (!scope.ok) {
+        await writeClusterArtifact(args.workDir, args.runId, args.cluster.id, "scope-lock.json", scope);
+        return {
+          unfixed: {
+            clusterId: args.cluster.id,
+            defectIds: args.cluster.defectIds,
+            reasonCode: "implement_failed",
+            reasonDetail: `Scope lock violated — edits outside solution target_files: ${scope.violations.join(", ")}`,
+            artifacts: {
+              rootCause: analysis.rootCause.one_line_description,
+              solution: analysis.solution.one_line_summary,
+            },
+          },
+        };
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return {
@@ -244,7 +265,19 @@ async function processCluster(args: {
         clusterId: args.cluster.id,
         defectIds: args.cluster.defectIds,
         reasonCode: "verify_failed",
-        reasonDetail: `Verify failed after ${iteration} iteration(s): ${lastLog}`,
+        reasonDetail: buildKnownIssuesDetail({
+          iterations: iteration,
+          maxIterate,
+          verifyCommand,
+          logTail: lastLog,
+          rootCauseSummary: analysis.rootCause.one_line_description,
+          solutionSummary: analysis.solution.one_line_summary,
+          actionsTaken: [
+            `Analyzed cluster ${args.cluster.id} (failure_mode=${analysis.rootCause.failure_mode ?? "unspecified"})`,
+            `Implemented solution under scope lock (${iteration} attempt(s))`,
+            `Verify remained red after budget ${maxIterate}`,
+          ],
+        }),
         artifacts: {
           rootCause: analysis.rootCause.one_line_description,
           solution: analysis.solution.one_line_summary,

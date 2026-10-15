@@ -7,6 +7,7 @@ import {
 } from "../agent/artifacts.js";
 import { runAgentSession } from "../agent/sdk-runner.js";
 import type { Cluster, Defect, ReasonCode } from "../types.js";
+import { FAILURE_MODE_HINT } from "./failure-modes.js";
 import { gateFromRootCause } from "./fixability.js";
 
 export interface AnalyzeClusterInput {
@@ -37,14 +38,19 @@ export type AnalyzeClusterResult =
       solution?: SolutionArtifact;
     };
 
-function buildAnalyzePrompt(input: AnalyzeClusterInput): string {
+export function buildAnalyzePrompt(input: AnalyzeClusterInput): string {
   const defectText = input.defects
     .map(
       (d) =>
         `- [${d.id}] ${d.title}\n  ${d.description ?? ""}\n  stack: ${d.stackTrace ?? "n/a"}`,
     )
     .join("\n");
-  return `You are analyzing a defect cluster for an automated bugfix agent.
+  return `You are analyzing a defect cluster for an automated bugfix agent (batch mode, no human wait).
+
+IRON LAW: No code changes without a proven hypothesis. Every later edit must trace to evidenced root cause. If you cannot evidence a hypothesis, set fixability to needs_more_context or not_actionable — do NOT invent a large refactor plan.
+
+This is a BugFix light path (not a greenfield feature): localize → root cause → minimal solution. Skip product/architecture redesign.
+
 Cluster: ${input.cluster.id} — ${input.cluster.primaryTitle}
 Repo: ${input.cluster.repoUrl}
 User guidance: ${input.userPrompt ?? "(none)"}
@@ -52,12 +58,17 @@ User guidance: ${input.userPrompt ?? "(none)"}
 Defects:
 ${defectText}
 
-Tasks:
-1) Localize likely files/symbols (read-only).
-2) Produce a RootCauseArtifact JSON with fixability.assessment in fixable|needs_more_context|not_actionable.
-3) If fixable, also produce a SolutionArtifact JSON with concrete steps.
+Tasks (read-only tools only):
+1) Localize likely files/symbols.
+2) Map to a failure_mode in: ${FAILURE_MODE_HINT}
+3) State hypothesis + evidence bullets.
+4) Produce RootCauseArtifact JSON with fixability.assessment in fixable|needs_more_context|not_actionable.
+5) If fixable, produce SolutionArtifact JSON with concrete steps AND target_files (relative paths allowlist for scope lock).
 
-Output TWO JSON objects clearly labeled ROOT_CAUSE and SOLUTION.`;
+Output TWO JSON objects clearly labeled ROOT_CAUSE and SOLUTION.
+
+ROOT_CAUSE fields: headline, one_line_description, five_whys, reproduction_steps, failure_mode, hypothesis, evidence, fixability{assessment,reason}, relevant_repo?
+SOLUTION fields: one_line_summary, steps[{title,description}], target_files[], acceptance_criteria?`;
 }
 
 function parseLabeled(text: string, label: string): unknown {
