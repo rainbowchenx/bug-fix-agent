@@ -527,8 +527,8 @@ Prompt 要求被调用时：
 
 ### P2 — 产品化包装（仅当需要对外「专家」叙事时）
 
-6. 将现有流水线导出为「BugFix Agent 定义包」（MD + skills 清单），供内部复用——**不必**做成 WorkBuddy 市场卡。  
-7. 若未来要做多角色：固定 `localizer` / `fixer` / `verifier` 三个子 Agent 定义，主理人逻辑留在 TypeScript 阶段机，而不是纯 prompt TeamCreate。
+6. 将现有流水线按 §3 指南四级结构导出为内部「BugFix Agent 定义包」（MD + skills 清单）——**不必**上 WorkBuddy 架；若要上架再补 `plugin.json` 展示字段。  
+7. 若未来要做多角色：固定 `localizer` / `fixer` / `verifier` 三个子 Agent 定义（写法对齐 §4.3–4.4），主理人逻辑留在 TypeScript 阶段机，而不是纯 prompt TeamCreate。
 
 ### 不建议做的
 
