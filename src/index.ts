@@ -17,6 +17,10 @@ export type { StorageAdapter, StorageSyncMode } from "./storage/adapter.js";
 export { checkScopeLock, extractAllowedFiles } from "./pipeline/scope-lock.js";
 export { buildKnownIssuesDetail } from "./pipeline/known-issues.js";
 export { FAILURE_MODES } from "./pipeline/failure-modes.js";
+export { classifyVerifyFailure } from "./pipeline/verify-classify.js";
+export { snipVerifyLog } from "./pipeline/log-snip.js";
+export { resolveStaticCheckPlan, runStaticCheck } from "./pipeline/static-check.js";
+export { reviewCluster, parseReviewResult } from "./pipeline/review.js";
 
 export interface StartServerOptions {
   port?: number;

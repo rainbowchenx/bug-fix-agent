@@ -34,6 +34,7 @@ describe("runner dual outcome", () => {
     await writeInputDefects(workDir, runId, defects, {
       workDir,
       defects,
+      options: { skipReviewer: true },
     });
 
     const report = await runPipeline(workDir, runId, {
@@ -44,6 +45,8 @@ describe("runner dual outcome", () => {
           repoPath: path.join(workDir, "repos", "app"),
           headSha: "sha",
         }),
+        resolveStaticCheckPlan: async () => ({ commands: [] }),
+        runStaticCheck: async () => ({ ok: true, command: "", logTail: "" }),
         analyzeCluster: async ({ cluster }) => {
           if (cluster.fingerprint === "fp-skip" || cluster.defectIds.includes("d-skip")) {
             return {
@@ -83,7 +86,12 @@ describe("runner dual outcome", () => {
           test: ["npm test"],
         }),
         prepareRepo: async () => ({ ok: true, logTail: "ok" }),
-        implementCluster: async () => ({ changedFiles: ["a.ts"], agentText: "ok" }),
+        implementCluster: async () => ({
+          changedFiles: ["a.ts"],
+          agentText: "ok",
+          scopeOk: true,
+          scopeViolations: [],
+        }),
         runVerify: async () => ({ ok: true, command: "npm test", logTail: "pass" }),
         deliverFix: async () => ({
           mrUrl: "https://gitlab.com/org/app/-/merge_requests/1",

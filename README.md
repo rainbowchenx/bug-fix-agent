@@ -56,7 +56,8 @@ bugfix-agent --help
   ],
   "options": {
     "maxIterate": 3,
-    "verifyOverrides": { "test": ["npm test"] }
+    "verifyOverrides": { "test": ["npm test"] },
+    "skipReviewer": false
   }
 }
 ```
@@ -76,7 +77,20 @@ bugfix-agent --help
 }
 ```
 
-硬门禁：**没有 GREEN，就没有 MR**（`no_test_command` / `verify_failed` 记入 `unfixed`）。
+硬门禁：**没有 GREEN，就没有 MR**。
+
+### 质量门禁（P1）
+
+簇在 GREEN→MR 前经过：
+
+1. **Implement** → **Static check**（探测到的 `typecheck`/`lint`/`tsc --noEmit`；无则跳过）
+2. **Verify**（仓库测试）
+3. **Smart Routing**：verify 失败时启发式分类  
+   - `environment` / `flaky` / `bad_assertion` → 立即 `unfixed`（`env_verify_failed` 等），不空烧 iterate  
+   - `product_code` / `unknown` → 允许回灌 snip 后的日志再 implement  
+4. **只读 Reviewer**（默认开；`options.skipReviewer: true` 可关）→ `request_changes` 计入同一 `maxIterate`；耗尽 → `review_failed`，**不开 MR**
+
+相关 `reasonCode`：`env_verify_failed`、`static_check_failed`、`review_failed`、`verify_failed`。
 
 ## 日批用法（Dify）
 

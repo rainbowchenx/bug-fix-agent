@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export type AgentMode = "analyze" | "implement";
+export type AgentMode = "analyze" | "implement" | "review";
 
 export interface RunAgentSessionInput {
   cwd: string;
@@ -35,7 +35,7 @@ const IMPLEMENT_TOOLS = ["Read", "Glob", "Grep", "Skill", "Edit"] as const;
 
 export function buildSdkOptions(input: RunAgentSessionInput): SdkQueryOptions {
   const allowedTools =
-    input.mode === "analyze" ? [...ANALYZE_TOOLS] : [...IMPLEMENT_TOOLS];
+    input.mode === "implement" ? [...IMPLEMENT_TOOLS] : [...ANALYZE_TOOLS];
 
   const options: SdkQueryOptions["options"] = {
     cwd: input.cwd,

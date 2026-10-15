@@ -6,16 +6,27 @@ import { aggregateDefects } from "../pipeline/aggregate.js";
 import { deliverFix } from "../pipeline/deliver.js";
 import { implementCluster, shouldContinueIterate } from "../pipeline/implement.js";
 import { buildKnownIssuesDetail } from "../pipeline/known-issues.js";
+import { snipVerifyLog } from "../pipeline/log-snip.js";
 import { normalizeDefects } from "../pipeline/normalize.js";
 import { prepareRepo } from "../pipeline/prepare.js";
 import { buildReport } from "../pipeline/report.js";
+import { reviewCluster } from "../pipeline/review.js";
 import { checkScopeLock } from "../pipeline/scope-lock.js";
+import {
+  resolveStaticCheckPlan,
+  runStaticCheck,
+} from "../pipeline/static-check.js";
+import {
+  classifyVerifyFailure,
+  reasonCodeForClassify,
+} from "../pipeline/verify-classify.js";
 import { resolveVerifyPlan, runVerify } from "../pipeline/verify.js";
 import type {
   Cluster,
   CreateRunRequest,
   Defect,
   FixedCluster,
+  ReasonCode,
   RunReport,
   UnfixedCluster,
 } from "../types.js";
@@ -39,6 +50,10 @@ export interface ClusterHandlers {
   runVerify?: typeof runVerify;
   resolveVerifyPlan?: typeof resolveVerifyPlan;
   deliverFix?: typeof deliverFix;
+  resolveStaticCheckPlan?: typeof resolveStaticCheckPlan;
+  runStaticCheck?: typeof runStaticCheck;
+  reviewCluster?: typeof reviewCluster;
+  classifyVerifyFailure?: typeof classifyVerifyFailure;
 }
 
 export interface RunnerOptions {
@@ -79,6 +94,27 @@ async function loadRequest(workDir: string, runId: string): Promise<{
   }
 }
 
+function unfixedBase(
+  cluster: Cluster,
+  reasonCode: ReasonCode,
+  reasonDetail: string,
+  rootCause?: string,
+  solution?: string,
+): { unfixed: UnfixedCluster } {
+  return {
+    unfixed: {
+      clusterId: cluster.id,
+      defectIds: cluster.defectIds,
+      reasonCode,
+      reasonDetail,
+      artifacts:
+        rootCause || solution
+          ? { rootCause, solution }
+          : undefined,
+    },
+  };
+}
+
 async function processCluster(args: {
   workDir: string;
   runId: string;
@@ -93,6 +129,7 @@ async function processCluster(args: {
   const maxIterate = args.runner.maxIterate ?? args.options?.maxIterate ?? cfg.maxIterate;
   const token = args.runner.gitlabToken ?? cfg.gitlabToken;
   const host = args.runner.gitlabHost ?? cfg.gitlabHost;
+  const skipReviewer = args.options?.skipReviewer === true;
   const clusterDefects = args.defects.filter((d) => args.cluster.defectIds.includes(d.id));
 
   let repoPath: string;
@@ -107,14 +144,7 @@ async function processCluster(args: {
     repoPath = ensured.repoPath;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return {
-      unfixed: {
-        clusterId: args.cluster.id,
-        defectIds: args.cluster.defectIds,
-        reasonCode: "prepare_failed",
-        reasonDetail: `Failed to ensure repo: ${message}`,
-      },
-    };
+    return unfixedBase(args.cluster, "prepare_failed", `Failed to ensure repo: ${message}`);
   }
 
   const mcpServers = await mergeMcpConfig({
@@ -153,18 +183,13 @@ async function processCluster(args: {
   }
 
   if (analysis.status === "unfixed") {
-    return {
-      unfixed: {
-        clusterId: args.cluster.id,
-        defectIds: args.cluster.defectIds,
-        reasonCode: analysis.reasonCode,
-        reasonDetail: analysis.reasonDetail,
-        artifacts: {
-          rootCause: analysis.rootCause?.one_line_description,
-          solution: analysis.solution?.one_line_summary,
-        },
-      },
-    };
+    return unfixedBase(
+      args.cluster,
+      analysis.reasonCode,
+      analysis.reasonDetail,
+      analysis.rootCause?.one_line_description,
+      analysis.solution?.one_line_summary,
+    );
   }
 
   const resolvePlan = h.resolveVerifyPlan ?? resolveVerifyPlan;
@@ -175,39 +200,40 @@ async function processCluster(args: {
   });
 
   if (!plan.test.length) {
-    return {
-      unfixed: {
-        clusterId: args.cluster.id,
-        defectIds: args.cluster.defectIds,
-        reasonCode: "no_test_command",
-        reasonDetail: "No verify/test command detected; refusing to open MR without GREEN gate.",
-        artifacts: {
-          rootCause: analysis.rootCause.one_line_description,
-          solution: analysis.solution.one_line_summary,
-        },
-      },
-    };
+    return unfixedBase(
+      args.cluster,
+      "no_test_command",
+      "No verify/test command detected; refusing to open MR without GREEN gate.",
+      analysis.rootCause.one_line_description,
+      analysis.solution.one_line_summary,
+    );
   }
 
   const prepare = h.prepareRepo ?? prepareRepo;
   const prepared = await prepare(repoPath, plan);
   if (!prepared.ok) {
-    return {
-      unfixed: {
-        clusterId: args.cluster.id,
-        defectIds: args.cluster.defectIds,
-        reasonCode: "prepare_failed",
-        reasonDetail: `Install failed: ${prepared.logTail}`,
-      },
-    };
+    return unfixedBase(
+      args.cluster,
+      "prepare_failed",
+      `Install failed: ${prepared.logTail}`,
+    );
   }
 
+  const resolveStatic = h.resolveStaticCheckPlan ?? resolveStaticCheckPlan;
+  const staticPlan = await resolveStatic(repoPath);
+  const runStatic = h.runStaticCheck ?? runStaticCheck;
   const implement = h.implementCluster ?? implementCluster;
   const verify = h.runVerify ?? runVerify;
-  let lastLog = "";
+  const classify = h.classifyVerifyFailure ?? classifyVerifyFailure;
+  const review = h.reviewCluster ?? reviewCluster;
+
+  let feedbackLog = "";
+  let lastVerifyLog = "";
   let verifyOk = false;
   let verifyCommand = plan.test.join(" && ");
   let iteration = 0;
+  let lastStaticFail = false;
+  let stopReason: { reasonCode: ReasonCode; detail: string } | null = null;
 
   while (true) {
     iteration += 1;
@@ -217,7 +243,7 @@ async function processCluster(args: {
         repoPath,
         rootCause: analysis.rootCause,
         solution: analysis.solution,
-        verifyLogTail: lastLog || undefined,
+        verifyLogTail: feedbackLog || undefined,
         iteration,
       });
       const scope =
@@ -226,79 +252,186 @@ async function processCluster(args: {
           : checkScopeLock(impl.changedFiles ?? [], analysis.solution);
       if (!scope.ok) {
         await writeClusterArtifact(args.workDir, args.runId, args.cluster.id, "scope-lock.json", scope);
-        return {
-          unfixed: {
-            clusterId: args.cluster.id,
-            defectIds: args.cluster.defectIds,
-            reasonCode: "implement_failed",
-            reasonDetail: `Scope lock violated — edits outside solution target_files: ${scope.violations.join(", ")}`,
-            artifacts: {
-              rootCause: analysis.rootCause.one_line_description,
-              solution: analysis.solution.one_line_summary,
-            },
-          },
-        };
+        return unfixedBase(
+          args.cluster,
+          "implement_failed",
+          `Scope lock violated — edits outside solution target_files: ${scope.violations.join(", ")}`,
+          analysis.rootCause.one_line_description,
+          analysis.solution.one_line_summary,
+        );
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      return {
-        unfixed: {
-          clusterId: args.cluster.id,
-          defectIds: args.cluster.defectIds,
-          reasonCode: "implement_failed",
-          reasonDetail: message,
-        },
-      };
+      return unfixedBase(args.cluster, "implement_failed", message);
     }
+
+    const staticResult = await runStatic(repoPath, staticPlan);
+    await writeClusterArtifact(
+      args.workDir,
+      args.runId,
+      args.cluster.id,
+      "static-check.json",
+      staticResult,
+    );
+    if (!staticResult.ok) {
+      lastStaticFail = true;
+      feedbackLog = snipVerifyLog(staticResult.logTail);
+      if (!shouldContinueIterate(iteration, maxIterate, false)) {
+        stopReason = {
+          reasonCode: "static_check_failed",
+          detail: buildKnownIssuesDetail({
+            iterations: iteration,
+            maxIterate,
+            verifyCommand: staticResult.command,
+            logTail: staticResult.logTail,
+            rootCauseSummary: analysis.rootCause.one_line_description,
+            solutionSummary: analysis.solution.one_line_summary,
+            actionsTaken: [
+              `Static check failed after ${iteration} iteration(s)`,
+              `Command: ${staticResult.command}`,
+            ],
+          }),
+        };
+        break;
+      }
+      continue;
+    }
+    lastStaticFail = false;
 
     const result = await verify(repoPath, plan);
     verifyCommand = result.command;
-    lastLog = result.logTail;
+    lastVerifyLog = result.logTail;
     await writeClusterArtifact(args.workDir, args.runId, args.cluster.id, "verify.json", result);
     verifyOk = result.ok;
-    if (!shouldContinueIterate(iteration, maxIterate, verifyOk)) break;
+
+    if (!verifyOk) {
+      const classification = classify(result.logTail, result.command);
+      await writeClusterArtifact(
+        args.workDir,
+        args.runId,
+        args.cluster.id,
+        "verify-classify.json",
+        classification,
+      );
+      if (classification.stopIterate) {
+        stopReason = {
+          reasonCode: reasonCodeForClassify(classification.kind),
+          detail: [
+            `Smart Routing: ${classification.kind}`,
+            classification.reason,
+            "",
+            snipVerifyLog(result.logTail),
+          ].join("\n"),
+        };
+        break;
+      }
+      feedbackLog = snipVerifyLog(result.logTail);
+      if (!shouldContinueIterate(iteration, maxIterate, false)) {
+        stopReason = {
+          reasonCode: "verify_failed",
+          detail: buildKnownIssuesDetail({
+            iterations: iteration,
+            maxIterate,
+            verifyCommand,
+            logTail: lastVerifyLog,
+            rootCauseSummary: analysis.rootCause.one_line_description,
+            solutionSummary: analysis.solution.one_line_summary,
+            actionsTaken: [
+              `Analyzed cluster ${args.cluster.id}`,
+              `Implement→static→verify ${iteration} time(s)`,
+              `Last classify: ${classification.kind}`,
+            ],
+          }),
+        };
+        break;
+      }
+      continue;
+    }
+
+    // Verify GREEN — optional reviewer
+    if (!skipReviewer) {
+      const reviewResult = await review({
+        repoPath,
+        rootCause: analysis.rootCause,
+        solution: analysis.solution,
+        verifyCommand,
+        verifyLogTail: snipVerifyLog(lastVerifyLog),
+        iteration,
+      });
+      await writeClusterArtifact(
+        args.workDir,
+        args.runId,
+        args.cluster.id,
+        "review.json",
+        reviewResult,
+      );
+      if (reviewResult.decision === "request_changes") {
+        feedbackLog = [
+          "Reviewer request_changes:",
+          ...reviewResult.reasons.map((r) => `- ${r}`),
+        ].join("\n");
+        if (!shouldContinueIterate(iteration, maxIterate, false)) {
+          stopReason = {
+            reasonCode: "review_failed",
+            detail: buildKnownIssuesDetail({
+              iterations: iteration,
+              maxIterate,
+              verifyCommand,
+              logTail: feedbackLog,
+              rootCauseSummary: analysis.rootCause.one_line_description,
+              solutionSummary: analysis.solution.one_line_summary,
+              actionsTaken: [
+                "Verify was GREEN",
+                `Reviewer rejected ${iteration} time(s)`,
+                ...reviewResult.reasons,
+              ],
+            }),
+          };
+          break;
+        }
+        verifyOk = false;
+        continue;
+      }
+    }
+
+    break;
   }
 
-  if (!verifyOk) {
-    return {
-      unfixed: {
-        clusterId: args.cluster.id,
-        defectIds: args.cluster.defectIds,
-        reasonCode: "verify_failed",
-        reasonDetail: buildKnownIssuesDetail({
-          iterations: iteration,
-          maxIterate,
-          verifyCommand,
-          logTail: lastLog,
-          rootCauseSummary: analysis.rootCause.one_line_description,
-          solutionSummary: analysis.solution.one_line_summary,
-          actionsTaken: [
-            `Analyzed cluster ${args.cluster.id} (failure_mode=${analysis.rootCause.failure_mode ?? "unspecified"})`,
-            `Implemented solution under scope lock (${iteration} attempt(s))`,
-            `Verify remained red after budget ${maxIterate}`,
-          ],
-        }),
-        artifacts: {
-          rootCause: analysis.rootCause.one_line_description,
-          solution: analysis.solution.one_line_summary,
-        },
-      },
-    };
+  if (stopReason) {
+    return unfixedBase(
+      args.cluster,
+      stopReason.reasonCode,
+      stopReason.detail,
+      analysis.rootCause.one_line_description,
+      analysis.solution.one_line_summary,
+    );
+  }
+
+  if (!verifyOk || lastStaticFail) {
+    return unfixedBase(
+      args.cluster,
+      lastStaticFail ? "static_check_failed" : "verify_failed",
+      buildKnownIssuesDetail({
+        iterations: iteration,
+        maxIterate,
+        verifyCommand,
+        logTail: lastVerifyLog || feedbackLog,
+        rootCauseSummary: analysis.rootCause.one_line_description,
+        solutionSummary: analysis.solution.one_line_summary,
+      }),
+      analysis.rootCause.one_line_description,
+      analysis.solution.one_line_summary,
+    );
   }
 
   if (!token) {
-    return {
-      unfixed: {
-        clusterId: args.cluster.id,
-        defectIds: args.cluster.defectIds,
-        reasonCode: "push_failed",
-        reasonDetail: "GITLAB_TOKEN not set; local verify GREEN but cannot open MR.",
-        artifacts: {
-          rootCause: analysis.rootCause.one_line_description,
-          solution: analysis.solution.one_line_summary,
-        },
-      },
-    };
+    return unfixedBase(
+      args.cluster,
+      "push_failed",
+      "GITLAB_TOKEN not set; local verify GREEN but cannot open MR.",
+      analysis.rootCause.one_line_description,
+      analysis.solution.one_line_summary,
+    );
   }
 
   try {
@@ -328,23 +461,18 @@ async function processCluster(args: {
         defectIds: args.cluster.defectIds,
         mrUrl: delivered.mrUrl,
         rootCauseSummary: analysis.rootCause.one_line_description,
-        verify: { command: verifyCommand, ok: true, logTail: lastLog },
+        verify: { command: verifyCommand, ok: true, logTail: lastVerifyLog },
       },
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return {
-      unfixed: {
-        clusterId: args.cluster.id,
-        defectIds: args.cluster.defectIds,
-        reasonCode: "push_failed",
-        reasonDetail: message,
-        artifacts: {
-          rootCause: analysis.rootCause.one_line_description,
-          solution: analysis.solution.one_line_summary,
-        },
-      },
-    };
+    return unfixedBase(
+      args.cluster,
+      "push_failed",
+      message,
+      analysis.rootCause.one_line_description,
+      analysis.solution.one_line_summary,
+    );
   }
 }
 

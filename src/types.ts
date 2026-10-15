@@ -4,6 +4,9 @@ export const ReasonCodeSchema = z.enum([
   "not_actionable",
   "needs_more_context",
   "verify_failed",
+  "env_verify_failed",
+  "static_check_failed",
+  "review_failed",
   "no_test_command",
   "push_failed",
   "localize_failed",
@@ -139,6 +142,8 @@ export const CreateRunOptionsSchema = z.object({
     .optional(),
   mcp: z.record(z.string(), McpServerConfigSchema).optional(),
   gitlabProjectId: z.union([z.string(), z.number()]).optional(),
+  /** Skip readonly reviewer gate (debug / fast path). Default false = reviewer on. */
+  skipReviewer: z.boolean().optional(),
 });
 export type CreateRunOptions = z.infer<typeof CreateRunOptionsSchema>;
 
