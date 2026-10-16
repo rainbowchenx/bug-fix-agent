@@ -15,6 +15,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./graph": {
+      "types": "./dist/graph.d.ts",
+      "import": "./dist/graph.js"
+    },
+    "./langgraph": {
+      "types": "./dist/langgraph.d.ts",
+      "import": "./dist/langgraph.js"
     }
   },
   "files": [
@@ -41,6 +49,8 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.299",
     "@hono/node-server": "^2.1.5",
+    "@langchain/core": "^1.2.18",
+    "@langchain/langgraph": "^1.5.0",
     "dotenv": "^18.0.7",
     "hono": "^4.13.13",
     "zod": "^4.6.7"

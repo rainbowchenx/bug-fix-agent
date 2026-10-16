@@ -1,0 +1,8 @@
+{
+  "node_version": "20",
+  "dependencies": ["."],
+  "graphs": {
+    "bugfix": "./src/graph/langgraph.ts:graph"
+  },
+  "env": ".env"
+}
