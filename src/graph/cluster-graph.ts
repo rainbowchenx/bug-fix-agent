@@ -3,7 +3,11 @@ import { defaultSkillsDir } from "../agent/sdk-runner.js";
 import { loadConfig } from "../config.js";
 import { mergeMcpConfig } from "../mcp/load-config.js";
 import { analyzeCluster } from "../pipeline/analyze.js";
-import { deliverFix } from "../pipeline/deliver.js";
+import {
+  NoChangesError,
+  buildMrDescription,
+  deliverFix,
+} from "../pipeline/deliver.js";
 import { implementCluster, shouldContinueIterate } from "../pipeline/implement.js";
 import { buildKnownIssuesDetail } from "../pipeline/known-issues.js";
 import { snipVerifyLog } from "../pipeline/log-snip.js";
@@ -18,7 +22,9 @@ import {
 import { resolveVerifyPlan, runVerify } from "../pipeline/verify.js";
 import { writeClusterArtifact } from "../runs/store.js";
 import type { ClusterHandlers } from "../runs/runner.js";
+import { filterSkills, listBuiltinSkills, mountSkillsIntoCwd } from "../skills/manifest.js";
 import type { ReasonCode } from "../types.js";
+import { getDiffText } from "../workspace/diff.js";
 import { ensureRepo } from "../workspace/git.js";
 import {
   ClusterStateAnnotation,
@@ -98,11 +104,22 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
     try {
       const ensured = await (h.ensureRepo ?? ensureRepo)({
         workDir: s.workDir,
+        runId: s.runId,
+        clusterId: s.cluster.id,
         repoUrl: s.cluster.repoUrl,
         branch: s.cluster.branch,
         token: opts.gitlabToken ?? loadConfig().gitlabToken,
       });
-      return { repoPath: ensured.repoPath };
+      const skillsDir = defaultSkillsDir();
+      const skillMetas = filterSkills(
+        await listBuiltinSkills(skillsDir),
+        s.options?.skills,
+      );
+      await mountSkillsIntoCwd(ensured.repoPath, skillMetas).catch(() => undefined);
+      return {
+        repoPath: ensured.repoPath,
+        baseSha: ensured.baseSha ?? ensured.headSha,
+      };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return unfixed(s, "prepare_failed", `Failed to ensure repo: ${message}`, false);
@@ -111,13 +128,19 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
 
   const analyzeNode = async (s: ClusterState): Promise<ClusterUpdate> => {
     const mcpServers = await mergeMcpConfig({ workDir: s.workDir, runMcp: s.options?.mcp });
+    const skillsDir = defaultSkillsDir();
+    const skillIds = filterSkills(
+      await listBuiltinSkills(skillsDir),
+      s.options?.skills,
+    ).map((x) => x.id);
     const analysis = await (h.analyzeCluster ?? analyzeCluster)({
       cluster: s.cluster,
       defects: s.defects,
       repoPath: s.repoPath!,
       userPrompt: s.userPrompt,
       mcpServers,
-      skillsDir: defaultSkillsDir(),
+      skillsDir,
+      skillIds,
     });
     if (analysis.rootCause) await artifact(s, "root-cause.json", analysis.rootCause);
     if (analysis.solution) await artifact(s, "solution.json", analysis.solution);
@@ -163,13 +186,21 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
   const implementNode = async (s: ClusterState): Promise<ClusterUpdate> => {
     const iteration = s.iteration + 1;
     try {
+      const skillsDir = defaultSkillsDir();
+      const skillIds = filterSkills(
+        await listBuiltinSkills(skillsDir),
+        s.options?.skills,
+      ).map((x) => x.id);
       const impl = await (h.implementCluster ?? implementCluster)({
         cluster: s.cluster,
         repoPath: s.repoPath!,
         rootCause: s.rootCause!,
         solution: s.solution!,
+        baseSha: s.baseSha,
         verifyLogTail: s.feedbackLog || undefined,
         iteration,
+        skillsDir,
+        skillIds,
       });
       const scope =
         impl.scopeOk === false
@@ -257,14 +288,31 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
   };
 
   const reviewNode = async (s: ClusterState): Promise<ClusterUpdate> => {
-    const result = await (h.reviewCluster ?? reviewCluster)({
-      repoPath: s.repoPath!,
-      rootCause: s.rootCause!,
-      solution: s.solution!,
-      verifyCommand: s.verifyCommand,
-      verifyLogTail: snipVerifyLog(s.lastVerifyLog),
-      iteration: s.iteration,
-    });
+    let result;
+    try {
+      const diffText = s.baseSha
+        ? await getDiffText(s.repoPath!, s.baseSha).catch(() => "")
+        : "";
+      const skillsDir = defaultSkillsDir();
+      const skillIds = filterSkills(
+        await listBuiltinSkills(skillsDir),
+        s.options?.skills,
+      ).map((x) => x.id);
+      result = await (h.reviewCluster ?? reviewCluster)({
+        repoPath: s.repoPath!,
+        rootCause: s.rootCause!,
+        solution: s.solution!,
+        verifyCommand: s.verifyCommand,
+        verifyLogTail: snipVerifyLog(s.lastVerifyLog),
+        diffText,
+        iteration: s.iteration,
+        skillsDir,
+        skillIds,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return unfixed(s, "review_failed", `Reviewer failed (cluster-local): ${message}`);
+    }
     await artifact(s, "review.json", result);
     if (result.decision !== "request_changes") return { reviewApproved: true };
 
@@ -303,18 +351,22 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
         runId: s.runId,
         clusterId: s.cluster.id,
         title: `fix: ${s.cluster.primaryTitle}`.slice(0, 200),
-        description: [
-          s.rootCause!.one_line_description,
-          "",
-          s.solution!.one_line_summary,
-          "",
-          `Verify: \`${s.verifyCommand}\``,
-        ].join("\n"),
+        description: buildMrDescription({
+          rootCauseSummary: s.rootCause!.one_line_description,
+          solutionSummary: s.solution!.one_line_summary,
+          defectIds: s.cluster.defectIds,
+          verifyCommand: s.verifyCommand,
+          verifyLogTail: s.lastVerifyLog,
+          reproductionSteps: s.rootCause!.reproduction_steps,
+        }),
         gitlabHost: opts.gitlabHost ?? cfg.gitlabHost,
         token,
         repoUrl: s.cluster.repoUrl,
         targetBranch: s.cluster.branch,
         projectId: s.options?.gitlabProjectId,
+        baseSha: s.baseSha,
+        draftMr: s.options?.draftMr,
+        defectIds: s.cluster.defectIds,
       });
       return {
         outcome: {
@@ -328,6 +380,9 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
         },
       };
     } catch (err) {
+      if (err instanceof NoChangesError) {
+        return unfixed(s, "no_changes", err.message);
+      }
       const message = err instanceof Error ? err.message : String(err);
       return unfixed(s, "push_failed", message);
     }

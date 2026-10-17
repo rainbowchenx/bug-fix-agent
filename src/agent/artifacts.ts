@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { FAILURE_MODES } from "../pipeline/failure-modes.js";
+import {
+  extractFirstJsonObject,
+  extractLabeledJson,
+} from "./json-extract.js";
 
 /** Seer-aligned fixability tri-state (轨 B). */
 export const FixabilityAssessmentSchema = z.object({
@@ -49,12 +53,9 @@ export function parseSolution(data: unknown): SolutionArtifact {
   return SolutionArtifactSchema.parse(data);
 }
 
-/** Extract first JSON object from agent text (tolerant). */
+/** Extract first JSON object from agent text (brace-balanced, tolerant). */
 export function extractJsonObject(text: string): unknown {
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start < 0 || end <= start) {
-    throw new Error("No JSON object found in text");
-  }
-  return JSON.parse(text.slice(start, end + 1)) as unknown;
+  return extractFirstJsonObject(text);
 }
+
+export { extractLabeledJson, extractFirstJsonObject };

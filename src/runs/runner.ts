@@ -3,7 +3,6 @@ import { loadConfig } from "../config.js";
 import type { RootCauseArtifact, SolutionArtifact } from "../agent/artifacts.js";
 import { analyzeCluster } from "../pipeline/analyze.js";
 import { aggregateDefects } from "../pipeline/aggregate.js";
-import { deliverFix } from "../pipeline/deliver.js";
 import { implementCluster, shouldContinueIterate } from "../pipeline/implement.js";
 import { buildKnownIssuesDetail } from "../pipeline/known-issues.js";
 import { snipVerifyLog } from "../pipeline/log-snip.js";
@@ -21,6 +20,11 @@ import {
   reasonCodeForClassify,
 } from "../pipeline/verify-classify.js";
 import { resolveVerifyPlan, runVerify } from "../pipeline/verify.js";
+import {
+  NoChangesError,
+  buildMrDescription,
+  deliverFix,
+} from "../pipeline/deliver.js";
 import type {
   Cluster,
   CreateRunRequest,
@@ -33,6 +37,8 @@ import type {
 } from "../types.js";
 import { mergeMcpConfig } from "../mcp/load-config.js";
 import { defaultSkillsDir } from "../agent/sdk-runner.js";
+import { filterSkills, listBuiltinSkills, mountSkillsIntoCwd } from "../skills/manifest.js";
+import { getDiffText } from "../workspace/diff.js";
 import { ensureRepo } from "../workspace/git.js";
 import { runDir } from "../workspace/paths.js";
 import {
@@ -136,15 +142,19 @@ async function processCluster(args: {
   const clusterDefects = args.defects.filter((d) => args.cluster.defectIds.includes(d.id));
 
   let repoPath: string;
+  let baseSha: string;
   try {
     const ensure = h.ensureRepo ?? ensureRepo;
     const ensured = await ensure({
       workDir: args.workDir,
+      runId: args.runId,
+      clusterId: args.cluster.id,
       repoUrl: args.cluster.repoUrl,
       branch: args.cluster.branch,
       token,
     });
     repoPath = ensured.repoPath;
+    baseSha = ensured.baseSha ?? ensured.headSha;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return unfixedBase(args.cluster, "prepare_failed", `Failed to ensure repo: ${message}`);
@@ -155,6 +165,12 @@ async function processCluster(args: {
     runMcp: args.options?.mcp,
   });
   const skillsDir = defaultSkillsDir();
+  const skillMetas = filterSkills(
+    await listBuiltinSkills(skillsDir),
+    args.options?.skills,
+  );
+  await mountSkillsIntoCwd(repoPath, skillMetas).catch(() => undefined);
+  const skillIds = skillMetas.map((s) => s.id);
 
   const analyze = h.analyzeCluster ?? analyzeCluster;
   const analysis = await analyze({
@@ -164,6 +180,7 @@ async function processCluster(args: {
     userPrompt: args.userPrompt,
     mcpServers,
     skillsDir,
+    skillIds,
   });
 
   if (analysis.rootCause) {
@@ -246,8 +263,12 @@ async function processCluster(args: {
         repoPath,
         rootCause: analysis.rootCause,
         solution: analysis.solution,
+        baseSha,
         verifyLogTail: feedbackLog || undefined,
         iteration,
+        skillsDir,
+        skillIds,
+        mcpServers,
       });
       const scope =
         impl.scopeOk === false
@@ -353,14 +374,29 @@ async function processCluster(args: {
 
     // Verify GREEN — optional reviewer
     if (!skipReviewer) {
-      const reviewResult = await review({
-        repoPath,
-        rootCause: analysis.rootCause,
-        solution: analysis.solution,
-        verifyCommand,
-        verifyLogTail: snipVerifyLog(lastVerifyLog),
-        iteration,
-      });
+      let reviewResult;
+      try {
+        const diffText = await getDiffText(repoPath, baseSha).catch(() => "");
+        reviewResult = await review({
+          repoPath,
+          rootCause: analysis.rootCause,
+          solution: analysis.solution,
+          verifyCommand,
+          verifyLogTail: snipVerifyLog(lastVerifyLog),
+          diffText,
+          iteration,
+          skillsDir,
+          skillIds,
+          mcpServers,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        stopReason = {
+          reasonCode: "review_failed",
+          detail: `Reviewer failed (cluster-local): ${message}`,
+        };
+        break;
+      }
       await writeClusterArtifact(
         args.workDir,
         args.runId,
@@ -444,18 +480,22 @@ async function processCluster(args: {
       runId: args.runId,
       clusterId: args.cluster.id,
       title: `fix: ${args.cluster.primaryTitle}`.slice(0, 200),
-      description: [
-        analysis.rootCause.one_line_description,
-        "",
-        analysis.solution.one_line_summary,
-        "",
-        `Verify: \`${verifyCommand}\``,
-      ].join("\n"),
+      description: buildMrDescription({
+        rootCauseSummary: analysis.rootCause.one_line_description,
+        solutionSummary: analysis.solution.one_line_summary,
+        defectIds: args.cluster.defectIds,
+        verifyCommand,
+        verifyLogTail: lastVerifyLog,
+        reproductionSteps: analysis.rootCause.reproduction_steps,
+      }),
       gitlabHost: host,
       token,
       repoUrl: args.cluster.repoUrl,
       targetBranch: args.cluster.branch,
       projectId: args.options?.gitlabProjectId,
+      baseSha,
+      draftMr: args.options?.draftMr,
+      defectIds: args.cluster.defectIds,
     });
 
     return {
@@ -468,6 +508,15 @@ async function processCluster(args: {
       },
     };
   } catch (err) {
+    if (err instanceof NoChangesError) {
+      return unfixedBase(
+        args.cluster,
+        "no_changes",
+        err.message,
+        analysis.rootCause.one_line_description,
+        analysis.solution.one_line_summary,
+      );
+    }
     const message = err instanceof Error ? err.message : String(err);
     return unfixedBase(
       args.cluster,

@@ -12,6 +12,7 @@ export const ReasonCodeSchema = z.enum([
   "localize_failed",
   "prepare_failed",
   "implement_failed",
+  "no_changes",
   "aggregate_skipped",
   "analyze_failed",
   "validation_failed",
@@ -149,6 +150,8 @@ export const CreateRunOptionsSchema = z.object({
   gitlabProjectId: z.union([z.string(), z.number()]).optional(),
   /** Skip readonly reviewer gate (debug / fast path). Default false = reviewer on. */
   skipReviewer: z.boolean().optional(),
+  /** Open GitLab MR as Draft. */
+  draftMr: z.boolean().optional(),
 });
 export type CreateRunOptions = z.infer<typeof CreateRunOptionsSchema>;
 

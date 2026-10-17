@@ -1,5 +1,10 @@
 #!/usr/bin/env node
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { loadConfig } from "./config.js";
+import { parseCreateRunRequest, type Engine } from "./types.js";
+import { createRunDir, writeInputDefects } from "./runs/store.js";
+import { runPipeline } from "./runs/runner.js";
 
 const VERSION = "0.1.0";
 
@@ -8,14 +13,67 @@ function printHelp(): void {
 
 Usage:
   bugfix-agent serve [--port <n>]
-  bugfix-agent run --work-dir <path> [--defects <file.json>]
+  bugfix-agent run --work-dir <path> --defects <file.json> [--engine pipeline|langgraph]
   bugfix-agent version
   bugfix-agent --help
 
 Environment:
   PORT, ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL, ANTHROPIC_MODEL
   GITLAB_TOKEN, GITLAB_HOST
+  BUGFIX_EXEC_TIMEOUT_MS, BUGFIX_SDK_TIMEOUT_MS, BUGFIX_MAX_ITERATE
 `);
+}
+
+function flagValue(args: string[], name: string): string | undefined {
+  const idx = args.indexOf(name);
+  if (idx < 0) return undefined;
+  return args[idx + 1];
+}
+
+async function runCommand(args: string[]): Promise<void> {
+  const workDir = flagValue(args, "--work-dir") ?? flagValue(args, "--workDir");
+  const defectsPath = flagValue(args, "--defects");
+  const engineRaw = flagValue(args, "--engine");
+
+  if (!workDir || !defectsPath) {
+    console.error("Usage: bugfix-agent run --work-dir <path> --defects <file.json> [--engine pipeline|langgraph]");
+    process.exitCode = 1;
+    return;
+  }
+
+  let engine: Engine | undefined;
+  if (engineRaw) {
+    if (engineRaw !== "pipeline" && engineRaw !== "langgraph") {
+      console.error(`Invalid --engine: ${engineRaw} (expected pipeline|langgraph)`);
+      process.exitCode = 1;
+      return;
+    }
+    engine = engineRaw;
+  }
+
+  const raw = JSON.parse(await readFile(path.resolve(defectsPath), "utf8")) as unknown;
+  const defectsPayload =
+    Array.isArray(raw) ? { workDir: path.resolve(workDir), defects: raw } : raw;
+  const request = parseCreateRunRequest({
+    ...(typeof defectsPayload === "object" && defectsPayload !== null ? defectsPayload : {}),
+    workDir: path.resolve(workDir),
+  });
+  if (engine) {
+    request.options = { ...request.options, engine };
+  }
+
+  const { runId } = await createRunDir(request.workDir);
+  await writeInputDefects(request.workDir, runId, request.defects, request);
+
+  console.log(`runId=${runId} workDir=${request.workDir} engine=${request.options?.engine ?? "pipeline"}`);
+  const report = await runPipeline(request.workDir, runId, { engine: request.options?.engine });
+  console.log(JSON.stringify(report, null, 2));
+
+  const allFixed =
+    report.summary.totalClusters > 0 &&
+    report.summary.unfixed === 0 &&
+    report.summary.fixed === report.summary.totalClusters;
+  process.exitCode = allFixed ? 0 : 1;
 }
 
 async function main(argv: string[]): Promise<void> {
@@ -38,15 +96,13 @@ async function main(argv: string[]): Promise<void> {
       portIdx >= 0 && args[portIdx + 1] ? Number(args[portIdx + 1]) : undefined;
     const cfg = loadConfig();
     const port = portOverride && Number.isFinite(portOverride) ? portOverride : cfg.port;
-    // Wired in Task 4
     const { startServer } = await import("./index.js");
     await startServer({ port });
     return;
   }
 
   if (cmd === "run") {
-    console.error("bugfix-agent run: not yet implemented (see Task 4+)");
-    process.exitCode = 1;
+    await runCommand(args);
     return;
   }
 

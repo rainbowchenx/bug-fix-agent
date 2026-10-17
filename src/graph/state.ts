@@ -30,6 +30,7 @@ export const ClusterStateAnnotation = Annotation.Root({
   options: Annotation<CreateRunOptions | undefined>(),
 
   repoPath: Annotation<string | undefined>(),
+  baseSha: Annotation<string | undefined>(),
   rootCause: Annotation<RootCauseArtifact | undefined>(),
   solution: Annotation<SolutionArtifact | undefined>(),
   verifyPlan: Annotation<VerifyPlan | undefined>(),

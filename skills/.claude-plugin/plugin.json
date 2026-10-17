@@ -1,0 +1,5 @@
+{
+  "name": "bugfix-agent-skills",
+  "version": "0.1.0",
+  "description": "Builtin skills for local bugfix-agent analyze/implement/review sessions"
+}

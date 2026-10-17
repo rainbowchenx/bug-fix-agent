@@ -1,9 +1,7 @@
-import { exec as execCb } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
-
-const exec = promisify(execCb);
+import { loadConfig } from "../config.js";
+import { ExecTimeoutError, timedExec } from "../util/exec.js";
 
 export interface StaticCheckPlan {
   commands: string[];
@@ -13,6 +11,7 @@ export interface StaticCheckResult {
   ok: boolean;
   command: string;
   logTail: string;
+  timedOut?: boolean;
 }
 
 async function readPackageJson(
@@ -54,24 +53,24 @@ export async function resolveStaticCheckPlan(repoPath: string): Promise<StaticCh
 export async function runStaticCheck(
   repoPath: string,
   plan: StaticCheckPlan,
-  execFn: typeof exec = exec,
+  timeoutMs?: number,
 ): Promise<StaticCheckResult> {
   if (!plan.commands.length) {
     return { ok: true, command: "", logTail: "No static check commands; skipped" };
   }
+  const ms = timeoutMs ?? loadConfig().execTimeoutMs;
   const command = plan.commands.join(" && ");
   try {
-    const { stdout, stderr } = await execFn(command, {
-      cwd: repoPath,
-      maxBuffer: 4 * 1024 * 1024,
-      shell: process.platform === "win32" ? "cmd.exe" : "/bin/sh",
-    });
+    const { stdout, stderr } = await timedExec(command, { cwd: repoPath, timeoutMs: ms });
     return {
       ok: true,
       command,
       logTail: `${stdout}\n${stderr}`.trim().slice(-4000),
     };
   } catch (err) {
+    if (err instanceof ExecTimeoutError) {
+      return { ok: false, command, timedOut: true, logTail: err.message };
+    }
     const e = err as { stdout?: string; stderr?: string; message?: string };
     return {
       ok: false,

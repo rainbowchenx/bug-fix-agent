@@ -1,9 +1,7 @@
-import { exec as execCb } from "node:child_process";
-import { promisify } from "node:util";
+import { loadConfig } from "../config.js";
 import { resolveVerifyPlan, type ResolveVerifyPlanInput } from "../profiles/detect.js";
 import type { VerifyPlan } from "../profiles/types.js";
-
-const exec = promisify(execCb);
+import { ExecTimeoutError, timedExec } from "../util/exec.js";
 
 export type { VerifyPlan };
 export { resolveVerifyPlan };
@@ -12,26 +10,27 @@ export interface VerifyResult {
   ok: boolean;
   command: string;
   logTail: string;
+  timedOut?: boolean;
 }
 
 export async function runVerify(
   repoPath: string,
   plan: Pick<VerifyPlan, "test">,
-  execFn: typeof exec = exec,
+  timeoutMs?: number,
 ): Promise<VerifyResult> {
   if (!plan.test.length) {
     return { ok: false, command: "", logTail: "No test command configured" };
   }
+  const ms = timeoutMs ?? loadConfig().execTimeoutMs;
   const command = plan.test.join(" && ");
   try {
-    const { stdout, stderr } = await execFn(command, {
-      cwd: repoPath,
-      maxBuffer: 4 * 1024 * 1024,
-      shell: process.platform === "win32" ? "cmd.exe" : "/bin/sh",
-    });
+    const { stdout, stderr } = await timedExec(command, { cwd: repoPath, timeoutMs: ms });
     const log = `${stdout}\n${stderr}`.trim();
     return { ok: true, command, logTail: log.slice(-4000) };
   } catch (err) {
+    if (err instanceof ExecTimeoutError) {
+      return { ok: false, command, timedOut: true, logTail: err.message };
+    }
     const e = err as { stdout?: string; stderr?: string; message?: string };
     const log = `${e.stdout ?? ""}\n${e.stderr ?? ""}\n${e.message ?? ""}`.trim();
     return { ok: false, command, logTail: log.slice(-4000) };

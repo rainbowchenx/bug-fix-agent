@@ -18,7 +18,12 @@ export interface ReviewClusterInput {
   solution: SolutionArtifact;
   verifyCommand: string;
   verifyLogTail?: string;
+  /** Unified diff text from orchestrator (preferred over blind review). */
+  diffText?: string;
   iteration: number;
+  skillsDir?: string;
+  skillIds?: string[];
+  mcpServers?: Record<string, unknown>;
   /** Test seam */
   mockResult?: ReviewResult;
 }
@@ -48,9 +53,13 @@ export function parseReviewResult(text: string): ReviewResult {
   return { decision, reasons };
 }
 
-function buildReviewPrompt(input: ReviewClusterInput): string {
+export function buildReviewPrompt(input: ReviewClusterInput): string {
+  const diffBlock =
+    input.diffText && input.diffText.trim()
+      ? input.diffText.trim().slice(0, 24_000)
+      : "(no diff provided — request_changes if you cannot verify the patch)";
   return `You are a readonly code reviewer for an automated bugfix agent.
-Do NOT edit files. Read the diff/intent and decide.
+Do NOT edit files. Decide only from the provided context and DIFF.
 
 Root cause:
 ${JSON.stringify(input.rootCause, null, 2)}
@@ -62,6 +71,11 @@ Verify: ${input.verifyCommand} (already GREEN)
 Verify log tail:
 ${input.verifyLogTail ?? "(none)"}
 
+DIFF (vs base):
+\`\`\`diff
+${diffBlock}
+\`\`\`
+
 Iteration: ${input.iteration}
 
 Checks:
@@ -69,18 +83,37 @@ Checks:
 - No drive-by refactors or weakened tests without cause
 - Residual risks called out
 
-Output ONE JSON object only:
+Output ONE JSON object only (no other braces outside it):
 { "decision": "approve" | "request_changes", "reasons": ["..."] }
 `;
 }
 
 export async function reviewCluster(input: ReviewClusterInput): Promise<ReviewResult> {
   if (input.mockResult) return input.mockResult;
-  const { text } = await runAgentSession({
-    cwd: input.repoPath,
-    prompt: buildReviewPrompt(input),
-    mode: "review",
-    maxTurns: 20,
-  });
-  return parseReviewResult(text);
+
+  const tryOnce = async (prompt: string): Promise<ReviewResult> => {
+    const { text } = await runAgentSession({
+      cwd: input.repoPath,
+      prompt,
+      mode: "review",
+      maxTurns: 20,
+      skillsDir: input.skillsDir,
+      skillIds: input.skillIds,
+      mcpServers: input.mcpServers,
+    });
+    return parseReviewResult(text);
+  };
+
+  try {
+    return await tryOnce(buildReviewPrompt(input));
+  } catch (first) {
+    // One retry: short prompt asking for JSON only
+    try {
+      return await tryOnce(
+        `Previous review output was invalid JSON. Reply with ONLY:\n{"decision":"approve"|"request_changes","reasons":["..."]}\nContext: ${input.rootCause.one_line_description}`,
+      );
+    } catch {
+      throw first instanceof Error ? first : new Error(String(first));
+    }
+  }
 }

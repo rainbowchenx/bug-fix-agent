@@ -16,6 +16,30 @@ describe("review", () => {
     expect(r.decision).toBe("request_changes");
   });
 
+  it("buildReviewPrompt includes diff hunk", async () => {
+    const { buildReviewPrompt } = await import("../../src/pipeline/review.js");
+    const prompt = buildReviewPrompt({
+      repoPath: "/tmp",
+      rootCause: {
+        headline: "h",
+        one_line_description: "d",
+        five_whys: [],
+        reproduction_steps: [],
+        fixability: { assessment: "fixable", reason: "r" },
+      },
+      solution: {
+        one_line_summary: "s",
+        steps: [{ title: "t", description: "d" }],
+      },
+      verifyCommand: "npm test",
+      diffText: "diff --git a/src/a.ts b/src/a.ts\n@@ -1 +1 @@\n-old\n+new\n",
+      iteration: 1,
+    });
+    expect(prompt).toContain("DIFF (vs base)");
+    expect(prompt).toContain("+new");
+    expect(prompt).toContain("diff --git a/src/a.ts");
+  });
+
   it("review mode excludes Edit", () => {
     const opts = buildSdkOptions({
       cwd: "/tmp",

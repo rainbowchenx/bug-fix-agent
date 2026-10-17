@@ -1,6 +1,7 @@
 import type { RootCauseArtifact, SolutionArtifact } from "../agent/artifacts.js";
 import { runAgentSession } from "../agent/sdk-runner.js";
 import type { Cluster } from "../types.js";
+import { listChangedFiles } from "../workspace/diff.js";
 import { checkScopeLock, extractAllowedFiles } from "./scope-lock.js";
 
 export interface ImplementClusterInput {
@@ -8,8 +9,12 @@ export interface ImplementClusterInput {
   repoPath: string;
   rootCause: RootCauseArtifact;
   solution: SolutionArtifact;
+  baseSha?: string;
   verifyLogTail?: string;
   iteration: number;
+  skillsDir?: string;
+  skillIds?: string[];
+  mcpServers?: Record<string, unknown>;
   /** Test seam */
   mockChangedFiles?: string[];
 }
@@ -41,7 +46,7 @@ ${JSON.stringify(input.solution, null, 2)}
 ${scopeBlock}
 
 Iteration: ${input.iteration}
-Previous verify log (if any):
+Previous verify/static/review feedback (if any):
 ${input.verifyLogTail ?? "(none)"}
 
 Rules:
@@ -64,19 +69,32 @@ export async function implementCluster(
       scopeViolations: scope.violations,
     };
   }
+
   const { text } = await runAgentSession({
     cwd: input.repoPath,
     prompt: buildImplementPrompt(input),
     mode: "implement",
     maxTurns: 40,
+    skillsDir: input.skillsDir,
+    skillIds: input.skillIds,
+    mcpServers: input.mcpServers,
   });
-  // Real SDK sessions do not reliably return a file list here; scope is enforced via prompt.
-  // Callers may pass git-diff based lists later.
+
+  let changedFiles: string[] = [];
+  if (input.baseSha) {
+    try {
+      changedFiles = await listChangedFiles(input.repoPath, input.baseSha);
+    } catch {
+      changedFiles = [];
+    }
+  }
+
+  const scope = checkScopeLock(changedFiles, input.solution);
   return {
-    changedFiles: [],
+    changedFiles,
     agentText: text,
-    scopeOk: true,
-    scopeViolations: [],
+    scopeOk: scope.ok,
+    scopeViolations: scope.violations,
   };
 }
 

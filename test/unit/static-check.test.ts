@@ -2,10 +2,16 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  resolveStaticCheckPlan,
-  runStaticCheck,
-} from "../../src/pipeline/static-check.js";
+import { resolveStaticCheckPlan, runStaticCheck } from "../../src/pipeline/static-check.js";
+
+vi.mock("../../src/util/exec.js", () => ({
+  ExecTimeoutError: class extends Error {
+    name = "ExecTimeoutError";
+  },
+  timedExec: vi.fn(async () => {
+    throw Object.assign(new Error("fail"), { stderr: "tsc error", stdout: "" });
+  }),
+}));
 
 describe("static-check", () => {
   let root: string;
@@ -39,14 +45,7 @@ describe("static-check", () => {
   });
 
   it("runStaticCheck returns not ok on exec failure", async () => {
-    const execFn = vi.fn(async () => {
-      throw Object.assign(new Error("fail"), { stderr: "tsc error", stdout: "" });
-    });
-    const result = await runStaticCheck(
-      "/tmp",
-      { commands: ["npx tsc --noEmit"] },
-      execFn as never,
-    );
+    const result = await runStaticCheck("/tmp", { commands: ["npx tsc --noEmit"] }, 1000);
     expect(result.ok).toBe(false);
     expect(result.logTail).toContain("tsc error");
   });

@@ -1,5 +1,5 @@
 import {
-  extractJsonObject,
+  extractLabeledJson,
   parseRootCause,
   parseSolution,
   type RootCauseArtifact,
@@ -17,6 +17,7 @@ export interface AnalyzeClusterInput {
   userPrompt?: string;
   mcpServers?: Record<string, unknown>;
   skillsDir?: string;
+  skillIds?: string[];
   /** Test seam / offline mode */
   mockArtifacts?: {
     rootCause: RootCauseArtifact;
@@ -65,17 +66,11 @@ Tasks (read-only tools only):
 4) Produce RootCauseArtifact JSON with fixability.assessment in fixable|needs_more_context|not_actionable.
 5) If fixable, produce SolutionArtifact JSON with concrete steps AND target_files (relative paths allowlist for scope lock).
 
-Output TWO JSON objects clearly labeled ROOT_CAUSE and SOLUTION.
+Output TWO separate JSON objects clearly labeled ROOT_CAUSE and SOLUTION.
+Prefer each as its own \`\`\`json fenced block after the label. Do not nest them in one object.
 
 ROOT_CAUSE fields: headline, one_line_description, five_whys, reproduction_steps, failure_mode, hypothesis, evidence, fixability{assessment,reason}, relevant_repo?
 SOLUTION fields: one_line_summary, steps[{title,description}], target_files[], acceptance_criteria?`;
-}
-
-function parseLabeled(text: string, label: string): unknown {
-  const re = new RegExp(`${label}[\\s\\S]*?(\\{[\\s\\S]*\\})`, "i");
-  const m = re.exec(text);
-  if (m?.[1]) return JSON.parse(m[1]);
-  return extractJsonObject(text);
 }
 
 export async function analyzeCluster(
@@ -96,10 +91,11 @@ export async function analyzeCluster(
         maxTurns: 25,
         mcpServers: input.mcpServers,
         skillsDir: input.skillsDir,
+        skillIds: input.skillIds,
       });
-      rootCause = parseRootCause(parseLabeled(text, "ROOT_CAUSE"));
+      rootCause = parseRootCause(extractLabeledJson(text, "ROOT_CAUSE"));
       try {
-        solution = parseSolution(parseLabeled(text, "SOLUTION"));
+        solution = parseSolution(extractLabeledJson(text, "SOLUTION"));
       } catch {
         solution = undefined;
       }

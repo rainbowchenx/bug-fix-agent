@@ -3,6 +3,8 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
 > **Status:** Implemented (2026-10-15)
+>
+> **Phase A 关闭说明（2026-10-17）：** 原 P1 已知限制「Scope lock 软通过（GAP-A4）」「Reviewer 盲审（GAP-A6）」已在 [Phase A 可信闭环](./2026-10-17-phase-a-trusted-loop.md) 中关闭：implement 后按 `baseSha` 采集真实 `changedFiles`；Reviewer prompt 注入 `git diff`。
 
 **Goal:** 在现有全自动双结局流水线上，降低无效 iterate、挡住坏编辑与低质量 MR：验证失败分类路由、静态检查门闩、只读 Reviewer、失败日志结构化回灌。
 

@@ -9,6 +9,10 @@ export interface AppConfig {
   gitlabHost: string;
   maxIterate: number;
   defaultConcurrency: number;
+  /** Subprocess timeout for install/static/verify (ms). Default 10min. */
+  execTimeoutMs: number;
+  /** Agent SDK session wall-clock budget (ms). Default 20min. */
+  sdkTimeoutMs: number;
 }
 
 function parsePort(raw: string | undefined, fallback: number): number {
@@ -41,5 +45,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     gitlabHost: env.GITLAB_HOST || "https://gitlab.com",
     maxIterate: parsePositiveInt(env.BUGFIX_MAX_ITERATE, 3),
     defaultConcurrency: parsePositiveInt(env.BUGFIX_DEFAULT_CONCURRENCY, 1),
+    execTimeoutMs: parsePositiveInt(env.BUGFIX_EXEC_TIMEOUT_MS, 600_000),
+    sdkTimeoutMs: parsePositiveInt(env.BUGFIX_SDK_TIMEOUT_MS, 1_200_000),
   };
 }

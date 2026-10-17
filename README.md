@@ -31,9 +31,12 @@ Node.js ≥ 20。
 
 ```bash
 bugfix-agent serve --port 8787
+bugfix-agent run --work-dir D:/batch/today --defects defects.json [--engine pipeline|langgraph]
 bugfix-agent version
 bugfix-agent --help
 ```
+
+`run` 同步等待整批结束并打印报告：全部 fixed 退出码 `0`，否则 `1`。
 
 服务仅绑定 `127.0.0.1`，供本机 Dify Custom Tool / HTTP 节点调用。
 
@@ -113,9 +116,21 @@ Agent **自身不做业务库**；状态默认落在 `{workDir}/.bugfix-runs/{ru
 
 `options.engine` 可选 `"pipeline"`（默认，原命令式循环）或 `"langgraph"`（`@langchain/langgraph` StateGraph）。两者底层都使用 Claude Agent SDK，产出与报告结构一致。仓库自带 `langgraph.json`，可直接 `npx @langchain/langgraph-cli dev` 在 LangGraph Server / Studio 中运行图 `bugfix`。详见 [docs/langgraph.md](docs/langgraph.md)。
 
-## 现状与路线
+## 当前限制（Phase A 完成后）
 
-当前实现相对设计规格的差距、理论效果评估、阻断级问题清单与 Phase A–D 后续安排见 [docs/superpowers/specs/2026-10-17-implementation-gap-analysis-and-roadmap.md](docs/superpowers/specs/2026-10-17-implementation-gap-analysis-and-roadmap.md)。在 Phase A 完成前，请勿将其用于真实日批。
+Phase A「可信闭环」已落地（worktree 隔离、真实 changedFiles / `no_changes`、超时与 CI 环境、pnpm/yarn/npm、Skills 挂载、Reviewer 喂 diff、Deliver 加固、最小 e2e、CLI `run`）。详见 [Phase A 计划](docs/superpowers/plans/2026-10-17-phase-a-trusted-loop.md)。
+
+仍建议知晓：
+
+| 限制 | 说明 |
+|------|------|
+| 默认串行 | `options.concurrency` 未作为并行簇调度；日批按簇顺序跑 |
+| 包管理器 | 已按 lockfile / `packageManager` 探测；复杂 monorepo 仅最小 workspace 选择 |
+| `scripts.test` | 无 test 命令 → `no_test_command`，不开 MR |
+| GET 轮询 | HTTP `GET /v1/runs/:id` 仍需带 `workDir` |
+| Phase B+ 未做 | 基线差分、Repo Map、LLM 聚合、Dify OpenAPI、多样本选优等 |
+
+差距分析与后续 Phase B–D：[implementation-gap-analysis-and-roadmap](docs/superpowers/specs/2026-10-17-implementation-gap-analysis-and-roadmap.md)。
 
 ## 库 API
 

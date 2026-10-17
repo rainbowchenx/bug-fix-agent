@@ -46,8 +46,15 @@ export async function createMergeRequest(input: GitLabMrInput): Promise<GitLabMr
   return { mrUrl: data.web_url, iid: data.iid };
 }
 
-/** Best-effort project path from https git URL → URL-encoded path. */
+/** Project path from https or ssh git URL. */
 export function projectIdFromRepoUrl(repoUrl: string): string {
-  const u = new URL(repoUrl.replace(/\.git$/i, ""));
-  return u.pathname.replace(/^\//, "");
+  const cleaned = repoUrl.replace(/\.git$/i, "");
+  const ssh = /^git@([^:]+):(.+)$/.exec(cleaned);
+  if (ssh?.[2]) return ssh[2].replace(/^\//, "");
+  try {
+    const u = new URL(cleaned);
+    return u.pathname.replace(/^\//, "");
+  } catch {
+    throw new Error(`Unsupported repo URL for GitLab project id: ${repoUrl}`);
+  }
 }
