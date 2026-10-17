@@ -113,6 +113,10 @@ Agent **自身不做业务库**；状态默认落在 `{workDir}/.bugfix-runs/{ru
 
 `options.engine` 可选 `"pipeline"`（默认，原命令式循环）或 `"langgraph"`（`@langchain/langgraph` StateGraph）。两者底层都使用 Claude Agent SDK，产出与报告结构一致。仓库自带 `langgraph.json`，可直接 `npx @langchain/langgraph-cli dev` 在 LangGraph Server / Studio 中运行图 `bugfix`。详见 [docs/langgraph.md](docs/langgraph.md)。
 
+## 现状与路线
+
+当前实现相对设计规格的差距、理论效果评估、阻断级问题清单与 Phase A–D 后续安排见 [docs/superpowers/specs/2026-10-17-implementation-gap-analysis-and-roadmap.md](docs/superpowers/specs/2026-10-17-implementation-gap-analysis-and-roadmap.md)。在 Phase A 完成前，请勿将其用于真实日批。
+
 ## 库 API
 
 ```ts
