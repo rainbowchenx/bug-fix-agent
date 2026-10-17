@@ -6,6 +6,8 @@ export { loadConfig, type AppConfig } from "./config.js";
 export { createApp } from "./http/app.js";
 export { startRun } from "./runs/create-run.js";
 export { runPipeline } from "./runs/runner.js";
+export type { RunnerOptions, ClusterHandlers } from "./runs/runner.js";
+export * from "./graph/index.js";
 export * from "./types.js";
 export * from "./agent/artifacts.js";
 export { listBuiltinSkills, filterSkills } from "./skills/manifest.js";

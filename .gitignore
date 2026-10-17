@@ -9,3 +9,6 @@ coverage/
 *.log
 .turbo/
 .vitest/
+
+# LangGraph API
+.langgraph_api

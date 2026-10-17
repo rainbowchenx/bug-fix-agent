@@ -125,7 +125,12 @@ export const McpServerConfigSchema = z.object({
 });
 export type McpServerConfig = z.infer<typeof McpServerConfigSchema>;
 
+export const EngineSchema = z.enum(["pipeline", "langgraph"]);
+export type Engine = z.infer<typeof EngineSchema>;
+
 export const CreateRunOptionsSchema = z.object({
+  /** Orchestrator: legacy imperative `pipeline` (default) or the `langgraph` StateGraph. */
+  engine: EngineSchema.optional(),
   maxIterate: z.number().int().positive().optional(),
   concurrency: z.number().int().positive().optional(),
   verifyOverrides: z

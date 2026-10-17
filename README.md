@@ -109,10 +109,16 @@ Agent **自身不做业务库**；状态默认落在 `{workDir}/.bugfix-runs/{ru
 | 可修路径可停在方案/改码 | 可修默认冲到 **开 MR** |
 | 不可修 | 同样产出 **完整 unfixed 说明** |
 
+## 编排引擎（pipeline / LangGraph）
+
+`options.engine` 可选 `"pipeline"`（默认，原命令式循环）或 `"langgraph"`（`@langchain/langgraph` StateGraph）。两者底层都使用 Claude Agent SDK，产出与报告结构一致。仓库自带 `langgraph.json`，可直接 `npx @langchain/langgraph-cli dev` 在 LangGraph Server / Studio 中运行图 `bugfix`。详见 [docs/langgraph.md](docs/langgraph.md)。
+
 ## 库 API
 
 ```ts
 import { createApp, startRun, loadConfig, startServer } from "bugfix-agent";
+import { createBugfixGraph, invokeBugfixGraph } from "bugfix-agent/graph";
+import { graph } from "bugfix-agent/langgraph"; // 已编译图，供 LangGraph Server 引用
 ```
 
 ## 开发

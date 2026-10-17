@@ -25,6 +25,7 @@ import type {
   Cluster,
   CreateRunRequest,
   Defect,
+  Engine,
   FixedCluster,
   ReasonCode,
   RunReport,
@@ -57,6 +58,8 @@ export interface ClusterHandlers {
 }
 
 export interface RunnerOptions {
+  /** Overrides `options.engine` from the run request. */
+  engine?: Engine;
   handlers?: ClusterHandlers;
   maxIterate?: number;
   gitlabToken?: string;
@@ -481,12 +484,32 @@ export async function runPipeline(
   runId: string,
   options: RunnerOptions = {},
 ): Promise<RunReport> {
+  const loaded = await loadRequest(workDir, runId);
+  const engine = options.engine ?? loaded.options?.engine ?? "pipeline";
+  if (engine === "langgraph") {
+    const { invokeBugfixGraph } = await import("../graph/run-graph.js");
+    return invokeBugfixGraph(
+      {
+        workDir,
+        runId,
+        defects: loaded.defects,
+        userPrompt: loaded.userPrompt,
+        options: loaded.options,
+      },
+      {
+        handlers: options.handlers,
+        maxIterate: options.maxIterate,
+        gitlabToken: options.gitlabToken,
+        gitlabHost: options.gitlabHost,
+      },
+    );
+  }
+
   await updateRunMeta(workDir, runId, {
     status: "running",
     progress: { phase: "normalize", message: "Normalizing defects" },
   });
 
-  const loaded = await loadRequest(workDir, runId);
   const defects = normalizeDefects(loaded.defects);
   await updateRunMeta(workDir, runId, {
     progress: { phase: "aggregate", message: "Aggregating clusters" },
