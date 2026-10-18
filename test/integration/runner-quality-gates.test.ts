@@ -75,7 +75,7 @@ describe("runner quality gates", () => {
       },
     });
 
-    expect(implement).toHaveBeenCalledTimes(1);
+    expect(implement).not.toHaveBeenCalled();
     expect(report.summary.fixed).toBe(0);
     expect(report.unfixed[0]?.reasonCode).toBe("env_verify_failed");
   });

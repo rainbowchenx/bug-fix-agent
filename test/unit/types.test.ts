@@ -12,7 +12,10 @@ describe("RunReport schema", () => {
           defectIds: ["d1"],
           mrUrl: "https://gitlab.com/g/p/-/merge_requests/1",
           rootCauseSummary: "null deref in foo",
-          verify: { command: "npm test", ok: true },
+          verify: { command: "npm test", ok: true, exitCode: 0 },
+          verifyLevel: "reproduced",
+          baselineRed: false,
+          baseSha: "abc",
         },
       ],
       unfixed: [

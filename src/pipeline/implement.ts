@@ -12,6 +12,8 @@ export interface ImplementClusterInput {
   baseSha?: string;
   verifyLogTail?: string;
   iteration: number;
+  /** reproduce = failing test only; fix = product change (default). */
+  phase?: "reproduce" | "fix";
   skillsDir?: string;
   skillIds?: string[];
   mcpServers?: Record<string, unknown>;
@@ -32,6 +34,22 @@ export function buildImplementPrompt(input: ImplementClusterInput): string {
     allowed.length > 0
       ? `SCOPE LOCK — you may ONLY edit these files:\n${allowed.map((f) => `- ${f}`).join("\n")}\nEditing any other file is forbidden.`
       : `SCOPE LOCK — only edit files named in the solution steps; do not touch unrelated modules.`;
+
+  if (input.phase === "reproduce") {
+    return `Write a minimal failing regression test for cluster ${input.cluster.id}: ${input.cluster.primaryTitle}
+
+Do NOT fix product code in this step. Add one focused test that fails on the current bug.
+Place it beside the allowlisted files (same package), named *.test.* or *.spec.*.
+
+${scopeBlock}
+
+Root cause:
+${JSON.stringify(input.rootCause, null, 2)}
+
+Solution plan:
+${JSON.stringify(input.solution, null, 2)}
+`;
+  }
 
   return `Implement a minimal fix for cluster ${input.cluster.id}: ${input.cluster.primaryTitle}
 

@@ -1,5 +1,6 @@
 import { Annotation } from "@langchain/langgraph";
 import type { RootCauseArtifact, SolutionArtifact } from "../agent/artifacts.js";
+import type { GateSnapshot } from "../pipeline/baseline.js";
 import type { StaticCheckPlan } from "../pipeline/static-check.js";
 import type { VerifyPlan } from "../pipeline/verify.js";
 import type {
@@ -35,6 +36,8 @@ export const ClusterStateAnnotation = Annotation.Root({
   solution: Annotation<SolutionArtifact | undefined>(),
   verifyPlan: Annotation<VerifyPlan | undefined>(),
   staticPlan: Annotation<StaticCheckPlan | undefined>(),
+  baselineStatic: Annotation<GateSnapshot | undefined>(),
+  baselineVerify: Annotation<GateSnapshot | undefined>(),
 
   iteration: Annotation<number>(),
   feedbackLog: Annotation<string>(),

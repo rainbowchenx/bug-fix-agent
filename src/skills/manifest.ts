@@ -7,19 +7,26 @@ export interface SkillMeta {
   name: string;
   description: string;
   dir: string;
+  profiles?: string[];
 }
 
-function parseFrontmatter(md: string): { name?: string; description?: string } {
+function parseFrontmatter(md: string): { name?: string; description?: string; profiles?: string[] } {
   if (!md.startsWith("---")) return {};
   const end = md.indexOf("---", 3);
   if (end < 0) return {};
   const block = md.slice(3, end);
-  const out: { name?: string; description?: string } = {};
+  const out: { name?: string; description?: string; profiles?: string[] } = {};
   for (const line of block.split("\n")) {
     const m = /^(\w+):\s*(.*)$/.exec(line.trim());
     if (!m) continue;
     if (m[1] === "name") out.name = m[2]?.trim();
     if (m[1] === "description") out.description = m[2]?.trim();
+    if (m[1] === "profiles") {
+      out.profiles = m[2]
+        ?.split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
   }
   return out;
 }
@@ -46,6 +53,7 @@ export async function listBuiltinSkills(
         name: fm.name ?? id,
         description: fm.description ?? "",
         dir,
+        profiles: fm.profiles,
       });
     } catch {
       // skip non-skill dirs
@@ -68,6 +76,11 @@ export function filterSkills(
     list = list.filter((s) => !deny.has(s.id));
   }
   return list;
+}
+
+/** Skills with no profiles list apply everywhere; others must list the profile. */
+export function filterSkillsForProfile(skills: SkillMeta[], profileId: string): SkillMeta[] {
+  return skills.filter((s) => !s.profiles?.length || s.profiles.includes(profileId));
 }
 
 /** Copy selected skills into worktree `.claude/skills` for settingSources:project. */

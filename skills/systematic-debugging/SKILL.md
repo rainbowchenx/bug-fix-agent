@@ -20,3 +20,15 @@ description: Use when investigating failures — reproduce, isolate, hypothesize
 ## BugFix light path
 
 This is defect repair, not greenfield delivery: skip PRD/architecture theater; localize → root cause → minimal solution → verify.
+
+## 适用
+analyze 阶段形成假设之前。
+
+## 不适用
+已经有失败测试且根因已写明时，不要再扩范围。
+
+## 反例
+堆三个互不相关的防御性 if。
+
+## 案例
+栈在 `login.ts:formatUser`，证据是 `user` 为 undefined：假设为调用方未等待加载，而不是重写登录模块。

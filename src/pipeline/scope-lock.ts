@@ -39,9 +39,16 @@ export function checkScopeLock(
   const allowSet = new Set(allowed.map((a) => a.toLowerCase()));
   const violations = changed.filter((c) => {
     const lower = c.toLowerCase();
-    // allow if any allowed path is prefix or exact match
     for (const a of allowSet) {
       if (lower === a || lower.endsWith("/" + a) || lower.includes(a)) return false;
+    }
+    // Reproduction tests next to an allowlisted file are in scope.
+    const isTest = /\.(test|spec)\.[a-z0-9]+$/i.test(lower) || lower.includes("/__tests__/");
+    if (isTest) {
+      for (const a of allowSet) {
+        const dir = a.includes("/") ? a.slice(0, a.lastIndexOf("/")) : "";
+        if (!dir || lower.startsWith(`${dir}/`)) return false;
+      }
     }
     return true;
   });

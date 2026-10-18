@@ -3,6 +3,7 @@ import type { RunnableConfig } from "@langchain/core/runnables";
 import { loadConfig } from "../config.js";
 import { aggregateDefects } from "../pipeline/aggregate.js";
 import { normalizeDefects } from "../pipeline/normalize.js";
+import { bindClusterMeta } from "../pipeline/cluster-meta.js";
 import { buildReport } from "../pipeline/report.js";
 import {
   createRunDir,
@@ -22,7 +23,7 @@ export interface CreateBugfixGraphOptions extends BugfixGraphOptions {
 
 /** Upper bound on supersteps for one cluster: 4 setup nodes + up to 5 nodes per iteration. */
 export function clusterRecursionLimit(maxIterate: number): number {
-  return 10 + maxIterate * 6;
+  return 16 + maxIterate * 8;
 }
 
 /** Upper bound on supersteps for the run graph (clusters ≤ defects). */
@@ -94,6 +95,15 @@ export function createBugfixGraph(opts: CreateBugfixGraphOptions = {}) {
     });
 
     const maxIterate = opts.maxIterate ?? s.options?.maxIterate ?? loadConfig().maxIterate;
+    const unbind = bindClusterMeta({
+      started: Date.now(),
+      branch: cluster.branch,
+      iterations: 0,
+      skillsInvoked: [],
+      mcpToolsInvoked: [],
+      verifyLevel: "regression_only",
+      baselineRed: false,
+    });
     const result = await clusterGraph.invoke(
       {
         workDir: s.workDir,
@@ -112,6 +122,7 @@ export function createBugfixGraph(opts: CreateBugfixGraphOptions = {}) {
       },
       { ...config, recursionLimit: clusterRecursionLimit(maxIterate) },
     );
+    unbind();
 
     const outcome = result.outcome ?? {
       unfixed: {
@@ -129,7 +140,11 @@ export function createBugfixGraph(opts: CreateBugfixGraphOptions = {}) {
   };
 
   const reportNode = async (s: RunState): Promise<RunUpdate> => {
-    const report = buildReport(s.runId!, s.fixed, s.unfixed);
+    const report = buildReport(s.runId!, s.fixed, s.unfixed, {
+      startedAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+      engine: "langgraph",
+    });
     await writeReport(s.workDir, s.runId!, report);
     await updateRunMeta(s.workDir, s.runId!, {
       status: "completed",

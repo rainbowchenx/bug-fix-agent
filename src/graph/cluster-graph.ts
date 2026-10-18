@@ -1,7 +1,17 @@
 import { END, START, StateGraph } from "@langchain/langgraph";
 import { defaultSkillsDir } from "../agent/sdk-runner.js";
 import { loadConfig } from "../config.js";
-import { mergeMcpConfig } from "../mcp/load-config.js";
+import {
+  ANALYZE_WRITE_DENY,
+  McpPolicyError,
+  assertStdioAllowlist,
+  defaultDeniedToolsForAnalyze,
+  mergeMcpConfig,
+  normalizeMcpInput,
+} from "../mcp/load-config.js";
+import { isNewFailure } from "../pipeline/baseline.js";
+import { currentClusterMeta } from "../pipeline/cluster-meta.js";
+import { detectProfile } from "../profiles/detect.js";
 import { analyzeCluster } from "../pipeline/analyze.js";
 import {
   NoChangesError,
@@ -22,7 +32,12 @@ import {
 import { resolveVerifyPlan, runVerify } from "../pipeline/verify.js";
 import { writeClusterArtifact } from "../runs/store.js";
 import type { ClusterHandlers } from "../runs/runner.js";
-import { filterSkills, listBuiltinSkills, mountSkillsIntoCwd } from "../skills/manifest.js";
+import {
+  filterSkills,
+  filterSkillsForProfile,
+  listBuiltinSkills,
+  mountSkillsIntoCwd,
+} from "../skills/manifest.js";
 import type { ReasonCode } from "../types.js";
 import { getDiffText } from "../workspace/diff.js";
 import { ensureRepo } from "../workspace/git.js";
@@ -60,8 +75,25 @@ function unfixed(
         reasonCode,
         reasonDetail,
         artifacts: rootCause || solution ? { rootCause, solution } : undefined,
+        ...liveFields(),
       },
     },
+  };
+}
+
+function liveFields() {
+  const m = currentClusterMeta();
+  if (!m) return {};
+  return {
+    baseSha: m.baseSha,
+    branch: m.branch,
+    profileId: m.profileId,
+    iterations: m.iterations,
+    durationMs: Date.now() - m.started,
+    skillsInvoked: m.skillsInvoked,
+    mcpToolsInvoked: m.mcpToolsInvoked,
+    verifyLevel: m.verifyLevel,
+    baselineRed: m.baselineRed,
   };
 }
 
@@ -111,11 +143,19 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
         token: opts.gitlabToken ?? loadConfig().gitlabToken,
       });
       const skillsDir = defaultSkillsDir();
-      const skillMetas = filterSkills(
-        await listBuiltinSkills(skillsDir),
-        s.options?.skills,
+      const profileGuess = await detectProfile(ensured.repoPath).catch(() => "unknown" as const);
+      const skillMetas = filterSkillsForProfile(
+        filterSkills(await listBuiltinSkills(skillsDir), s.options?.skills),
+        profileGuess,
       );
       await mountSkillsIntoCwd(ensured.repoPath, skillMetas).catch(() => undefined);
+      const meta = currentClusterMeta();
+      if (meta) {
+        meta.baseSha = ensured.baseSha ?? ensured.headSha;
+        meta.branch = s.cluster.branch;
+        meta.profileId = profileGuess;
+        meta.skillsInvoked = skillMetas.map((x) => x.id);
+      }
       return {
         repoPath: ensured.repoPath,
         baseSha: ensured.baseSha ?? ensured.headSha,
@@ -127,11 +167,24 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
   };
 
   const analyzeNode = async (s: ClusterState): Promise<ClusterUpdate> => {
-    const mcpServers = await mergeMcpConfig({ workDir: s.workDir, runMcp: s.options?.mcp });
+    const mcpNorm = normalizeMcpInput(s.options?.mcp);
+    if (mcpNorm.enabled && mcpNorm.mode === "required") {
+      try {
+        assertStdioAllowlist(mcpNorm.servers);
+      } catch (err) {
+        if (err instanceof McpPolicyError) return unfixed(s, "prepare_failed", err.message, false);
+        throw err;
+      }
+    }
+    const meta = currentClusterMeta();
+    if (meta) meta.mcpToolsInvoked = mcpNorm.allowedTools;
+    const mcpServers = mcpNorm.enabled
+      ? await mergeMcpConfig({ workDir: s.workDir, runMcp: mcpNorm.servers })
+      : {};
     const skillsDir = defaultSkillsDir();
-    const skillIds = filterSkills(
-      await listBuiltinSkills(skillsDir),
-      s.options?.skills,
+    const skillIds = filterSkillsForProfile(
+      filterSkills(await listBuiltinSkills(skillsDir), s.options?.skills),
+      meta?.profileId ?? "unknown",
     ).map((x) => x.id);
     const analysis = await (h.analyzeCluster ?? analyzeCluster)({
       cluster: s.cluster,
@@ -141,9 +194,22 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
       mcpServers,
       skillsDir,
       skillIds,
+      disallowedTools: [
+        ...new Set([
+          ...mcpNorm.deniedTools,
+          ...ANALYZE_WRITE_DENY,
+          ...defaultDeniedToolsForAnalyze(mcpNorm.allowedTools),
+        ]),
+      ],
     });
     if (analysis.rootCause) await artifact(s, "root-cause.json", analysis.rootCause);
     if (analysis.solution) await artifact(s, "solution.json", analysis.solution);
+    if (analysis.localization) {
+      await artifact(s, "localization.json", analysis.localization);
+      if (analysis.solution && !analysis.solution.target_files?.length) {
+        analysis.solution.target_files = analysis.localization.editTargets;
+      }
+    }
 
     const update: ClusterUpdate = {
       rootCause: analysis.rootCause,
@@ -168,6 +234,8 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
       userPrompt: s.userPrompt,
       overrides: s.options?.verifyOverrides,
     });
+    const meta = currentClusterMeta();
+    if (meta) meta.profileId = plan.profileId;
     if (!plan.test.length) {
       return unfixed(
         s,
@@ -183,8 +251,84 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
     return { verifyPlan: plan, staticPlan, verifyCommand: plan.test.join(" && ") };
   };
 
+  const baselineNode = async (s: ClusterState): Promise<ClusterUpdate> => {
+    const staticResult = await (h.runStaticCheck ?? runStaticCheck)(s.repoPath!, s.staticPlan!);
+    const verifyResult = await (h.runVerify ?? runVerify)(s.repoPath!, s.verifyPlan!);
+    await artifact(s, "baseline.json", { static: staticResult, verify: verifyResult });
+    const meta = currentClusterMeta();
+    if (meta && (!staticResult.ok || !verifyResult.ok)) meta.baselineRed = true;
+    if (!verifyResult.ok) {
+      const baselineClass = (h.classifyVerifyFailure ?? classifyVerifyFailure)(
+        verifyResult.logTail,
+        verifyResult.command,
+      );
+      if (baselineClass.stopIterate) {
+        return unfixed(
+          s,
+          reasonCodeForClassify(baselineClass.kind),
+          `Baseline verify is not runnable (${baselineClass.kind}): ${baselineClass.reason}`,
+        );
+      }
+    }
+    return {
+      baselineStatic: {
+        ok: staticResult.ok,
+        command: staticResult.command,
+        logTail: staticResult.logTail,
+      },
+      baselineVerify: {
+        ok: verifyResult.ok,
+        command: verifyResult.command,
+        logTail: verifyResult.logTail,
+      },
+    };
+  };
+
+  const reproduceNode = async (s: ClusterState): Promise<ClusterUpdate> => {
+    try {
+      await (h.implementCluster ?? implementCluster)({
+        cluster: s.cluster,
+        repoPath: s.repoPath!,
+        rootCause: s.rootCause!,
+        solution: s.solution!,
+        baseSha: s.baseSha,
+        iteration: 0,
+        phase: "reproduce",
+        skillsDir: defaultSkillsDir(),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return unfixed(s, "implement_failed", `Reproduction step failed: ${message}`, false);
+    }
+    const repro = await (h.runVerify ?? runVerify)(s.repoPath!, s.verifyPlan!);
+    const base = s.baselineVerify ?? { ok: true, command: repro.command, logTail: "" };
+    const novel = isNewFailure(base, {
+      ok: repro.ok,
+      command: repro.command,
+      logTail: repro.logTail,
+    });
+    if (!repro.ok && novel) {
+      const reproClass = (h.classifyVerifyFailure ?? classifyVerifyFailure)(
+        repro.logTail,
+        repro.command,
+      );
+      if (reproClass.stopIterate) {
+        return unfixed(
+          s,
+          reasonCodeForClassify(reproClass.kind),
+          `Reproduction verify blocked (${reproClass.kind}): ${reproClass.reason}`,
+        );
+      }
+      const meta = currentClusterMeta();
+      if (meta) meta.verifyLevel = "reproduced";
+    }
+    return {};
+  };
+
   const implementNode = async (s: ClusterState): Promise<ClusterUpdate> => {
     const iteration = s.iteration + 1;
+    const meta = currentClusterMeta();
+    if (meta) meta.iterations = iteration;
     try {
       const skillsDir = defaultSkillsDir();
       const skillIds = filterSkills(
@@ -227,7 +371,8 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
   const staticCheckNode = async (s: ClusterState): Promise<ClusterUpdate> => {
     const result = await (h.runStaticCheck ?? runStaticCheck)(s.repoPath!, s.staticPlan!);
     await artifact(s, "static-check.json", result);
-    if (result.ok) return { staticOk: true };
+    const base = s.baselineStatic ?? { ok: true, command: result.command, logTail: "" };
+    if (result.ok || !isNewFailure(base, result)) return { staticOk: true };
 
     const feedbackLog = snipVerifyLog(result.logTail);
     const maxIterate = resolveMaxIterate(s, opts);
@@ -247,8 +392,18 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
   const verifyNode = async (s: ClusterState): Promise<ClusterUpdate> => {
     const result = await (h.runVerify ?? runVerify)(s.repoPath!, s.verifyPlan!);
     await artifact(s, "verify.json", result);
+    const base = s.baselineVerify ?? { ok: true, command: result.command, logTail: "" };
+    const novel = isNewFailure(base, {
+      ok: result.ok,
+      command: result.command,
+      logTail: result.logTail,
+    });
+    if (!result.ok && !novel) {
+      const meta = currentClusterMeta();
+      if (meta) meta.baselineRed = true;
+    }
     return {
-      verifyOk: result.ok,
+      verifyOk: result.ok || !novel,
       verifyCommand: result.command,
       lastVerifyLog: result.logTail,
     };
@@ -365,7 +520,7 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
         targetBranch: s.cluster.branch,
         projectId: s.options?.gitlabProjectId,
         baseSha: s.baseSha,
-        draftMr: s.options?.draftMr,
+        draftMr: s.options?.draftMr ?? currentClusterMeta()?.verifyLevel === "regression_only",
         defectIds: s.cluster.defectIds,
       });
       return {
@@ -375,7 +530,8 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
             defectIds: s.cluster.defectIds,
             mrUrl: delivered.mrUrl,
             rootCauseSummary: s.rootCause!.one_line_description,
-            verify: { command: s.verifyCommand, ok: true, logTail: s.lastVerifyLog },
+            verify: { command: s.verifyCommand, ok: true, logTail: s.lastVerifyLog, exitCode: 0 },
+            ...liveFields(),
           },
         },
       };
@@ -392,6 +548,8 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
     .addNode("ensure_repo", ensureRepoNode)
     .addNode("analyze", analyzeNode)
     .addNode("prepare", prepareNode)
+    .addNode("baseline", baselineNode)
+    .addNode("reproduce", reproduceNode)
     .addNode("implement", implementNode)
     .addNode("static_check", staticCheckNode)
     .addNode("verify", verifyNode)
@@ -401,7 +559,9 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
     .addEdge(START, "ensure_repo")
     .addConditionalEdges("ensure_repo", doneOr("analyze"), ["analyze", END])
     .addConditionalEdges("analyze", doneOr("prepare"), ["prepare", END])
-    .addConditionalEdges("prepare", doneOr("implement"), ["implement", END])
+    .addConditionalEdges("prepare", doneOr("baseline"), ["baseline", END])
+    .addConditionalEdges("baseline", doneOr("reproduce"), ["reproduce", END])
+    .addConditionalEdges("reproduce", doneOr("implement"), ["implement", END])
     .addConditionalEdges("implement", doneOr("static_check"), ["static_check", END])
     .addConditionalEdges(
       "static_check",

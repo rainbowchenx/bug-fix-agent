@@ -9,6 +9,11 @@ import { runAgentSession } from "../agent/sdk-runner.js";
 import type { Cluster, Defect, ReasonCode } from "../types.js";
 import { FAILURE_MODE_HINT } from "./failure-modes.js";
 import { gateFromRootCause } from "./fixability.js";
+import {
+  localizationFromSolution,
+  type LocalizationArtifact,
+} from "./localization.js";
+import { buildRepoMap, formatRepoMap } from "./repo-map.js";
 
 export interface AnalyzeClusterInput {
   cluster: Cluster;
@@ -18,10 +23,12 @@ export interface AnalyzeClusterInput {
   mcpServers?: Record<string, unknown>;
   skillsDir?: string;
   skillIds?: string[];
+  disallowedTools?: string[];
   /** Test seam / offline mode */
   mockArtifacts?: {
     rootCause: RootCauseArtifact;
     solution?: SolutionArtifact;
+    localization?: LocalizationArtifact;
   };
 }
 
@@ -30,6 +37,7 @@ export type AnalyzeClusterResult =
       status: "fixable";
       rootCause: RootCauseArtifact;
       solution: SolutionArtifact;
+      localization: LocalizationArtifact;
     }
   | {
       status: "unfixed";
@@ -37,9 +45,10 @@ export type AnalyzeClusterResult =
       reasonDetail: string;
       rootCause?: RootCauseArtifact;
       solution?: SolutionArtifact;
+      localization?: LocalizationArtifact;
     };
 
-export function buildAnalyzePrompt(input: AnalyzeClusterInput): string {
+export function buildAnalyzePrompt(input: AnalyzeClusterInput, repoMapText = ""): string {
   const defectText = input.defects
     .map(
       (d) =>
@@ -59,6 +68,9 @@ User guidance: ${input.userPrompt ?? "(none)"}
 Defects:
 ${defectText}
 
+Repo map:
+${repoMapText || "(unavailable)"}
+
 Tasks (read-only tools only):
 1) Localize likely files/symbols.
 2) Map to a failure_mode in: ${FAILURE_MODE_HINT}
@@ -66,7 +78,10 @@ Tasks (read-only tools only):
 4) Produce RootCauseArtifact JSON with fixability.assessment in fixable|needs_more_context|not_actionable.
 5) If fixable, produce SolutionArtifact JSON with concrete steps AND target_files (relative paths allowlist for scope lock).
 
-Output TWO separate JSON objects clearly labeled ROOT_CAUSE and SOLUTION.
+Also output LOCALIZATION JSON: { "suspectFiles": [], "symbols": [], "editTargets": [] }.
+editTargets should match solution target_files.
+
+Output separate JSON objects clearly labeled ROOT_CAUSE, SOLUTION, and LOCALIZATION.
 Prefer each as its own \`\`\`json fenced block after the label. Do not nest them in one object.
 
 ROOT_CAUSE fields: headline, one_line_description, five_whys, reproduction_steps, failure_mode, hypothesis, evidence, fixability{assessment,reason}, relevant_repo?
@@ -79,19 +94,23 @@ export async function analyzeCluster(
   try {
     let rootCause: RootCauseArtifact;
     let solution: SolutionArtifact | undefined;
+    let localizationExtra: LocalizationArtifact | undefined;
 
     if (input.mockArtifacts) {
       rootCause = input.mockArtifacts.rootCause;
       solution = input.mockArtifacts.solution;
+      localizationExtra = input.mockArtifacts.localization;
     } else {
+      const map = await buildRepoMap(input.repoPath).catch(() => undefined);
       const { text } = await runAgentSession({
         cwd: input.repoPath,
-        prompt: buildAnalyzePrompt(input),
+        prompt: buildAnalyzePrompt(input, map ? formatRepoMap(map) : ""),
         mode: "analyze",
         maxTurns: 25,
         mcpServers: input.mcpServers,
         skillsDir: input.skillsDir,
         skillIds: input.skillIds,
+        disallowedTools: input.disallowedTools,
       });
       rootCause = parseRootCause(extractLabeledJson(text, "ROOT_CAUSE"));
       try {
@@ -99,7 +118,14 @@ export async function analyzeCluster(
       } catch {
         solution = undefined;
       }
+      try {
+        localizationExtra = extractLabeledJson(text, "LOCALIZATION") as LocalizationArtifact;
+      } catch {
+        localizationExtra = undefined;
+      }
     }
+
+    const localization = localizationFromSolution(solution, localizationExtra);
 
     const gate = gateFromRootCause(rootCause);
     if (gate.status === "unfixed") {
@@ -109,6 +135,7 @@ export async function analyzeCluster(
         reasonDetail: gate.reasonDetail,
         rootCause,
         solution,
+        localization,
       };
     }
 
@@ -118,10 +145,11 @@ export async function analyzeCluster(
         reasonCode: "analyze_failed",
         reasonDetail: "Root cause is fixable but solution artifact missing or invalid.",
         rootCause,
+        localization,
       };
     }
 
-    return { status: "fixable", rootCause, solution };
+    return { status: "fixable", rootCause, solution, localization };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return {

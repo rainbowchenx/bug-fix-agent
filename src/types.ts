@@ -48,12 +48,28 @@ export type Cluster = z.infer<typeof ClusterSchema>;
 export const ClusterOutcomeSchema = z.enum(["fixed", "unfixed"]);
 export type ClusterOutcome = z.infer<typeof ClusterOutcomeSchema>;
 
+export const VerifyLevelSchema = z.enum(["reproduced", "regression_only"]);
+export type VerifyLevel = z.infer<typeof VerifyLevelSchema>;
+
 export const VerifySummarySchema = z.object({
   command: z.string(),
   ok: z.boolean(),
   logTail: z.string().optional(),
+  exitCode: z.number().int().optional(),
 });
 export type VerifySummary = z.infer<typeof VerifySummarySchema>;
+
+const ClusterReportFields = {
+  baseSha: z.string().optional(),
+  branch: z.string().optional(),
+  profileId: z.string().optional(),
+  iterations: z.number().int().nonnegative().optional(),
+  durationMs: z.number().int().nonnegative().optional(),
+  skillsInvoked: z.array(z.string()).optional(),
+  mcpToolsInvoked: z.array(z.string()).optional(),
+  verifyLevel: VerifyLevelSchema.optional(),
+  baselineRed: z.boolean().optional(),
+};
 
 export const FixedClusterSchema = z.object({
   clusterId: z.string(),
@@ -61,6 +77,7 @@ export const FixedClusterSchema = z.object({
   mrUrl: z.string().url().or(z.string().min(1)),
   rootCauseSummary: z.string().optional(),
   verify: VerifySummarySchema.optional(),
+  ...ClusterReportFields,
 });
 export type FixedCluster = z.infer<typeof FixedClusterSchema>;
 
@@ -75,11 +92,18 @@ export const UnfixedClusterSchema = z.object({
       solution: z.string().optional(),
     })
     .optional(),
+  ...ClusterReportFields,
 });
 export type UnfixedCluster = z.infer<typeof UnfixedClusterSchema>;
 
+export const EngineSchema = z.enum(["pipeline", "langgraph"]);
+export type Engine = z.infer<typeof EngineSchema>;
+
 export const RunReportSchema = z.object({
   runId: z.string().min(1),
+  startedAt: z.string().optional(),
+  finishedAt: z.string().optional(),
+  engine: EngineSchema.optional(),
   summary: z.object({
     totalClusters: z.number().int().nonnegative(),
     fixed: z.number().int().nonnegative(),
@@ -126,8 +150,16 @@ export const McpServerConfigSchema = z.object({
 });
 export type McpServerConfig = z.infer<typeof McpServerConfigSchema>;
 
-export const EngineSchema = z.enum(["pipeline", "langgraph"]);
-export type Engine = z.infer<typeof EngineSchema>;
+export const McpPolicySchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    servers: z.record(z.string(), McpServerConfigSchema).optional(),
+    allowedTools: z.array(z.string()).optional(),
+    deniedTools: z.array(z.string()).optional(),
+    mode: z.enum(["optional", "required"]).optional(),
+  })
+  .strict();
+export type McpPolicy = z.infer<typeof McpPolicySchema>;
 
 export const CreateRunOptionsSchema = z.object({
   /** Orchestrator: legacy imperative `pipeline` (default) or the `langgraph` StateGraph. */
@@ -146,7 +178,7 @@ export const CreateRunOptionsSchema = z.object({
       disabled: z.array(z.string()).optional(),
     })
     .optional(),
-  mcp: z.record(z.string(), McpServerConfigSchema).optional(),
+  mcp: z.union([McpPolicySchema, z.record(z.string(), McpServerConfigSchema)]).optional(),
   gitlabProjectId: z.union([z.string(), z.number()]).optional(),
   /** Skip readonly reviewer gate (debug / fast path). Default false = reviewer on. */
   skipReviewer: z.boolean().optional(),

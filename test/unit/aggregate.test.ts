@@ -33,6 +33,43 @@ describe("normalize + aggregate", () => {
     expect(login?.primaryTitle).toBeTruthy();
   });
 
+  it("merges same-repo defects that share a top application stack file", () => {
+    const stack = (file: string) =>
+      `Error: x\n    at boom (${file}:10:1)\n    at Module._compile (node:internal/modules/cjs/loader.js:1:1)`;
+    const defects = normalizeDefects([
+      {
+        id: "1",
+        title: "crash A",
+        repoUrl: "https://gitlab.com/a/b.git",
+        fingerprint: "fp-a",
+        stackTrace: stack("/app/src/login.ts"),
+      },
+      {
+        id: "2",
+        title: "crash B",
+        repoUrl: "https://gitlab.com/a/b.git",
+        fingerprint: "fp-b",
+        stackTrace: stack("/app/src/login.ts"),
+      },
+    ]);
+    expect(aggregateDefects(defects)).toHaveLength(1);
+  });
+
+  it("splits clusters larger than 5", () => {
+    const defects = normalizeDefects(
+      Array.from({ length: 6 }, (_, i) => ({
+        id: `d${i}`,
+        title: "same",
+        repoUrl: "https://gitlab.com/a/b.git",
+        fingerprint: "fp",
+      })),
+    );
+    const clusters = aggregateDefects(defects);
+    expect(clusters).toHaveLength(2);
+    expect(clusters[0]?.defectIds).toHaveLength(5);
+    expect(clusters[1]?.defectIds).toHaveLength(1);
+  });
+
   it("does not merge across different repos", () => {
     const defects = normalizeDefects([
       {

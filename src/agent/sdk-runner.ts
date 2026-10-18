@@ -13,6 +13,8 @@ export interface RunAgentSessionInput {
   skillsDir?: string;
   /** Skill ids to expose (after enabled/disabled filter). */
   skillIds?: string[];
+  allowedExtraTools?: string[];
+  disallowedTools?: string[];
   model?: string;
   timeoutMs?: number;
   /** Injected for tests — real SDK query is optional at runtime. */
@@ -27,6 +29,7 @@ export interface SdkQueryOptions {
     permissionMode?: string;
     maxTurns: number;
     mcpServers?: Record<string, unknown>;
+    disallowedTools?: string[];
     settingSources?: string[];
     env?: Record<string, string | undefined>;
     model?: string;
@@ -36,7 +39,7 @@ export interface SdkQueryOptions {
 }
 
 const ANALYZE_TOOLS = ["Read", "Glob", "Grep", "Skill"] as const;
-const IMPLEMENT_TOOLS = ["Read", "Glob", "Grep", "Skill", "Edit"] as const;
+const IMPLEMENT_TOOLS = ["Read", "Glob", "Grep", "Skill", "Edit", "Write"] as const;
 
 export function buildSdkOptions(input: RunAgentSessionInput): SdkQueryOptions {
   const allowedTools =
@@ -70,6 +73,9 @@ export function buildSdkOptions(input: RunAgentSessionInput): SdkQueryOptions {
   }
   if (input.skillIds?.length) {
     options.skills = input.skillIds;
+  }
+  if (input.disallowedTools?.length) {
+    options.disallowedTools = input.disallowedTools;
   }
 
   return { prompt: input.prompt, options };

@@ -137,7 +137,7 @@ const scenarios: Scenario[] = [
       }));
     },
     expect: (r, h) => {
-      expect(h.implementCluster).toHaveBeenCalledTimes(1);
+      expect(h.implementCluster).not.toHaveBeenCalled();
       expect(r.unfixed[0]?.reasonCode).toBe("env_verify_failed");
     },
   },
@@ -146,19 +146,25 @@ const scenarios: Scenario[] = [
     defects: [defect("d1", "fp-iter")],
     options: { maxIterate: 3, skipReviewer: true },
     tweak: (h) => {
-      h.runVerify
-        .mockImplementationOnce(async () => ({
-          ok: false,
-          command: "npm test",
-          logTail: "AssertionError: expected 1 to be 2",
-        }))
-        .mockImplementation(async () => ({ ok: true, command: "npm test", logTail: "pass" }));
+      let n = 0;
+      h.runVerify.mockImplementation(async () => {
+        n += 1;
+        if (n === 1) return { ok: true, command: "npm test", logTail: "baseline" };
+        if (n === 2 || n === 3) {
+          return {
+            ok: false,
+            command: "npm test",
+            logTail: "AssertionError: expected 1 to be 2",
+          };
+        }
+        return { ok: true, command: "npm test", logTail: "pass" };
+      });
     },
     expect: (r, h) => {
       expect(r.summary.fixed).toBe(1);
-      expect(h.implementCluster).toHaveBeenCalledTimes(2);
-      const second = h.implementCluster.mock.calls[1]![0] as { verifyLogTail?: string };
-      expect(second.verifyLogTail).toMatch(/AssertionError/);
+      expect(h.implementCluster).toHaveBeenCalledTimes(3);
+      const third = h.implementCluster.mock.calls[2]![0] as { verifyLogTail?: string };
+      expect(third.verifyLogTail).toMatch(/AssertionError/);
       expect(h.reviewCluster).not.toHaveBeenCalled();
     },
   },
@@ -167,14 +173,15 @@ const scenarios: Scenario[] = [
     defects: [defect("d1", "fp-exhaust")],
     options: { maxIterate: 5, skipReviewer: true },
     tweak: (h) => {
-      h.runVerify.mockImplementation(async () => ({
-        ok: false,
-        command: "npm test",
-        logTail: "AssertionError: still broken",
-      }));
+      let n = 0;
+      h.runVerify.mockImplementation(async () => {
+        n += 1;
+        if (n === 1) return { ok: true, command: "npm test", logTail: "baseline" };
+        return { ok: false, command: "npm test", logTail: "AssertionError: still broken" };
+      });
     },
     expect: (r, h) => {
-      expect(h.implementCluster).toHaveBeenCalledTimes(5);
+      expect(h.implementCluster).toHaveBeenCalledTimes(6);
       expect(r.unfixed[0]?.reasonCode).toBe("verify_failed");
       expect(h.deliverFix).not.toHaveBeenCalled();
     },
@@ -185,13 +192,14 @@ const scenarios: Scenario[] = [
     options: { maxIterate: 2, skipReviewer: true },
     tweak: (h) => {
       h.runStaticCheck
+        .mockImplementationOnce(async () => ({ ok: true, command: "tsc", logTail: "" }))
         .mockImplementationOnce(async () => ({ ok: false, command: "tsc", logTail: "TS2322" }))
         .mockImplementation(async () => ({ ok: true, command: "tsc", logTail: "" }));
     },
     expect: (r, h) => {
       expect(r.summary.fixed).toBe(1);
-      expect(h.implementCluster).toHaveBeenCalledTimes(2);
-      expect(h.runVerify).toHaveBeenCalledTimes(1);
+      expect(h.implementCluster).toHaveBeenCalledTimes(3);
+      expect(h.runVerify.mock.calls.length).toBeGreaterThanOrEqual(2);
     },
   },
   {
@@ -199,15 +207,17 @@ const scenarios: Scenario[] = [
     defects: [defect("d1", "fp-static-x")],
     options: { maxIterate: 2 },
     tweak: (h) => {
-      h.runStaticCheck.mockImplementation(async () => ({
-        ok: false,
-        command: "tsc",
-        logTail: "TS2322",
-      }));
+      h.runStaticCheck
+        .mockImplementationOnce(async () => ({ ok: true, command: "tsc", logTail: "" }))
+        .mockImplementation(async () => ({
+          ok: false,
+          command: "tsc",
+          logTail: "TS2322",
+        }));
     },
     expect: (r, h) => {
       expect(r.unfixed[0]?.reasonCode).toBe("static_check_failed");
-      expect(h.runVerify).not.toHaveBeenCalled();
+      expect(h.deliverFix).not.toHaveBeenCalled();
     },
   },
   {
@@ -241,9 +251,9 @@ const scenarios: Scenario[] = [
     },
     expect: (r, h) => {
       expect(r.summary.fixed).toBe(1);
-      expect(h.implementCluster).toHaveBeenCalledTimes(2);
-      const second = h.implementCluster.mock.calls[1]![0] as { verifyLogTail?: string };
-      expect(second.verifyLogTail).toMatch(/missing null check/);
+      expect(h.implementCluster).toHaveBeenCalledTimes(3);
+      const third = h.implementCluster.mock.calls[2]![0] as { verifyLogTail?: string };
+      expect(third.verifyLogTail).toMatch(/missing null check/);
     },
   },
   {
@@ -292,8 +302,16 @@ const scenarios: Scenario[] = [
 ];
 
 function stripRunId(report: RunReport) {
-  const { runId: _runId, ...rest } = report;
-  return rest;
+  const { runId: _runId, startedAt: _s, finishedAt: _f, engine: _e, ...rest } = report;
+  const scrub = <T extends { durationMs?: number }>(row: T) => {
+    const { durationMs: _d, ...kept } = row;
+    return kept;
+  };
+  return {
+    ...rest,
+    fixed: rest.fixed.map(scrub),
+    unfixed: rest.unfixed.map(scrub),
+  };
 }
 
 describe("LangGraph engine parity with legacy pipeline", () => {

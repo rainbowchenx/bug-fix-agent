@@ -25,3 +25,18 @@ Output exactly one JSON object:
 - Error paths and empty states covered?
 - No secrets / env hardcodes?
 - Residual risks named in `reasons` even on approve.
+
+## 适用
+review 模式。
+
+## 不适用
+analyze / implement（不要在评审里改文件）。
+
+## 步骤
+对照 DIFF hunk 与 target_files。
+
+## 反例
+没有 diff 却 approve。
+
+## 案例
+hunk 只把 `a - b` 改成 `a + b` 且测试变绿：approve。顺手改了无关文件：request_changes。

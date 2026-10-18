@@ -116,21 +116,24 @@ Agent **自身不做业务库**；状态默认落在 `{workDir}/.bugfix-runs/{ru
 
 `options.engine` 可选 `"pipeline"`（默认，原命令式循环）或 `"langgraph"`（`@langchain/langgraph` StateGraph）。两者底层都使用 Claude Agent SDK，产出与报告结构一致。仓库自带 `langgraph.json`，可直接 `npx @langchain/langgraph-cli dev` 在 LangGraph Server / Studio 中运行图 `bugfix`。详见 [docs/langgraph.md](docs/langgraph.md)。
 
-## 当前限制（Phase A 完成后）
+## 当前限制（Phase B 完成后）
 
-Phase A「可信闭环」已落地（worktree 隔离、真实 changedFiles / `no_changes`、超时与 CI 环境、pnpm/yarn/npm、Skills 挂载、Reviewer 喂 diff、Deliver 加固、最小 e2e、CLI `run`）。详见 [Phase A 计划](docs/superpowers/plans/2026-10-17-phase-a-trusted-loop.md)。
+Phase A 可信闭环与 Phase B 修复真值已落地。计划：[Phase A](docs/superpowers/plans/2026-10-17-phase-a-trusted-loop.md)、[Phase B](docs/superpowers/plans/2026-10-18-phase-b-fix-truth.md)。
+
+簇报告可带 `baseSha`、`profileId`、`iterations`、`verifyLevel`（`reproduced` | `regression_only`）、`baselineRed`、`skillsInvoked`。基线里已经存在的失败签名不会单独阻断；写不出 RED 复现时 MR 默认为 Draft。
 
 仍建议知晓：
 
 | 限制 | 说明 |
 |------|------|
-| 默认串行 | `options.concurrency` 未作为并行簇调度；日批按簇顺序跑 |
-| 包管理器 | 已按 lockfile / `packageManager` 探测；复杂 monorepo 仅最小 workspace 选择 |
+| 默认串行 | `options.concurrency` 还未做跨仓并行 |
+| 包管理器 | 复杂 monorepo 只做最小 workspace 选择 |
 | `scripts.test` | 无 test 命令 → `no_test_command`，不开 MR |
 | GET 轮询 | HTTP `GET /v1/runs/:id` 仍需带 `workDir` |
-| Phase B+ 未做 | 基线差分、Repo Map、LLM 聚合、Dify OpenAPI、多样本选优等 |
+| 聚合 | 同文件合并与簇大小上限是规则；没有 LLM 同根因判定 |
+| Phase C+ | Storage、取消/恢复、`.bugfix.yml`、Dify OpenAPI、引擎收敛尚未做 |
 
-差距分析与后续 Phase B–D：[implementation-gap-analysis-and-roadmap](docs/superpowers/specs/2026-10-17-implementation-gap-analysis-and-roadmap.md)。
+差距分析与后续 Phase C–D：[implementation-gap-analysis-and-roadmap](docs/superpowers/specs/2026-10-17-implementation-gap-analysis-and-roadmap.md)。
 
 ## 库 API
 

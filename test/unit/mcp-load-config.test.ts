@@ -3,8 +3,12 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  McpPolicyError,
+  assertStdioAllowlist,
+  defaultDeniedToolsForAnalyze,
   expandEnvVars,
   mergeMcpConfig,
+  normalizeMcpInput,
 } from "../../src/mcp/load-config.js";
 
 describe("mcp load-config", () => {
@@ -41,5 +45,21 @@ describe("mcp load-config", () => {
 
     expect(merged.docs?.env?.T).toBe("xyz");
     expect(merged.stale?.args).toEqual(["new"]);
+  });
+
+  it("normalizes policy shape and denies write-like tools", () => {
+    const policy = normalizeMcpInput({
+      enabled: true,
+      mode: "required",
+      servers: { fs: { command: "npx", args: ["server"] } },
+      allowedTools: ["read_file", "write_file"],
+      deniedTools: ["rm"],
+    });
+    expect(policy.mode).toBe("required");
+    expect(defaultDeniedToolsForAnalyze(policy.allowedTools)).toEqual(["write_file"]);
+    expect(() =>
+      assertStdioAllowlist({ evil: { command: "bash", args: ["-c", "x"] } }),
+    ).toThrow(McpPolicyError);
+    expect(() => assertStdioAllowlist(policy.servers)).not.toThrow();
   });
 });

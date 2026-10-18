@@ -34,10 +34,26 @@ import type {
   ReasonCode,
   RunReport,
   UnfixedCluster,
+  VerifyLevel,
 } from "../types.js";
-import { mergeMcpConfig } from "../mcp/load-config.js";
+import {
+  ANALYZE_WRITE_DENY,
+  McpPolicyError,
+  assertStdioAllowlist,
+  defaultDeniedToolsForAnalyze,
+  mergeMcpConfig,
+  normalizeMcpInput,
+} from "../mcp/load-config.js";
+import { isNewFailure, type GateSnapshot } from "../pipeline/baseline.js";
+import { bindClusterMeta, liveClusterFields } from "../pipeline/cluster-meta.js";
+import { detectProfile } from "../profiles/detect.js";
 import { defaultSkillsDir } from "../agent/sdk-runner.js";
-import { filterSkills, listBuiltinSkills, mountSkillsIntoCwd } from "../skills/manifest.js";
+import {
+  filterSkills,
+  filterSkillsForProfile,
+  listBuiltinSkills,
+  mountSkillsIntoCwd,
+} from "../skills/manifest.js";
 import { getDiffText } from "../workspace/diff.js";
 import { ensureRepo } from "../workspace/git.js";
 import { runDir } from "../workspace/paths.js";
@@ -109,6 +125,7 @@ function unfixedBase(
   reasonDetail: string,
   rootCause?: string,
   solution?: string,
+  extra?: Partial<UnfixedCluster>,
 ): { unfixed: UnfixedCluster } {
   return {
     unfixed: {
@@ -120,6 +137,8 @@ function unfixedBase(
         rootCause || solution
           ? { rootCause, solution }
           : undefined,
+      ...liveClusterFields(),
+      ...extra,
     },
   };
 }
@@ -134,6 +153,18 @@ async function processCluster(args: {
   runner: RunnerOptions;
 }): Promise<{ fixed?: FixedCluster; unfixed?: UnfixedCluster }> {
   const h = { ...args.runner.handlers };
+  const meta = {
+    started: Date.now(),
+    baseSha: undefined as string | undefined,
+    branch: args.cluster.branch,
+    profileId: undefined as string | undefined,
+    iterations: 0,
+    skillsInvoked: [] as string[],
+    mcpToolsInvoked: [] as string[],
+    verifyLevel: "regression_only" as VerifyLevel,
+    baselineRed: false,
+  };
+  bindClusterMeta(meta);
   const cfg = loadConfig();
   const maxIterate = args.runner.maxIterate ?? args.options?.maxIterate ?? cfg.maxIterate;
   const token = args.runner.gitlabToken ?? cfg.gitlabToken;
@@ -155,22 +186,44 @@ async function processCluster(args: {
     });
     repoPath = ensured.repoPath;
     baseSha = ensured.baseSha ?? ensured.headSha;
+    meta.baseSha = baseSha;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return unfixedBase(args.cluster, "prepare_failed", `Failed to ensure repo: ${message}`);
   }
 
-  const mcpServers = await mergeMcpConfig({
-    workDir: args.workDir,
-    runMcp: args.options?.mcp,
-  });
+  const mcpNorm = normalizeMcpInput(args.options?.mcp);
+  if (mcpNorm.enabled && mcpNorm.mode === "required") {
+    try {
+      assertStdioAllowlist(mcpNorm.servers);
+    } catch (err) {
+      if (err instanceof McpPolicyError) {
+        return unfixedBase(args.cluster, "prepare_failed", err.message);
+      }
+      throw err;
+    }
+  }
+  const mcpServers = mcpNorm.enabled
+    ? await mergeMcpConfig({ workDir: args.workDir, runMcp: mcpNorm.servers })
+    : {};
   const skillsDir = defaultSkillsDir();
-  const skillMetas = filterSkills(
-    await listBuiltinSkills(skillsDir),
-    args.options?.skills,
+  const profileGuess = await detectProfile(repoPath).catch(() => "unknown" as const);
+  const skillMetas = filterSkillsForProfile(
+    filterSkills(await listBuiltinSkills(skillsDir), args.options?.skills),
+    profileGuess,
   );
   await mountSkillsIntoCwd(repoPath, skillMetas).catch(() => undefined);
   const skillIds = skillMetas.map((s) => s.id);
+  const analyzeDeny = [
+    ...new Set([
+      ...mcpNorm.deniedTools,
+      ...ANALYZE_WRITE_DENY,
+      ...defaultDeniedToolsForAnalyze(mcpNorm.allowedTools),
+    ]),
+  ];
+  meta.profileId = profileGuess;
+  meta.skillsInvoked = skillIds;
+  meta.mcpToolsInvoked = mcpNorm.allowedTools;
 
   const analyze = h.analyzeCluster ?? analyzeCluster;
   const analysis = await analyze({
@@ -181,6 +234,7 @@ async function processCluster(args: {
     mcpServers,
     skillsDir,
     skillIds,
+    disallowedTools: analyzeDeny,
   });
 
   if (analysis.rootCause) {
@@ -201,6 +255,18 @@ async function processCluster(args: {
       analysis.solution,
     );
   }
+  if (analysis.localization) {
+    await writeClusterArtifact(
+      args.workDir,
+      args.runId,
+      args.cluster.id,
+      "localization.json",
+      analysis.localization,
+    );
+    if (analysis.solution && !analysis.solution.target_files?.length && analysis.localization.editTargets.length) {
+      analysis.solution.target_files = analysis.localization.editTargets;
+    }
+  }
 
   if (analysis.status === "unfixed") {
     return unfixedBase(
@@ -218,6 +284,7 @@ async function processCluster(args: {
     userPrompt: args.userPrompt,
     overrides: args.options?.verifyOverrides,
   });
+  meta.profileId = plan.profileId;
 
   if (!plan.test.length) {
     return unfixedBase(
@@ -255,8 +322,67 @@ async function processCluster(args: {
   let lastStaticFail = false;
   let stopReason: { reasonCode: ReasonCode; detail: string } | null = null;
 
+  const baselineStatic = await runStatic(repoPath, staticPlan);
+  const baselineVerify = await verify(repoPath, plan);
+  await writeClusterArtifact(args.workDir, args.runId, args.cluster.id, "baseline.json", {
+    static: baselineStatic,
+    verify: baselineVerify,
+  });
+  if (!baselineStatic.ok || !baselineVerify.ok) meta.baselineRed = true;
+  if (!baselineVerify.ok) {
+    const baselineClass = classify(baselineVerify.logTail, baselineVerify.command);
+    if (baselineClass.stopIterate) {
+      return unfixedBase(
+        args.cluster,
+        reasonCodeForClassify(baselineClass.kind),
+        `Baseline verify is not runnable (${baselineClass.kind}): ${baselineClass.reason}`,
+        analysis.rootCause.one_line_description,
+        analysis.solution.one_line_summary,
+      );
+    }
+  }
+
+  try {
+    await implement({
+      cluster: args.cluster,
+      repoPath,
+      rootCause: analysis.rootCause,
+      solution: analysis.solution,
+      baseSha,
+      iteration: 0,
+      phase: "reproduce",
+      skillsDir,
+      skillIds,
+      mcpServers,
+    });
+    const repro = await verify(repoPath, plan);
+    const reproNovel = isNewFailure(baselineVerify, {
+      ok: repro.ok,
+      command: repro.command,
+      logTail: repro.logTail,
+    });
+    if (!repro.ok && reproNovel) {
+      const reproClass = classify(repro.logTail, repro.command);
+      if (reproClass.stopIterate) {
+        return unfixedBase(
+          args.cluster,
+          reasonCodeForClassify(reproClass.kind),
+          `Reproduction verify blocked (${reproClass.kind}): ${reproClass.reason}`,
+        );
+      }
+      meta.verifyLevel = "reproduced";
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return unfixedBase(args.cluster, "implement_failed", `Reproduction step failed: ${message}`);
+  }
+
+  const baseStaticSnap: GateSnapshot = baselineStatic;
+  const baseVerifySnap: GateSnapshot = baselineVerify;
+
   while (true) {
     iteration += 1;
+    meta.iterations = iteration;
     try {
       const impl = await implement({
         cluster: args.cluster,
@@ -297,7 +423,8 @@ async function processCluster(args: {
       "static-check.json",
       staticResult,
     );
-    if (!staticResult.ok) {
+    const staticNovel = isNewFailure(baseStaticSnap, staticResult);
+    if (!staticResult.ok && staticNovel) {
       lastStaticFail = true;
       feedbackLog = snipVerifyLog(staticResult.logTail);
       if (!shouldContinueIterate(iteration, maxIterate, false)) {
@@ -326,7 +453,13 @@ async function processCluster(args: {
     verifyCommand = result.command;
     lastVerifyLog = result.logTail;
     await writeClusterArtifact(args.workDir, args.runId, args.cluster.id, "verify.json", result);
-    verifyOk = result.ok;
+    const verifyNovel = isNewFailure(baseVerifySnap, {
+      ok: result.ok,
+      command: result.command,
+      logTail: result.logTail,
+    });
+    verifyOk = result.ok || !verifyNovel;
+    if (!result.ok && !verifyNovel) meta.baselineRed = true;
 
     if (!verifyOk) {
       const classification = classify(result.logTail, result.command);
@@ -494,7 +627,7 @@ async function processCluster(args: {
       targetBranch: args.cluster.branch,
       projectId: args.options?.gitlabProjectId,
       baseSha,
-      draftMr: args.options?.draftMr,
+      draftMr: args.options?.draftMr ?? meta.verifyLevel === "regression_only",
       defectIds: args.cluster.defectIds,
     });
 
@@ -504,7 +637,8 @@ async function processCluster(args: {
         defectIds: args.cluster.defectIds,
         mrUrl: delivered.mrUrl,
         rootCauseSummary: analysis.rootCause.one_line_description,
-        verify: { command: verifyCommand, ok: true, logTail: lastVerifyLog },
+        verify: { command: verifyCommand, ok: true, logTail: lastVerifyLog, exitCode: 0 },
+        ...liveClusterFields(),
       },
     };
   } catch (err) {
@@ -594,7 +728,11 @@ export async function runPipeline(
     if (outcome.unfixed) unfixed.push(outcome.unfixed);
   }
 
-  const report = buildReport(runId, fixed, unfixed);
+  const report = buildReport(runId, fixed, unfixed, {
+    startedAt: new Date().toISOString(),
+    finishedAt: new Date().toISOString(),
+    engine: "pipeline",
+  });
   await writeReport(workDir, runId, report);
   await updateRunMeta(workDir, runId, {
     status: "completed",

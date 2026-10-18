@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Defect } from "../types.js";
 import { DefectSchema } from "../types.js";
+import { stackSignature } from "./stack-frame.js";
 
 function compact(s: string | undefined): string | undefined {
   if (s === undefined) return undefined;
@@ -21,6 +22,7 @@ export function deriveFingerprint(defect: Pick<Defect, "title" | "fingerprint" |
   const basis = [
     normalizeTitleKey(defect.title),
     compact(defect.pageUrl) ?? "",
+    stackSignature(defect.stackTrace),
     (compact(defect.stackTrace) ?? "").slice(0, 200),
   ].join("|");
   return createHash("sha1").update(basis).digest("hex").slice(0, 16);
