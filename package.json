@@ -35,6 +35,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "dev:serve": "tsx src/cli.ts serve",
+    "swe:batch": "tsx adapters/swe-bench/cli.ts",
     "prepack": "npm run build"
   },
   "keywords": [

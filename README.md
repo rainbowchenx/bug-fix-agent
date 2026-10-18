@@ -135,6 +135,10 @@ Phase A 可信闭环与 Phase B 修复真值已落地。计划：[Phase A](docs/
 
 差距分析与后续 Phase C–D：[implementation-gap-analysis-and-roadmap](docs/superpowers/specs/2026-10-17-implementation-gap-analysis-and-roadmap.md)。
 
+## SWE-bench 适配（独立上层）
+
+公开榜评测不塞进核心：`adapters/swe-bench/` 只通过 `handlers` 注入 checkout / patch 交付，导出 `predictions.jsonl` 后再用官方 harness 打分。用法见 [adapters/swe-bench/README.md](adapters/swe-bench/README.md)。
+
 ## 库 API
 
 ```ts
