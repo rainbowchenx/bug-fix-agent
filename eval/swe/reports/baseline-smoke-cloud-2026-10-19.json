@@ -1,0 +1,114 @@
+{
+  "run_id": "baseline-smoke-cloud",
+  "git_sha": "ba6d6e1410d26cb1d9c364e20d6f6cfaa806c2ee",
+  "finished_at": "2026-10-19T14:16:50.746869+00:00",
+  "dataset": "eval/swe/data/lite-smoke-10.jsonl",
+  "limit": 10,
+  "model": "deepseek-flash",
+  "base_url": "https://api.deepseek.com/anthropic",
+  "summary": {
+    "total": 10,
+    "fixed": 6,
+    "unfixed": 4,
+    "error": 0,
+    "pipeline_fixed_rate": 0.6,
+    "predictions_exported": 6
+  },
+  "note": "pipeline fixed = GREEN+patch delivered. Official SWE Resolved% needs Docker harness (not run in this cloud VM).",
+  "results": [
+    {
+      "instance_id": "pallets__flask-4992",
+      "runId": "5c31bcad-19cd-458d-b3d0-c9f90bc9aa79",
+      "outcome": "fixed",
+      "mrUrl": "swe-patch://pallets__flask-4992",
+      "patch_bytes": 3072,
+      "patch_lines": 88,
+      "has_prediction": true
+    },
+    {
+      "instance_id": "psf__requests-863",
+      "runId": "ec06cc01-6133-43eb-8574-5213ca20c36e",
+      "outcome": "fixed",
+      "mrUrl": "swe-patch://psf__requests-863",
+      "patch_bytes": 1875,
+      "patch_lines": 59,
+      "has_prediction": true
+    },
+    {
+      "instance_id": "mwaskom__seaborn-3407",
+      "runId": "162743d6-73c4-44fc-8278-2619a90ee119",
+      "outcome": "fixed",
+      "mrUrl": "swe-patch://mwaskom__seaborn-3407",
+      "patch_bytes": 1860,
+      "patch_lines": 52,
+      "has_prediction": true
+    },
+    {
+      "instance_id": "pydata__xarray-4094",
+      "runId": "866c0c15-7e2a-4995-8cec-3e5828570965",
+      "outcome": "unfixed",
+      "reasonCode": "analyze_failed",
+      "reasonDetail": "Analyze failed: Claude Code returned an error result: Reached maximum number of turns (25)",
+      "patch_bytes": 0,
+      "patch_lines": 0,
+      "has_prediction": false
+    },
+    {
+      "instance_id": "astropy__astropy-14182",
+      "runId": "d08ba2ba-1713-4e2f-87c7-56f51768b6f0",
+      "outcome": "unfixed",
+      "reasonCode": "implement_failed",
+      "reasonDetail": "Claude Code returned an error result: Reached maximum number of turns (40)",
+      "patch_bytes": 0,
+      "patch_lines": 0,
+      "has_prediction": false
+    },
+    {
+      "instance_id": "pytest-dev__pytest-8906",
+      "runId": "50b6d28d-4382-43fc-bc84-5aebe02d8c9e",
+      "outcome": "fixed",
+      "mrUrl": "swe-patch://pytest-dev__pytest-8906",
+      "patch_bytes": 1639,
+      "patch_lines": 34,
+      "has_prediction": true
+    },
+    {
+      "instance_id": "scikit-learn__scikit-learn-10297",
+      "runId": "cda35f5b-962a-495e-b1c7-2b997e0236dc",
+      "outcome": "fixed",
+      "mrUrl": "swe-patch://scikit-learn__scikit-learn-10297",
+      "patch_bytes": 2689,
+      "patch_lines": 66,
+      "has_prediction": true
+    },
+    {
+      "instance_id": "matplotlib__matplotlib-24970",
+      "runId": "acc80e9f-be64-4ee8-86cb-47495c6c8ff5",
+      "outcome": "fixed",
+      "mrUrl": "swe-patch://matplotlib__matplotlib-24970",
+      "patch_bytes": 2756,
+      "patch_lines": 61,
+      "has_prediction": true
+    },
+    {
+      "instance_id": "django__django-12708",
+      "runId": "545fc80f-5836-4b12-b131-ad8f5f29a92e",
+      "outcome": "unfixed",
+      "reasonCode": "implement_failed",
+      "reasonDetail": "Reproduction step failed: Claude Code returned an error result: Reached maximum number of turns (40)",
+      "patch_bytes": 0,
+      "patch_lines": 0,
+      "has_prediction": false
+    },
+    {
+      "instance_id": "sympy__sympy-14024",
+      "runId": "af9a5f64-6046-4171-803f-052b3c324fc1",
+      "outcome": "unfixed",
+      "reasonCode": "implement_failed",
+      "reasonDetail": "Claude Code returned an error result: Reached maximum number of turns (40)",
+      "patch_bytes": 0,
+      "patch_lines": 0,
+      "has_prediction": false
+    }
+  ]
+}
