@@ -137,7 +137,16 @@ Phase A 可信闭环与 Phase B 修复真值已落地。计划：[Phase A](docs/
 
 ## SWE-bench 适配（独立上层）
 
-公开榜评测不塞进核心：`adapters/swe-bench/` 只通过 `handlers` 注入 checkout / patch 交付，导出 `predictions.jsonl` 后再用官方 harness 打分。用法见 [adapters/swe-bench/README.md](adapters/swe-bench/README.md)。
+公开榜评测不塞进核心：`adapters/swe-bench/` 只通过 `handlers` 注入 checkout / patch 交付，导出 `predictions.jsonl` 后再用官方 harness 打分。
+
+```bash
+# .env 配好 ANTHROPIC_API_KEY 后
+npm run swe:baseline      # 烟雾 10 条 → predictions
+npm run swe:baseline:20   # 20 条
+npm run swe:eval          # Docker 官方 harness 打分（需 swebench）
+```
+
+详见 [eval/swe/README.md](eval/swe/README.md)、[adapters/swe-bench/README.md](adapters/swe-bench/README.md)。
 
 ## 库 API
 

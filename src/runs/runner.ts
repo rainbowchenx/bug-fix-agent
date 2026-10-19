@@ -255,6 +255,15 @@ async function processCluster(args: {
       analysis.solution,
     );
   }
+  if (analysis.agentTranscript) {
+    await writeClusterArtifact(
+      args.workDir,
+      args.runId,
+      args.cluster.id,
+      "analyze-transcript.json",
+      { text: analysis.agentTranscript },
+    );
+  }
   if (analysis.localization) {
     await writeClusterArtifact(
       args.workDir,

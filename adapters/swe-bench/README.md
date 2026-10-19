@@ -13,26 +13,22 @@ instances.jsonl  →  adapters/swe-bench  →  runPipeline(handlers)
 
 ## 跑子集基线
 
-1. 准备实例文件（官方 Lite/Verified 导出或自截 20 条），需字段：`instance_id`、`repo`、`base_commit`、`problem_statement`；建议含 `FAIL_TO_PASS`。
-2. 配置模型：`ANTHROPIC_API_KEY`（及可选 `ANTHROPIC_BASE_URL` / `ANTHROPIC_MODEL`）。
-3. 批跑：
+仓库内已备好实例与脚本，详见 [`eval/swe/README.md`](../../eval/swe/README.md)。
+
+1. 根目录 `.env` 配置 `ANTHROPIC_API_KEY`（可选 `ANTHROPIC_BASE_URL` / `ANTHROPIC_MODEL`）。
+2. 烟雾 10 条：`npm run swe:baseline`  
+   或 20 条：`npm run swe:baseline:20`（数据在 `eval/swe/data/`）。
+3. 全量/更大子集（需 HuggingFace）：`npm run swe:fetch`
+4. 官方 harness 打分：`npm run swe:eval`（需 Docker + `pip install swebench`）
+
+手动等价：
 
 ```bash
 npx tsx adapters/swe-bench/cli.ts \
-  --instances D:/data/swe-lite-20.jsonl \
-  --work-dir D:/eval/swe-run1 \
-  --predictions D:/eval/swe-run1/predictions.jsonl \
-  --limit 20
-```
-
-4. 用官方 harness 打分（本 adapter **不**内嵌 Docker 评测）：
-
-```bash
-python -m swebench.harness.run_evaluation \
-  --dataset_name princeton-nlp/SWE-bench_Lite \
-  --predictions_path D:/eval/swe-run1/predictions.jsonl \
-  --max_workers 4 \
-  --run_id bugfix-agent-smoke
+  --instances eval/swe/data/lite-smoke-10.jsonl \
+  --work-dir eval/swe/runs/baseline-smoke \
+  --predictions eval/swe/runs/baseline-smoke/predictions.jsonl \
+  --limit 10
 ```
 
 ## 行为说明

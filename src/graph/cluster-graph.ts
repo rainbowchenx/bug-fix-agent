@@ -202,6 +202,9 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
         ]),
       ],
     });
+    if (analysis.agentTranscript) {
+      await artifact(s, "analyze-transcript.json", { text: analysis.agentTranscript });
+    }
     if (analysis.rootCause) await artifact(s, "root-cause.json", analysis.rootCause);
     if (analysis.solution) await artifact(s, "solution.json", analysis.solution);
     if (analysis.localization) {

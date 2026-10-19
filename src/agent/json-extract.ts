@@ -42,16 +42,42 @@ export function extractFirstJsonObject(text: string): unknown {
   return JSON.parse(extracted.json) as unknown;
 }
 
+/** Label token outside JSON strings, so a word inside an earlier object is not a heading. */
+export function indexOfLabel(text: string, label: string): number {
+  const lower = label.toLowerCase();
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]!;
+    if (inString) {
+      if (escape) escape = false;
+      else if (ch === "\\") escape = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (text.slice(i, i + label.length).toLowerCase() !== lower) continue;
+    const before = i === 0 ? "" : text[i - 1]!;
+    const after = text[i + label.length] ?? "";
+    if (!/\w/.test(before) && !/\w/.test(after)) return i;
+  }
+  return -1;
+}
+
 /**
- * Find object after a label (ROOT_CAUSE / SOLUTION) or fenced ```json block near the label.
+ * Find the object after a heading (ROOT_CAUSE / SOLUTION / LOCALIZATION),
+ * or a fenced ```json block after that heading.
+ * A missing heading is an error. Falling back to the first object in the
+ * text would reuse an earlier artifact (usually ROOT_CAUSE) under the wrong schema.
  */
 export function extractLabeledJson(text: string, label: string): unknown {
-  const labelRe = new RegExp(`${label}\\b`, "i");
-  const labelMatch = labelRe.exec(text);
-  const from = labelMatch ? labelMatch.index + labelMatch[0].length : 0;
-  const slice = text.slice(from);
+  const at = indexOfLabel(text, label);
+  if (at < 0) throw new Error(`Missing ${label} JSON object`);
+  const slice = text.slice(at + label.length);
 
-  // Prefer fenced block after label
   const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(slice);
   if (fence?.[1]) {
     const inner = fence[1].trim();
@@ -67,6 +93,5 @@ export function extractLabeledJson(text: string, label: string): unknown {
     if (bal) return JSON.parse(bal.json) as unknown;
   }
 
-  // Fallback: first object in whole text
-  return extractFirstJsonObject(text);
+  throw new Error(`Missing ${label} JSON object`);
 }

@@ -36,6 +36,12 @@
     "test:watch": "vitest",
     "dev:serve": "tsx src/cli.ts serve",
     "swe:batch": "tsx adapters/swe-bench/cli.ts",
+    "swe:baseline": "tsx adapters/swe-bench/cli.ts --instances eval/swe/data/lite-smoke-10.jsonl --work-dir eval/swe/runs/baseline-smoke --predictions eval/swe/runs/baseline-smoke/predictions.jsonl --limit 10",
+    "swe:baseline:20": "tsx adapters/swe-bench/cli.ts --instances eval/swe/data/lite-20.jsonl --work-dir eval/swe/runs/baseline-20 --predictions eval/swe/runs/baseline-20/predictions.jsonl --limit 20",
+    "swe:fetch": "py -3.12 adapters/swe-bench/fetch-instances.py --out eval/swe/data/lite-50.jsonl --limit 50",
+    "swe:export:official": "py -3.12 eval/swe/export-official-lite.py --out eval/swe/data/official-lite-20.jsonl --limit 20",
+    "swe:baseline:official20": "tsx adapters/swe-bench/cli.ts --instances eval/swe/data/official-lite-20.jsonl --work-dir eval/swe/runs/official-20 --predictions eval/swe/runs/official-20/predictions.jsonl --limit 20",
+    "swe:eval": "py -3.12 -m swebench.harness.run_evaluation --dataset_name SWE-bench/SWE-bench_Lite --predictions_path eval/swe/runs/official-20/predictions.jsonl --max_workers 1 --run_id official-20",
     "prepack": "npm run build"
   },
   "keywords": [

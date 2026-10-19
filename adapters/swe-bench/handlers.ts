@@ -43,17 +43,20 @@ export function createSweEnsureRepo(ctx: SweHandlerContext) {
     const wt = worktreePath(input.workDir, input.runId, input.clusterId);
     const clean = cleanRepoUrl(input.repoUrl);
 
+    // Shallow fetch of the exact base_commit — full clone is too slow for SWE repos.
     if (!(await gitDirExists(mirror, run))) {
       await mkdir(mirror, { recursive: true });
-      await run("git", ["clone", clean, mirror]);
-    } else {
-      await run("git", ["fetch", "--all", "--tags"], { cwd: mirror }).catch(() => undefined);
+      await run("git", ["init"], { cwd: mirror });
+      await run("git", ["remote", "add", "origin", clean], { cwd: mirror });
     }
 
     await run("git", ["cat-file", "-e", `${commit}^{commit}`], { cwd: mirror }).catch(async () => {
       await run("git", ["fetch", "--depth", "1", "origin", commit], { cwd: mirror }).catch(
         async () => {
-          await run("git", ["fetch", "origin", commit], { cwd: mirror });
+          // Some hosts need the full SHA as ref without depth limits falling back
+          await run("git", ["fetch", "--depth", "1", "origin", `+${commit}:refs/swe/${commit}`], {
+            cwd: mirror,
+          });
         },
       );
     });

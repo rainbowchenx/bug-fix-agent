@@ -12,8 +12,11 @@
  *   python -m swebench.harness.run_evaluation --predictions_path ... --run_id ...
  */
 import path from "node:path";
+import { config as loadDotenv } from "dotenv";
 import { loadSweInstances } from "./load-instances.js";
 import { runSweBatch } from "./run-batch.js";
+
+loadDotenv();
 
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);
@@ -50,6 +53,14 @@ Environment: ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL, ANTHROPIC_MODEL
   const engineRaw = flag(args, "--engine");
   const engine =
     engineRaw === "langgraph" || engineRaw === "pipeline" ? engineRaw : undefined;
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error(
+      "ANTHROPIC_API_KEY is not set. Create a .env in the repo root (see .env.example) before running the baseline.",
+    );
+    process.exitCode = 2;
+    return;
+  }
 
   const instances = await loadSweInstances(path.resolve(instancesPath));
   console.log(`Loaded ${instances.length} instances; limit=${flagNum(args, "--limit") ?? "all"}`);

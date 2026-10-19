@@ -53,6 +53,58 @@ export function parseSolution(data: unknown): SolutionArtifact {
   return SolutionArtifactSchema.parse(data);
 }
 
+/**
+ * Accept solution shapes models actually emit, without inventing a plan.
+ * String steps become {title, description}. Aliases map onto the schema fields.
+ */
+export function coerceSolutionInput(data: unknown): unknown {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return data;
+  const obj = { ...(data as Record<string, unknown>) };
+  if (typeof obj.one_line_summary !== "string" || !obj.one_line_summary.trim()) {
+    for (const key of ["summary", "oneLineSummary"] as const) {
+      const value = obj[key];
+      if (typeof value === "string" && value.trim()) {
+        obj.one_line_summary = value.trim();
+        break;
+      }
+    }
+  }
+  if (!Array.isArray(obj.target_files)) {
+    const files = obj.targetFiles ?? obj.files;
+    if (Array.isArray(files)) obj.target_files = files.filter((f) => typeof f === "string");
+  }
+  if (typeof obj.steps === "string" && obj.steps.trim()) {
+    obj.steps = [obj.steps];
+  }
+  if (Array.isArray(obj.steps)) {
+    obj.steps = obj.steps.map((step, i) => {
+      if (typeof step === "string" && step.trim()) {
+        return { title: `Step ${i + 1}`, description: step.trim() };
+      }
+      if (step && typeof step === "object" && !Array.isArray(step)) {
+        const s = step as Record<string, unknown>;
+        const title = String(s.title ?? s.name ?? `Step ${i + 1}`).trim();
+        const description = String(s.description ?? s.detail ?? s.action ?? "").trim();
+        return {
+          title: title || `Step ${i + 1}`,
+          description: description || title,
+        };
+      }
+      return step;
+    });
+  }
+  return obj;
+}
+
+export function parseSolutionText(text: string, opts?: { allowBare?: boolean }): SolutionArtifact {
+  try {
+    return parseSolution(coerceSolutionInput(extractLabeledJson(text, "SOLUTION")));
+  } catch (labeled) {
+    if (!opts?.allowBare) throw labeled;
+    return parseSolution(coerceSolutionInput(extractFirstJsonObject(text)));
+  }
+}
+
 /** Extract first JSON object from agent text (brace-balanced, tolerant). */
 export function extractJsonObject(text: string): unknown {
   return extractFirstJsonObject(text);

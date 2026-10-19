@@ -10,5 +10,13 @@ coverage/
 .turbo/
 .vitest/
 
+# SWE eval workspaces / large caches
+eval/swe/runs/
+eval/swe/data/*.raw.*
+eval/swe/data/b64.txt
+eval/swe/data/instances.json
+eval/swe/data/lite-20/
+logs/
+
 # LangGraph API
 .langgraph_api

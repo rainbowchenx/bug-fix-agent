@@ -46,22 +46,52 @@ export async function hasCodeChanges(
   return files.length > 0;
 }
 
+function isAgentLocalPath(filePath: string): boolean {
+  return filePath.replace(/\\/g, "/").startsWith(".claude/");
+}
+
+async function diffUntrackedFile(
+  repoPath: string,
+  filePath: string,
+  execFileFn: ExecFileFn,
+): Promise<string> {
+  try {
+    const { stdout } = await execFileFn(
+      "git",
+      ["diff", "--no-index", "--", "/dev/null", filePath],
+      { cwd: repoPath },
+    );
+    return stdout;
+  } catch (err) {
+    // git --no-index exits 1 when a diff exists and still prints it on stdout.
+    const e = err as { stdout?: string };
+    return e.stdout ?? "";
+  }
+}
+
 export async function getDiffText(
   repoPath: string,
   baseSha: string,
   execFileFn: ExecFileFn = defaultExec,
   maxChars = 24_000,
 ): Promise<string> {
-  const { stdout } = await execFileFn("git", ["diff", baseSha], { cwd: repoPath });
+  const { stdout } = await execFileFn(
+    "git",
+    ["diff", baseSha, "--", ".", ":(exclude).claude"],
+    { cwd: repoPath },
+  );
   const { stdout: untrackedNames } = await execFileFn(
     "git",
     ["ls-files", "--others", "--exclude-standard"],
     { cwd: repoPath },
   ).catch(() => ({ stdout: "" }));
   let text = stdout;
-  const names = untrackedNames.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  const names = untrackedNames
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter((name) => name && !isAgentLocalPath(name));
   for (const name of names.slice(0, 20)) {
-    text += `\n--- /dev/null\n+++ b/${name}\n(new untracked file)\n`;
+    text += await diffUntrackedFile(repoPath, name, execFileFn);
   }
   const trimmed = text.trim();
   if (trimmed.length <= maxChars) return trimmed;
