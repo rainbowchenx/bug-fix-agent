@@ -115,16 +115,30 @@ function failToPassList(inst: SweInstance): string[] {
 }
 
 export function createSweHandlers(ctx: SweHandlerContext): ClusterHandlers {
+  const skipInstall = ctx.skipInstall ?? true;
   return {
     ensureRepo: createSweEnsureRepo(ctx),
     deliverFix: createSweDeliverFix(ctx),
-    prepareRepo: ctx.skipInstall
+    prepareRepo: skipInstall
       ? async () => ({ ok: true, logTail: "swe-adapter: skip install" })
       : async () => ({
           ok: true,
           logTail:
             "swe-adapter: install skipped by default (use host venv or Docker eval for deps)",
         }),
+    /**
+     * Without a full SWE image, local pytest is not a truth signal.
+     * Defer scoring to the official harness instead of treating env-red as product-red
+     * (or as a silent "same signature → green" via isNewFailure).
+     */
+    runVerify: skipInstall
+      ? async (_repoPath, plan) => ({
+          ok: true,
+          command: plan.test.join(" && ") || "swe:deferred-verify",
+          logTail:
+            "swe-adapter: skipInstall — local verify deferred to official swebench harness",
+        })
+      : undefined,
     resolveVerifyPlan: async ({ overrides }) => {
       const fail = failToPassList(ctx.instance);
       return {
@@ -133,8 +147,8 @@ export function createSweHandlers(ctx: SweHandlerContext): ClusterHandlers {
         test:
           overrides?.test ??
           (fail.length
-            ? [`python -m pytest -x ${fail.slice(0, 20).join(" ")}`]
-            : ["python -m pytest -x"]),
+            ? [`python3 -m pytest -x ${fail.slice(0, 20).join(" ")}`]
+            : ["python3 -m pytest -x"]),
       };
     },
   };

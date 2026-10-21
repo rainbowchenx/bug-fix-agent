@@ -70,6 +70,7 @@ ${input.verifyLogTail ?? "(none)"}
 Rules:
 - Minimal diff only; do not refactor unrelated code.
 - Prefer editing existing files over creating new ones.
+- When target_files / evidence already name the edit sites, open those paths and Edit immediately — do not spend turns on broad Grep/Glob exploration.
 - Prefer fixing product code over weakening tests (unless the test assertion is clearly wrong).
 - Do not commit, push, or open MRs.
 `;
@@ -92,7 +93,8 @@ export async function implementCluster(
     cwd: input.repoPath,
     prompt: buildImplementPrompt(input),
     mode: "implement",
-    maxTurns: 40,
+    // reproduce is narrower; fix needs headroom on large repos / weaker models
+    maxTurns: input.phase === "reproduce" ? 40 : 80,
     skillsDir: input.skillsDir,
     skillIds: input.skillIds,
     mcpServers: input.mcpServers,

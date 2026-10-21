@@ -37,7 +37,8 @@ npx tsx adapters/swe-bench/cli.ts \
 |------|----------|
 | `base_commit` checkout | adapter `ensureRepo` handler |
 | 跳过 GitLab，写 `model_patch` | adapter `deliverFix` handler |
-| pytest 启发式 | adapter `resolveVerifyPlan`（可用 request 的 `verifyOverrides`） |
-| 默认跳过 pip install | `skipInstall`（加 `--install` 才走 prepare；完整依赖仍建议官方镜像评测） |
+| pytest 启发式（`python3`） | adapter `resolveVerifyPlan` / `map-instance` |
+| 默认跳过 pip install | `skipInstall`：本地 `runVerify` 记为 deferred，**不以本机 pytest 当真绿**；加 `--install` 才跑真 verify |
+| 跳过 reproduce | request `options.skipReproduce: true`（官方已有 FAIL_TO_PASS） |
 
 公司内部缺陷可平行新增 `adapters/internal-bugs/`，复用同一 handlers 模式，互不污染。

@@ -18,7 +18,12 @@ const ENV_PATTERNS: { re: RegExp; label: string }[] = [
   { re: /npm ERR!/i, label: "npm ERR!" },
   { re: /ELIFECYCLE/i, label: "ELIFECYCLE" },
   { re: /Cannot find module/i, label: "Cannot find module" },
+  { re: /No module named/i, label: "No module named" },
+  { re: /ModuleNotFoundError/i, label: "ModuleNotFoundError" },
   { re: /command not found/i, label: "command not found" },
+  // /bin/sh: 1: python: not found  (dash/ash) — not the same as "command not found"
+  { re: /:\s*not found\b/i, label: "shell not found" },
+  { re: /\/bin\/sh:.*\bnot found\b/i, label: "sh not found" },
   { re: /ECONNREFUSED/i, label: "ECONNREFUSED" },
   { re: /ENOTFOUND/i, label: "ENOTFOUND" },
   { re: /No such file or directory/i, label: "missing file/dir" },
