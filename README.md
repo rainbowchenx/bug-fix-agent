@@ -137,6 +137,10 @@ Phase A 可信闭环与 Phase B 修复真值已落地。计划：[Phase A](docs/
 
 缺陷输入形态与来源契约（真实样本实测：无堆栈、仅文本/图、状态过滤、附件缺失、验证边界）：[defect-input-shape-and-source-contract](docs/superpowers/specs/2026-10-22-defect-input-shape-and-source-contract.md)。
 
+目标流水线设计（12 步主流程：规则初筛 → 分簇 → 范围圈定 → 分析定位 → RED→改码→验证分流 → 串行交付 → 双结局报告）：[target-pipeline-design](docs/superpowers/specs/2026-10-22-target-pipeline-design.md)。
+
+环境适配层与能力降级（业务异构不可穷举：前置 `EnvironmentProfile` 契约 + `capabilities` 派生 + L0~L3 降级阶梯 + 探针化验证）：[environment-adapter-and-capability-degradation](docs/superpowers/specs/2026-10-22-environment-adapter-and-capability-degradation.md)。
+
 ## SWE-bench 适配（独立上层）
 
 公开榜评测不塞进核心：`adapters/swe-bench/` 只通过 `handlers` 注入 checkout / patch 交付，导出 `predictions.jsonl` 后再用官方 harness 打分。
