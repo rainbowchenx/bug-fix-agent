@@ -141,6 +141,8 @@ Phase A 可信闭环与 Phase B 修复真值已落地。计划：[Phase A](docs/
 
 环境适配层与能力降级（业务异构不可穷举：前置 `EnvironmentProfile` 契约 + `capabilities` 派生 + L0~L3 降级阶梯 + 探针化验证）：[environment-adapter-and-capability-degradation](docs/superpowers/specs/2026-10-22-environment-adapter-and-capability-degradation.md)。
 
+**报告型分析 Agent 设计（最终产品边界：只分析、不出 MR）**：置信度分级 + `suggestedAction` 路由 + 报告 6 段契约 + `ruledOut`/`openQuestions` 交接：[report-agent-design](docs/superpowers/specs/2026-10-23-report-agent-design.md)。
+
 ## SWE-bench 适配（独立上层）
 
 公开榜评测不塞进核心：`adapters/swe-bench/` 只通过 `handlers` 注入 checkout / patch 交付，导出 `predictions.jsonl` 后再用官方 harness 打分。

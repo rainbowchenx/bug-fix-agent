@@ -4,6 +4,8 @@
 > 前置依据：[缺陷输入形态与来源契约](2026-10-22-defect-input-shape-and-source-contract.md)（`OBS-*` / `INV-*` / `C-*` / `GAP-F*`）、[目标流水线设计](2026-10-22-target-pipeline-design.md)（`S0..S10` / `CLS-*` / `LOC-*` / `GATE-*` / `DEL-*`）。
 > 定位：回答「业务环境异构、无法穷举适配」时的工程出路。本文定义**适配层的契约（`EnvironmentProfile`）、能力派生（`capabilities`）与降级阶梯（`L0..L3`）**，并给出对主流程的增量修改。**不含实现**。
 > 一句话立场：**不追求全适配，追求可度量的降级。**
+>
+> **⚠️ 产品边界变更**：本产品最终**只做分析、不出 MR**（见 [报告型分析 Agent 设计](2026-10-23-report-agent-design.md)）。因此本文中的 `Probe` 执行、dev-server 托管、多仓交付（`ENV-9`）**属下游职责**；本产品只消费 `profile.localization` 与 `profile.capabilities` 用于分析阶段的降级判定（`L0..L3` 仍成立：`L1` 只能出报告、不能给运行时验证方案）。
 
 ---
 
