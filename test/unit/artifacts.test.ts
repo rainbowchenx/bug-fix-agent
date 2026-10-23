@@ -35,6 +35,18 @@ describe("RootCauseArtifact", () => {
       }),
     ).toThrow();
   });
+
+  it("coerces boolean relevant_repo to null", () => {
+    const rc = parseRootCause({
+      headline: "mode flag missing",
+      one_line_description: "from_file always opens text mode",
+      five_whys: ["why"],
+      reproduction_steps: ["repro"],
+      relevant_repo: true,
+      fixability: { assessment: "fixable", reason: "add text flag" },
+    });
+    expect(rc.relevant_repo).toBeNull();
+  });
 });
 
 describe("SolutionArtifact", () => {

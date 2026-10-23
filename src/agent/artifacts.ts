@@ -45,8 +45,49 @@ export const SolutionArtifactSchema = z.object({
 });
 export type SolutionArtifact = z.infer<typeof SolutionArtifactSchema>;
 
+/**
+ * Accept root-cause shapes models actually emit.
+ * Boolean/empty relevant_repo → null; string arrays stay; common aliases map in.
+ */
+export function coerceRootCauseInput(data: unknown): unknown {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return data;
+  const obj = { ...(data as Record<string, unknown>) };
+
+  if (obj.relevant_repo !== undefined && obj.relevant_repo !== null) {
+    if (typeof obj.relevant_repo === "boolean") {
+      obj.relevant_repo = null;
+    } else if (typeof obj.relevant_repo === "number") {
+      obj.relevant_repo = String(obj.relevant_repo);
+    } else if (typeof obj.relevant_repo === "string") {
+      const trimmed = obj.relevant_repo.trim();
+      obj.relevant_repo = trimmed || null;
+    } else {
+      obj.relevant_repo = null;
+    }
+  }
+
+  for (const key of ["five_whys", "reproduction_steps", "evidence"] as const) {
+    if (typeof obj[key] === "string" && obj[key].trim()) {
+      obj[key] = [obj[key].trim()];
+    }
+  }
+
+  if (obj.fixability && typeof obj.fixability === "object" && !Array.isArray(obj.fixability)) {
+    const f = { ...(obj.fixability as Record<string, unknown>) };
+    if (typeof f.assessment === "string") {
+      f.assessment = f.assessment.trim().toLowerCase().replace(/\s+/g, "_");
+    }
+    if (typeof f.reason !== "string" || !f.reason.trim()) {
+      f.reason = typeof f.reason === "string" ? "unspecified" : String(f.reason ?? "unspecified");
+    }
+    obj.fixability = f;
+  }
+
+  return obj;
+}
+
 export function parseRootCause(data: unknown): RootCauseArtifact {
-  return RootCauseArtifactSchema.parse(data);
+  return RootCauseArtifactSchema.parse(coerceRootCauseInput(data));
 }
 
 export function parseSolution(data: unknown): SolutionArtifact {

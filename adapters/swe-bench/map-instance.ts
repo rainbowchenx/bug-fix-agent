@@ -49,9 +49,10 @@ export function mapInstanceToRequest(
 ): CreateRunRequest {
   const defect = mapInstanceToDefect(inst);
   const tests = opts?.failToPassTests ?? asList(inst.FAIL_TO_PASS);
+  // Prefer python3 — many cloud/Linux images have no `python` shim.
   const testCmd = tests.length
-    ? [`python -m pytest -x ${tests.map(shellQuote).join(" ")}`]
-    : ["python -m pytest -x"];
+    ? [`python3 -m pytest -x ${tests.map(shellQuote).join(" ")}`]
+    : ["python3 -m pytest -x"];
 
   return {
     workDir,
@@ -59,6 +60,7 @@ export function mapInstanceToRequest(
     userPrompt: [
       "SWE-bench evaluation mode: fix the issue described in the defect.",
       "Prefer minimal patch; do not commit or push.",
+      "FAIL_TO_PASS tests are known — skip inventing a separate reproduction test; edit product code directly.",
       tests.length ? `Focus tests: ${tests.slice(0, 8).join(", ")}` : "",
     ]
       .filter(Boolean)
@@ -67,6 +69,8 @@ export function mapInstanceToRequest(
       engine: opts?.engine,
       maxIterate: opts?.maxIterate ?? 3,
       skipReviewer: opts?.skipReviewer ?? true,
+      // Oracle tests already exist; reproduce burns turns without helping Resolved%.
+      skipReproduce: true,
       verifyOverrides: {
         install: [],
         test: testCmd,

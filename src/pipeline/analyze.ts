@@ -176,7 +176,7 @@ export async function analyzeCluster(
       const first = await run({
         ...sessionBase,
         prompt: buildAnalyzePrompt(input, map ? formatRepoMap(map) : ""),
-        maxTurns: 25,
+        maxTurns: 50,
       });
       let transcript = first.text;
       agentTranscript = clipTranscript(transcript);

@@ -57,6 +57,7 @@ py -3.12 -m swebench.harness.run_evaluation `
 
 ## 注意
 
-- Adapter 默认跳过 pip install；**最终数字以 Docker harness 为准**。
+- Adapter 默认跳过 pip install：本地 verify **deferred**，不以本机 pytest 当真绿；**最终数字以 Docker harness 为准**。
+- SWE 请求默认 `skipReproduce: true`（已有 FAIL_TO_PASS）；analyze/implement turn 上限已提高到 50/80。
 - 无 `ANTHROPIC_API_KEY` 时推理会在 analyze 阶段失败——先配模型再跑。
 - `eval/swe/runs/` 建议 gitignore（体积大）。

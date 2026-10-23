@@ -288,6 +288,9 @@ export function createClusterGraph(opts: BugfixGraphOptions = {}) {
   };
 
   const reproduceNode = async (s: ClusterState): Promise<ClusterUpdate> => {
+    if (s.options?.skipReproduce) {
+      return {};
+    }
     try {
       await (h.implementCluster ?? implementCluster)({
         cluster: s.cluster,
