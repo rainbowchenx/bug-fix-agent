@@ -143,6 +143,8 @@ Phase A 可信闭环与 Phase B 修复真值已落地。计划：[Phase A](docs/
 
 **报告型分析 Agent 设计（最终产品边界：只分析、不出 MR）**：置信度分级 + `suggestedAction` 路由 + 报告 6 段契约 + `ruledOut`/`openQuestions` 交接：[report-agent-design](docs/superpowers/specs/2026-10-23-report-agent-design.md)。
 
+落地前决策备忘与跟进（`Q-*` / 已确认：LangGraph Python + Claude Code、去 SWE、缺陷 MCP/xlsx、tag 可选）：[decision-memo](docs/superpowers/specs/2026-10-23-report-agent-decision-memo.md) · [decision-followup](docs/superpowers/specs/2026-10-23-report-agent-decision-followup.md)。
+
 ## SWE-bench 适配（独立上层）
 
 公开榜评测不塞进核心：`adapters/swe-bench/` 只通过 `handlers` 注入 checkout / patch 交付，导出 `predictions.jsonl` 后再用官方 harness 打分。
