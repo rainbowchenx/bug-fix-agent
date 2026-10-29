@@ -182,6 +182,11 @@ export const CreateRunOptionsSchema = z.object({
   gitlabProjectId: z.union([z.string(), z.number()]).optional(),
   /** Skip readonly reviewer gate (debug / fast path). Default false = reviewer on. */
   skipReviewer: z.boolean().optional(),
+  /**
+   * Skip the reproduce-phase agent session (write failing test before fix).
+   * Useful for SWE-bench where FAIL_TO_PASS already names the oracle tests.
+   */
+  skipReproduce: z.boolean().optional(),
   /** Open GitLab MR as Draft. */
   draftMr: z.boolean().optional(),
 });

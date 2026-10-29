@@ -41,4 +41,19 @@ AssertionError: expected 1 to equal 2
     expect(c.kind).toBe("flaky");
     expect(c.stopIterate).toBe(true);
   });
+
+  it("classifies /bin/sh python: not found as environment", () => {
+    const c = classifyVerifyFailure(
+      "/bin/sh: 1: python: not found\n\nCommand failed: python -m pytest -x",
+    );
+    expect(c.kind).toBe("environment");
+    expect(c.stopIterate).toBe(true);
+    expect(c.reason).toMatch(/not found/i);
+  });
+
+  it("classifies ModuleNotFoundError as environment", () => {
+    const c = classifyVerifyFailure("ModuleNotFoundError: No module named 'pytest'");
+    expect(c.kind).toBe("environment");
+    expect(c.stopIterate).toBe(true);
+  });
 });

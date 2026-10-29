@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createSweDeliverFix,
+  createSweHandlers,
   githubRepoUrl,
   loadSweInstances,
   mapInstanceToDefect,
@@ -43,9 +44,10 @@ describe("swe-bench adapter (decoupled)", () => {
       FAIL_TO_PASS: ["pkg/test_a.py::test_b"],
     });
     expect(req.defects).toHaveLength(1);
-    expect(req.options?.verifyOverrides?.test?.[0]).toContain("pytest");
+    expect(req.options?.verifyOverrides?.test?.[0]).toContain("python3 -m pytest");
     expect(req.options?.verifyOverrides?.test?.[0]).toContain("pkg/test_a.py::test_b");
     expect(req.options?.skipReviewer).toBe(true);
+    expect(req.options?.skipReproduce).toBe(true);
   });
 
   it("loads jsonl instances", async () => {
@@ -113,5 +115,30 @@ describe("swe-bench adapter (decoupled)", () => {
     expect(row.instance_id).toBe("id-1");
     expect(row.model_name_or_path).toBe("test-model");
     expect(row.model_patch).toContain("+fixed");
+  });
+
+  it("defers local verify when skipInstall (default)", async () => {
+    const handlers = createSweHandlers({
+      instance: {
+        instance_id: "id-2",
+        repo: "o/r",
+        base_commit: "base",
+        problem_statement: "p",
+        FAIL_TO_PASS: ["t.py::test_a"],
+      },
+      predictionsPath: "/tmp/unused.jsonl",
+      modelName: "m",
+    });
+    expect(handlers.runVerify).toBeTypeOf("function");
+    const result = await handlers.runVerify!("/tmp/repo", {
+      test: ["python3 -m pytest -x t.py::test_a"],
+    });
+    expect(result.ok).toBe(true);
+    expect(result.logTail).toMatch(/deferred/i);
+    const plan = await handlers.resolveVerifyPlan!({
+      repoPath: "/tmp/repo",
+      overrides: undefined,
+    });
+    expect(plan.test[0]).toContain("python3 -m pytest");
   });
 });

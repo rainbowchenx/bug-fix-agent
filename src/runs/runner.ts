@@ -351,39 +351,41 @@ async function processCluster(args: {
     }
   }
 
-  try {
-    await implement({
-      cluster: args.cluster,
-      repoPath,
-      rootCause: analysis.rootCause,
-      solution: analysis.solution,
-      baseSha,
-      iteration: 0,
-      phase: "reproduce",
-      skillsDir,
-      skillIds,
-      mcpServers,
-    });
-    const repro = await verify(repoPath, plan);
-    const reproNovel = isNewFailure(baselineVerify, {
-      ok: repro.ok,
-      command: repro.command,
-      logTail: repro.logTail,
-    });
-    if (!repro.ok && reproNovel) {
-      const reproClass = classify(repro.logTail, repro.command);
-      if (reproClass.stopIterate) {
-        return unfixedBase(
-          args.cluster,
-          reasonCodeForClassify(reproClass.kind),
-          `Reproduction verify blocked (${reproClass.kind}): ${reproClass.reason}`,
-        );
+  if (!args.options?.skipReproduce) {
+    try {
+      await implement({
+        cluster: args.cluster,
+        repoPath,
+        rootCause: analysis.rootCause,
+        solution: analysis.solution,
+        baseSha,
+        iteration: 0,
+        phase: "reproduce",
+        skillsDir,
+        skillIds,
+        mcpServers,
+      });
+      const repro = await verify(repoPath, plan);
+      const reproNovel = isNewFailure(baselineVerify, {
+        ok: repro.ok,
+        command: repro.command,
+        logTail: repro.logTail,
+      });
+      if (!repro.ok && reproNovel) {
+        const reproClass = classify(repro.logTail, repro.command);
+        if (reproClass.stopIterate) {
+          return unfixedBase(
+            args.cluster,
+            reasonCodeForClassify(reproClass.kind),
+            `Reproduction verify blocked (${reproClass.kind}): ${reproClass.reason}`,
+          );
+        }
+        meta.verifyLevel = "reproduced";
       }
-      meta.verifyLevel = "reproduced";
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return unfixedBase(args.cluster, "implement_failed", `Reproduction step failed: ${message}`);
     }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return unfixedBase(args.cluster, "implement_failed", `Reproduction step failed: ${message}`);
   }
 
   const baseStaticSnap: GateSnapshot = baselineStatic;
