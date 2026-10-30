@@ -8,11 +8,24 @@ import { NoChangesError } from "../../src/pipeline/deliver.js";
 import type { EnsureRepoInput, EnsureRepoResult, ExecFileFn } from "../../src/workspace/git.js";
 import { cleanRepoUrl } from "../../src/workspace/git.js";
 import { getDiffText, hasCodeChanges } from "../../src/workspace/diff.js";
-import { repoPath, worktreePath } from "../../src/workspace/paths.js";
+import { repoPath, safeRepoDirName, worktreePath } from "../../src/workspace/paths.js";
 import { appendPrediction } from "./predictions.js";
 import type { SweInstance } from "./types.js";
 
 const defaultExec = promisify(execFileCb) as ExecFileFn;
+
+/**
+ * Shared mirror cache filled by `eval/swe/prefetch-repos.py`.
+ * When set, all instances of the same GitHub repo reuse one shallow mirror
+ * instead of fetching mid-batch on flaky networks.
+ */
+function resolveMirrorPath(workDir: string, repoUrl: string): string {
+  const cacheRoot = process.env.SWE_MIRROR_CACHE?.trim();
+  if (cacheRoot) {
+    return path.join(cacheRoot, safeRepoDirName(repoUrl));
+  }
+  return repoPath(workDir, repoUrl);
+}
 
 export interface SweHandlerContext {
   instance: SweInstance;
@@ -39,7 +52,7 @@ export function createSweEnsureRepo(ctx: SweHandlerContext) {
   return async (input: EnsureRepoInput): Promise<EnsureRepoResult> => {
     const run = ctx.execFileFn ?? input.execFileFn ?? defaultExec;
     const commit = ctx.instance.base_commit;
-    const mirror = repoPath(input.workDir, input.repoUrl);
+    const mirror = resolveMirrorPath(input.workDir, input.repoUrl);
     const wt = worktreePath(input.workDir, input.runId, input.clusterId);
     const clean = cleanRepoUrl(input.repoUrl);
 

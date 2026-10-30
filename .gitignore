@@ -12,6 +12,7 @@ coverage/
 
 # SWE eval workspaces / large caches
 eval/swe/runs/
+eval/swe/cache/
 eval/swe/data/*.raw.*
 eval/swe/data/b64.txt
 eval/swe/data/instances.json

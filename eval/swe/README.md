@@ -10,9 +10,10 @@
 | 项 | 说明 |
 |----|------|
 | 模型 | 根目录 `.env` 设置 `ANTHROPIC_API_KEY`（可选 `ANTHROPIC_BASE_URL` / `ANTHROPIC_MODEL`） |
-| 实例 | 已备烟雾集 `eval/swe/data/lite-smoke-10.jsonl`（10 条真实 Lite 字段） |
-| 全量 Lite | `py -3.12 adapters/swe-bench/fetch-instances.py --out eval/swe/data/lite-50.jsonl --limit 50`（需能访问 HuggingFace） |
-| 打分 | Docker + `pip install swebench`（Python 3.12 推荐） |
+| 实例 | 官方 Lite 已落盘：`official-lite-300.jsonl`（全量 300）、`official-lite-50.jsonl`、`official-lite-20.jsonl`；烟雾集 `lite-smoke-10.jsonl` |
+| 重新导出 | `$env:HF_ENDPOINT="https://hf-mirror.com"; npm run swe:export:official:all`（需 HuggingFace / 镜像） |
+| 预拉仓库 | GitHub：`npm run swe:prefetch`；更稳：`npm run swe:prefetch:docker`（从官方评测镜像拷 `.git`）→ `eval/swe/cache/mirrors/`；批跑前 `$env:SWE_MIRROR_CACHE=(Resolve-Path eval/swe/cache/mirrors)` |
+| 打分 | Docker + `pip install swebench`（Python 3.12 推荐）；每条实例首次会拉对应官方评测镜像 |
 
 ## 一键推理（烟雾 10 条）
 

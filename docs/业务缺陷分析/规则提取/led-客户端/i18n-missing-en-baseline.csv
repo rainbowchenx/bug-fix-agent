@@ -1,0 +1,209 @@
+localeLayer,key,zh_CN,HEAD状态,HEAD en_US
+web,CalibrationTool.boxConfig.serialLength.msg,序列号长度不满足,已补,Serial number length does not meet requirements.
+web,CalibrationTool.config.paramAnalysis.name,参数分析,已补,Parameter Analysis
+web,CalibrationTool.config.continueTask.name,继续任务,已补,Continue Task
+web,CalibrationTool.config.restartTask.name,重新开始任务,已补,Restart Task
+web,CalibrationTool.config.continueBrightnessTask.msg,当前分区已有采集的灯珠数据信息，是否继续任务？重新开始采集会覆盖掉之前采集的数据,已补,The current partition already has captured data of lamp bead. Continue the task?
+web,CalibrationTool.projectDetail.environmentInfo.selectScreen.tooltipBefore.msg,在LED Tool中创建当前校正的屏幕，完成点屏后在此处选择该屏幕,已补,Create the current calibration screen in LED Tool. After completing screen light
+web,CalibrationTool.projectDetail.environmentInfo.selectScreen.tooltipNote.msg,注意：如此处布局与真实屏幕布局不一致，请前往LED Tool中调整,已补,"Note: If the layout here does not match the actual screen layout, please go to L"
+web,CalibrationTool.projectDetail.partitionConfig.cameraDisPreview2.name,相机摆放距离预览,已补,Camera Distance Preview
+web,CalibrationTool.projectDetail.partitionConfig.unit.mm.name,mm,已补,mm
+web,CalibrationTool.projectDetail.partitionConfig.hint.autoGenerateFirst.name,请先在左侧配置参数后点击「自动生成分区」,已补,"Please configure parameters on the left first, then click ""Auto Generate Partiti"
+web,CalibrationTool.projectDetail.partitionConfig.toast.fetchFailed.msg,获取分区配置数据失败,已补,Failed to get partition configuration data. 
+web,CalibrationTool.projectDetail.partitionConfig.toast.cameraDisSaveSuccess.msg,相机实际摆放距离保存成功,已补,Camera actual placement distance saved.  
+web,CalibrationTool.projectDetail.partitionConfig.toast.cameraDisSaveFailed.msg,保存相机实际摆放距离失败,已补,Failed to save the actual camera placement distance.
+web,CalibrationTool.projectDetail.partitionConfig.toast.savePartitionFailed.msg,保存分区配置数据失败,已补,Failed to save partition configuration data.
+web,CalibrationTool.projectDetail.partitionConfig.toast.cameraDistanceOutOfRange.msg,相机摆放距离不合适，请重新设置，推荐的相机距离范围为：{0} - {1},已补,Camera placement distance is inappropriate. Please reset. Recommended camera dis
+web,CalibrationTool.projectDetail.partitionConfig.confirm.transitionZoneReset.title.name,提示,已补,Prompt
+web,CalibrationTool.projectDetail.partitionConfig.confirm.transitionZoneReset.msg,分区为 1×1 时，过渡区采集固定为 0，将在确认后恢复为 0。,已补,"When the partition is 1×1, the transition zone capture is fixed at 0 and will be"
+web,CalibrationTool.cameraAdjust.moreParams.name,更多参数,已补,More
+web,CalibrationTool.cameraAdjust.effectReference.name,效果参考,已补,Effect Reference
+web,CalibrationTool.cameraAdjust.effectReference.title.name,目标效果参考,已补,Target effect reference. 
+web,CalibrationTool.cameraAdjust.exposureTimeUnit.ms.name,ms,已补,ms
+web,CalibrationTool.cameraAdjust.roughAdjustTip.seg1.msg, 1.请调节 ,已补,1. Please adjust 
+web,CalibrationTool.cameraAdjust.roughAdjustTip.apertureWarn.msg,光圈f/11,已补,aperture f/11
+web,CalibrationTool.cameraAdjust.roughAdjustTip.seg2.msg,"；
+ 2.请将 ",已补,";
+ 2. Please "
+web,CalibrationTool.cameraAdjust.roughAdjustTip.framingWarn.msg,相机取景画面放置于Max-Min 范围内,已补,place the camera viewfinder image within the Max-Min range
+web,CalibrationTool.cameraAdjust.roughAdjustTip.seg3.msg,"；
+ 3.调整 ",已补,"; 
+ 3. Suggestion"
+web,CalibrationTool.cameraAdjust.roughAdjustTip.microFocusWarn.msg,微焦,已补, micro-focus 
+web,CalibrationTool.cameraAdjust.roughAdjustTip.seg4.msg, 直到清晰显示灯珠,已补,until the lamp bead is clearly displayed
+web,CalibrationTool.cameraAdjust.roughAdjustTip.seg5.msg,"；
+ 4. 完成以上任务后，点击 “完成”",已补,";
+ 4. After completing the above tasks, click Finish."
+web,CalibrationTool.cameraAdjust.finPositionTip.prefix.msg,请确认 ,已补,Please confirm 
+web,CalibrationTool.cameraAdjust.finPositionTip.question.msg,定位框位置是否正确：,已补,is the positioning frame position correct:
+web,CalibrationTool.cameraAdjust.finPositionTip.instruction.msg,"
+ 若不正确，请拖动四个顶点修改定位区域后，请点击 “完成”
+   若正确，请直接点击 “完成”。",已补,"If incorrect, please drag the four vertices to adjust the positioning area, then"
+web,CalibrationTool.cameraAdjust.toast.setFilterFailed.msg,设置相机滤片失败,已补,Failed to set camera filter. 
+web,CalibrationTool.cameraAdjust.toast.positioningCalcFailed.msg,定位计算失败,已补,Positioning calculation failed. 
+web,CalibrationTool.cameraAdjust.toast.frameOutOfBounds.msg,画面不在最大最小框范围内，请调整相机位置使得画面完全在标记区域内,已补,The image is not within the maximum-minimum frame range. Please adjust the camer
+web,CalibrationTool.cameraAdjust.toast.cameraPoseLeft.msg,检测到相机镜头偏左，可能会影响后续分析,已补,"Detected that the camera lens is tilted to the left, which may affect subsequent"
+web,CalibrationTool.cameraAdjust.toast.cameraPoseRight.msg,检测到相机镜头偏右，可能会影响后续分析,已补,"Detected that the camera lens is tilted to the right, which may affect subsequen"
+web,CalibrationTool.cameraAdjust.toast.cameraPoseUp.msg,检测到相机镜头偏上，可能会影响后续分析,已补,"Detected that the camera lens is tilted upward, which may affect subsequent anal"
+web,CalibrationTool.cameraAdjust.toast.cameraPoseDown.msg,检测到相机镜头偏下，可能会影响后续分析,已补,"Detected that the camera lens is tilted downward, which may affect subsequent an"
+web,CalibrationTool.cameraAdjust.toast.cameraPoseLevel.msg,检测到相机镜头不水平，可能会影响后续分析,已补,"Detected that the camera lens is not level, which may affect subsequent analysis"
+web,CalibrationTool.cameraAdjust.toast.positioningSaved.msg,定位数据已保存,已补,Positioning data saved.
+web,CalibrationTool.cameraAdjust.toast.noRoiPoint.msg,未获取到定位坐标，请重新调整,已补,"Positioning coordinates not obtained, please readjust. "
+web,CalibrationTool.cameraAdjust.toast.needCornerPositioningFirst.msg,请先进行角点定位后再进行相机调节,已补,Please perform corner point positioning before adjusting the camera. 
+web,CalibrationTool.cameraAdjust.toast.edgeLedDeformation.msg,屏幕边缘灯点形变过大，请调大光圈数值,已补,"Excessive deformation of pixel points on screen edge:  
+1. Ensure the screen ima"
+web,CalibrationTool.cameraAdjust.toast.cameraAdjustCompleted.msg,相机调节已完成,已补,Camera adjustment completed.
+web,CalibrationTool.cameraAdjust.toast.paramAnalysisProgressFailed.msg,查询参数分析进度失败,已补,Failed to search parameter analysis progress.  
+web,CalibrationTool.cameraAdjust.toast.paramAnalysisCompleted.msg,参数分析完成,已补,Parameter analysis completed.
+web,CalibrationTool.cameraAdjust.toast.paramAnalysisFailed.msg,参数分析失败,已补,Parameter analysis failed.
+web,CalibrationTool.cameraAdjust.toast.connectCameraFirst.msg,请先连接相机，再开始使用本页面的功能,已补,Please connect the camera first before using the functions on this page.
+web,CalibrationTool.calibrationTarget.targetImplementationRatioOutOfRangeNext.msg,请检查屏幕，为保证均匀性，若存在坏点灯珠，请先维修再校正，若不存在坏点，请增大亮度损失。,已补,Target achievement ratio not met. This may cause abnormal calibration uniformity
+web,CalibrationTool.calibrationTarget.checkScrrenRect.msg,当前布局为非矩形或布局中存在空白或重叠区域，请点击刷新或前往LED Tool中调整屏幕,已补,The current layout is non-rectangular or contains blank or overlapping areas. Pl
+electron,CalibrationTool.errorNode.calibration:54.name,为获取到反初始化参数,已补,Deinitialization parameters not reached.
+subsystem,calibration_subsystem.algorithmSDK_4000,图像尺寸不匹配,已补,Image size mismatches. 
+subsystem,calibration_subsystem.algorithmSDK_4000_sgt,请检查图像分辨率是否正确,已补,Please check if the image resolution is correct.
+subsystem,calibration_subsystem.algorithmSDK_4001,图像通道数不匹配,已补,Number of image channel mismatches.  
+subsystem,calibration_subsystem.algorithmSDK_4001_sgt,请检查图像通道数是否正确,已补,Please check if the number of image channel is correct.
+subsystem,calibration_subsystem.algorithmSDK_4002,图像 bit 位不匹配,已补,Image bit depth mismatches.  
+subsystem,calibration_subsystem.algorithmSDK_4002_sgt,请检查图像 bit 位是否正确,已补,Please check if the image bit depth is correct.
+subsystem,calibration_subsystem.algorithmSDK_4003,参数无效,已补,Invalid parameters. 
+subsystem,calibration_subsystem.algorithmSDK_4003_sgt,请检查算法入参,已补,Please check the algorithm input parameters.
+subsystem,calibration_subsystem.algorithmSDK_4004,图像为空,已补,No image
+subsystem,calibration_subsystem.algorithmSDK_4004_sgt,请检查图像能否正常打开,已补,Please check if the image can be opened normally.
+subsystem,calibration_subsystem.algorithmSDK_4005,连通域太小,已补,Connected domain too small.  
+subsystem,calibration_subsystem.algorithmSDK_4005_sgt,请检查图像画面是否太暗,已补,Please check if the image is too dark.
+subsystem,calibration_subsystem.algorithmSDK_4006,连通域太大,已补,Connected domain too large. 
+subsystem,calibration_subsystem.algorithmSDK_4006_sgt,"1、请检查图像画面是否太亮
+2、请检查灯珠成像是否过度粘连",已补,"1. Please check if the image is too bright.  
+2. Please check if the lamp beads "
+subsystem,calibration_subsystem.algorithmSDK_4007,图像处理错误,已补,Image processing error. 
+subsystem,calibration_subsystem.algorithmSDK_4007_sgt,请检查拍摄的图片是否显示正常,已补,Please check if the captured image is displayed normally.
+subsystem,calibration_subsystem.algorithmSDK_4008,图片保存失败,已补,Saving image failed. 
+subsystem,calibration_subsystem.algorithmSDK_4008_sgt,请检查图片保存路径,已补,Please check the image save path.
+subsystem,calibration_subsystem.algorithmSDK_4009,背景光移除失败,已补,Removing background light failed. 
+subsystem,calibration_subsystem.algorithmSDK_4009_sgt,请检查对应的暗场图是否存在,已补,Please check if the corresponding dark field image exists.
+subsystem,calibration_subsystem.algorithmSDK_4010,ROI 提取失败,已补,ROI extraction failed.  
+subsystem,calibration_subsystem.algorithmSDK_4010_sgt,请检查屏幕定位的角点是否合适,已补,Please check if the screen positioning corner points are appropriate. 
+subsystem,calibration_subsystem.algorithmSDK_4011,无效的 ROI 区域,已补,Invalid ROI region. 
+subsystem,calibration_subsystem.algorithmSDK_4011_sgt,请检查屏幕定位的角点是否合适,已补,Please check if the screen positioning corner points are appropriate. 
+subsystem,calibration_subsystem.algorithmSDK_4012,无效模式,已补,Invalid mode.
+subsystem,calibration_subsystem.algorithmSDK_4012_sgt,输入的分析模式非法,已补,Invalid input analysis mode.
+subsystem,calibration_subsystem.algorithmSDK_4013,图像定位失败,已补,Image positioning failed.  
+subsystem,calibration_subsystem.algorithmSDK_4013_sgt,"1、请检查屏幕显示是否正常
+2、请检查拍摄的屏幕照片是否正常
+3、请检查是否有环境光干扰
+4、请确认是否遮挡屏幕或挪动相机",已补,"1. Please check if the screen display is normal.  
+2. Please check if the captur"
+subsystem,calibration_subsystem.algorithmSDK_4014,定位行列数不匹配,已补,Positioning rows and columns mismatch.  
+subsystem,calibration_subsystem.algorithmSDK_4014_sgt,"1、请检查屏幕显示是否正常
+2、请检查拍摄的屏幕照片是否正常
+3、请检查是否有环境光干扰
+4、请确认是否遮挡屏幕或挪动相机",已补,"1. Please check if the screen display is normal.  
+2. Please check if the captur"
+subsystem,calibration_subsystem.algorithmSDK_4015,亮度提取失败,已补,Brightness extraction failed. 
+subsystem,calibration_subsystem.algorithmSDK_4015_sgt,"1、请检查屏幕显示是否正常
+2、请检查拍摄的屏幕照片是否正常
+3、请检查是否有环境光干扰
+4、请确认是否遮挡屏幕或挪动相机",已补,"1. Please check if the screen display is normal.  
+2. Please check if the captur"
+subsystem,calibration_subsystem.algorithmSDK_4016,网格标定失败,已补,Grid calibration failed. 
+subsystem,calibration_subsystem.algorithmSDK_4016_sgt,"1、请检查屏幕显示棋盘图是否正常
+2、请检查拍摄的棋盘图照片是否正常
+3、请检查是否有环境光干扰
+4、请确认是否遮挡屏幕或挪动相机",已补,1. Please check if the displayed checkerboard pattern on the screen is normal.  
+subsystem,calibration_subsystem.algorithmSDK_4017,网格参数错误,已补,Grid parameter error.  
+subsystem,calibration_subsystem.algorithmSDK_4017_sgt,"1、请检查屏幕显示棋盘图是否正常
+2、请检查拍摄的棋盘图照片是否正常
+3、请检查是否有环境光干扰
+4、请确认是否遮挡屏幕或挪动相机",已补,1. Please check if the displayed checkerboard pattern on the screen is normal.  
+subsystem,calibration_subsystem.algorithmSDK_4018,网格角点定位失败,已补,Grid corner point positioning failed. 
+subsystem,calibration_subsystem.algorithmSDK_4018_sgt,"1、请检查屏幕显示棋盘图是否正常
+2、请检查拍摄的棋盘图照片是否正常
+3、请检查是否有环境光干扰
+4、请确认是否遮挡屏幕或挪动相机",已补,1. Please check if the displayed checkerboard pattern on the screen is normal.  
+subsystem,calibration_subsystem.algorithmSDK_4019,网格排序失败,已补,Grid sorting failed.  
+subsystem,calibration_subsystem.algorithmSDK_4019_sgt,"1、请检查屏幕显示棋盘图是否正常
+2、请检查拍摄的棋盘图照片是否正常
+3、请检查是否有环境光干扰
+4、请确认是否遮挡屏幕或挪动相机",已补,1. Please check if the displayed checkerboard pattern on the screen is normal.  
+subsystem,calibration_subsystem.algorithmSDK_4020,网格尺寸不匹配,已补,Grid size mismatches.  
+subsystem,calibration_subsystem.algorithmSDK_4020_sgt,"1、请检查屏幕显示棋盘图是否正常
+2、请检查拍摄的棋盘图照片是否正常
+3、请检查是否有环境光干扰
+4、请确认是否遮挡屏幕或挪动相机",已补,1. Please check if the displayed checkerboard pattern on the screen is normal.  
+subsystem,calibration_subsystem.algorithmSDK_4021,网格映射失败,已补,Grid mapping failed.
+subsystem,calibration_subsystem.algorithmSDK_4021_sgt,"1、请检查屏幕显示棋盘图是否正常
+2、请检查拍摄的棋盘图照片是否正常
+3、请检查是否有环境光干扰
+4、请确认是否遮挡屏幕或挪动相机",已补,1. Please check if the displayed checkerboard pattern on the screen is normal.  
+subsystem,calibration_subsystem.algorithmSDK_4022,网格边界修正失败,已补,Grid boundary correction failed. 
+subsystem,calibration_subsystem.algorithmSDK_4022_sgt,"1、请检查屏幕显示棋盘图是否正常
+2、请检查拍摄的棋盘图照片是否正常
+3、请检查是否有环境光干扰
+4、请确认是否遮挡屏幕或挪动相机",已补,1. Please check if the displayed checkerboard pattern on the screen is normal.  
+subsystem,calibration_subsystem.algorithmSDK_4023,网格映射结果为空,已补,Grid mapping result is empty. 
+subsystem,calibration_subsystem.algorithmSDK_4023_sgt,"1、请检查屏幕显示棋盘图是否正常
+2、请检查拍摄的棋盘图照片是否正常
+3、请检查是否有环境光干扰
+4、请确认是否遮挡屏幕或挪动相机",已补,1. Please check if the displayed checkerboard pattern on the screen is normal.  
+subsystem,calibration_subsystem.algorithmSDK_4024,图像亮度低,已补,Image brightness is too low. 
+subsystem,calibration_subsystem.algorithmSDK_4024_sgt,请检查图像画面是否太暗,已补,Please check if the image is too dark.
+subsystem,calibration_subsystem.algorithmSDK_4025,图像畸变矫正失败,已补,Image distortion correction failed. 
+subsystem,calibration_subsystem.algorithmSDK_4025_sgt,"1、请检查拍摄的图片是否形变过大，摆正相机位置
+2、请检查是否有环境光干扰
+3、请确认是否遮挡屏幕或挪动相机",已补,1. Please check if the captured image has excessive distortion and adjust the ca
+subsystem,calibration_subsystem.algorithmSDK_4026,畸变校正失败,已补,Distortion correction failed. 
+subsystem,calibration_subsystem.algorithmSDK_4026_sgt,"1、请检查拍摄的图片是否形变过大，摆正相机位置
+2、请检查是否有环境光干扰
+3、请确认是否遮挡屏幕或挪动相机",已补,1. Please check if the captured image has excessive distortion and adjust the ca
+subsystem,calibration_subsystem.algorithmSDK_4027,图片畸变过大,已补,Image distortion is too large.
+subsystem,calibration_subsystem.algorithmSDK_4027_sgt,"1、请检查拍摄的图片是否形变过大，摆正相机位置
+2、请检查是否有环境光干扰
+3、请确认是否遮挡屏幕或挪动相机",已补,1. Please check if the captured image has excessive distortion and adjust the ca
+subsystem,calibration_subsystem.algorithmSDK_4028,角点为空,已补,Corner points are empty. 
+subsystem,calibration_subsystem.algorithmSDK_4028_sgt,请检查算法入参,已补,Please check the algorithm input parameters.
+subsystem,calibration_subsystem.algorithmSDK_4029,图像分析模式非法,已补,Invalid image analysis mode.  
+subsystem,calibration_subsystem.algorithmSDK_4029_sgt,请检查算法入参,已补,Please check the algorithm input parameters.
+subsystem,calibration_subsystem.algorithmSDK_4030,图片打开失败,已补,Failed to open the image. 
+subsystem,calibration_subsystem.algorithmSDK_4030_sgt,1、请检查图片是否存在,已补,1. Please check if the image exists.  
+subsystem,calibration_subsystem.algorithmSDK_4031,图片 bit 位非法,已补,Image bit depth is invalid.
+subsystem,calibration_subsystem.algorithmSDK_4031_sgt,1、请检查输入图片的 bit 位是否为 8/12/16bit,已补,1. Please check if the input image bit depth is 8/12/16 bit.
+subsystem,calibration_subsystem.algorithmSDK_4032,ROI 点数非法,已补,ROI points is invalid. 
+subsystem,calibration_subsystem.algorithmSDK_4032_sgt,"1、请检查屏幕是否显示异常
+2、请检查拍摄环境是否存在干扰",已补,"1. Please check if the screen display is abnormal.  
+2. Please check for any env"
+subsystem,calibration_subsystem.algorithmSDK_4033,连通域过小,已补,Connected domain too small. 
+subsystem,calibration_subsystem.algorithmSDK_4033_sgt,"1、请检查拍摄的 LED 屏幕是否显示正常
+2、请检查环境是否存在干扰
+3、请检查相机成像亮度是否足够",已补,"1. Please check if the captured LED screen display is normal.  
+2. Please check "
+subsystem,calibration_subsystem.algorithmSDK_4034,提取框范围大于图像区域,已补,Extraction frame range exceeds the image region. 
+subsystem,calibration_subsystem.algorithmSDK_4034_sgt,1、请调节相机位置，使成像尽量保持在 MIN-MAX 框范围内,已补,1. Please adjust the camera position to keep the imaging within the MIN-MAX fram
+subsystem,calibration_subsystem.algorithmSDK_4035,自动曝光初始化失败,已补,Auto exposure initialization failed. 
+subsystem,calibration_subsystem.algorithmSDK_4035_sgt,1、请检查自动曝光初始化入参是否在范围之内,已补,1. Please check if the auto exposure initialization parameters are within the ra
+subsystem,calibration_subsystem.algorithmSDK_4036,自动曝光曝光超过下限,已补,Auto exposure exceeded the lower limit.  
+subsystem,calibration_subsystem.algorithmSDK_4036_sgt,"1、请增加光圈刻度，若光圈刻度达到最大，需要减小屏幕亮度或校正灰阶
+2、请确认相机对焦是否过实",已补,1. Please increase the aperture value. If the aperture value reaches the maximum
+subsystem,calibration_subsystem.algorithmSDK_4037,自动曝光曝光超过上限,已补,Auto exposure exceeded the upper limit.  
+subsystem,calibration_subsystem.algorithmSDK_4037_sgt,"1、请减小光圈刻度，且光圈刻度需要大于 F11
+2、请增加屏幕亮度或校正灰阶
+3、请确认相机对焦是否过虚",已补,"1. Please reduce the aperture value, and ensure it is greater than F11.  
+2. Ple"
+subsystem,calibration_subsystem.algorithmSDK_4038,自动曝光增益超过下限,已补,Auto exposure gain exceeded the lower limit. 
+subsystem,calibration_subsystem.algorithmSDK_4038_sgt,"1、请减小光圈刻度，且光圈刻度需要大于 F11
+2、请增加屏幕亮度或校正灰阶
+3、请确认相机对焦是否过虚",已补,"1. Please reduce the aperture value, and ensure it is greater than F11.  
+2. Ple"
+subsystem,calibration_subsystem.algorithmSDK_4039,自动曝光增益超过上限,已补,Auto exposure gain exceeded the upper limit. 
+subsystem,calibration_subsystem.algorithmSDK_4039_sgt,"1、请增加光圈刻度，若光圈刻度达到最大，需要减小屏幕亮度或校正灰阶
+2、请确认相机对焦是否过实",已补,1. Please increase the aperture value. If the aperture value reaches the maximum
+subsystem,calibration_subsystem.algorithmSDK_4040,自动曝光失败,已补,Auto exposure failed. 
+subsystem,calibration_subsystem.algorithmSDK_4040_sgt,请检查算法入参,已补,Exposure exception. Please confirm if the screen status is normal and check for 
+subsystem,calibration_subsystem.algorithmSDK_4041,无效的入参,已补,Invalid input parameters.
+subsystem,calibration_subsystem.algorithmSDK_4041_sgt,请检查算法入参,已补,Please check the algorithm input parameters.
+subsystem,calibration_subsystem.projectDetail_2100,图像分析成功,已补,Analyzing image succeeded.
+subsystem,calibration_subsystem.projectDetail_2101,路径不能为空,已补,Path is required.
+subsystem,calibration_subsystem.projectDetail_2102,文件不存在,已补,File does not exist. 
+subsystem,calibration_subsystem.projectDetail_2103,文件过大，不支持预览超过100MB的文件,已补,File too large. Preview not supported for files over 100MB.
+subsystem,calibration_subsystem.self_0001,理论灯珠宽{0}，理论灯珠高{1}，实际灯珠宽{2}，实际灯珠高{3},已补,"Theoretical lamp bead width {0}, theoretical lamp bead height {1}, actual lamp b"
+subsystem,calibration_subsystem.task_0023,参数分析失败,已补,Parameter analysis failed

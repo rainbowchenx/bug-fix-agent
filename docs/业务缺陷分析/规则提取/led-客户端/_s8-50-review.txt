@@ -1,0 +1,756 @@
+
+────────────────────────────────────────────────────────────────────────────────
+[1] #1201741 相机调节-粗调相机：英文版本下针对亮度计未连接的报错翻译不准确
+  基线 tool/web/src/views/config/CalibrationTarget.vue:320
+    | const statusRes = await luxMeterApi.getLuxMeterStatus(luxMeterId)
+    | if (!statusRes || statusRes.code !== 200 || !statusRes.data.state) {
+    | $message.warning('亮度计未连接，正在尝试重连...')
+    | const connectRes = await luxMeterApi.connectLuxMeter(luxMeterId)
+    | if (!connectRes || connectRes.code !== 200) {
+    | $message.error('亮度计连接失败，请检查设备')
+    | return
+  实际 2026-05-15 3fdf26f fix： getSplitAndBox入参修改，改为实际点亮的分区宽高 +  图片英文 + 屏幕预览显示优化 + 隔点行
+    > * @description: 亮度计的后端轮询逻辑
+    > * @description: 亮度计的后端轮询 + 自动轮询
+    > /** 是否已订阅过亮度计状态推送（避免重复注册 callback）（不入库） */
+  实际 2026-05-21 6502ed8 fix: 修复 innerBox 和 outerBox 数据没有被正确清除的问题 + 补充多语言翻译
+    > "CalibrationTool.calibrationTarget.selectLuxMeterFirst.msg":"请先选择并连接亮度计",
+    > "CalibrationTool.calibrationTarget.luxMeterNotConnected.msg":"亮度计未连接，正在尝试重连...",
+    > "CalibrationTool.calibrationTarget.luxMeterConnectionFailed.msg":"亮度计连接失败，请检查设备",
+
+────────────────────────────────────────────────────────────────────────────────
+[2] #1400655 中文版本相机未连接时，报错信息删除error
+  基线 tool/web/src/views/boxManagement/components/viewTabPane.vue:56
+    | 
+    | const activeTab = ref('cameraPreview');
+    | // 相机预览下，相机未连接，给提示
+    | watch(() => activeTab.value, (newVal) => {
+    | if (newVal === 'cameraPreview' && !cameraStatus.value) {
+    | $message.error($lan('boxConfig.cameraNoConnected.name'))
+    | }
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[3] #2901122 相机调节-英文界面：相机粗调的操作说明按钮排布异常
+  基线 tool/web/src/stores/modules/projectDetail/cameraInfo.ts:69
+    | /** 是否已完成相机粗调（用于步骤按钮 disable 及跨次打开项目的状态恢复） */
+    | roughAdjustFinished: boolean,
+    | /** 是否已完成相机调节（用于步骤按钮 disable 及跨次打开项目的状态恢复） */
+    | cameraAdjustFinished: boolean
+    | /** 是否已完成参数分析（用于步骤按钮 disable 及跨次打开项目的状态恢复） */
+    | paramAnalysisFinished: boolean
+    | /**
+  实际 2026-06-05 a246b2d fix: 进入相机调节再设置完成前不允许进行任何点击操作 + 第一次进入相机调节设置默认曝光值  [msg命中['相机调节', '机调节', '相机调']]
+    > // 如果是第一次进入相机调节页面，根据定位方式设置不同的默认曝光时间
+
+────────────────────────────────────────────────────────────────────────────────
+[4] #2901741 加密狗授权完毕连接好相机后，拔出加密狗，相机依然在连接状态
+  基线 subsystem/src/controllers/cameraManagerController.ts:31
+    | return ResponseUtil.error(ctx, locale.lan("camera_1000"), 500);
+    | }
+    | // // 0.5. 加密狗授权（haspLogin 内 feature_id 为 66），未授权则不往下走
+    | // const haspAuth = await Hasp.haspLogin(66);
+    | // if (haspAuth.code !== 0) {
+    | //   if (haspAuth.code === 41) {
+    | //     return ResponseUtil.error(
+  实际 2026-06-03 e29513e fix: 暂时注释
+    > "检测到加密狗授权与当前相机不匹配",
+    > //     "检测到加密狗授权与当前相机不匹配",
+    > return ResponseUtil.error(ctx, "检测到加密狗授权与当前相机不匹配", 500);
+  实际 2026-06-03 d73923d fix: 加密狗解禁  [msg命中['加密狗']]
+    > // 针对加密狗授权相机id和相机不匹配的问题
+    > "检测到加密狗授权与当前相机不匹配",
+    > // 加密狗验证
+
+────────────────────────────────────────────────────────────────────────────────
+[5] #1201257 任务列表打开后点击全部开始，开始后任务列表不消失
+  基线 tool/web/src/views/boxManagement/index.vue:306
+    | boxConfigStore.saveRecordStatus(true)
+    | }
+    | // 全部开始
+    | if (!startCalibration.value) {
+    | if (currentStep.value == 1) {
+    | // 曲面学习阶段
+    | if (selectBoxIndex.value === boxQuantity.value) {
+  实际 2026-08-31 9e1e0b7 fix: 序列号错位&箱体导出系数文件只有一份 [CRR:100]
+    > // 进入页面后是否已完成首次校正确认（仅校正阶段首次「全部开始」时弹窗核对箱体序号/序列号）
+    > // 进入校正阶段首次「全部开始」前，弹窗核对当前箱体序号与将写入的序列号
+    > // 进入页面后首次「全部开始」：弹窗核对箱体序号/序列号，防止错号
+  实际 2026-05-21 6ae5338 feat: 补充暗场图是否采集需求
+    > // 首台箱体开始后，不让修改箱体数和温度控制
+    > // 首台箱体开始后，不让修改箱体数和温度控制
+
+────────────────────────────────────────────────────────────────────────────────
+[6] #1206385 异常参数情况下关闭色温调节使能按钮客户端也会报错需修改
+  基线 tool/electron/electron/controller/projectDetail/index.ts:815
+    | * @param {0|1} data.targAdjType - 目标调节方式
+    | * @param {number} data.whiteAttenRatio - 白色亮度衰减比例
+    | * @param {boolean} data.tempAdjEnable - 色温调节是否开启
+    | * @param {number} data.tempVal - 色温值
+    | * @param {Object} data.whiteAttenRatioRange - 白色亮度衰减比例范围
+    | */
+    | @ipcHandler()
+  实际 2026-05-15 3fdf26f fix： getSplitAndBox入参修改，改为实际点亮的分区宽高 +  图片英文 + 屏幕预览显示优化 + 隔点行
+    > * 1. 箱体情况下已经在执行完任务时执行完系数仿真，所以直接去指定目录下读取即可
+    > if (!val) return // 兼容用户删除数据时，不触发计算，否则会报错
+  实际 2026-06-08 30859ad fix: 亮度计修复稳定性问题 + 翻译修改 + 默认值修改
+    > // 确保在错误情况下也停止轮询
+
+────────────────────────────────────────────────────────────────────────────────
+[7] #1104823 均衡和高速模式下曝光默认参数要改成1000ms
+  基线 subsystem/src/controllers/common/autoExposure/index.ts:63
+    | /** 过渡区大小 */
+    | transitionZoneGap: number;
+    | /** 行隔点偏移  - 最基础的自动曝光默认为0 */
+    | rowSplitoff?: number;
+    | /** 列隔点偏移  - 最基础的自动曝光默认为0 */
+    | colSplitoff?: number;
+    | // /** 行分区 - 合并在screenArea中 */
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[8] #0103203 相机ID和加密狗烧录的ID不匹配时，无对应报错
+  基线 tool/electron/electron/controller/calibrationTask/index.ts:1944
+    | }
+    | } else {
+    | // 如果没有任务在运行或者分区不匹配，从数据库查询分区状态
+    | try {
+    | // 获取项目ID（从当前任务配置中提取）
+    | const projectId = this.currentTaskConfig.projectId
+    | 
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[9] #1505265 热力校正-开始校正热屏采集接收卡掉线未拦截且无提示
+  基线 tool/electron/electron/controller/calibrationTask/index.ts:123
+    | 'temperatureRiseCollection', // 温升曲线采集
+    | 
+    | // 步骤2：热屏采集
+    | 'collectHotScreenRed', // 采集热屏红色
+    | 'collectHotScreenGreen', // 采集热屏绿色
+    | 'collectHotScreenBlue', // 采集热屏蓝色
+    | 
+  实际 2026-05-20 e0f453c fix: 修复热力任务的顺序和图表性能优化问题
+    > console.log('热力校正任务开始成功，文件路径:', resultPathInfo)
+    > console.error('开始热力校正任务失败:', error)
+    > logger.error(`开始热力校正任务失败:${error}`)
+  实际 2026-05-23 f0f5532 fix: 解决亮色度分区显示状态错误问题 2.在没有进行温升采集就开始热屏采集的时候报错  [msg命中['热屏采集', '热屏采', '屏采集']]
+    > "CalibrationTool.errorNode.calibration:61.name": "获取接收卡信息失败"
+    > "CalibrationTool.errorNode.calibration:61.name": "获取接收卡信息失败",
+    > "CalibrationTool.errorNode.calibration:62.name": "请先进行温升曲线采集，再进行热屏采集"
+
+────────────────────────────────────────────────────────────────────────────────
+[10] #0202007 相机调节抓图画面过亮时要增加调节曝光值的提示
+  基线 tool/web/src/views/config/CameraAdjust.vue:3
+    | <script setup lang="ts">
+    | /**
+    | * @description: 相机调节页面
+    | * 功能：
+    | * 1. 发送卡相关设置：屏幕颜色、颜色灰阶
+    | * 2. 相机相关设置：曝光时间 增益 滤片
+    | * 3. 算法相关： 自动曝光、相机定位、相机调节、参数分析
+  实际 2026-06-05 a246b2d fix: 进入相机调节再设置完成前不允许进行任何点击操作 + 第一次进入相机调节设置默认曝光值  [msg命中['相机调节', '机调节', '相机调', '曝光值']]
+    > // 如果是第一次进入相机调节页面，根据定位方式设置不同的默认曝光时间
+
+────────────────────────────────────────────────────────────────────────────────
+[11] #0102025 执行新分区校正时区域定位点击取消定位后出现报错
+  基线 tool/web/src/views/config/StartCalibration.vue:329
+    | }
+    | 
+    | // 获取分区校正任务状态
+    | const updatePartitionTaskStatus = async () => {
+    | try {
+    | if (!selectPartID.value) {
+    | return
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[12] #2900684 环境准备-英文界面：获取亮度计失败未翻译为英文
+  基线 tool/web/src/views/config/EnvironmentPrep.vue:238
+    | // ------ 亮度计初始化与连接 -------------
+    | /**
+    | * @description: 初始化亮度计连接 & 获取亮度计列表
+    | */
+    | const luxMeterList = ref([])
+    | async function initAndGetLuxMeterList() {
+    | // 防止用户频繁点击刷新导致并发请求/重复触发连接
+  实际 2026-06-08 30859ad fix: 亮度计修复稳定性问题 + 翻译修改 + 默认值修改  [msg命中['亮度计']]
+    > return commonResponse.getError(res.msg || "选择亮度计失败")
+    > return commonResponse.getError(res.msg || "选择亮度计失败")
+    > return commonResponse.getError(error.message || "选择亮度计失败")
+  实际 2026-06-04 68c19ee fix: 全量翻译补充
+    > "CalibrationTool.config.disconnectLuxMeterFailed.msg": "断开亮度计连接失败",
+    > throw new Error(res?.msg || '断开亮度计连接失败')
+
+────────────────────────────────────────────────────────────────────────────────
+[13] #0502981 [项目管理] 系数仿真界面没最大化之前，左边的不同图像框无法选择
+  基线 tool/electron/electron/controller/boxCalibration/boxManage.ts:388
+    | 
+    | /**
+    | * 获取校正文件路径, 提供给系数仿真
+    | */
+    | @ipcHandler()
+    | async getCalibrationFilePathList(data: {projectID: string, programDataPath: string}) {
+    | try {
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[14] #1804069 打开校正工具再打开画质引擎刷新亮度计设备出现客户端闪退
+  基线 subsystem/src/service/LuxMeterManager.ts:43
+    | /**
+    | * 扫描已物理连接的设备
+    | * @returns 已连接的亮度计设备列表
+    | */
+    | async scanAllDevice(): Promise<ScanAllDeviceResponse> {
+    | const cmd = "ScanAllDevice";
+    | const request = JSON.stringify({});
+  实际 2026-06-05 4c0e29b fix: 亮度计补充日志记录  [msg命中['亮度计']]
+    > logger.info(`[亮度计管理] ${cmd} 请求入参: ${request}`);
+    > logger.info(`[亮度计管理] ${cmd} 响应结果: ${res}`);
+    > logger.info(`[亮度计管理] ${cmd} 请求入参: ${request}`);
+  实际 2026-06-06 a122674 feat: 亮度计底层连接重构，添加全局互斥锁，防止亮度计sdk并发调用导致崩溃  [msg命中['亮度计']]
+    > * 亮度计 SDK 全局互斥锁配置
+    > ? `[亮度计管理] 命令 ${cmd} 入队等待超时（${waitedMs}ms），亮度计正忙`
+    > : `[亮度计管理] 命令 ${cmd} 执行超时（${waitedMs}ms）`
+
+────────────────────────────────────────────────────────────────────────────────
+[15] #1206817 自动采集过程中插拔亮度计会提示校正服务异常建议重启客户端与相机离线等错误
+  基线 tool/electron/electron/main/index.ts:168
+    | })
+    | 
+    | /** 重启客户端 */
+    | async function restartApp() {
+    | logger.info(`重启客户端, 参数:${process.argv.slice(1)}`)
+    | await quitFun()
+    | app.relaunch({ args: process.argv.slice(1) })
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[16] #1101941 没创建屏幕先创建校正任务后退出创建屏幕再进入任务无法获取画布中屏幕信息
+  基线 tool/electron/electron/controller/calibrationTask/index.ts:508
+    | const options = {
+    | needAreaPositioning,
+    | // 屏幕信息
+    | screenInfo: {
+    | width: screenWidth,
+    | height: screenHeight,
+    | physicalWidth: physicalWidth,
+  实际 2026-05-20 e0f453c fix: 修复热力任务的顺序和图表性能优化问题
+    > console.log('热力校正任务开始成功，文件路径:', resultPathInfo)
+    > console.error('开始热力校正任务失败:', error)
+    > logger.error(`开始热力校正任务失败:${error}`)
+  实际 2026-06-01 f53ac2c fix: 添加修改校正目标的时候，清空分区任务状态的逻辑 [CRR:60]
+    > // 更新工程详情中的校正任务数据
+    > // 更新工程详情中的校正任务数据
+    > * 开始亮色度校正任务
+
+────────────────────────────────────────────────────────────────────────────────
+[17] #1104839 环境准备-修改任务信息-采集间隔：加减键位置与鼠标实际点击对不上
+  基线 tool/web/src/views/config/EnvironmentPrep.vue:56
+    | const isThermalOrBoxCalibration = computed(() => projectStore.isThermalOrBoxCalibration)
+    | 
+    | // -----------------------  修改任务信息部分 -------------------------
+    | const dialogVisible = ref(false)
+    | 
+    | // 重置表单数据为最新的项目信息
+    | function resetFormData() {
+  实际 2026-05-15 3fdf26f fix： getSplitAndBox入参修改，改为实际点亮的分区宽高 +  图片英文 + 屏幕预览显示优化 + 隔点行  [msg命中['实际点', '境准备', '环境准备', '环境准']]
+    > * 3. 设备轮询：亮度计仅在环境准备页 connect 成功后由该页开启；离开 config 或清空选中时关闭
+    > console.error('保存任务信息失败:', error)
+    > $message.error('保存任务信息失败')
+  实际 2026-06-04 68c19ee fix: 全量翻译补充
+    > "CalibrationTool.config.environmentPrep.saveSuccess.msg": "任务信息保存成功",
+    > $message.success('任务信息保存成功')
+
+────────────────────────────────────────────────────────────────────────────────
+[18] #1201340 相机调节-粗调相机：英文版本未翻译操作提示
+  基线 tool/common/type.ts:127
+    | /** 分区配置 */
+    | partitionInfo: string;
+    | /** 相机调节 */
+    | cameraInfo: string;
+    | /** 校正目标 */
+    | calibrationTarget: string;
+    | /** 开始校正 */
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[19] #1304028 英文客户端下开始校正页面任务列表显示为中文需修改
+  基线 tool/web/src/views/config/components/partitionPreview.vue:37
+    | /**
+    | * 分区配置页传入：与表单 localPartitionInfo.partitionCount 同步，避免仅改本地未落库时预览不更新。
+    | * 不传则仍使用 store（如开始校正页）。
+    | */
+    | previewPartitionCount: {
+    | type: Array as unknown as PropType<[number, number] | undefined>,
+    | default: undefined,
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[20] #1201008 全屏校正-开始校正：在LEDTool开启校正定位时，开始校正的每个步骤开始时都会先显示下定位图像
+  基线 subsystem/src/controllers/brightnessManage/brightnessChromaController.ts:417
+    | 
+    | logger.info(`亮度矫正开启: ${JSON.stringify(deviceInfo)}`);
+    | // 开启校正
+    | const result_setBoxCalibration = await LED.request({
+    | url: "/setBoxCalibration",
+    | data: {
+    | ip: deviceInfo.ip,
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[21] #1805155 偶现一次分区校正完成后，报错提示“获取进度失败”
+  基线 tool/web/src/views/config/StartCalibration.vue:387
+    | await updatePartitionTaskStatus()
+    | } catch (error) {
+    | console.error('获取进度失败:', error)
+    | }
+    | }
+    | 
+    | // 监听任务状态变化
+  实际 2026-05-19 1df4b06 fix: 1.优化温升曲线性能 2.解决热力温度参数 可能会报错undefined的问题 3.添加开始热力计算时添加弹窗
+    > "CalibrationTool.config.thermalTaskTip1.msg":"请将温度计置于被测屏体0.5m处，且不遮挡相机，完成后点击“继续”",
+
+────────────────────────────────────────────────────────────────────────────────
+[22] #1102144 画布中接收卡掉线环境准备同步按钮或者切换屏幕概率性出现“未知错误”提示
+  基线 tool/web/src/views/config/EnvironmentPrep.vue:110
+    | * 以下情况需要重新获取对应屏幕拓扑
+    | * 1. 强制刷新
+    | * 2. 手动选择屏幕或者切换屏幕
+    | * 以下情况需要调用初始化函数
+    | * 1. 强制刷新
+    | * 2. 手动选择屏幕或者切换屏幕
+    | * 3. 每次进入项目时
+  实际 2026-05-15 3fdf26f fix： getSplitAndBox入参修改，改为实际点亮的分区宽高 +  图片英文 + 屏幕预览显示优化 + 隔点行  [msg命中['境准备', '环境准备', '环境准']]
+    > * 3. 设备轮询：亮度计仅在环境准备页 connect 成功后由该页开启；离开 config 或清空选中时关闭
+    > * 2. 手动选择与切换屏幕触发
+    > * 2. 手动选择屏幕或者切换屏幕
+  实际 2026-06-04 68c19ee fix: 全量翻译补充
+    > "CalibrationTool.boxManagement.getFirstRecvCardInfoFailed.msg": "获取首台接收卡信息失败"
+    > throw Error('获取首台接收卡信息失败')
+    > throw Error('获取接收卡信息失败')
+
+────────────────────────────────────────────────────────────────────────────────
+[23] #1400397 相机未连接时出现未明确定义的报错
+  基线 tool/web/src/views/boxManagement/components/viewTabPane.vue:56
+    | 
+    | const activeTab = ref('cameraPreview');
+    | // 相机预览下，相机未连接，给提示
+    | watch(() => activeTab.value, (newVal) => {
+    | if (newVal === 'cameraPreview' && !cameraStatus.value) {
+    | $message.error($lan('boxConfig.cameraNoConnected.name'))
+    | }
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[24] #1205380 DDS2026021100255需求中的 升级导入配置（默认开，可关闭）与实际不一致需修改
+  基线 tool/electron/electron/types/box/box.ts:53
+    | 
+    | export enum TaskStep {
+    | /** 升级导入配置 */
+    | upgradeImportConfig = 'upgradeImportConfig',
+    | /** 初始化配置 */
+    | boxInitialization = 'boxInitialization',
+    | /** 预热 */
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[25] #1503697 开始校正后点击全部暂停，再快速点击全部开始，会出现几秒钟的采集进度异常
+  基线 tool/web/src/views/boxManagement/index.vue:575
+    | }
+    | 
+    | // 进入开始校正，初始化校正全局信息
+    | const initCalibrationGlobalInfo = async (result: any) => {
+    | // 初始化校正步骤信息
+    | if ('boxStepData' in result) {
+    | boxConfigStore.setBoxStepInfo(result.boxStepData)
+  实际 2026-08-31 9e1e0b7 fix: 序列号错位&箱体导出系数文件只有一份 [CRR:100]
+    > // 进入页面后是否已完成首次校正确认（仅校正阶段首次「全部开始」时弹窗核对箱体序号/序列号）
+    > // 进入校正阶段首次「全部开始」前，弹窗核对当前箱体序号与将写入的序列号
+    > // 进入页面后首次「全部开始」：弹窗核对箱体序号/序列号，防止错号
+  实际 2026-05-25 5883e94 fix: 补充任务暂停处理等待
+    > startCalibration: false, // 是否开始校正
+    > startCalibration: true, // 是否开始校正
+
+────────────────────────────────────────────────────────────────────────────────
+[26] #1302474 在画质引擎使用CA410亮度计后，无法在校正工具里面使用该亮度计
+  基线 tool/web/src/views/ConfigView.vue:574
+    | // 停止所有设备的轮询
+    | stopPolling()
+    | // 停止亮度计后端轮询
+    | try {
+    | await setLuxMeterBackendPolling(false)
+    | } catch {
+    | // ignore
+  实际 2026-05-15 3fdf26f fix： getSplitAndBox入参修改，改为实际点亮的分区宽高 +  图片英文 + 屏幕预览显示优化 + 隔点行
+    > * @description: 亮度计的后端轮询逻辑
+    > * @description: 亮度计的后端轮询 + 自动轮询
+    > /** 是否已订阅过亮度计状态推送（避免重复注册 callback）（不入库） */
+  实际 2026-05-21 6502ed8 fix: 修复 innerBox 和 outerBox 数据没有被正确清除的问题 + 补充多语言翻译
+    > "CalibrationTool.calibrationTarget.selectLuxMeterFirst.msg":"请先选择并连接亮度计",
+    > "CalibrationTool.calibrationTarget.luxMeterNotConnected.msg":"亮度计未连接，正在尝试重连...",
+    > "CalibrationTool.calibrationTarget.luxMeterConnectionFailed.msg":"亮度计连接失败，请检查设备",
+
+────────────────────────────────────────────────────────────────────────────────
+[27] #1402589 亮度系数生成失败后剩余子任务的状态不正确
+  基线 tool/electron/electron/controller/calibrationTask/index.ts:94
+    | 'coefficientFirmware', // 系数固化
+    | ],
+    | // 亮色度校正模式：区域定位 → 亮度采集RGB → 亮度系数生成 → 亮度系数上传 → 色度采集RGB → 色度系数生成 → 色度系数上传 → 系数固化
+    | both: [
+    | 'areaPositioning', // 区域定位
+    | 'paramAnalysis', // 参数分析
+    | 'collectBrightnessRed', // 采集红色（亮度）
+  实际 2026-05-19 1df4b06 fix: 1.优化温升曲线性能 2.解决热力温度参数 可能会报错undefined的问题 3.添加开始热力计算时添加弹窗
+    > // 特殊情况需要保存中间的状态
+    > // 更新保存的任务的第一个分区算出来的 亮度目标比例，色度目标参数
+    > // 更新亮色度任务 保存的任务的第一个分区算出来的 亮度目标比例，色度目标参数。热力校正的温度也保存
+  实际 2026-05-26 2ea0bc7 fix: 1.优化耗时计算 2.修复显示逻辑
+    > /** 系数生成（亮度） */
+    > /** 系数生成（色度） */
+    > // 亮色度任务：区域定位 → 亮度校正 → 亮度系数上传 → 色度校正 → 系数固化
+
+────────────────────────────────────────────────────────────────────────────────
+[28] #1403046 校正任务预计时间和实际耗时存在偏差
+  基线 tool/electron/electron/controller/calibrationTask/index.ts:30
+    | 
+    | /**
+    | * 亮色度校正任务管理器
+    | * 负责任务进度控制，具体子任务执行在子系统中
+    | */
+    | class DisplayEffect {
+    | static registerName = 'CalibrationTask'
+  实际 2026-05-20 e0f453c fix: 修复热力任务的顺序和图表性能优化问题
+    > console.log('热力校正任务开始成功，文件路径:', resultPathInfo)
+    > console.error('开始热力校正任务失败:', error)
+    > logger.error(`开始热力校正任务失败:${error}`)
+  实际 2026-06-01 f53ac2c fix: 添加修改校正目标的时候，清空分区任务状态的逻辑 [CRR:60]
+    > // 更新工程详情中的校正任务数据
+    > // 更新工程详情中的校正任务数据
+    > * 开始亮色度校正任务
+
+────────────────────────────────────────────────────────────────────────────────
+[29] #1404139 热力校正相机参数分析时提示曝光超过上限（放宽默认上限）
+  基线 tool/web/src/stores/modules/projectDetail/cameraInfo.ts:277
+    | 
+    | /**
+    | * 更新当前相机参数分析的工作阶段
+    | */
+    | updateCurrentStage(stage: WorkStage) {
+    | this.currentStage = stage
+    | },
+  实际 2026-05-23 402c085 feat: 箱体和热力下相机调节新增自动计算隔点功能，开启后自动计算隔点和minmax，关闭后不计算，只显示初始75框
+    > // 箱体/热力校正：进入页面自动获取推荐隔点数与 Max/Min 框角点
+    > // // 箱体/热力校正：进入页面自动获取推荐隔点数与 Max/Min 框角点
+  实际 2026-05-27 b7f3df6 fix: 样式修复
+    > /** 查询参数分析进度 */
+
+────────────────────────────────────────────────────────────────────────────────
+[30] #1104778 全屏校正-亮色度校正时点击全部暂停后再点击全部开始，此时默认选了分区但实际画面显示为全白屏，提示参数分析失败
+  基线 tool/web/src/views/config/starCalibration/taskList.vue:845
+    | taskProgressData.value = progressData
+    | 
+    | // 添加 参数分析失败的报错
+    | if (progressData.analysisError) {
+    | showParamAnalysisError()
+    | // 有弹窗时不用报错
+    | noMessage = true
+  实际 2026-05-26 2ea0bc7 fix: 1.优化耗时计算 2.修复显示逻辑
+    > /** 参数分析 */
+    > sourceTargetLight: targetLight, // 原始屏幕配置下来的曝光比例。亮色度计算的时候需要计算色度的补偿曝光
+    > // 亮度任务：区域定位 → 亮度校正 → 系数固化
+  实际 2026-05-28 86d1b16 fix: 迭代任务 添加初始化上传逻辑 [PRJ:PJ01PD20260122219] [CRR:60]
+    > // 清空原有配置，重新配置亮色度校正任务
+    > // 亮度校正部分
+    > // 色度校正部分
+
+────────────────────────────────────────────────────────────────────────────────
+[31] #1402044 开始校正-绑定箱体序列号的数字位数向下按钮点击位置异常
+  基线 tool/web/src/views/boxManagement/index.vue:324
+    | handleAlignVertical()
+    | } else {
+    | // 1.1. 绑定箱体序列号
+    | visibleSerialNum.value = true;
+    | }
+    | }
+    | }
+  实际 2026-08-31 9e1e0b7 fix: 序列号错位&箱体导出系数文件只有一份 [CRR:100]  [msg命中['序列号']]
+    > - `selectBoxIndex` = 当前要校正的箱体序号（step3 从 `boxQuantity+1`=10 开始）
+    > 偏差来源：规则绑定路径 `index.vue:355-359` 在 `handleAlignVertical` 前先 `updateSerialNum` 写序列号，这一步会触发懒 push；而 `step3P
+    > "CalibrationTool.boxConfig.boxIndexConfirm.msg": "当前箱体序号：%s，将写入该箱体的序列号：%s。请确认是否继续校正当前箱体，或校正下一个箱体。",
+  实际 2026-05-25 5883e94 fix: 补充任务暂停处理等待
+    > startCalibration: false, // 是否开始校正
+    > startCalibration: true, // 是否开始校正
+
+────────────────────────────────────────────────────────────────────────────────
+[32] #1104859 相机调节-屏幕颜色（如绿色）下的某一颜色灰阶变化后（如切换到100），再切到另外颜色（如红色）显示该颜色灰阶为100实际数值为默认的220
+  基线 tool/web/src/views/config/CameraAdjust.vue:5
+    | * @description: 相机调节页面
+    | * 功能：
+    | * 1. 发送卡相关设置：屏幕颜色、颜色灰阶
+    | * 2. 相机相关设置：曝光时间 增益 滤片
+    | * 3. 算法相关： 自动曝光、相机定位、相机调节、参数分析
+    | * 4. 亮度图： 查看亮度图
+    | * 5. 相机抓图预览
+  实际 2026-05-19 fa3b2f1 fix: 自动曝光新增入参，亮度设置新增loading + 相机调节tip显示修改， 文案对不齐修改， 抓图闪烁框修改颜  [msg命中['相机调', '机调节', '相机调节']]
+    > /** 顶部 ComTip：粗调进行中 / 开始定位步骤 / 相机调节步骤（与 curTip 文案一致，避免重复展示） */
+    > /** 顶部 ComTip：粗调进行中 / 定位进行中 / 相机调节分析中 */
+    > // 相机调节提示：仅在自动曝光成功并进入分析后展示
+  实际 2026-05-21 14e4759 fix：修复任务列表修改信息后未同步到当前项目的问题 + 新增屏幕无选项跳转拉起led tool + 相机调节mount  [msg命中['相机调', '机调节', '相机调节']]
+    > console.error('进入相机调节页：创建参数分析临时目录失败', e)
+    > // 修改相机调节页面曝光上下限
+    > // 修改相机调节页面曝光上下限
+
+────────────────────────────────────────────────────────────────────────────────
+[33] #0104157 热力校正-开始校正热屏采集时，接收卡掉线无任何提示，进程正常进行下去
+  基线 tool/electron/electron/controller/calibrationTask/index.ts:123
+    | 'temperatureRiseCollection', // 温升曲线采集
+    | 
+    | // 步骤2：热屏采集
+    | 'collectHotScreenRed', // 采集热屏红色
+    | 'collectHotScreenGreen', // 采集热屏绿色
+    | 'collectHotScreenBlue', // 采集热屏蓝色
+    | 
+  实际 2026-06-01 f53ac2c fix: 添加修改校正目标的时候，清空分区任务状态的逻辑 [CRR:60]
+    > "CalibrationTool.errorNode.calibration:62.name": "请先进行温升曲线采集，再进行热屏采集"
+    > "CalibrationTool.errorNode.calibration:62.name": "请先进行温升曲线采集，再进行热屏采集",
+
+────────────────────────────────────────────────────────────────────────────────
+[34] #2903371 单箱体校正特征学习阶段返回步骤三会导致开始校正步骤的特征学习数据被清空需重新进行，此处应补充提示
+  基线 tool/web/src/views/boxManagement/index.vue:271
+    | boxIndex.value = boxQuantity.value
+    | }
+    | // 特征学习阶段，一次性更新箱体序列号
+    | if (boxIndex.value >= boxQuantity.value) {
+    | isSerialFinish.value = true;
+    | visibleSerialNum.value = false;
+    | boxIndex.value = boxIndex.value + 1
+  实际 2026-08-31 9e1e0b7 fix: 序列号错位&箱体导出系数文件只有一份 [CRR:100]
+    > # 箱体校正 selectBoxIndex / boxIndex 错乱 — 诊断上下文
+
+────────────────────────────────────────────────────────────────────────────────
+[35] #1304134 开始校正采集红绿蓝任务的进度条显示不合理
+  基线 tool/web/src/views/config/CameraAdjust.vue:1077
+    | if (green != null) nextExposure.green = green
+    | if (blue != null) nextExposure.blue = blue
+    | // 执行完成更新状态来去掉进度条显示
+    | cameraInfoStore.updateCurrentStage(WorkStage.DONE)
+    | $message.success($lan('cameraAdjust.toast.paramAnalysisCompleted.msg'))
+    | isParamAnalysisLoading.value = false
+    | stopParamAnalysisProgressPolling()
+  实际 2026-05-21 a727666 fix: 翻译补充
+    > return commonResponse.getError(`自动分区参数不合理：${bezelValidation.error}`)
+    > return commonResponse.getError(`自动分区参数不合理：${transitionZoneValidation.error}`)
+    > return commonResponse.getError(`自动分区参数不合理：${partitionPointValidation.error}`)
+
+────────────────────────────────────────────────────────────────────────────────
+[36] #2501412 【环境兼容性】相机采集需要增加温度检测
+  基线 tool/electron/electron/types/box/box.ts:225
+    | }
+    | };
+    | /** 相机采集信息 */
+    | captureCollectParams?: ScreenCollectOptions;
+    | /** 亮度校正参数 */
+    | brightnessCalibrationParams?: BoxCalibrationOptions;
+    | /** 色度校正参数 */
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[37] #1202206 分区配置--英文页面：提示相机摆放距离正确的提示未翻译
+  基线 tool/web/src/views/config/PartitionConfig.vue:304
+    | partitionInfoStore.setIsAutoGeneratePartitionDone(true)
+    | }
+    | // 相机摆放距离不合适提示
+    | const cameraDistance = localPartitionInfo.value.cameraActualPlacementDistance * 1000
+    | if (cameraDistanceMax < cameraDistance || cameraDistanceMin > cameraDistance) {
+    | $message.warning(
+    | $lan('projectDetail.partitionConfig.toast.cameraDistanceOutOfRange.msg', [
+  实际 2026-05-12 796e163 fix: 目标实现比例推荐损失适配，计算移动到参数分析完成后进行一次 + 模组分辨率适配无信息情况 + 部分文案显示错误  [msg命中['相机摆放距离', '相机摆放', '摆放距离', '放距离', '机摆放', '相机摆放距', '机摆放距', '机摆放距离', '摆放距', '相机摆']]
+    > "CalibrationTool.projectDetail.partitionConfig.switchToManual.name": "切换至手动分区配置模式",
+    > "CalibrationTool.projectDetail.partitionConfig.switchToAuto.name": "切换至自动分区配置模式",
+  实际 2026-05-12 fc5d85f fix: 校正目标样式修改 + 相机摆放距离保证3位小数  [msg命中['相机摆放距离', '相机摆放', '摆放距离', '放距离', '机摆放', '相机摆放距', '机摆放距', '机摆放距离', '摆放距', '相机摆']]
+
+────────────────────────────────────────────────────────────────────────────────
+[38] #0203199 温升曲线采集过程中，相机离线，报错弹窗被遮挡未全部显示
+  基线 tool/common/type.ts:320
+    | }
+    | 
+    | /** 温升曲线采集参数 */
+    | export interface TemperatureRiseCollectionParams {
+    | /** 项目ID */
+    | projectId: string;
+    | /** 温度波动阈值（℃） */
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[39] #1305628 【体验性】开始校正的显示耗时与实际耗时差距较大，建议优化
+  基线 tool/common/type.ts:131
+    | /** 校正目标 */
+    | calibrationTarget: string;
+    | /** 开始校正 */
+    | calibrationTask: string;
+    | }
+    | 
+    | /** 更新工程详情信息 */
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[40] #1102394 屏幕下有一张发送卡，此发送卡若无接收卡会提示未知错误
+  基线 tool/electron/electron/utils/commonResponse.ts:19
+    | 500: {
+    | en: 'unknown error',
+    | cn: '未知错误',
+    | },
+    | }
+    | i18n = {
+    | cn: getI18Locales(Locale.zh_CN),
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[41] #1403295 相机调节：英文版本下相机镜头有偏移的提示信息未翻译
+  基线 tool/common/type.ts:523
+    | export enum CameraPosition {
+    | CAMERAPOSITION_OK = 0, // 相机姿态符合要求
+    | CAMERAPOSITION_LEFT = 1, // 相机镜头偏左
+    | CAMERAPOSITION_RIGHT = 2, // 相机镜头偏右
+    | CAMERAPOSITION_UP = 3, // 相机镜头偏上
+    | CAMERAPOSITION_DOWN = 4, // 相机镜头偏下
+    | CAMERAPOSITION_LEVEL = 5, // 相机镜头不水平
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[42] #1403229 英文界面下环境准备，设置屏幕亮度值的提示为中文
+  基线 tool/electron/electron/controller/projectDetail/index.ts:1063
+    | }
+    | /**
+    | * @description: 设置屏幕颜色/灰阶 - 纯色 - 非隔点图
+    | * @param {Object} data - 设置屏幕颜色参数
+    | * @param {string} data.screenID - 屏幕id
+    | * @param {string} data.screenColor - 屏幕颜色
+    | * @param {number} data.colorGrayscale - 颜色灰阶
+  实际 2026-05-21 6502ed8 fix: 修复 innerBox 和 outerBox 数据没有被正确清除的问题 + 补充多语言翻译
+    > "CalibrationTool.projectDetail.createScreenTip.msg":"双击唤起LED TOOL配置屏幕"
+    > "CalibrationTool.projectDetail.createScreenTip.msg":"双击唤起LED TOOL配置屏幕",
+  实际 2026-05-21 a727666 fix: 翻译补充
+    > return commonResponse.getError(error.message || '设置屏幕颜色/颜色灰阶')
+    > "CalibrationTool.setScreenParamsFailed.name": "设置屏幕颜色/颜色灰阶失败",
+
+────────────────────────────────────────────────────────────────────────────────
+[43] #2802312 分区配置隔点数横向纵向的参数值反了
+  基线 tool/common/type.ts:125
+    | /** 环境准备 */
+    | environmentInfo: string;
+    | /** 分区配置 */
+    | partitionInfo: string;
+    | /** 相机调节 */
+    | cameraInfo: string;
+    | /** 校正目标 */
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[44] #1505309 热力校正-温升曲线采集和热屏采集发送卡掉线未报错未拦截
+  基线 tool/electron/electron/controller/calibrationTask/index.ts:120
+    | 'collectColdScreenBlue', // 采集冷屏蓝色
+    | 
+    | // 步骤1：温升曲线采集
+    | 'temperatureRiseCollection', // 温升曲线采集
+    | 
+    | // 步骤2：热屏采集
+    | 'collectHotScreenRed', // 采集热屏红色
+  实际 2026-05-19 1df4b06 fix: 1.优化温升曲线性能 2.解决热力温度参数 可能会报错undefined的问题 3.添加开始热力计算时添加弹窗  [msg命中['温升曲', '升曲线', '温升曲线']]
+    > // 判断是温升曲线任务结束
+    > // 当温升曲线完成的时候
+    > // 更新亮色度任务 保存的任务的第一个分区算出来的 亮度目标比例，色度目标参数。热力校正的温度也保存
+  实际 2026-05-20 e0f453c fix: 修复热力任务的顺序和图表性能优化问题
+    > console.log('热力校正任务开始成功，文件路径:', resultPathInfo)
+    > console.error('开始热力校正任务失败:', error)
+    > logger.error(`开始热力校正任务失败:${error}`)
+
+────────────────────────────────────────────────────────────────────────────────
+[45] #1104870 【易用性】相机调节-校正目标：目标值实现比例未达到99.99%均显示红色框，容易有歧义
+  基线 tool/web/src/views/ConfigView.vue:177
+    | // 校正目标页离开
+    | if (route.path === '/config/target') {
+    | // 目标值实现比例存在标红（超出参考范围）时先提示检查屏幕 / 亮度损失
+    | if (calibrationTargetStore.isTargetValueImplementationRatioOutOfRange) {
+    | const okRatio = await new Promise<boolean>((resolve) => {
+    | MessageBox.confirm($lan('calibrationTarget.targetImplementationRatioOutOfRangeNext.msg'), {
+    | type: 'warning',
+  实际 2026-05-15 3fdf26f fix： getSplitAndBox入参修改，改为实际点亮的分区宽高 +  图片英文 + 屏幕预览显示优化 + 隔点行  [msg命中['校正目标', '正目标', '校正目']]
+    > // 进入校正目标页：若 ConfigView 已开启亮度计轮询，则启用断线重连
+    > // 进入页面先基于上一步的生成结果和当前页面的默认亮度衰减比例计算出目标值实现比例
+    > //   // 进入校正目标页：若 ConfigView 已开启亮度计轮询，则启用断线重连
+  实际 2026-05-19 fa3b2f1 fix: 自动曝光新增入参，亮度设置新增loading + 相机调节tip显示修改， 文案对不齐修改， 抓图闪烁框修改颜  [msg命中['相机调', '机调节', '相机调节']]
+    > /** 顶部 ComTip：粗调进行中 / 开始定位步骤 / 相机调节步骤（与 curTip 文案一致，避免重复展示） */
+    > /** 顶部 ComTip：粗调进行中 / 定位进行中 / 相机调节分析中 */
+    > // 相机调节提示：仅在自动曝光成功并进入分析后展示
+
+────────────────────────────────────────────────────────────────────────────────
+[46] #1503765 对接C66设备会出现提示“设备不支持该功能”（ScreenDisplayParams协议）
+  基线 tool/web/src/request/ipcRequest.ts:40
+    | if (res.code !== 200) {
+    | console.error('error interface:', config.url, parameter, res)
+    | // 去除[设备不支持]的错误提示
+    | if (!config?.noShowError) {
+    | const msg = String(res.msg)
+    | message.error({
+    | showClose: true,
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[47] #0205359 【易用性】多分区时，相机参数分析失败后重新参数分析会导致校正目标变化，影响校正
+  基线 tool/web/src/views/config/CameraAdjust.vue:1024
+    | isParamAnalysisLoading.value = false
+    | // void cameraInfoStore.updateData({ paramAnalysisFinished: false })
+    | // 参数分析失败后回退到“相机调节完成，待开始参数分析”的状态
+    | isAdjustFi.value = true
+    | cameraInfoStore.updateCurrentStage(WorkStage.CAMERA_ADJUSTMENT)
+    | activeStep.value = 3
+    | }
+  实际 2026-06-03 cb5727a fix： 精调，亮度满足的情况下才考虑形变影响+文案修改
+    > "CalibrationTool.cameraAdjust.toast.edgeLedDeformation.msg": "屏幕边缘灯点形变过大：\n 1、确保屏幕成像横屏竖直； \n 2、调大光圈数值后重新
+  实际 2026-06-08 a0d3a58 fix:  参数分析传递错误（lcy）  [msg命中['参数分析', '数分析', '参数分']]
+
+────────────────────────────────────────────────────────────────────────────────
+[48] #0102975 偶现相机自动重连无法成功
+  基线 tool/electron/electron/controller/polling/cameraPolling.ts:145
+    | reconnectSuccess = res?.success
+    | if (!reconnectSuccess) {
+    | lastError = (res as any)?.msg || "相机自动重连失败"
+    | }
+    | } catch (e: any) {
+    | reconnectSuccess = false
+    | lastError = e?.message || "相机自动重连异常"
+  实际 2026-06-08 bc85ed2 fix: 翻译补充
+    > lastError = (res as any)?.msg || "相机自动重连失败"
+    > lastError = e?.message || "相机自动重连异常"
+    > "CalibrationTool.cameraAutoReconnectFailed.name": "相机自动重连失败",
+
+────────────────────────────────────────────────────────────────────────────────
+[49] #2901090 分区配置-英文界面：自动分区计算成功未翻译为英文
+  基线 subsystem/src/controllers/projectDetail.ts:235
+    | }
+    | /**
+    | * 自动分区计算
+    | * @param ctx Koa 上下文
+    | * @returns void
+    | */
+    | async autoPartitionGenerate(ctx: Context): Promise<void> {
+  实际改动: **该文件窗口内无相关改动**
+
+────────────────────────────────────────────────────────────────────────────────
+[50] #1201606 任务管理下载校正系数文件提示遮挡
+  基线 subsystem/src/controllers/brightnessManage/index.ts:988
+    | port: deviceInfo.port,
+    | },
+    | filePath: deviceInfo.filePath, // 对应的校正系数文件路径
+    | content: {
+    | startPosType: "recvCardArea",
+    | recvCardArea: {
+    | x: 1,
+  实际 2026-05-28 05e2ee9 fix: 迭代任务 添加初始化上传逻辑 [PRJ:PJ01PD20260122219] [CRR:60]
+    > // 调用算法 SplitCalibrationdata 将分区校正系数拆分到每个发送卡
+    > filePath: deviceInfo.filePath, // 对应的校正系数文件路径
+  实际 2026-06-03 6ed861f fix: 1.修复错误返回的问题2.修改参数分析使用的范围，改成使用配置文件的 [CRR: 60]
+    > // 调用算法 AreaLuminCompute 生成分区亮度校正系数
+    > // 调用算法 AreaLuminCompute 生成分区亮度校正系数

@@ -1,0 +1,2462 @@
+[
+ {
+  "defectId": "BGCM2026102604208",
+  "title": "[安全][iOS静态检测]通过NSLog打印的敏感信息或者错误异常信息，可以定位应用运行的流程或者关键代码。",
+  "description": "漏洞名称：通过NSLog打印的敏感信息或者错误异常信息，可以定位应用运行的流程或者关键代码。漏洞描述：检出工具：iOS静态检测漏洞细节：\t低危--通过NSLog打印的敏感信息或者错误异常信息，可以定位应用运行的流程或者关键代码。漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261026105043P3KVCJ详情请查看原始报告",
+  "status": "New",
+  "severity": "低",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102604207",
+  "title": "[安全][iOS静态检测]APP禁用保护功能ATS(App Transport Security)，使用HTTP明文传输协议进行通信造成信息泄露。",
+  "description": "漏洞名称：APP禁用保护功能ATS(App Transport Security)，使用HTTP明文传输协议进行通信造成信息泄露。漏洞描述：检出工具：iOS静态检测漏洞细节：\t低危--APP禁用保护功能ATS(App Transport Security)，使用HTTP明文传输协议进行通信造成信息泄露。漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261026105043P3KVCJ详情请查看原始报告",
+  "status": "New",
+  "severity": "低",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102604057",
+  "title": "[安全][软件成分分析]【SYS.7z】libjpeg-turbo_3.2.0_CVE漏洞(高危:0个,中危:1个,低危:0个)",
+  "description": "漏洞名称：【SYS.7z】libjpeg-turbo_3.2.0_CVE漏洞(高危:0个,中危:1个,低危:0个)漏洞描述：libjpeg-turbo_3.2.0 所属组件：[] 影响路径：['jpeg62.dll', 'postgis/postgresql17/bin/libproj_9.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261026103932KYNZJK详情请查看原始报告",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102604047",
+  "title": "[安全][软件成分分析]【SYS.7z】libexpat_2.5.0_CVE漏洞(高危:11个,中危:19个,低危:2个)",
+  "description": "漏洞名称：【SYS.7z】libexpat_2.5.0_CVE漏洞(高危:11个,中危:19个,低危:2个)漏洞描述：libexpat_2.5.0 所属组件：[] 影响路径：['libxlsxio_read.dll', 'aapt2.exe']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261026103932KYNZJK详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "商业显示/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102604041",
+  "title": "[安全][软件成分分析]【SYS.7z】FFmpeg_8.1.2_CVE漏洞(高危:23个,中危:13个,低危:2个)",
+  "description": "漏洞名称：【SYS.7z】FFmpeg_8.1.2_CVE漏洞(高危:23个,中危:13个,低危:2个)漏洞描述：FFmpeg_8.1.2 所属组件：[] 影响路径：['ffmpeg.exe', 'ffprobe.exe']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261026103932KYNZJK详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "商业显示/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102604022",
+  "title": "[安全][软件成分分析]【SYS.7z】openssl_3.6.3_CVE漏洞(高危:12个,中危:6个,低危:4个)",
+  "description": "漏洞名称：【SYS.7z】openssl_3.6.3_CVE漏洞(高危:12个,中危:6个,低危:4个)漏洞描述：openssl_3.6.3 所属组件：[] 影响路径：['ffmpeg.exe', 'ffprobe.exe']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261026103932KYNZJK详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "商业显示/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102603852",
+  "title": "[安全][软件成分分析]【SMS.7z】zlib_1.3.2_CVE漏洞(高危:1个,中危:0个,低危:0个)",
+  "description": "漏洞名称：【SMS.7z】zlib_1.3.2_CVE漏洞(高危:1个,中危:0个,低危:0个)漏洞描述：zlib_1.3.2 所属组件：[] 影响路径：['bin/ums-nginx/nginxums.exe', 'bin/zlib.dll', 'bin/transcode/VcaTransCode/DecodePlugins/Hik/libpng16.dll', 'bin/libcurl.dll', 'plugins/ezviz_plugin/HPStreamCom/zlib1.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261026102326YVKMMW详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": "BGCM2026102101495"
+ },
+ {
+  "defectId": "BGCM2026102603849",
+  "title": "[安全][软件成分分析]【SMS.7z】openssl_3.5.8_CVE漏洞(高危:4个,中危:5个,低危:4个)",
+  "description": "漏洞名称：【SMS.7z】openssl_3.5.8_CVE漏洞(高危:4个,中危:5个,低危:4个)漏洞描述：openssl_3.5.8 所属组件：[] 影响路径：['bin/ums-nginx/nginxums.exe', 'plugins/hik_plugin/libcrypto-3-x64.dll', 'plugins/hik_plugin/libssl-3-x64.dll', 'bin/Identify.dll', 'bin/libcrypto-3-x64.dll', 'bin/libssl-3-x64.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261026102326YVKMMW详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": "BGCM2026102101498"
+ },
+ {
+  "defectId": "BGCM2026102603830",
+  "title": "[安全][软件成分分析]【SMS.7z】Boost C++ Libraries - boost_1.53.0_CVE漏洞(高危:1个,中危:0个,低危:0个)",
+  "description": "漏洞名称：【SMS.7z】Boost C++ Libraries - boost_1.53.0_CVE漏洞(高危:1个,中危:0个,低危:0个)漏洞描述：Boost C++ Libraries - boost_1.53.0 所属组件：[] 影响路径：['bin/Cloud_API.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261026102326YVKMMW详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": "BGCM2026092401492"
+ },
+ {
+  "defectId": "BGCM2026102603630",
+  "title": "[安全][软件成分分析]【SADPServer.7z】openssl_3.0.22_CVE漏洞(高危:1个,中危:3个,低危:2个)",
+  "description": "漏洞名称：【SADPServer.7z】openssl_3.0.22_CVE漏洞(高危:1个,中危:3个,低危:2个)漏洞描述：openssl_3.0.22 所属组件：[] 影响路径：['libcrypto-3.dll', 'libssl-3.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261026102038TQUWM9详情请查看原始报告",
+  "status": "New",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102603627",
+  "title": "[安全][软件成分分析]【SADPServer.7z】gSOAP_2.8_CVE漏洞(高危:4个,中危:0个,低危:0个)",
+  "description": "漏洞名称：【SADPServer.7z】gSOAP_2.8_CVE漏洞(高危:4个,中危:0个,低危:0个)漏洞描述：gSOAP_2.8 所属组件：[] 影响路径：['ONVIFClient.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261026102038TQUWM9详情请查看原始报告",
+  "status": "New",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102603626",
+  "title": "[安全][软件成分分析]【SADPServer.7z】openssl_3.0.21_CVE漏洞(高危:5个,中危:4个,低危:2个)",
+  "description": "漏洞名称：【SADPServer.7z】openssl_3.0.21_CVE漏洞(高危:5个,中危:4个,低危:2个)漏洞描述：openssl_3.0.21 所属组件：[] 影响路径：['Identify.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261026102038TQUWM9详情请查看原始报告",
+  "status": "New",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102102203",
+  "title": "[安全][软件成分分析]【ThirdPluginServer.7z】openssl_1.0.2t_CVE漏洞(高危:18个,中危:17个,低危:4个)",
+  "description": "漏洞名称：【ThirdPluginServer.7z】openssl_1.0.2t_CVE漏洞(高危:18个,中危:17个,低危:4个)漏洞描述：openssl_1.0.2t 所属组件：[] 影响路径：['hplugin/dahua_plugin/ssleay32.dll', 'hplugin/dahua_plugin/libeay32.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261019154116L5U1KI详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "ThirdPluginServer",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102102201",
+  "title": "[安全][软件成分分析]【ThirdPluginServer.7z】zlib_1.2.12_CVE漏洞(高危:3个,中危:1个,低危:0个)",
+  "description": "漏洞名称：【ThirdPluginServer.7z】zlib_1.2.12_CVE漏洞(高危:3个,中危:1个,低危:0个)漏洞描述：zlib_1.2.12 所属组件：[] 影响路径：['hplugin/dahua_plugin/play.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261019154116L5U1KI详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "ThirdPluginServer",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102101633",
+  "title": "[安全][软件成分分析]【Client.7z】Speex_1.2_CVE漏洞(高危:0个,中危:2个,低危:0个)",
+  "description": "漏洞名称：【Client.7z】Speex_1.2_CVE漏洞(高危:0个,中危:2个,低危:0个)漏洞描述：Speex_1.2 所属组件：[] 影响路径：['HPStreamCom/ezvqe_win32.dll', 'dahua_play_plugin/play.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261019154116L5U1KI详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "中",
+  "quality": "安全性",
+  "moduleTag": "Client",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102101617",
+  "title": "[安全][软件成分分析]【Client.7z】OpenJPEG_2.4.0_CVE漏洞(高危:2个,中危:4个,低危:0个)",
+  "description": "漏洞名称：【Client.7z】OpenJPEG_2.4.0_CVE漏洞(高危:2个,中危:4个,低危:0个)漏洞描述：OpenJPEG_2.4.0 所属组件：[] 影响路径：['dahua_play_plugin/play.dll', 'Qt5WebEngineCore.dll', 'libcef.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261019154116L5U1KI详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "Client",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102101595",
+  "title": "[安全][软件成分分析]【Client.7z】openssl_3.1.5_CVE漏洞(高危:4个,中危:4个,低危:0个)",
+  "description": "漏洞名称：【Client.7z】openssl_3.1.5_CVE漏洞(高危:4个,中危:4个,低危:0个)漏洞描述：openssl_3.1.5 所属组件：[] 影响路径：['dahua_play_plugin/play.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261019154116L5U1KI详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "Client",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102101594",
+  "title": "[安全][软件成分分析]【Client.7z】zlib_1.2.12_CVE漏洞(高危:3个,中危:1个,低危:0个)",
+  "description": "漏洞名称：【Client.7z】zlib_1.2.12_CVE漏洞(高危:3个,中危:1个,低危:0个)漏洞描述：zlib_1.2.12 所属组件：[] 影响路径：['dahua_play_plugin/play.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261019154116L5U1KI详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "Client",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102101591",
+  "title": "[安全][软件成分分析]【Client.7z】Qt_5.9.6_CVE漏洞(高危:17个,中危:11个,低危:0个)",
+  "description": "漏洞名称：【Client.7z】Qt_5.9.6_CVE漏洞(高危:17个,中危:11个,低危:0个)漏洞描述：Qt_5.9.6 所属组件：[] 影响路径：['3rdTools/VSPlayer.exe/app/Qt5Core.dll', '3rdTools/VSPlayer.exe/app/Qt5Gui.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261019154116L5U1KI详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "QT",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102101589",
+  "title": "[安全][软件成分分析]【Client.7z】libpng_1.6.34_CVE漏洞(高危:4个,中危:6个,低危:0个)",
+  "description": "漏洞名称：【Client.7z】libpng_1.6.34_CVE漏洞(高危:4个,中危:6个,低危:0个)漏洞描述：libpng_1.6.34 所属组件：[] 影响路径：['3rdTools/VSPlayer.exe/app/platforms/qdirect2d.dll', '3rdTools/VSPlayer.exe/app/platforms/qminimal.dll', '3rdTools/VSPlayer.exe/app/platforms/qoffscreen.dll', '3rdTools/VSPlayer.exe/app/platforms/qwindows.dll', '3rdTools/VSPlayer.exe/app/Qt5Gui.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261019154116L5U1KI详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "QT",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102101586",
+  "title": "[安全][软件成分分析]【Client.7z】PCRE2_10.22_CVE漏洞(高危:5个,中危:2个,低危:0个)",
+  "description": "漏洞名称：【Client.7z】PCRE2_10.22_CVE漏洞(高危:5个,中危:2个,低危:0个)漏洞描述：PCRE2_10.22 所属组件：[] 影响路径：['3rdTools/VSPlayer.exe/app/Qt5Core.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261019154116L5U1KI详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "QT",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102101517",
+  "title": "[安全][软件成分分析]【SMS.7z】Speex_1.2_CVE漏洞(高危:0个,中危:2个,低危:0个)",
+  "description": "漏洞名称：【SMS.7z】Speex_1.2_CVE漏洞(高危:0个,中危:2个,低危:0个)漏洞描述：Speex_1.2 所属组件：[] 影响路径：['plugins/ezviz_plugin/HPStreamCom/ezvqe_win32.dll', 'plugins/dahua_plugin/play.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261019154116L5U1KI详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "中",
+  "quality": "安全性",
+  "moduleTag": "SMS.",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102101511",
+  "title": "[安全][软件成分分析]【SMS.7z】zlib_1.2.12_CVE漏洞(高危:3个,中危:1个,低危:0个)",
+  "description": "漏洞名称：【SMS.7z】zlib_1.2.12_CVE漏洞(高危:3个,中危:1个,低危:0个)漏洞描述：zlib_1.2.12 所属组件：[] 影响路径：['plugins/dahua_plugin/play.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261019154116L5U1KI详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "SMS",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026102101496",
+  "title": "[安全][软件成分分析]【SMS.7z】openssl_1.0.2t_CVE漏洞(高危:18个,中危:17个,低危:4个)",
+  "description": "漏洞名称：【SMS.7z】openssl_1.0.2t_CVE漏洞(高危:18个,中危:17个,低危:4个)漏洞描述：openssl_1.0.2t 所属组件：[] 影响路径：['plugins/dahua_plugin/dhnetsdk.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20261019154116L5U1KI详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "SMS",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026101303895",
+  "title": "第一次从域里面导入并保留的人员无法再次导入",
+  "description": "包括复现方法和现象描述等前置条件：操作步骤：预期结果：从域里面导入并保留的人员还能再次导入问题：建议：如其他项目或产品中存在同样缺陷，请说明：",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "系统平台/人员",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026093004337",
+  "title": "[A03_BS_预览] 无插件预览，开启电子放大后，一直对画面进行放大，放大到一定程度后画面会还原，还原后无法再放大",
+  "description": "用例名称：窗口工具栏电子放大窗口内双击成功前置条件：操作步骤：1.在开启电子放大的窗口一直进行电子放大操作，查看操作情况实际结果：开启电子放大后，一直对画面进行放大，放大到一定程度后画面会还原，还原后无法再放大",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092804308",
+  "title": "[B02_BS_回放] 同步跳转只能跳转选中的那一个画面，其他画面不变",
+  "description": "用例名称：同步回放时跳转至月历显示正常前置条件：操作步骤：1.同步回放时跳转月历测试数据：预期结果：1.跳转到相应的时间点开始同步回放正常，无卡顿情况实际结果：同步跳转只能跳转选中的那一个画面，其他画面不变问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "",
+  "duplicateOf": "BGCM2026091404992"
+ },
+ {
+  "defectId": "BGCM2026092804306",
+  "title": "[B02_BS_回放] 二分法按钮和同步/异步按钮没有被隐藏",
+  "description": "用例名称：调整资源树空间并缩小客户端比例成功前置条件：操作步骤：1.窗口较小的情况下，查看二分法按钮的排布测试数据：拉宽资源树的空间，缩小客户端比例预期结果：1.优先隐藏异步/同步回放文案，二分法按钮被隐藏到“更多”按钮内实际结果：二分法按钮和同步/异步按钮没有被隐藏如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092804225",
+  "title": "[AA18_混合云移动凭证] 【安卓】已激活多个移动凭证时有遮挡，不能滑动",
+  "description": "用例名称：验证APP激活多个平台的凭证显示正常前置条件：操作步骤：1.APP激活多个平台的凭证测试数据：预期结果：1.激活成功，人员信息，授权码信息正确，平台地址正确实际结果：【安卓】已激活多个移动凭证时有遮挡，不能滑动",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "视觉交互和文案/视觉交互和文案",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092803698",
+  "title": "[CC03_访客管理] 自助预约页面的过期180天提示和首页上的提示不统一",
+  "description": "用例名称：云服务过期180天页面提示正确前置条件：操作步骤：1.云服务过期180天，查看自助预约页面显示测试数据：预期结果：1.提示云访客已到期180天，云端数据已删除问题：1.自助预约页面的过期180天提示和首页上的提示不统一2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092803600",
+  "title": "[Q01_人员管理] license保留期时APP已激活的移动凭证不会失效，能蓝牙开门",
+  "description": "用例名称：验证保留期内员工操作移动凭证失败前置条件：订阅到期后16-180天操作步骤：1.员工在保留期内操作移动凭证测试数据：预期结果：1.平台删除所有移动凭证实际结果：license保留期时APP已激活的移动凭证不会失效，能蓝牙开门，和需求不一致",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "混合云/移动凭证",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092803536",
+  "title": "[B02_BS_回放] 无控件之前取流正常，后续取流一直失败报错701",
+  "description": "用例名称：验证回放失败下切换码流类型成功前置条件：当前码流回放失败操作步骤：1、回放录像失败场景下切换码流类型测试数据：主切子或子切主预期结果：1、码流切换按钮被放开2、可成功切换至其他码流类型实际结果：无控件之前取流正常，后续取流一直失败报错701问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/检索与回放",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092803480",
+  "title": "[CC03_访客管理] 自助预约页面没有即将到期提示",
+  "description": "用例名称：云服务即将过期页面提示正确前置条件：操作步骤：1.云服务即将过期，查看自助预约页面显示测试数据：提前30天？预期结果：1.提示云访客还有多少天过期，过期后自助预约访客仅可查询无法预约，请及时续费问题：1.自助预约页面没有即将到期提示https://10.67.32.582.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092803224",
+  "title": "[Q01_人员管理] license订阅宽限期内指派移动凭证错误提示标题是空白",
+  "description": "用例名称：验证宽期限内管理员操作移动凭证失败前置条件：订阅到期后1-15天操作步骤：1.管理员在宽期限内操作移动凭证测试数据：预期结果：1.不支持指派移动凭证实际结果：license订阅宽限期内指派移动凭证错误提示标题是空白，两种云服务离线的提示都不对",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "系统平台/人员",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092803098",
+  "title": "[Q01_人员管理] 移动凭证license过期时间显示错误",
+  "description": "用例名称：验证移动凭证过期8天提示正确前置条件：移动凭证已过期8天操作步骤：1.移动凭证已过期8天，进入移动凭证管理页面测试数据：预期结果：1.提示移动凭证已到期8天，无法发放和激活新的移动凭证，15天后人员将无法使用移动凭证通行，请及时续费",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "系统平台/人员",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092803016",
+  "title": "[A03_BS_预览] 无插件预览，预览的窗口工具栏进行码流切换，主码流或子码流切换平滑码流实际无法切换成功",
+  "description": "用例名称：配置全局码流为主码流后手动切换至平滑码流成功前置条件：操作步骤：1.预览窗口界面切换码流为{数据a}，查看预览实际取流方式测试数据：网络平滑码流预期结果：1.码流切换后预览成功，码流也是{数据a}码流实际结果：无插件预览，窗口工具栏进行，主码流或子码流切换平滑码流无法切换成功",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092802997",
+  "title": "[A03_BS_预览] 无插件预览，出现特定设备的通道，取流状态页面的帧率参数显示不是整数",
+  "description": "用例名称：配置全局码流为子码流时中心站点手动切换码流成功前置条件：操作步骤：1.预览窗口界面切换码流为{数据a}，查看预览实际取流方式测试数据：子码流预期结果：1.码流切换后预览成功，码流也是{数据a}码流实际结果：无插件预览，出现特定设备的通道，取流状态页面的帧率参数显示不是整数",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092802994",
+  "title": "[A03_BS_预览] 无插件预览，预览失败的时候切换码流参数默认都是选择在子码流上，实际上全局取流参数当前设置的是主码流",
+  "description": "用例名称：预览失败时，支持预览工具栏码流切换前置条件：操作步骤：1.预览失败时，查看预览工具栏能否支持码流切换测试数据：预期结果：1.预览失败时，预览工具栏正常展示，有码流切换选项展示，可以成功切换到其他码流展示实际结果：无插件预览，预览失败的时候切换码流参数默认都是选择在子码流上，实际上全局取流参数当前设置的是主码流",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092802992",
+  "title": "[A03_BS_预览] 无插件预览，密钥错误导致预览失败时，点击错误提示的编辑密钥无效",
+  "description": "用例名称：预览失败时，支持预览工具栏码流切换前置条件：操作步骤：1.预览失败时，查看预览工具栏能否支持码流切换测试数据：预期结果：1.预览失败时，预览工具栏正常展示，有码流切换选项展示，可以成功切换到其他码流展示实际结果：无插件预览，密钥错误导致预览失败时，点击错误提示的编辑密钥无效",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092802969",
+  "title": "[A03_BS_预览] 无插件预览取流，全局码流设置为平滑码流，支持平滑码流的设备实际上也没有用平滑码流取流",
+  "description": "用例名称：切换全局码流设置为平滑码流并验证成功前置条件：切换为平滑码流操作步骤：1.web客户端设置全局码流为数据a，进行保存测试数据：预期结果：1.数据a码流设置成功，功能正常，tip提示显示正常实际结果：全局码流设置为平滑码流，支持平滑码流的设备实际上也没有用平滑码流取流，使用的还是主码流或者子码流",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092802858",
+  "title": "[D01_移动执法与采集] 无插件，存储位置pstor&amp;css，播放视频文件报错1008（采集站在线/不在线，都报1008）",
+  "description": "用例名称：加密播放_pStor前置条件：采集站已开启AES256加密操作步骤：1.检索文件来源为{测试数据:a}的视频文件，点击播放测试数据：a:pStor预期结果：1.文件能正常播放实际结果：无插件，存储位置pstor&css，播放视频文件报错1008（需要确定下和cvr是不是一个原因，如果是的话再沟通置重）问题：1.",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/检索与回放",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092802726",
+  "title": "[D01_移动执法与采集] 无插件，采集站正常状态，回传位置pstor+css，播放音频文件报错system error（404）",
+  "description": "用例名称：音频播放_pStor前置条件：无操作步骤：3.检索文件来源为{测试数据:a}的音频文件，点击播放测试数据：a:pStor预期结果：1.文件能正常播放实际结果：无插件，采集站正常状态，回传位置pstor+css，播放音频文件报错system error（404）问题：1.",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/检索与回放",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092802600",
+  "title": "[A03_BS_预览] 无插件，已展开资源树，切换至需要加载界面在切回来，资源树全部都会收起",
+  "description": "问题：无插件，已展开资源树，切换至需要加载界面在切回来，资源树全部都会收起看录像",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092802336",
+  "title": "[B02_BS_回放] 修改同一存储器上的某一个锁的锁定时间，其余锁的锁定时间也会被修改",
+  "description": "用例名称：修改录像锁定成功前置条件：操作步骤：1.修改录像锁定（锁定时长）测试数据：预期结果：1.操作成功实际结果：修改同一存储器上的某一个锁的锁定时间，其余的锁的锁定时间也会被修改问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/检索与回放",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092801864",
+  "title": "[B02_BS_回放] 用户有add权限无edit权限，无控件窗口没有锁定的图标，cs端回放窗口可以正常展示",
+  "description": "用例名称：添加权限成功前置条件：操作步骤：1.设置用户的锁定权限符合{测试数据}，在回放中检查用户锁定录像操作限制情况测试数据：只有添加权限预期结果：1.可以添加锁定录像，无法查看、编辑、删除实际结果：用户有add权限无edit权限，无控件窗口没有锁定的图标，cs端回放窗口可以正常展示问题： 1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092801758",
+  "title": "[CC03_访客管理] 云访客查询，未找到有效记录，验证码没自动刷新",
+  "description": "用例名称：无效查询码提示无效查询码前置条件：1、已进入访客预约查询页面操作步骤：1、输入无效查询码2、点击查询测试数据：无效查询码预期结果：1、提示未查到有效记录问题：1.云访客查询，未找到有效记录，验证码没自动刷新，需要手动刷新，不好用",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092801009",
+  "title": "[CC03_访客管理] 预约过程中关闭云访客，提交预约报错error_0_60170",
+  "description": "用例名称：预约过程中关闭云启用预约失败前置条件：操作步骤：1.开启云的情况下进入预约页面填写信息，不点击预约2.关闭云访客3.点击提交预约测试数据：预期结果：1.页面有合理提示问题：1.预约过程中关闭云访客，再提交预约报错error_0_60170",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "",
+  "duplicateOf": "BGCM2026092802382"
+ },
+ {
+  "defectId": "BGCM2026092800989",
+  "title": "[CC03_访客管理] 关闭云访客手机点击预约报错CCF10001没有具体信息",
+  "description": "用例名称：预约过程中关闭云启用预约失败前置条件：操作步骤：1.关闭云访客2.手机刷新云访客的链接，点击访客预约测试数据：预期结果：1.页面有合理提示问题：1.关闭云访客手机点击预约报错CCF10001没有具体信息",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092800769",
+  "title": "[功能稳定性] 3.2提前批，113出现崩溃，HCCore.dll",
+  "description": "问题：SYS出现崩溃，HCCore.dll\\\\10.66.75.113\\HikCentral\\VSM Servers\\Log\\dump日志备份：\\\\10.66.73.99\\HCP_log_3.2  administrator Hik@12345++",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "功能性",
+  "moduleTag": "商业智能/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092407247",
+  "title": "[A03_BS_预览] 无插件预览，9路预览，预览画面就出现黑屏或者卡住不动的现象了，实际上PC的资源还都正常",
+  "description": "用例名称：主子码流阈值切换_切换至1_25预览成功前置条件：切换至1_25操作步骤：1.进行主子码流不同阈值切换，进行保存测试数据：预期结果：1.仅全局码流设置为主码流时，才显示主子码流阈值切换配置项2.各阈值设置成功，功能正常，tip提示显示正常实际结果： 无插件预览，9路预览，预览画面就出现黑屏或者卡住不动的现象了，实际上PC的资源还都正常，需要确认无插件预览性能支持情况",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092406964",
+  "title": "[Q01_人员管理] 移动凭证管理关闭后不应支持设置模版",
+  "description": "用例名称：验证移动凭证管理关闭后管理员操作移动凭证正常前置条件：移动凭证管理关闭操作步骤：1.移动凭证管理关闭后，管理员操作移动凭证测试数据：预期结果：1.仅支持查询移动凭证实际结果：移动凭证管理关闭后不应支持设置模版，操作后有两个提示，一个成功，一个错误修改开门方式实际效果能保存成功，其他都保存失败 ",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "子系统/系统服务",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092406431",
+  "title": "[A03_BS_预览] 无插件取流，如果码流切换在隐藏中，分屏较多时，码流切换窗口被工具栏的操作遮挡",
+  "description": "用例名称：主子码流阈值切换_切换至1_25预览成功前置条件：切换至1_25操作步骤：1.进行主子码流不同阈值切换，进行保存测试数据：预期结果：1.仅全局码流设置为主码流时，才显示主子码流阈值切换配置项2.各阈值设置成功，功能正常，tip提示显示正常实际结果：码流切换在隐藏中，分屏较多时，码流切换窗口被工具栏的操作遮挡",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092405136",
+  "title": "[A03_BS_预览] 无插件预览，配置中，全局码流配置和主子码流切换阈值配置，如果切换了选择，但是不保存的话，下次进入页面显示的是切换的参数，不是实际之前保存的参数",
+  "description": "用例名称：主子码流阈值切换_切换至1_16预览成功前置条件：切换至1_16操作步骤：1.进行全局码流的切换2.进行主子码流切换阈值的切换3.不保存4.退出设置页面重新进入问题：1.重新进入后，页面显示的是之前没保存的参数，而不是实际当前生效的参数",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092403982",
+  "title": "[A03_BS_预览] 无插件预览，存在翻页的情况下，翻到第二页很容易出现取流失败或者无画面，或者加载叫长时间的现象",
+  "description": "用例名称：验证修改预览分屏大于阈值，存量和新增预览均为子码流(存量预览小于等于阈值)删除前置条件：操作步骤：1、预览6个通道2.修改分屏为43.翻页到第二页实际结果：无插件预览，存在翻页的情况下，翻到第二页很容易出现取流失败或者无画面，或者加载叫长时间的现象加载不出来时也关不掉，只能一直等着",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402949",
+  "title": "[安全][软件成分分析]【BeeRedis.7z】lua_5.1_CVE漏洞(高危:0个,中危:2个,低危:0个)",
+  "description": "漏洞名称：【BeeRedis.7z】lua_5.1_CVE漏洞(高危:0个,中危:2个,低危:0个)漏洞描述：lua_5.1 所属组件：[] 影响路径：['redis-check-aof.exe', 'redis-check-rdb.exe', 'redis-server.exe']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "中",
+  "quality": "安全性",
+  "moduleTag": "BeeRedis",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402553",
+  "title": "[安全][软件成分分析]【BeeSMSRedirectServer.7z】nghttp2_1.69.0_CVE漏洞(高危:0个,中危:1个,低危:0个)",
+  "description": "漏洞名称：【BeeSMSRedirectServer.7z】nghttp2_1.69.0_CVE漏洞(高危:0个,中危:1个,低危:0个)漏洞描述：nghttp2_1.69.0 所属组件：[] 影响路径：['libnghttp2.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "安全性",
+  "moduleTag": "smsrediect",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402518",
+  "title": "[安全][软件成分分析]【ThirdPluginServer.7z】Speex_1.2_CVE漏洞(高危:0个,中危:2个,低危:0个)",
+  "description": "漏洞名称：【ThirdPluginServer.7z】Speex_1.2_CVE漏洞(高危:0个,中危:2个,低危:0个)漏洞描述：Speex_1.2 所属组件：[] 影响路径：['hplugin/dahua_plugin/play.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "中",
+  "quality": "安全性",
+  "moduleTag": "ThirdPluginServer",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402457",
+  "title": "[安全][软件成分分析]【SMS.7z】Speex_1.2_CVE漏洞(高危:0个,中危:2个,低危:0个)",
+  "description": "漏洞名称：【SMS.7z】Speex_1.2_CVE漏洞(高危:0个,中危:2个,低危:0个)漏洞描述：Speex_1.2 所属组件：[] 影响路径：['plugins/dahua_plugin/play.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "中",
+  "quality": "安全性",
+  "moduleTag": "SMS",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402400",
+  "title": "[安全][软件成分分析]【BACnetGateway.7z】Apache Portable Runtime_1.3.1_CVE漏洞(高危:8个,中危:8个,低危:0个)",
+  "description": "漏洞名称：【BACnetGateway.7z】Apache Portable Runtime_1.3.1_CVE漏洞(高危:8个,中危:8个,低危:0个)漏洞描述：Apache Portable Runtime_1.3.1 所属组件：[] 影响路径：['hlog.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402397",
+  "title": "[安全][软件成分分析]【BACnetGateway.7z】libxml2_1.6.0_CVE漏洞(高危:46个,中危:35个,低危:4个)",
+  "description": "漏洞名称：【BACnetGateway.7z】libxml2_1.6.0_CVE漏洞(高危:46个,中危:35个,低危:4个)漏洞描述：libxml2_1.6.0 所属组件：[] 影响路径：['BeeProto.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402372",
+  "title": "[安全][软件成分分析]【BeeOnvifGateway.7z】Apache Portable Runtime_1.3.1_CVE漏洞(高危:8个,中危:8个,低危:0个)",
+  "description": "漏洞名称：【BeeOnvifGateway.7z】Apache Portable Runtime_1.3.1_CVE漏洞(高危:8个,中危:8个,低危:0个)漏洞描述：Apache Portable Runtime_1.3.1 所属组件：[] 影响路径：['hlog.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402337",
+  "title": "[安全][软件成分分析]【ManagementCenter.7z】openssl_3.0.21_CVE漏洞(高危:4个,中危:1个,低危:0个)",
+  "description": "漏洞名称：【ManagementCenter.7z】openssl_3.0.21_CVE漏洞(高危:4个,中危:1个,低危:0个)漏洞描述：openssl_3.0.21 所属组件：[] 影响路径：['libssl-3-x64.dll', 'libcrypto-3-x64.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "安全性",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402320",
+  "title": "[安全][软件成分分析]【BeeSMSRedirectServer.7z】libxml2_1.6.0_CVE漏洞(高危:46个,中危:35个,低危:4个)",
+  "description": "漏洞名称：【BeeSMSRedirectServer.7z】libxml2_1.6.0_CVE漏洞(高危:46个,中危:35个,低危:4个)漏洞描述：libxml2_1.6.0 所属组件：[] 影响路径：['BeeProto.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402319",
+  "title": "[安全][软件成分分析]【BeeSMSRedirectServer.7z】Apache Portable Runtime_1.3.1_CVE漏洞(高危:8个,中危:8个,低危:0个)",
+  "description": "漏洞名称：【BeeSMSRedirectServer.7z】Apache Portable Runtime_1.3.1_CVE漏洞(高危:8个,中危:8个,低危:0个)漏洞描述：Apache Portable Runtime_1.3.1 所属组件：[] 影响路径：['hlog.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402318",
+  "title": "[安全][软件成分分析]【BeeSMSRedirectServer.7z】curl_8.21.0_CVE漏洞(高危:4个,中危:3个,低危:2个)",
+  "description": "漏洞名称：【BeeSMSRedirectServer.7z】curl_8.21.0_CVE漏洞(高危:4个,中危:3个,低危:2个)漏洞描述：curl_8.21.0 所属组件：[] 影响路径：['curl.exe', 'libcurl.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "smsrediect",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402317",
+  "title": "[安全][软件成分分析]【BeeSMSRedirectServer.7z】openssl_3.0.21_CVE漏洞(高危:4个,中危:1个,低危:0个)",
+  "description": "漏洞名称：【BeeSMSRedirectServer.7z】openssl_3.0.21_CVE漏洞(高危:4个,中危:1个,低危:0个)漏洞描述：openssl_3.0.21 所属组件：[] 影响路径：['Identify.dll', 'libcrypto-3-x64.dll', 'libssl-3-x64.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "smsrediect",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402316",
+  "title": "[安全][软件成分分析]【BeeSMSRedirectServer.7z】libxml2_2.15.3_CVE漏洞(高危:7个,中危:1个,低危:1个)",
+  "description": "漏洞名称：【BeeSMSRedirectServer.7z】libxml2_2.15.3_CVE漏洞(高危:7个,中危:1个,低危:1个)漏洞描述：libxml2_2.15.3 所属组件：[] 影响路径：['libxml2.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "smsredirect",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402296",
+  "title": "[安全][软件成分分析]【ExtendedDeviceAccessServer.7z】Apache Portable Runtime_1.3.1_CVE漏洞(高危:8个,中危:8个,低危:0个)",
+  "description": "漏洞名称：【ExtendedDeviceAccessServer.7z】Apache Portable Runtime_1.3.1_CVE漏洞(高危:8个,中危:8个,低危:0个)漏洞描述：Apache Portable Runtime_1.3.1 所属组件：[] 影响路径：['hlog.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402290",
+  "title": "[安全][软件成分分析]【ManagementCenter.7z】libxml2_2.15.3_CVE漏洞(高危:7个,中危:1个,低危:1个)",
+  "description": "漏洞名称：【ManagementCenter.7z】libxml2_2.15.3_CVE漏洞(高危:7个,中危:1个,低危:1个)漏洞描述：libxml2_2.15.3 所属组件：[] 影响路径：['libxml2.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "安全性",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402280",
+  "title": "[安全][软件成分分析]【ManagementCenter.7z】curl_8.21.0_CVE漏洞(高危:4个,中危:3个,低危:2个)",
+  "description": "漏洞名称：【ManagementCenter.7z】curl_8.21.0_CVE漏洞(高危:4个,中危:3个,低危:2个)漏洞描述：curl_8.21.0 所属组件：[] 影响路径：['curl.exe', 'libcurl.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "安全性",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402266",
+  "title": "[安全][软件成分分析]【ManagementCenter.7z】PostgreSQL Database Server_16.14_CVE漏洞(高危:17个,中危:6个,低危:3个)",
+  "description": "漏洞名称：【ManagementCenter.7z】PostgreSQL Database Server_16.14_CVE漏洞(高危:17个,中危:6个,低危:3个)漏洞描述：PostgreSQL Database Server_16.14 所属组件：[] 影响路径：['libpq.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "安全性",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402196",
+  "title": "[安全][软件成分分析]【SADPServer.7z】openssl_3.0.21_CVE漏洞(高危:4个,中危:1个,低危:0个)",
+  "description": "漏洞名称：【SADPServer.7z】openssl_3.0.21_CVE漏洞(高危:4个,中危:1个,低危:0个)漏洞描述：openssl_3.0.21 所属组件：[] 影响路径：['Identify.dll', 'libcrypto-3.dll', 'libssl-3.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "设备管理/设备管理",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402194",
+  "title": "[安全][软件成分分析]【SADPServer.7z】libxml2_2.15.3_CVE漏洞(高危:7个,中危:1个,低危:1个)",
+  "description": "漏洞名称：【SADPServer.7z】libxml2_2.15.3_CVE漏洞(高危:7个,中危:1个,低危:1个)漏洞描述：libxml2_2.15.3 所属组件：[] 影响路径：['libxml2.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "设备管理/设备管理",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402192",
+  "title": "[安全][软件成分分析]【SADPServer.7z】libxml2_1.6.0_CVE漏洞(高危:46个,中危:35个,低危:4个)",
+  "description": "漏洞名称：【SADPServer.7z】libxml2_1.6.0_CVE漏洞(高危:46个,中危:35个,低危:4个)漏洞描述：libxml2_1.6.0 所属组件：[] 影响路径：['BeeProto.dll', 'SADPServer.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402155",
+  "title": "[安全][软件成分分析]【ManagementCenter.7z】nghttp2_1.69.0_CVE漏洞(高危:0个,中危:1个,低危:0个)",
+  "description": "漏洞名称：【ManagementCenter.7z】nghttp2_1.69.0_CVE漏洞(高危:0个,中危:1个,低危:0个)漏洞描述：nghttp2_1.69.0 所属组件：[] 影响路径：['libnghttp2.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "安全性",
+  "moduleTag": "973136",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402154",
+  "title": "[安全][软件成分分析]【ManagementCenter.7z】Apache Portable Runtime_1.3.1_CVE漏洞(高危:8个,中危:8个,低危:0个)",
+  "description": "漏洞名称：【ManagementCenter.7z】Apache Portable Runtime_1.3.1_CVE漏洞(高危:8个,中危:8个,低危:0个)漏洞描述：Apache Portable Runtime_1.3.1 所属组件：[] 影响路径：['hlog.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402153",
+  "title": "[安全][软件成分分析]【Nginx.rar】nginx_1.24.0_CVE漏洞(高危:11个,中危:6个,低危:3个)",
+  "description": "漏洞名称：【Nginx.rar】nginx_1.24.0_CVE漏洞(高危:11个,中危:6个,低危:3个)漏洞描述：nginx_1.24.0 所属组件：[] 影响路径：['Nginx/nginx.exe']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "安全性",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402152",
+  "title": "[安全][软件成分分析]【ManagementCenter.7z】libxml2_1.6.0_CVE漏洞(高危:46个,中危:35个,低危:4个)",
+  "description": "漏洞名称：【ManagementCenter.7z】libxml2_1.6.0_CVE漏洞(高危:46个,中危:35个,低危:4个)漏洞描述：libxml2_1.6.0 所属组件：[] 影响路径：['BeeProto.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402151",
+  "title": "[安全][软件成分分析]【ManagementCenter.7z】libTIFF_4.5.1_CVE漏洞(高危:5个,中危:6个,低危:1个)",
+  "description": "漏洞名称：【ManagementCenter.7z】libTIFF_4.5.1_CVE漏洞(高危:5个,中危:6个,低危:1个)漏洞描述：libTIFF_4.5.1 所属组件：[] 影响路径：['opencv_imgcodecs4120.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402147",
+  "title": "[安全][软件成分分析]【Nginx.rar】7zip_25.01_CVE漏洞(高危:5个,中危:4个,低危:1个)",
+  "description": "漏洞名称：【Nginx.rar】7zip_25.01_CVE漏洞(高危:5个,中危:4个,低危:1个)漏洞描述：7zip_25.01 所属组件：[] 影响路径：['Nginx/7za.exe']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "系统平台/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402144",
+  "title": "[安全][软件成分分析]【Nginx.rar】openssl_3.0.20_CVE漏洞(高危:8个,中危:4个,低危:1个)",
+  "description": "漏洞名称：【Nginx.rar】openssl_3.0.20_CVE漏洞(高危:8个,中危:4个,低危:1个)漏洞描述：openssl_3.0.20 所属组件：[] 影响路径：['Nginx/nginx.exe']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "安全性",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402060",
+  "title": "[安全][软件成分分析]【SADPServer.7z】nghttp2_1.69.0_CVE漏洞(高危:0个,中危:1个,低危:0个)",
+  "description": "漏洞名称：【SADPServer.7z】nghttp2_1.69.0_CVE漏洞(高危:0个,中危:1个,低危:0个)漏洞描述：nghttp2_1.69.0 所属组件：[] 影响路径：['libnghttp2.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "安全性",
+  "moduleTag": "设备管理/设备管理",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402059",
+  "title": "[安全][软件成分分析]【ExtendedDeviceAccessServer.7z】nghttp2_1.69.0_CVE漏洞(高危:0个,中危:1个,低危:0个)",
+  "description": "漏洞名称：【ExtendedDeviceAccessServer.7z】nghttp2_1.69.0_CVE漏洞(高危:0个,中危:1个,低危:0个)漏洞描述：nghttp2_1.69.0 所属组件：[] 影响路径：['libnghttp2.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "安全性",
+  "moduleTag": "设备管理/设备管理",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402058",
+  "title": "[安全][软件成分分析]【ExtendedDeviceAccessServer.7z】nghttp2_1.37.0_CVE漏洞(高危:5个,中危:2个,低危:0个)",
+  "description": "漏洞名称：【ExtendedDeviceAccessServer.7z】nghttp2_1.37.0_CVE漏洞(高危:5个,中危:2个,低危:0个)漏洞描述：nghttp2_1.37.0 所属组件：[] 影响路径：['nghttp2.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "设备管理/设备管理",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402057",
+  "title": "[安全][软件成分分析]【ExtendedDeviceAccessServer.7z】libxml2_2.15.3_CVE漏洞(高危:7个,中危:1个,低危:1个)",
+  "description": "漏洞名称：【ExtendedDeviceAccessServer.7z】libxml2_2.15.3_CVE漏洞(高危:7个,中危:1个,低危:1个)漏洞描述：libxml2_2.15.3 所属组件：[] 影响路径：['libxml2.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "设备管理/设备管理",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402056",
+  "title": "[安全][软件成分分析]【ExtendedDeviceAccessServer.7z】openssl_3.0.21_CVE漏洞(高危:4个,中危:1个,低危:0个)",
+  "description": "漏洞名称：【ExtendedDeviceAccessServer.7z】openssl_3.0.21_CVE漏洞(高危:4个,中危:1个,低危:0个)漏洞描述：openssl_3.0.21 所属组件：[] 影响路径：['libssl-3.dll', 'libcrypto-3.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "设备管理/设备管理",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402055",
+  "title": "[安全][软件成分分析]【ExtendedDeviceAccessServer.7z】libxml2_1.6.0_CVE漏洞(高危:46个,中危:35个,低危:4个)",
+  "description": "漏洞名称：【ExtendedDeviceAccessServer.7z】libxml2_1.6.0_CVE漏洞(高危:46个,中危:35个,低危:4个)漏洞描述：libxml2_1.6.0 所属组件：[] 影响路径：['BeeProto.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "设备管理/设备管理",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402054",
+  "title": "[安全][软件成分分析]【ExtendedDeviceAccessServer.7z】curl_8.21.0_CVE漏洞(高危:4个,中危:3个,低危:2个)",
+  "description": "漏洞名称：【ExtendedDeviceAccessServer.7z】curl_8.21.0_CVE漏洞(高危:4个,中危:3个,低危:2个)漏洞描述：curl_8.21.0 所属组件：[] 影响路径：['libcurl.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "设备管理/设备管理",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402051",
+  "title": "[安全][软件成分分析]【SADPServer.7z】Apache Portable Runtime_1.3.1_CVE漏洞(高危:8个,中危:8个,低危:0个)",
+  "description": "漏洞名称：【SADPServer.7z】Apache Portable Runtime_1.3.1_CVE漏洞(高危:8个,中危:8个,低危:0个)漏洞描述：Apache Portable Runtime_1.3.1 所属组件：[] 影响路径：['hlog.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092402048",
+  "title": "[安全][软件成分分析]【SADPServer.7z】curl_8.21.0_CVE漏洞(高危:4个,中危:3个,低危:2个)",
+  "description": "漏洞名称：【SADPServer.7z】curl_8.21.0_CVE漏洞(高危:4个,中危:3个,低危:2个)漏洞描述：curl_8.21.0 所属组件：[] 影响路径：['libcurl.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "设备管理/设备管理",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401727",
+  "title": "[安全][软件成分分析]【HCWebControl.rar】Speex_1.2_CVE漏洞(高危:0个,中危:2个,低危:0个)",
+  "description": "漏洞名称：【HCWebControl.rar】Speex_1.2_CVE漏洞(高危:0个,中危:2个,低危:0个)漏洞描述：Speex_1.2 所属组件：[] 影响路径：['HCWebControl/User目录下的HCWebControl/playControl/dahua_play_plugin/play.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "中",
+  "quality": "安全性",
+  "moduleTag": "HCWebControl",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401716",
+  "title": "[安全][软件成分分析]【HCWebControl.rar】OpenJPEG_2.4.0_CVE漏洞(高危:2个,中危:4个,低危:0个)",
+  "description": "漏洞名称：【HCWebControl.rar】OpenJPEG_2.4.0_CVE漏洞(高危:2个,中危:4个,低危:0个)漏洞描述：OpenJPEG_2.4.0 所属组件：[] 影响路径：['HCWebControl/User目录下的HCWebControl/playControl/dahua_play_plugin/play.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "HCWebControl",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401711",
+  "title": "[安全][软件成分分析]【HCWebControl.rar】openssl_3.1.5_CVE漏洞(高危:5个,中危:1个,低危:2个)",
+  "description": "漏洞名称：【HCWebControl.rar】openssl_3.1.5_CVE漏洞(高危:5个,中危:1个,低危:2个)漏洞描述：openssl_3.1.5 所属组件：[] 影响路径：['HCWebControl/User目录下的HCWebControl/playControl/dahua_play_plugin/play.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "HCWebControl",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401614",
+  "title": "[安全][软件成分分析]【ThirdPluginServer.7z】OpenJPEG_2.4.0_CVE漏洞(高危:2个,中危:4个,低危:0个)",
+  "description": "漏洞名称：【ThirdPluginServer.7z】OpenJPEG_2.4.0_CVE漏洞(高危:2个,中危:4个,低危:0个)漏洞描述：OpenJPEG_2.4.0 所属组件：[] 影响路径：['hplugin/dahua_plugin/play.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "ThirdPluginServer",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401613",
+  "title": "[安全][软件成分分析]【ThirdPluginServer.7z】libjpeg-turbo_2.0.2_CVE漏洞(高危:1个,中危:2个,低危:0个)",
+  "description": "漏洞名称：【ThirdPluginServer.7z】libjpeg-turbo_2.0.2_CVE漏洞(高危:1个,中危:2个,低危:0个)漏洞描述：libjpeg-turbo_2.0.2 所属组件：[] 影响路径：['hplugin/dahua_plugin/play.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "ThirdPluginServer",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401612",
+  "title": "[安全][软件成分分析]【ThirdPluginServer.7z】openssl_1.0.2t_CVE漏洞(高危:16个,中危:9个,低危:9个)",
+  "description": "漏洞名称：【ThirdPluginServer.7z】openssl_1.0.2t_CVE漏洞(高危:16个,中危:9个,低危:9个)漏洞描述：openssl_1.0.2t 所属组件：[] 影响路径：['hplugin/dahua_plugin/libeay32.dll', 'hplugin/dahua_plugin/ssleay32.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "ThirdPluginServer",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401509",
+  "title": "[安全][软件成分分析]【SMS.7z】openssl_3.0.21_CVE漏洞(高危:4个,中危:1个,低危:0个)",
+  "description": "漏洞名称：【SMS.7z】openssl_3.0.21_CVE漏洞(高危:4个,中危:1个,低危:0个)漏洞描述：openssl_3.0.21 所属组件：[] 影响路径：['bin/Identify.dll', 'bin/libcrypto-3-x64.dll', 'bin/libssl-3-x64.dll', 'plugins/hik_plugin/libcrypto-3-x64.dll', 'plugins/hik_plugin/libssl-3-x64.dll', 'plugins/axis_plugin/NPClient.dll', 'plugins/hanwha_plugin/NPClient.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "分布式集群/流媒体",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401503",
+  "title": "[安全][软件成分分析]【SMS.7z】OpenJPEG_2.4.0_CVE漏洞(高危:2个,中危:4个,低危:0个)",
+  "description": "漏洞名称：【SMS.7z】OpenJPEG_2.4.0_CVE漏洞(高危:2个,中危:4个,低危:0个)漏洞描述：OpenJPEG_2.4.0 所属组件：[] 影响路径：['plugins/dahua_plugin/play.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "SMS",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401502",
+  "title": "[安全][软件成分分析]【SMS.7z】libsrtp_1.0.2_CVE漏洞(高危:1个,中危:0个,低危:1个)",
+  "description": "漏洞名称：【SMS.7z】libsrtp_1.0.2_CVE漏洞(高危:1个,中危:0个,低危:1个)漏洞描述：libsrtp_1.0.2 所属组件：[] 影响路径：['bin/HCNetSDKCom/StreamTransClient.dll', 'plugins/hik_plugin/HCNetSDKCom/StreamTransClient.dll', 'plugins/hik_plugin/StreamTransClient.dll', 'bin/StreamTransClient.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401501",
+  "title": "[安全][软件成分分析]【SMS.7z】openssl_1.0.2t_CVE漏洞(高危:16个,中危:9个,低危:9个)",
+  "description": "漏洞名称：【SMS.7z】openssl_1.0.2t_CVE漏洞(高危:16个,中危:9个,低危:9个)漏洞描述：openssl_1.0.2t 所属组件：[] 影响路径：['plugins/dahua_plugin/dhnetsdk.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "SMS",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401499",
+  "title": "[安全][软件成分分析]【SMS.7z】Apache Portable Runtime_1.3.1_CVE漏洞(高危:8个,中危:8个,低危:0个)",
+  "description": "漏洞名称：【SMS.7z】Apache Portable Runtime_1.3.1_CVE漏洞(高危:8个,中危:8个,低危:0个)漏洞描述：Apache Portable Runtime_1.3.1 所属组件：[] 影响路径：['bin/hlog.dll', 'bin/transcode/VcaTransCode/hlog.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401497",
+  "title": "[安全][软件成分分析]【SMS.7z】libjpeg-turbo_2.0.2_CVE漏洞(高危:1个,中危:2个,低危:0个)",
+  "description": "漏洞名称：【SMS.7z】libjpeg-turbo_2.0.2_CVE漏洞(高危:1个,中危:2个,低危:0个)漏洞描述：libjpeg-turbo_2.0.2 所属组件：[] 影响路径：['plugins/dahua_plugin/play.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "SMS",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401495",
+  "title": "[安全][软件成分分析]【SMS.7z】mbed TLS_3.6.0_CVE漏洞(高危:6个,中危:5个,低危:0个)",
+  "description": "漏洞名称：【SMS.7z】mbed TLS_3.6.0_CVE漏洞(高危:6个,中危:5个,低危:0个)漏洞描述：mbed TLS_3.6.0 所属组件：[] 影响路径：['plugins/ezviz_plugin/ecdhCryption.dll', 'bin/microkernel.dll', 'bin/ezDevSDK_domain.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401418",
+  "title": "[安全][软件成分分析]【SYS.7z】Speex_1.2_CVE漏洞(高危:0个,中危:2个,低危:0个)",
+  "description": "漏洞名称：【SYS.7z】Speex_1.2_CVE漏洞(高危:0个,中危:2个,低危:0个)漏洞描述：Speex_1.2 所属组件：[] 影响路径：['ffmpeg.exe', 'ffprobe.exe']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "安全性",
+  "moduleTag": "商业显示/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401413",
+  "title": "[安全][软件成分分析]【SYS.7z】libsrtp_1.0.2_CVE漏洞(高危:1个,中危:0个,低危:1个)",
+  "description": "漏洞名称：【SYS.7z】libsrtp_1.0.2_CVE漏洞(高危:1个,中危:0个,低危:1个)漏洞描述：libsrtp_1.0.2 所属组件：[] 影响路径：['HCOTAPSDKCom/StreamTransClient.dll', 'HCNetSDKCom/StreamTransClient.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401411",
+  "title": "[安全][软件成分分析]【SYS.7z】libTIFF_4.5.1_CVE漏洞(高危:5个,中危:6个,低危:1个)",
+  "description": "漏洞名称：【SYS.7z】libTIFF_4.5.1_CVE漏洞(高危:5个,中危:6个,低危:1个)漏洞描述：libTIFF_4.5.1 所属组件：[] 影响路径：['opencv_imgcodecs4120.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401410",
+  "title": "[安全][软件成分分析]【SYS.7z】Apache Portable Runtime_1.3.1_CVE漏洞(高危:8个,中危:8个,低危:0个)",
+  "description": "漏洞名称：【SYS.7z】Apache Portable Runtime_1.3.1_CVE漏洞(高危:8个,中危:8个,低危:0个)漏洞描述：Apache Portable Runtime_1.3.1 所属组件：[] 影响路径：['hlog.dll', 'axis_plugin/hlog.dll', 'hanwha_plugin/hlog.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401407",
+  "title": "[安全][软件成分分析]【SYS.7z】cJSON_1.5.3_CVE漏洞(高危:8个,中危:2个,低危:0个)",
+  "description": "漏洞名称：【SYS.7z】cJSON_1.5.3_CVE漏洞(高危:8个,中危:2个,低危:0个)漏洞描述：cJSON_1.5.3 所属组件：[] 影响路径：['BeeLPCServer.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401403",
+  "title": "[安全][软件成分分析]【SYS.7z】openssl_3.6.3_CVE漏洞(高危:7个,中危:1个,低危:0个)",
+  "description": "漏洞名称：【SYS.7z】openssl_3.6.3_CVE漏洞(高危:7个,中危:1个,低危:0个)漏洞描述：openssl_3.6.3 所属组件：[] 影响路径：['ffmpeg.exe', 'ffprobe.exe']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "商业显示/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401400",
+  "title": "[安全][软件成分分析]【SYS.7z】libssh_0.12.0_CVE漏洞(高危:1个,中危:0个,低危:0个)",
+  "description": "漏洞名称：【SYS.7z】libssh_0.12.0_CVE漏洞(高危:1个,中危:0个,低危:0个)漏洞描述：libssh_0.12.0 所属组件：[] 影响路径：['ffmpeg.exe', 'ffprobe.exe']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "商业显示/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401398",
+  "title": "[安全][软件成分分析]【SYS.7z】gSOAP_2.8_CVE漏洞(高危:4个,中危:0个,低危:0个)",
+  "description": "漏洞名称：【SYS.7z】gSOAP_2.8_CVE漏洞(高危:4个,中危:0个,低危:0个)漏洞描述：gSOAP_2.8 所属组件：[] 影响路径：['Soap.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Delay/A bug",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "soap",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401391",
+  "title": "[安全][软件成分分析]【SYS.7z】libexpat_2.8.2_CVE漏洞(高危:3个,中危:0个,低危:0个)",
+  "description": "漏洞名称：【SYS.7z】libexpat_2.8.2_CVE漏洞(高危:3个,中危:0个,低危:0个)漏洞描述：libexpat_2.8.2 所属组件：[] 影响路径：['libexpat-1.dll', 'ffmpeg.exe', 'ffprobe.exe']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "商业显示/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401388",
+  "title": "[安全][软件成分分析]【SYS.7z】libxml2_1.6.0_CVE漏洞(高危:46个,中危:35个,低危:4个)",
+  "description": "漏洞名称：【SYS.7z】libxml2_1.6.0_CVE漏洞(高危:46个,中危:35个,低危:4个)漏洞描述：libxml2_1.6.0 所属组件：[] 影响路径：['radar.d.dll', 'ReportCreatorByAPI.dll', 'report.s.dll', 'ThirdPluginClient_R.dll', 'tvwallaccess.d.dll', 'UpgradeServer.dll', 'platform.dll', 'VSSUtils.dll', 'baseacs.d.dll', 'BeeLicenseService.dll', 'firecontrol.d.dll', 'focsignaccess.d.dll', 'BeeProto.dll', 'integration.s.dll', 'hanwha_plugin/BeeProto.dll', 'axis_plugin/BeeProto.dll', 'CapsetModule.dll', 'alarm.s.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401387",
+  "title": "[安全][软件成分分析]【SYS.7z】FFmpeg_8.1.2_CVE漏洞(高危:16个,中危:5个,低危:0个)",
+  "description": "漏洞名称：【SYS.7z】FFmpeg_8.1.2_CVE漏洞(高危:16个,中危:5个,低危:0个)漏洞描述：FFmpeg_8.1.2 所属组件：[] 影响路径：['ffmpeg.exe', 'ffprobe.exe']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "商业显示/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401383",
+  "title": "[安全][软件成分分析]【SYS.7z】Boost C++ Libraries - boost_1.1.0_CVE漏洞(高危:1个,中危:0个,低危:0个)",
+  "description": "漏洞名称：【SYS.7z】Boost C++ Libraries - boost_1.1.0_CVE漏洞(高危:1个,中危:0个,低危:0个)漏洞描述：Boost C++ Libraries - boost_1.1.0 所属组件：[] 影响路径：['BeeDistributedMsgBus.dll']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401380",
+  "title": "[安全][软件成分分析]【SYS.7z】libpng_1.6.39_CVE漏洞(高危:7个,中危:3个,低危:0个)",
+  "description": "漏洞名称：【SYS.7z】libpng_1.6.39_CVE漏洞(高危:7个,中危:3个,低危:0个)漏洞描述：libpng_1.6.39 所属组件：[] 影响路径：['aapt2.exe']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "商业显示/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092401379",
+  "title": "[安全][软件成分分析]【SYS.7z】libexpat_2.5.0_CVE漏洞(高危:10个,中危:19个,低危:2个)",
+  "description": "漏洞名称：【SYS.7z】libexpat_2.5.0_CVE漏洞(高危:10个,中危:19个,低危:2个)漏洞描述：libexpat_2.5.0 所属组件：[] 影响路径：['aapt2.exe']检出工具：软件成分分析漏洞细节：漏洞共计：1报告地址：http://hikshield.hikvision.com.cn/task/detail?task_group_id=STG20260923150111VOMX0E详情请查看原始报告",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "安全性",
+  "moduleTag": "商业显示/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092303617",
+  "title": "[Q01_人员管理] 平台连接云服务离线(重定向请求失败)",
+  "description": "用例名称：验证正常期内管理员操作移动凭证成功前置条件：订阅有效期操作步骤：1.管理员在有效期内操作移动凭证测试数据：预期结果：1.支持指派、查询、撤销移动凭证实际结果：平台连接云服务离线(重定向请求失败)，https://hcp-sgp-uat-13.hikcentralportal.com/hcp/ccfsas/mqtt/v1/cluster/assign，重定向协议请求失败了，错误码是LAP000021 ",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "系统平台/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092303578",
+  "title": "[A03_BS_预览] 无插件预览，窗口较小的时候，缩略图和模式切换与窗口的边框存在重合",
+  "description": "用例名称：前置条件：操作步骤：1.点击电子放大测试数据：切换25分屏预期结果：1.工具栏码流切换按钮，显示主码流和子码流切换入口实际结果：窗口较小的时候，缩略图和模式切换与窗口的边框存在重合平台：10.66.75.113&nbsp; &nbsp;fln&nbsp; &nbsp; Abc112233",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092302892",
+  "title": "[A03_BS_预览] 数字看板，小路数条件下，界面效果展示还是大路数下的效果，没有展示小路数的效果",
+  "description": "用例名称：查看数字看板显示少量数据成功前置条件：操作步骤：1. 选择中心资源树，并勾选对应的监控点测试数据：预期结果：1. 资源区域及资源树获取正确实际结果：数字看板，小路数条件下，界面效果展示还是大路数下的效果，没有展示小路数的效果搜索在后面 同样的权限下，视频模块是小路数的效果了，检索在前面",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092302423",
+  "title": "[AA18_混合云移动凭证] APP激活移动凭证报错登录超时",
+  "description": "用例名称：验证APP激活多个不同区域的移动凭证成功前置条件：操作步骤：1.A凭证是新加坡大区，B凭证是欧洲大区，激活A、B凭证测试数据：预期结果：1.激活成功，凭证信息展示正常实际结果：APP激活移动凭证报错登录超时，环境：https://101.68.90.141:20443/#/portal     admin/Abc112233",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "功能性",
+  "moduleTag": "混合云/移动凭证",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092301411",
+  "title": "[AA18_混合云移动凭证] 2624主机偶现蓝牙开门无反应",
+  "description": "实际结果：2624主机偶现蓝牙开门无反应，有时候能认证成功，有时候读卡器滴一声但没有认证事件已联系设备研发抓了日志设备：10.67.32.164   admin/Abc112233设备版本：DS-K2624X20260922V020100ENFV2429804           ",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "",
+  "duplicateOf": "BGCM2026092206311"
+ },
+ {
+  "defectId": "BGCM2026092300319",
+  "title": "[CC03_访客管理] 隐私协议中带有链接，点击链接应该打开另一个标签页而不是在原标签页打开",
+  "description": "用例名称：校验首次点击预约显示隐私协议正确前置条件：操作步骤：1.pc访问链接，首次点击预约，查看页面显示2.点击不同意3.点击同意测试数据：预期结果：1.弹出隐私协议，下方显示不同意，同意按钮，隐私协议内容正确2.返回首页3.进入预约信息填写页面问题：1.隐私协议中带有链接，点击链接应该打开另一个标签页而不是在原标签页打开",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092211582",
+  "title": "[A03_BS_预览] 无插件预览，全局码流配置，只有显示主码流时，才支持主子码流阈值配置才有效，控件版本只有在主码流下才显示阈值，其他码流下，阈值隐藏",
+  "description": "用例名称：切换全局码流设置为子码流并验证成功前置条件：切换为子码流操作步骤：1.web客户端设置全局码流为数据a，进行保存测试数据：预期结果：1.数据a码流设置成功，功能正常，tip提示显示正常实际结果：全局码流配置，只有显示主码流时，才支持主子码流阈值配置才有效，控件版本只有在主码流下才显示阈值，其他码流下，阈值隐藏，目前无插件版本没有隐藏、",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092211474",
+  "title": "[A03_BS_预览] 无插件预览，回放和预览支持的码流类型不一样时，预览切换即时回放在切换回来，显示的预览，码流类型错误",
+  "description": "用例名称：验证窗口工具栏电子放大录像回放功能页显示正常前置条件：操作步骤：1.用户操作预览工具栏-查看可切换的码流2.即时回放，查看可切换的码流3.退出即时回放回到预览，查看可切换的码流，实际结果：无插件预览，回放和预览支持的码流类型不一样时，预览切换即时回放在切换回来，显示的预览，码流类型错误",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092210988",
+  "title": "[A03_BS_预览] 无插件不支持第四码流需求，需求中删除，工具栏需要删除",
+  "description": "用例名称：隐藏与显示工具栏_支持主码流子码流和平滑码流正常显示前置条件：操作步骤：1.本地站点中设备支持如下选项，查看工具栏显示测试数据：码流能力集-支持主码流、子码流、平滑码流预期结果：1.工具栏码流切换按钮，显示主码流、子码流、平滑码流切换入口实际结果：无插件不支持第四码流需求，需求中删除，工具栏需要删除",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "子系统/设备接入管理",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092210498",
+  "title": "[B02_BS_回放] 无控件回放，连续切换二分法的前进后退按钮，时间轴的密度不会随之更新，不便于查看具体时间点",
+  "description": "用例名称：跨时区搜索远端站点录像返回成功结果_云存储前置条件：1.远端站点和RSM时区不相同，例如分别是-7时区和-8时区2.存储介质、设备同VSM所在服务器时区一致操作步骤：1.假设客户端在-9时区，配置按设备时间回放，在符合前置条件时，对远端站点进行当前时间回放测试数据：云存储预期结果：1.回放时间轴和客户端的时间显示一致，远端功能回放正常，回放画面中的录像的OSD时间也同客户端时间显示一致（其中CVR要求设备、存储介质、VSM、客户端都在同一个时区）实际结果：无控件回放，连续切换二分法的前进后退按钮，时间轴的密度不会随之更新，不便于查看具体时间点问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "",
+  "duplicateOf": "BGCM2026091502618"
+ },
+ {
+  "defectId": "BGCM2026092210481",
+  "title": "[A03_BS_预览] 预览无插件，开启电子放大之后，启用3D定位，电子放大没有自动关闭",
+  "description": "用例名称：启用电子放大3D功能成功前置条件：操作步骤：1.打开PTZ中的3D放大功能测试数据：3D放大预期结果：1.电子放大自动关闭，3D放大开启成功,云镜操作成功实际结果：预览无插件，开启电子放大之后，启用3D定位，电子放大没有自动关闭，效果冲突不可以一起开启",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092206311",
+  "title": "[AA18_混合云移动凭证] 【安卓】挥手开门成功会上报多条事件",
+  "description": "用例名称：验证挥手开门成功前置条件：操作步骤：1.挥手开门测试数据：预期结果：1.开门成功实际结果：【安卓】挥手开门成功会上报多条事件 ",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "系统平台/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092206077",
+  "title": "[CC03_访客管理] 自助预约添加多个被访人，访客的访客组显示不一致",
+  "description": "用例名称：填写预约信息提交预约成功-需要审核-多被访人前置条件：关闭了审核自动通过操作步骤：1. 扫描自助访客预约二维码，点击预约2.填写预约信息，填写多个被访人信息，点击提交测试数据：预期结果：1.进入预约信息填写页面2.提交成功，返回提交成功等待审核，分行显示多条预约时间、被访人信息，待审批状态，展示预约详情：访客姓名，事由，信息正确；页面最上方显示查询码信息问题：1.自助预约添加多个被访人，访客的访客组显示不一致2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "混合云/访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092205707",
+  "title": "[AA18_混合云移动凭证] 挥手开门实际只有门3认证成功，APP上显示4个门都成功",
+  "description": "用例名称：验证挥手开门成功前置条件：操作步骤：1.挥手开门测试数据：预期结果：1.开门成功实际结果：挥手开门实际只有门3认证成功，APP上显示4个门都成功，设备上只有门3的1105读卡器支持挥手开门",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "系统平台/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092205643",
+  "title": "[CC03_访客管理] 预约成功邮件中的连接没有PIN码",
+  "description": "用例名称：校验审核通过后邮件链接跳转页面显示正确前置条件：二维码设置为动态二维码操作步骤：1.访客预约时已填邮箱，审核通过后，查看接收到的邮件2.点击链接跳转测试数据：预期结果：1.邮件中有动态二维码链接2.跳转后显示预约详情，包括开门二维码，PIN码二维码的剩余时长与配置一致，刷新二维码正常问题：1.预约成功邮件中的连接没有PIN码",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "访客/访客预约",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092204889",
+  "title": "[CC03_访客管理] 查询码与姓名不一致时查询记录提示语停留时间太短看不清",
+  "description": "用例名称：查询码与姓名不匹配时查询失败前置条件：1、已进入访客预约查询页面操作步骤：1、输入查询码，输入与查询码不匹配的访客姓名，点击查询测试数据：预期结果：1、失败问题：1. 查询码与姓名不一致时查询记录提示语停留时间太短看不清",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092204804",
+  "title": "[CC03_访客管理] 云访客扫描二维码预约，提示错误LAP000000没有具体错误信息",
+  "description": "用例名称：校验手机扫描后页面显示正确前置条件：操作步骤：1.开启自助预约，手机扫描二维码，查看页面显示测试数据：预期结果：1.展示企业信息，查询、预约，企业信息与平台配置一致问题：1.云访客扫描二维码预约，提示错误LAP000000没有具体错误信息",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "访客/访客预约",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092204525",
+  "title": "[CC03_访客管理] 系统中关闭了公司信息展示，访客应该也不显示",
+  "description": "用例名称：系统未开启公司信息配置页面显示正确前置条件：操作步骤：1.系统中未启用公司信息配置，访客中开启公司图片名称显示，查看本地访客、云访客预约页面测试数据：预期结果：1.不显示公司名称和图片，页面无异常问题：1.系统中关闭了公司信息展示，访客应该也不显示",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "混合云/访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092204186",
+  "title": "[B02_BS_回放] 无控件回放，手动解锁的文案与其他端不一致",
+  "description": "用例名称：手动解锁成功前置条件：操作步骤：1.手动解锁pStor录像锁定测试数据：预期结果：1.手动解锁实际结果：无控件回放，手动解锁的文案与其他端不一致问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092203395",
+  "title": "[B02_BS_回放] 修改锁定的时间后，再次添加锁时默认的锁定时间是上次编辑后的时间",
+  "description": "用例名称：编辑锁定内容成功前置条件：操作步骤：1.编辑CVR锁定录像，修改锁定时间测试数据：预期结果：1.修改成功实际结果：修改锁定的时间后，再次添加锁时默认的锁定时间是上次编辑后的时间问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092202775",
+  "title": "[A03_BS_预览] 1.无插件预览，窗口开启电子放大后，双击放大当前窗口，电子放大功能失效",
+  "description": "用例名称：选择不同窗口时电子放大功能正常工作前置条件：操作步骤：1.窗口开启电子放大后，双击放大当前窗口实际结果：1.双击放大当前窗口，电子放大功能失效",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092202266",
+  "title": "[A03_BS_预览] 无插件预览，电子放大，只要是存在多分割的情况下，画中画的小图画面的下方会被工具栏遮挡",
+  "description": "用例名称：选择不同窗口时电子放大功能正常工作前置条件：操作步骤：1.选择不同电子放大状态的串讲窗口，查看选中的窗口中电子放大按钮状态的展示情况测试数据：预期结果：1.正确获取当前选中窗口的电子放大状态，各窗口互不影响实际结果：无插件预览，只要是存在多分割的情况下，画面的下方会被工具栏遮挡（4分割就会出现）",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092202191",
+  "title": "[A03_BS_预览] 无插件预览，开启1个窗口的电子放大后，在开启第二个窗口的电子放大，第一个窗口的电子放大失效无法放大",
+  "description": "用例名称：选择不同窗口时电子放大功能正常工作前置条件：操作步骤：1.开启1个窗口的电子放大后，在开启第二个窗口的电子放大2.操作窗口1测试数据：实际结果：开启第二个窗口的电子放大后，第一个窗口的电子放大开关还在，但是功能失效无法放大",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092110582",
+  "title": "[A03_BS_预览] 无插件预览，电子放大功能，电子放大的画中画小窗中，画框位置无法拖动，有插件模式下支持",
+  "description": "用例名称：验证窗口工具栏电子放大框选放大功能成功前置条件：操作步骤：1.在开启电子放大的窗口中进行{数据a}操作，查看操作情况测试数据：框选放大预期结果：1.对比CS端测试，预期结果和CS端操作一致实际结果：无插件预览，电子放大功能，电子放大的画中画小窗中，画框位置无法拖动，有插件模式下支持",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092110572",
+  "title": "[A03_BS_预览] 无插件预览，电子放大窗口，鼠标滚轮滑动，没有放大缩小画面，实际有插件是支持的",
+  "description": "用例名称：窗口工具栏电子放大鼠标滚轮滚动成功前置条件：操作步骤：1.在开启电子放大的窗口中进行{数据a}操作，查看操作情况测试数据：鼠标滚轮滚动预期结果：1.对比CS端测试，预期结果和CS端操作一致实际结果：无插件预览，电子放大窗口，鼠标滚轮滑动，没有放大缩小画面，实际有插件是支持的",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092110508",
+  "title": "[A03_BS_预览] 按住鼠标中键，无法拖动画面",
+  "description": "用例名称：验证窗口工具栏电子放大鼠标中键功能正常前置条件：操作步骤：1.用户操作电子放大，电子放大按下鼠标中键进行拖动测试数据：预期结果：1.电子放大按下鼠标中键进行拖动成功实际结果：按住鼠标中键，无法拖动画面，插件下有这个功能",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092110488",
+  "title": "[A03_BS_预览] 电子放大功能，开启后鼠标没有变成电子放大的图标，并且切换模式后，也没有变成小手的图标",
+  "description": "用例名称：窗口工具栏开启电子放大成功前置条件：操作步骤：1.点击电子放大按钮测试数据：预期结果：1.开启电子放大2.切换模式实际结果：1.开启后鼠标的图标没有变成电子放大的图标，任然是原本的鼠标图形2.切换模式后，鼠标的图标也没有变成小手的图标 ",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092110477",
+  "title": "[A03_BS_预览] 无插件预览，分屏数达到36时，如果有多个码流类型，会出现主码流被工具栏遮住的现象",
+  "description": "用例名称：前置条件：操作步骤：1.25分屏下点切换码流类型测试数据：实际结果：多个码流类型，会出现主码流被工具栏遮住的现象",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092106567",
+  "title": "[CC03_访客管理] 被访人必填提示信息中缺少空格",
+  "description": "用例名称：必填信息未填写提示正确前置条件：操作步骤：1.字段配置了必填但未填写，点击预约测试数据：预期结果：1.必填信息文本框下有合理提示问题：被访人必填提示信息中缺少空格被访人设置必填，前面没有必填符号",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092105547",
+  "title": "[CC03_访客管理] 云访客预约区号和国家中间没有空格",
+  "description": "用例名称：校验预约中的国家信息正确前置条件：操作步骤：1.点击访客的国家区域信息，查看可选项2.开启whatsapp，查看可选国家区号测试数据：预期结果：1.国家信息正确2.区号信息正确问题：1.云访客预约区号和国家中间没有空格",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092105448",
+  "title": "[CC03_访客管理] 本地预约，可选国家Brunei翻译与web不一致",
+  "description": "用例名称：校验预约中的国家信息正确前置条件：操作步骤：1.点击访客的国家区域信息，查看可选项2.开启whatsapp，查看可选国家区号测试数据：预期结果：1.国家信息正确2.区号信息正确问题：1.本地预约，可选国家Brunei翻译与web不一致2.Iran、Laos、moldova、north&nbsp;Korea、Reunion、south&nbsp;Korea、Syria、Tanzania、vietnam也不一样",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092105402",
+  "title": "[CC03_访客管理] 本地预约，访客所有信息都填，点击预约没反应",
+  "description": "用例名称：校验访客所有信息回传正确前置条件：操作步骤：1.表单配置所有字段显示，扫描二维码进入预约页面，填写所有信息，点击预约测试数据：访客基本信息：头像、姓名、邮箱、电话、车牌号，证件类型、证件号、证件照片、性别、单位、国家来访信息：来访事由、预约开始及结束时间，被访人预期结果：1.预约成功，信息回传正确，访客的所有信息与填写时一致问题：1.本地预约 访客所有信息都填，点击预约没反应好像是因为日期类型的自定义属性",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092105206",
+  "title": "[D01_移动执法与采集] 手持无插件，预览报错资源不存在，实际手持的监控点资源已加到平台",
+  "description": "用例名称：人员图标进入预览_monitoring未展开前置条件：人员已定位且monitoring未展开操作步骤：1.点击地图上的人员图标，选择播放按钮，查看展示测试数据：无预期结果：1.窗口在人员旁边就地播放实际结果：手持无插件，预览报错资源不存在，实际手持的监控点资源已加到平台问题：1.2.",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "移动执法/监控应用",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092105178",
+  "title": "[D01_移动执法与采集] 无插件，点开预览窗口，提示信息没换行展示",
+  "description": "用例名称：人员tab页进入预览_monitoring未展开前置条件：人员已定位且monitoring未展开操作步骤：1.在人员展示tab页，选择播放按钮，查看展示测试数据：无预期结果：1.窗口在人员旁边就地播放实际结果：无插件，点开预览窗口，提示信息没换行展示问题：1.2.",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "移动执法/监控应用",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092105143",
+  "title": "[CC03_访客管理] 火狐浏览器上传隐私协议按钮不居中",
+  "description": "用例名称：校验firefox浏览器兼容正常前置条件：操作步骤：1.使用firefox浏览器查看页面显示，保存配置测试数据：预期结果：1.页面显示正常，保存正常问题：1.火狐浏览器上传隐私协议按钮不居中",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "视觉交互和文案/视觉交互和文案",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092104953",
+  "title": "[CC03_访客管理] 手机上多个步骤预约，到下一个步骤没有自动定位到最上方",
+  "description": "用例名称：校验两个步骤H5页面显示正确-云前置条件：操作步骤：1.配置了二个步骤，手机访问链接查看页面页面测试数据：预期结果：1.本地预约、云访客预约显示步骤一、二，步骤一页面显示下一步按钮，步骤二页面显示上一步、预约按钮，步骤中的字段与配置一致问题：1.多个步骤预约，到下一个步骤没有自动定位到最上方，还需要手动滑上去，使用不方便",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092104907",
+  "title": "[B02_BS_回放] 点击时间轴上的手动标签、锁小窗口中的上一个、下一个箭头，窗口不会切换而移动",
+  "description": "用例名称：小窗口回放操作:点击日历，选择播放指定时间录像_正确跳转前置条件：操作步骤：1.鼠标移至回放小窗口底部的操作栏中，做{测试数据}操作测试数据：点击日历，选择播放指定时间录像预期结果：1.选定相应的时间后，正确跳转播放相应的录像实际结果：点击时间轴上的手动标签、锁小窗口中的上一个、下一个箭头，窗口不会切换而移动问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092104646",
+  "title": "[CC03_访客管理] 访问时间的结束时间没有限制只能选今天以后",
+  "description": "用例名称：校验来访时间选择正确前置条件：操作步骤：校验来访时间选择正确测试数据：预期结果：校验来访时间选择正确问题：1.访问时间没有限制只能选今天以后，老的限制了",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092104359",
+  "title": "[A03_BS_预览] 数字看板，用户没有权限的区域中的通道任然会显示在已选择列表中",
+  "description": "用例名称：验证数字看板权限显示成功前置条件：操作步骤：1. 用户拥有区域1&nbsp; 区域2的资源访问权限2.数字看板选择区域1&nbsp; 区域2的通道3.取消掉用户的区域2的显示权限&nbsp;问题：1.用户没有权限的区域（也就是区域2）中的通道任然会显示在已选择列表中，这导致有权限的通道也没有预览轮训，整个预览轮训都没有画面，但是进度还在走账户信息：fln&nbsp; Abc112233区域可以用任意两个区域，需要手动修改下区域的展示与隐藏&nbsp;&nbsp;&nbsp;",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092104213",
+  "title": "[CC03_访客管理] 被访人不存在提示信息没有显示被访人的姓名、电话、邮箱",
+  "description": "用例名称：填写不存在的被访人姓名提示错误正确前置条件：操作步骤：1.进入预约填写页面，点击被访人姓名字段，输入不存在的被访姓名，其他正常填写，点击提交测试数据：不存在的被访人信息预期结果：1.提示被访人不存在问题：1.被访人不存在提示信息没有显示被访人的姓名、电话、邮箱2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "混合云/访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092103935",
+  "title": "[CC03_访客管理] 手机预约，事由过长时没有……显示",
+  "description": "用例名称：选择自定义来访事由回传正确前置条件：操作步骤：选择自定义来访事由回传正确测试数据：预期结果：选择自定义来访事由回传正确问题：1.事由过长时没有……显示",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "系统平台/基础组件",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092103806",
+  "title": "[CC03_访客管理] 公司名称超长时修改访客预约配置，没有同步到云访客",
+  "description": "用例名称：公司名称超长页面显示正确前置条件：操作步骤：1.开启显示公司名称，名称输入到最长字符显示，手机端、电脑端访问链接查看测试数据：预期结果：1.名称显示正常，超长…显示问题：1.公司名称超长时修改访客预约配置，没有同步到云访客关闭公司名称显示，云访客也还是显示公司名称，同步应该失败了日志\\\\10.66.75.113",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "访客/访客预约",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092100792",
+  "title": "[CC03_访客管理] 电脑端链接数值类型自定义属性提示显示错误",
+  "description": "用例名称：校验数值自定义属性可输入限制正确前置条件：操作步骤：校验数值自定义属性可输入限制正确测试数据：预期结果：校验数值自定义属性可输入限制正确问题：1.电脑端链接数值类型自定义属性提示显示错误",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092100633",
+  "title": "[CC03_访客管理] 混合云，基础信息，license过期15天以内，混合云显示离线，预期是15天以内不显示离线，15天以外才显示离线；",
+  "description": "用例名称：验证license到期15天内云连接保持正常前置条件：HCP已激活物料license，且本地云连接正常操作步骤：1、模拟最后一个本地物料license到期2、等待14天3、检查本地云连接状态测试数据：最后一个本地物料license到期预期结果：1、云连接保持正常2、连接状态仍为已连接实际结果：混合云，基础信息，license过期15天以内，混合云显示离线，预期是15天以内不显示离线，15天以外才显示离线；问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "混合云/混合云框架",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092011072",
+  "title": "[A03_BS_预览] 数字看板，勾选多个远端站点的通道进行轮训的时候，会出现报错，通道不存在，实际上通道预览都是正常的",
+  "description": "用例名称：验证数字看板远端资源树显示成功前置条件：操作步骤：1. 选择远端资源树，并勾选对应的监控点测试数据：预期结果：1. 资源获取正确（与区域树保持一致）2. 资源取流成功实际结果：数字看板，勾选多个远端站点的通道进行轮训的时候，会出现报错，通道不存在，实际上通道预览都是正常的",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092009762",
+  "title": "[AA18_混合云移动凭证] 【IOS】凭证名称满64字符后不能删除",
+  "description": "实际结果：【IOS】凭证名称满64字符后，删除部分，再输入中文后无法删除，现象见附件录屏IOS都有这个问题 ",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "混合云/移动凭证",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092009117",
+  "title": "[A03_BS_预览] 数字看板功能，概率性出现，窗口播着播着就没画面的现象，窗口也没有用任何异常提示",
+  "description": "用例名称：执行数字看板轮巡操作并成功前置条件：操作步骤：1. 反复点击分屏的窗口测试数据：实际结果：数字看板功能，概率性出现，窗口播着播着就没画面的现象，窗口也没有用任何异常提示",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092008948",
+  "title": "[A03_BS_预览] 数字看板功能，最大化窗口后，点击抓图，没有任何提示和反应",
+  "description": "用例名称：选择四个数字看板显示成功前置条件：操作步骤：最大化窗口后，点击抓图测试数据：实际结果：数字看板功能，最大化窗口后，点击抓图，没有任何提示和反应",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092008911",
+  "title": "[A03_BS_预览] 数字看板，最左侧的窗口工具栏的蒙版，距离左边边界还有一点点距离",
+  "description": "用例名称：选择四个数字看板显示成功前置条件：操作步骤：1. 勾选监控点，轮巡测试数据：预期结果：1. 资源预览正确，窗口不会切换实际结果：数字看板，最左侧的窗口工具栏的蒙版，距离左边边界还有一点点距离",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092008413",
+  "title": "[A03_BS_预览] 数字看板，对于密钥错误的预览窗口，点击修改密钥没有反应",
+  "description": "用例名称：选择四个数字看板显示成功前置条件：操作步骤：1. 勾选监控点，轮巡测试数据：预期结果：1. 资源预览正确，窗口不会切换实际结果：对于密钥错误的预览窗口，点击修改密钥没有反应",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092006779",
+  "title": "[B02_BS_回放] 无控件回放时间轴上的锁图标太模糊，看不太清",
+  "description": "用例名称：验证整体GUI显示正常前置条件：已在新建标签页面操作步骤：1.查看新建锁定页面GUI测试数据：预期结果：1.新建锁定页面显示合理，包括名称输入框、标签内容、标签时间、备注以及保存按钮；实际结果：无控件回放时间轴上的锁图标太模糊，看不太清问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092006762",
+  "title": "[B02_BS_回放] 无控件回放，给cvr存储器添加锁会报错，关闭报错信息后，录像时间轴上会展示锁图标",
+  "description": "用例名称：锁定录像成功前置条件：操作步骤：1.回放监控点的CVR录像时，执行录像锁定操作测试数据：预期结果：1.录像锁定成功（3.X+2.X）实际结果：无控件回放，给cvr存储器添加锁会报错，关闭报错信息后，录像时间轴上会展示锁图标问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "设备管理/设备管理",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092006235",
+  "title": "[A03_BS_预览] 单窗口放大没有主码流",
+  "description": "问题：1.单窗口放大没有主码流",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092006198",
+  "title": "[A03_BS_预览] 画面分割超过配置窗格，窗口1是主码流，其他窗口是子码流",
+  "description": "问题：1.画面分割超过配置窗格，窗口1是主码流，其他窗口是子码流；应该是所有窗口都是子码流",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092005234",
+  "title": "[A03_BS_预览] 画面分割多次切换，经常取流失败错误码700，或者直接黑屏，没有报错",
+  "description": "问题：1.画面分割多次切换，经常取流失败错误码7002. 或者直接黑屏，没有报错",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026092004974",
+  "title": "[A03_BS_预览] 多分割下，左下角报警按钮优先级需要优化，会遮挡工具栏弹窗，操作工具栏弹窗优先级应该更高",
+  "description": "问题：1.多分割下，左下角报警按钮优先级需要优化，会遮挡工具栏弹窗，操作工具栏弹窗优先级应该更高",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091706993",
+  "title": "[Q01_人员管理] 站点操作中心指派到站点的人员移动凭证不应有审批提示",
+  "description": "问题：站点操作中心指派到站点的人员移动凭证不应有审批提示，移动凭证中心和站点不同步，中心也收不到审批 ",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "系统平台/人员",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091705818",
+  "title": "[B02_BS_回放] 拖动功能鼠标没有变成小手",
+  "description": "用例名称：通过鼠标中键移动放大区域成功前置条件：无操作步骤：1.打开电子放大，鼠标左键放大当前窗口播放的录像2.鼠标中键拖动被放大画面测试数据：无预期结果：1.放大标识变为拖动标识，成功拖动被放大的录像实际结果：放大标识没有变成拖动小手标识问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091705794",
+  "title": "[B02_BS_回放] 画面恢复正常，但是不能继续放大其他区域，退出了电子放大器",
+  "description": "用例名称：移动放大后的电子时间轴成功前置条件：操作步骤：1.对回放画面进行电子放大后，再进行数据a操作测试数据：移动时间轴预期结果：1.操作成功，画面恢复正常，可以继续放大其它区域实际结果：画面恢复正常，但是不能继续放大其他区域问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091705666",
+  "title": "[B02_BS_回放] 功能正常画面可以恢复正常，但是框选时红框会出现卡顿",
+  "description": "用例名称：取消框选区域电子放大功能成功前置条件：操作步骤：1.按住鼠标左键从右下角向左上角框选区域测试数据：预期结果：1.画面恢复正常，可以继续放大其它区域实际结果：功能正常画面可以恢复正常，但是框选时红框会出现卡顿，红框在图中位置会卡住，但是页面可以恢复正常大小如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091705592",
+  "title": "[B02_BS_回放] 滚轮没有效果",
+  "description": "用例名称：验证鼠标滚轮操作成功前置条件：操作步骤：1.电子放大后进行鼠标滚轮操作测试数据：预期结果：1以鼠标停留位置为中心，滚动鼠标滚轮放大或缩小实际结果：滚轮没有效果问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091705535",
+  "title": "[B02_BS_回放] 点击移动按钮，只有鼠标在按钮上才是抓手，在页面中还是鼠标箭头",
+  "description": "用例名称：移动数据恢复成功前置条件：操作步骤：1.电子放大后，点击移动按钮2.电子放大后，点击恢复按钮测试数据：预期结果：1.进入移动画面模式，该模式下鼠标变为抓手，可拖动画面进行移动快捷操作，放大模式下，也可以拖动鼠标中键拖动画面2.点击恢复按钮画面回到默认大小实际结果：点击移动按钮，只有鼠标在按钮上才是抓手，在页面中还是鼠标箭头问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/检索与回放",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091703823",
+  "title": "[B02_BS_回放] 初始时每个视频倍速不一样，点击同步回放后，左下角倍速按钮恢复为1，但是部分视频还是保持原倍速回放",
+  "description": "用例名称：开启同步回放并进行倍速播放应成功前置条件：操作步骤：1.开启同步回放后，进行数据a操作测试数据：倍速播放预期结果：1.操作成功，对所有正在回放的窗口同步生效实际结果：无法同步倍速播放问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091703799",
+  "title": "[Q01_人员管理] 中心指派到站点的人员在站点上删除后移动凭证显示异常",
+  "description": "实际结果：中心指派到站点的人员在站点上删除后，移动凭证显示异常  ",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "系统平台/人员",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091701736",
+  "title": "[功能稳定性]9.15 113dump",
+  "description": "问题：\\\\10.66.75.113\\HikCentral\\VSM Servers\\Log\\dump都没分析过",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "功能性",
+  "moduleTag": "设备管理/设备管理",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091608217",
+  "title": "[D01_移动执法与采集] 手持文件播放，勾选play in order，没有连续播下一个视频文件也没有其他提示",
+  "description": "用例名称：验证录像文件播放控制正常_开始或暂停播放前置条件：操作步骤：1.录像文件回放时播放功能控制测试数据：开始播放/暂停播放预期结果：1.可以正常播放和暂定实际结果：手持文件播放，勾选play in order，没有连续播下一个视频文件也没有其他提示问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "移动执法/监控应用",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091607907",
+  "title": "[AA18_混合云移动凭证] uat13环境获取邮箱验证码失败有报错",
+  "description": "用例名称：验证APP激活多个不同区域的移动凭证成功前置条件：操作步骤：1.A凭证是新加坡大区，B凭证是欧洲大区，激活A、B凭证测试数据：预期结果：1.激活成功，凭证信息展示正常实际结果：uat13环境获取邮箱验证码失败有报错，无法连接云，多大区功能验证阻塞",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "系统平台/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091606027",
+  "title": "[AA18_混合云移动凭证] 【安卓】离线有效期外开门无认证失败记录，IOS有",
+  "description": "用例名称：验证离线开门失败_有效期7天前置条件：操作步骤：1.离线开门有效期为7天，7天后手机离线开门测试数据：预期结果：1.开门失败实际结果：【安卓】离线有效期外开门无认证失败记录，只有一个提示，IOS有失败记录 ",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "系统平台/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091605194",
+  "title": "[B02_BS_回放] 会出现卡顿，无响应等情况",
+  "description": "用例名称：同步多窗口回放成功前置条件：当前处于同步回放状态操作步骤：1.快速打开多个窗口进行同步回放测试数据：子主题 1预期结果：1.窗口可以快速打开，无窗口残影和卡顿实际结果：会出现卡顿，无响应等情况如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091604643",
+  "title": "[B02_BS_回放] 点击后退按钮只会变成相同时间，比如从-4/+8变成-4/+4",
+  "description": "用例名称：同步回放-前进/后退_当前有多个窗口在回放前置条件：当前有多个窗口在回放操作步骤：1.交叉点击前进和后退按钮定位置某一有录像的时间点测试数据：测试数据：定位置当天12:45分预期结果：1.点击-4h变为+2h，点击+2h变为-1小时，点击-1h变为+30min，依次类推，点击前进则后退值会变为前进值的一半，点击后退则前进值会变为后退值的一半实际结果：点击后退按钮只会变成相同时间，比如从-4/+8变成-4/+4如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091504894",
+  "title": "[B02_BS_回放] 无控件回放，开启电子放大绘制放大矩形框后拖动时间轴，电子放大功能会被自动关闭",
+  "description": "用例名称：移动放大后的电子时间轴成功前置条件：操作步骤：1.对回放画面进行电子放大后，再进行数据a操作测试数据：移动时间轴预期结果：1.操作成功，画面恢复正常，可以继续放大其它区域实际结果：无控件回放，开启电子放大绘制放大矩形框后拖动时间轴，电子放大功能会被自动关闭问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091504877",
+  "title": "[B02_BS_回放] 无控件回放，多窗口回放时操作二分法按钮前进、后退，选中其他监控点时二分法间隔会被重置，再选中原来的窗口也是重置后的效果",
+  "description": "用例名称：全局性前置条件：当前有多个监控点在回放操作步骤：1.配置二分法按钮为任意一非默认值，然后依次选中不同的监控点窗口测试数据：测试数据：同步/异步回放预期结果：1.二分法按钮的作用范围为全局，选中所有监控点二分法的值均为配置后的实际结果：无控件回放，多窗口回放时操作二分法按钮前进、后退，选中其他监控点时二分法间隔会被重置，再选中原来的窗口也是重置后的效果问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/检索与回放",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091504868",
+  "title": "[AA18_混合云移动凭证] 【安卓】从桌面多次点开APP后返回异常",
+  "description": "实际结果：【安卓】从桌面多次点开APP后点击返回，没有返回成功，详情见录屏",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "视觉交互和文案/视觉交互和文案",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091503077",
+  "title": "[B02_BS_回放] 无控件回放筛选面板，锁图标与页面其他图标风格不一致",
+  "description": "用例名称：验证录像过滤功能成功显示锁定项前置条件：1.录像搜索成功，录像类型包含定时、事件、回传录像操作步骤：1.取消显示某种录像类型后，对当前显示的录像添加锁定录像测试数据：预期结果：1.添加锁定录像成功，锁定显示正确实际结果：无控件回放筛选面板，锁图标与页面其他图标风格不一致问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091503057",
+  "title": "[AA18_混合云移动凭证] 【安卓】连续点击通知按钮有报错，错误码未翻译",
+  "description": "用例名称：验证打开通知按钮成功前置条件：系统权限里的通知是开启状态操作步骤：1.打开通知按钮测试数据：预期结果：1.打开成功，能收到推送实际结果：【安卓】连续点击通知按钮有报错，错误码未翻译",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "混合云/移动凭证",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091503025",
+  "title": "[B02_BS_回放] 缩小、放大、还原浏览器的过程中，无控件页面会出现筛选按钮附近全变黑的现象",
+  "description": "用例名称：调整资源树空间并缩小客户端比例成功前置条件：操作步骤：1.窗口较小的情况下，查看二分法按钮的排布测试数据：拉宽资源树的空间，缩小客户端比例预期结果：1.优先隐藏异步/同步回放文案，二分法按钮被隐藏到“更多”按钮内实际结果：缩小、放大、还原浏览器的过程中，无控件页面会出现筛选按钮附近全变黑的现象问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091502983",
+  "title": "[B02_BS_回放] 缩小浏览器大小，无控件回放页面的功能按钮出现挤压的问题现象",
+  "description": "用例名称：在窗口尺寸小于预期时正常显示GUI界面前置条件：操作步骤：1.查看二分法按钮风格，与文案提示是否通俗易懂测试数据：预期结果：1.二分法按钮与其他界面保持一致，页面提示语通俗易懂实际结果：缩小浏览器大小，无控件回放页面的功能按钮出现挤压的问题现象问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091502618",
+  "title": "[B02_BS_回放] 无控件回放，连续切换二分法的前进后退按钮，时间轴的密度不会随之更新，不便于查看具体时间点",
+  "description": "用例名称：时间轴前置条件：当前有多个窗口在回放操作步骤：1.交叉点击前进或后退按钮，查看时间轴的时间间隔，和放大效果测试数据：测试数据：同步/异步回放预期结果：1.二分法小于等于8min对应时间轴12min二分法15min对应时间轴1h二分法30min对应时间轴2h以此类推二分法4h对应时间轴24h实际结果：无控件回放，连续切换二分法的前进后退按钮，时间轴的密度不会随之更新，不便于查看具体时间点问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091501933",
+  "title": "[AA18_混合云移动凭证] 【安卓】粘贴授权码失败，只显示一部分",
+  "description": "用例名称：验证粘贴授权码激活成功前置条件：操作步骤：1.粘贴激活码，点击激活测试数据：预期结果：1.激活成功，首页展示激活的授权码信息，绿色字样已激活实际结果：【安卓】粘贴授权码失败，只显示一部分",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "视觉交互和文案/视觉交互和文案",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091501800",
+  "title": "[AA18_混合云移动凭证] 【安卓】点击链接跳转激活成功后没有跳转到首页",
+  "description": "用例名称：验证收到新邮件激活页面更新授权码成功前置条件：APP已安装操作步骤：1.激活页面已打开，收到新的邮件链接，点击跳转测试数据：预期结果：1.激活页面更新授权码成功实际结果：【安卓】点击链接跳转激活成功后没有跳转到首页，还显示了上一次没有激活成功的授权码，并且返回到首页没有显示激活成功的凭证，具体见录屏【IOS】同样的步骤可以直接跳转到首页显示激活的凭证",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "混合云/移动凭证",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091501612",
+  "title": "[B02_BS_回放] 无控件回放，操作二分法按钮后关闭当前监控点回放，前进后退的时间间隔不会被重置",
+  "description": "用例名称：重置前置条件：操作步骤：1.交叉点击前进和后退按钮，让时间为非默认值，点击重置测试数据：预期结果：1.时间恢复为+4/-4实际结果：无控件回放，操作二分法按钮后关闭当前监控点回放，前进后退的时间间隔不会被重置问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/检索与回放",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091501262",
+  "title": "[B02_BS_回放] 无控件回放，开启电子放大后切换正倒放、以及画面偶尔自己加载时，不会保留电子放大的状态",
+  "description": "用例名称：保留电子放大状态并正放切倒放成功前置条件：操作步骤：1.将当前监控点画面开启电子放大，然后操作{测试数据}，查看电子放大状态是否保留测试数据：测试数据：正放切倒放预期结果：1.电子放大状态保留成功实际结果：无控件回放，开启电子放大后切换正倒放、偶尔画面自己加载不会保留电子放大的状态问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/检索与回放",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091501194",
+  "title": "[B02_BS_回放] 无控件回放，同步回放按钮的文案应与CS端以及控件端保持一致",
+  "description": "用例名称：开启同步回放功能成功前置条件：操作步骤：1.当前有多个回放窗口，点切换同步回放按钮测试数据：预期结果：1.同步成功，此时点击时间轴下的以当前高亮窗口的OSD时间为准，所有监控点均跳转到同一时间点开始回放实际结果：无控件回放，同步回放按钮的文案应与CS端以及控件端保持一致问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091406745",
+  "title": "[B02_BS_回放] 无控件回放，开启电子放大后按住鼠标中键无法移动电子放大的区域",
+  "description": "用例名称：通过鼠标中键移动放大区域成功前置条件：无操作步骤：1.打开电子放大，鼠标左键放大当前窗口播放的录像2.鼠标中键拖动被放大画面测试数据：无预期结果：1.放大标识变为拖动标识，成功拖动被放大的录像实际结果：无控件回放，开启电子放大后按住鼠标中键无法移动电子放大的区域问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091406639",
+  "title": "[B02_BS_回放] 无控件回放，开启电子放大后移动画中画中的规则框不能切换视频的位置",
+  "description": "用例名称：验证电子放大功能成功前置条件：操作步骤：1.单击选中有预览画面的窗口，点击【电子放大】按钮，框选放大区域测试数据：预期结果：1.电子放大显示打开状态，按钮高亮显示，等比放大画面，画面保持不变形，以框选范围内的最大边放大至窗口，短边居中，将放大后画面填充至窗口，放大后画面中会显示恢复按钮、移动按钮实际结果：无控件回放，开启电子放大后移动画中画中的规则框不能切换视频的位置问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091406624",
+  "title": "[B02_BS_回放] 无控件回放，开启电子放大功能后的画中画没有收缩和展开功能按钮",
+  "description": "用例名称：验证电子放大功能成功前置条件：操作步骤：1.单击选中有预览画面的窗口，点击【电子放大】按钮，框选放大区域测试数据：预期结果：1.电子放大显示打开状态，按钮高亮显示，等比放大画面，画面保持不变形，以框选范围内的最大边放大至窗口，短边居中，将放大后画面填充至窗口，放大后画面中会显示恢复按钮、移动按钮实际结果：无控件回放，开启电子放大功能后的画中画没有收缩和展开功能按钮问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/检索与回放",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091406584",
+  "title": "[B02_BS_回放] 无控件回放，开启电子放大后使用鼠标滚轮无法放大缩小当前画面",
+  "description": "用例名称：验证鼠标滚轮操作成功前置条件：操作步骤：1.电子放大后进行鼠标滚轮操作测试数据：预期结果：1以鼠标停留位置为中心，滚动鼠标滚轮放大或缩小实际结果：无控件回放，开启电子放大后使用鼠标滚轮无法放大缩小当前画面问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "",
+  "duplicateOf": "BGCM2026092110572"
+ },
+ {
+  "defectId": "BGCM2026091406575",
+  "title": "[A03_BS_预览] 数字看板，资源树抓图的透明度需要优化，现在透明度太高了",
+  "description": "问题：1.数字看板，资源树抓图的透明度需要优化，现在透明度太高了p",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091406573",
+  "title": "[B02_BS_回放] 无控件回放，开启电子放大绘制放大矩形框后点击切换切换模式按钮，放大效果会被还原",
+  "description": "用例名称：移动数据恢复成功前置条件：操作步骤：1.电子放大后，点击移动按钮2.电子放大后，点击恢复按钮测试数据：预期结果：1.进入移动画面模式，该模式下鼠标变为抓手，可拖动画面进行移动快捷操作，放大模式下，也可以拖动鼠标中键拖动画面2.点击恢复按钮画面回到默认大小实际结果：无控件回放，开启电子放大绘制放大矩形框后点击切换切换模式按钮，放大效果会被还原问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "",
+  "duplicateOf": "BGCM2026091103937"
+ },
+ {
+  "defectId": "BGCM2026091406417",
+  "title": "[B02_BS_回放] 无控件回放，将窗口的工具栏设置为常显后开启电子放大，右下角画中画会被遮挡",
+  "description": "用例名称：验证电子放大功能成功前置条件：操作步骤：1.单击选中有预览画面的窗口，点击【电子放大】按钮，框选放大区域测试数据：预期结果：1.电子放大显示打开状态，按钮高亮显示，等比放大画面，画面保持不变形，以框选范围内的最大边放大至窗口，短边居中，将放大后画面填充至窗口，放大后画面中会显示恢复按钮、移动按钮实际结果：无控件回放，将窗口欧工具栏设置为常显后开启电子放大，右下角全景画面会被遮挡问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091406052",
+  "title": "[B02_BS_回放] 点击时间轴上的手动标签、锁图标，弹出的小窗口速度较慢",
+  "description": "用例名称：开启同步回放功能成功前置条件：操作步骤：1.当前有多个回放窗口，点切换同步回放按钮测试数据：预期结果：1.同步成功，此时点击时间轴下的以当前高亮窗口的OSD时间为准，所有监控点均跳转到同一时间点开始回放实际结果：点击时间轴上的手动标签、锁图标，弹出的小窗口速度较慢问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频/检索与回放",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091406050",
+  "title": "[B02_BS_回放] 无控件回放，鼠标悬浮至时间轴上弹出的时间点很快会消失",
+  "description": "用例名称：开启同步回放功能成功前置条件：操作步骤：1.当前有多个回放窗口，点切换同步回放按钮测试数据：预期结果：1.同步成功，此时点击时间轴下的以当前高亮窗口的OSD时间为准，所有监控点均跳转到同一时间点开始回放实际结果：无控件回放，鼠标悬浮至时间轴上弹出的时间点很快会消失问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频/检索与回放",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091405343",
+  "title": "[AA18_混合云移动凭证] 【安卓】已禁用凭证不应开门成功",
+  "description": "用例名称：验证转一转开门失败_凭证已禁用前置条件：操作步骤：1.凭证已禁用，转一转开门测试数据：预期结果：1.不会触发开门实际结果：【安卓】已禁用凭证不应开门成功，见录屏",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "系统平台/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091405078",
+  "title": "[B02_BS_回放] 无控件回放，预览和回放页面在没有监控点回放状态下没有任何提示信息，为空白底图",
+  "description": "用例名称：启动默认同步回放功能成功前置条件：当前为窗口播放状态为预览模式操作步骤：1.切换至回放模式测试数据：无预期结果：1.默认为同步回放状态实际结果：无控件回放，预览和回放页面在没有监控点回放状态下没有任何提示信息，空白底图问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频/检索与回放",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091405071",
+  "title": "[B02_BS_回放] 无控件回放窗口中有声音报警、闪光灯等功能按钮，有控件中没有",
+  "description": "用例名称：切换为同步回放状态成功前置条件：monistring界面操作步骤：1.勾选同步回放的复选框，查看回放状态测试数据：预期结果：1.当前通道的回放状态为同步回放实际结果：无控件回放窗口中有声音报警、闪光灯等功能按钮，有控件中没有问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频/检索与回放",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091404812",
+  "title": "[B02_BS_回放] 同步回放状态下，监控点等信息字体过小，颜色有点暗，文案展示不清晰",
+  "description": "用例名称：启动默认同步回放功能成功前置条件：当前为窗口播放状态为预览模式操作步骤：1.切换至回放模式测试数据：无预期结果：1.默认为同步回放状态实际结果：同步回放状态下，监控点等信息字体过小，颜色有点暗，文案展示不清晰问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "基础视频/检索与回放",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091404176",
+  "title": "[CC03_访客管理] 混合云，基础服务，license的到期时间与维保过期时间不一致",
+  "description": "用例名称：验证license过期邮件提醒发送成功前置条件：1、HCP1已激活物料licenseA2、admin用户邮箱A已配置操作步骤：1、使licenseA过期2、检查admin用户邮箱A测试数据：licenseA已过期，admin用户邮箱A已配置只要配置admin的邮箱即可；预期结果：1、系统向admin用户邮箱A发送license过期提醒邮件2、邮件内容包含licenseA的code、过期时间等信息实际结果：混合云，基础服务，license的到期时间与维保过期时间不一致问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091105412",
+  "title": "[AA18_混合云移动凭证] 【安卓】输入授权码后删除从中间无法继续输入",
+  "description": "用例名称：验证授权码输入限制大写字母和数字成功前置条件：操作步骤：1.手动输入激活码测试数据：预期结果：1.只能输入大写字母和数字，无法输入小写字母、特殊字符实际结果：【安卓】输入授权码后删除从中间无法继续输入",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "视觉交互和文案/视觉交互和文案",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091104680",
+  "title": "[CC03_访客管理] 来访事由选择tour&amp;visit，预约成功显示的是tour",
+  "description": "用例名称：校验不同来访事由回传正确前置条件：操作步骤：1.点击来访事由，查看可选项2.选择不同来访事由提交预约，查看回传信息测试数据：business training tour meeting other填写其他信息预期结果：1.可选项与平台配置一致2.来访事由与预约时选择的一致问题：1.来访事由选择tour&visit，预约成功显示的是tour",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "混合云/访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091103996",
+  "title": "[A03_BS_预览] 无插件，电子放大关闭后/关闭预览，仍旧处于电子放大模式",
+  "description": "问题：无插件，电子放大关闭后/关闭预览，仍旧处于电子放大模式",
+  "status": "Closed",
+  "severity": "高",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091103937",
+  "title": "[A03_BS_预览] 无插件，切换模式后会重置电子放大",
+  "description": "用例名称：切换电子放大模式成功操作步骤：1.用户操作电子放大，电子放大切换模式，鼠标变成小手拖动预期结果：1.电子放大切换模式，鼠标变成小手拖动成功问题：切换模式后会重置电子放大",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "基础视频/预览",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091103316",
+  "title": "[CC03_访客管理] 日期类型的自定义属性名称显示和其他字段没有对齐，选择日期后日期会换行不美观",
+  "description": "用例名称：校验自定义属性信息回传正确前置条件：操作步骤：1.配置了自定义字段，访客预约时填写自定义字段信息提交预约，查看访客信息显示测试数据：文本类型日期类型单选类型数字类型预期结果：1.访客自定义信息正确问题：1.日期类型的自定义属性名称和其他字段名称没有对齐2.选择日期后日期会换行，可以和访问时间一样不换行吧2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091101622",
+  "title": "[CC03_访客管理] 步骤内容为空保存时提示step is required不太合理，可以是step content is required",
+  "description": "用例名称：步骤内容为空保存失败前置条件：操作步骤：1.新增步骤，步骤内容为空点击保存测试数据：预期结果：1.保存失败，有合理提示问题：1.步骤内容为空保存时提示step is required不太合理，可以是step content is required",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091101453",
+  "title": "[CC03_访客管理] 必填符号显示位置不一致，有的显示偏上有的偏下不居中",
+  "description": "用例名称：点击编辑表单设置必填成功前置条件：操作步骤：1.在编辑表单字段中修改字段的填写设置为必填，点击保存，查看可拖动字段显示测试数据：预期结果：1.保存成功，字段显示必填符号问题：1.设置必填后手机扫码预约，页面上的必填符号显示位置不一致，有的显示偏上有的偏下",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "系统平台/基础组件",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091100995",
+  "title": "[CC03_访客管理] 步骤中的固定字段没有显示必填符号",
+  "description": "用例名称：校验表单字段显示正确前置条件：操作步骤：校验表单字段显示正确测试数据：预期结果：校验表单字段显示正确问题：1.步骤中的固定字段没有显示必填符号",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "访客/访客预约",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091016477",
+  "title": "[Q01_人员管理] 设置里点击恢复默认按钮不应修改开门方式",
+  "description": "用例名称：验证恢复默认成功前置条件：操作步骤：1.点击恢复默认测试数据：预期结果：1.过期时间默认7天、默认邮件内容实际结果：设置里点击恢复默认按钮不应修改开门方式",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "系统平台/人员",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091013183",
+  "title": "[AA18_混合云移动凭证] 【IOS18】右滑关闭刷卡记录页面显示异常",
+  "description": "用例名称：验证最近刷卡记录滑动正常前置条件：操作步骤：1.有刷卡记录,滑动显示测试数据：预期结果：1.可滑动查看记录实际结果：【IOS18】右滑关闭刷卡记录页面显示异常，会出现空白页面复现步骤：点开过失效凭证的刷卡记录",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "混合云/移动凭证",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091002248",
+  "title": "[CC03_访客管理] 混合云，基础服务，邮箱验证码，有2处异常展示",
+  "description": "用例名称：验证英文验证码邮件模板内容正确前置条件：系统已配置邮箱服务，存在待注册的访客账号操作步骤：1. 触发注册验证码邮件发送；2. 打开邮箱查看收到的邮件；3. 核对邮件主题；4. 核对邮件正文内容测试数据：产品名称：示例云；用户名：lisi；验证码：654321；公司名称：示例科技有限公司预期结果：1. 邮件主题显示为“Your 示例云 Cloud Enterprise Account Registration Verification Code (Valid for 30 Minutes)”；2. 邮件正文包含“Dear lisi,”；3. 邮件正文包含“You are registering for a cloud enterprise account on 示例云. Please use the following verification code for your registration: 654321.”；4. 邮件正文包含安全须知三条英文内容；5. 邮件正文包含“Thank you for using our service!”；6. 邮件正文包含“Company: 示例科技有限公司”实际结果：混合云，基础服务，邮箱验证码，有2处异常展示问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "系统平台/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026091002128",
+  "title": "[CC03_访客管理] 混合云，基础服务，邮箱验证码，邮箱展示与交互不一致",
+  "description": "用例名称：验证英文验证码邮件模板内容正确前置条件：系统已配置邮箱服务，存在待注册的访客账号操作步骤：1. 触发注册验证码邮件发送；2. 打开邮箱查看收到的邮件；3. 核对邮件主题；4. 核对邮件正文内容测试数据：产品名称：示例云；用户名：lisi；验证码：654321；公司名称：示例科技有限公司预期结果：1. 邮件主题显示为“Your 示例云 Cloud Enterprise Account Registration Verification Code (Valid for 30 Minutes)”；2. 邮件正文包含“Dear lisi,”；3. 邮件正文包含“You are registering for a cloud enterprise account on 示例云. Please use the following verification code for your registration: 654321.”；4. 邮件正文包含安全须知三条英文内容；5. 邮件正文包含“Thank you for using our service!”；6. 邮件正文包含“Company: 示例科技有限公司”实际结果：混合云，基础服务，邮箱验证码，邮箱展示与交互不一致问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "系统平台/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090905226",
+  "title": "[CC03_访客管理] 混合云，基础服务，已经绑定其他平台的邮箱，提示信息之后，对话框应该是解绑提示。",
+  "description": "用例名称：验证已绑定邮箱重复绑定失败前置条件：1、HCP已激活base license和物料license2、使用admin用户登录HCP web端并进入授权绑定页面3、已获取邮箱验证码4、该邮箱已在其他HCP绑定操作步骤：1、输入已绑定邮箱bound@example.com2、选择国家地区3、输入正确验证码4、点击连接云服务按钮测试数据：已绑定邮箱：bound@example.com预期结果：1、绑定请求返回失败2、页面显示邮箱已被其他HCP绑定提示信息实际结果：混合云，基础服务，已经绑定其他平台的邮箱，提示信息之后，对话框应该是解绑提示。问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "系统平台/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090904840",
+  "title": "[CC03_访客管理] 自定义字段名称过长，和下方的文本框显示有重叠",
+  "description": "用例名称：点击编辑表单新增自定义属性成功前置条件：操作步骤：1.在编辑表单字段中新增自定义属性字段，点击添加，点击保存测试数据：预期结果：1.添加成功，保存成功，可拖动字段新增正确问题：1.自定义字段名称过长，和下方的文本框显示有重叠",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "系统平台/基础组件",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090904706",
+  "title": "[Q01_人员管理] 移动凭证过期未激活没有显示在过期列表中",
+  "description": "用例名称：验证新增一个已失效的凭证显示正常_人员过期未激活前置条件：人员过期未激活凭证操作步骤：1.新增已失效凭证后查看已失效数量测试数据：预期结果：1.全部数量+1，已失效数量+1，已失效列表新增失效人员信息实际结果：移动凭证过期未激活没有显示在过期列表中, 过期凭证：8B3C-BKFL-YV40 ",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "系统平台/人员",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090904290",
+  "title": "[AA18_混合云移动凭证] 【安卓】蓝牙开门失败提示点击空白处不应关闭弹窗",
+  "description": "用例名称：验证开门失败提示点击知道了下次再进入不提示该失败记录前置条件：操作步骤：1.开门失败后，打开APP，提示点击知道了，再次打开APP测试数据：预期结果：1.上一次的失败记录不再提示实际结果：【安卓】蓝牙开门失败提示点击空白处不应关闭弹窗，见附件录屏",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "混合云/移动凭证",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090805701",
+  "title": "[CC03_访客管理] 混合云基础服务，邮箱格式提示了限制64位，实际输入格式正确后，超长没有提示异常",
+  "description": "用例名称：验证合法邮箱格式可通过校验前置条件：1、HCP已激活base license和物料license2、使用admin用户登录HCP web端并进入授权绑定页面操作步骤：1、在邮箱输入框输入合法邮箱user@example.com2、点击获取验证码按钮测试数据：合法邮箱：user@example.com预期结果：1、邮箱格式校验通过2、页面无错误提示，可继续获取验证码实际结果：混合云基础服务，邮箱格式提示了限制64位，实际输入格式正确后，超长没有提示异常问题：1.2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "系统平台/其他",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090805173",
+  "title": "[CC03_访客管理] 字段名称有g/y/p等会显示不全有遮挡",
+  "description": "用例名称：校验表单字段显示正确前置条件：操作步骤：校验表单字段显示正确测试数据：预期结果：校验表单字段显示正确问题：1.字段显示不全",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "访客",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090706789",
+  "title": "[Q01_人员管理] 已失效凭证生成新凭证时license数量超限提示错误",
+  "description": "用例名称：验证新增一个已失效的凭证显示正常_license到期前置条件：license凭证到期操作步骤：1.新增已失效凭证后查看已失效数量测试数据：预期结果：1.全部数量+1，已失效数量+1，已失效列表新增失效人员信息实际结果：已失效凭证生成新凭证时license数量超限提示错误，展示的是邮件发送失败的提示",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "系统平台/人员",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090705735",
+  "title": "[Q01_人员管理] 人员列表顶部过滤未配置凭证没有过滤移动凭证",
+  "description": "用例名称：验证人员列表未配置移动凭证过滤成功前置条件：操作步骤：1.人员列表顶部凭证状态过滤，勾选未配置移动凭证测试数据：预期结果：1.过滤成功，列表显示所有未配置移动凭证的人员实际结果：人员列表顶部过滤未配置凭证没有过滤移动凭证",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "系统平台/人员",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090703662",
+  "title": "[Q01_人员管理] 失效凭证重新生成新凭证激活失败",
+  "description": "用例名称：验证激活移动凭证显示正确前置条件：操作步骤：1.APP激活移动凭证测试数据：预期结果：1.待激活数量-1，已激活数量+1，待激活状态列表不显示该人员，已激活状态列表新增该人员实际结果：失效凭证重新生成新凭证激活失败",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "系统平台/人员",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090502288",
+  "title": "[Q01_人员管理] 移动凭证管理处重新发送邮件网络异常时无错误提示",
+  "description": "用例名称：验证邮件发送失败列表处有红色感叹号提示_网络异常前置条件：操作步骤：1.网络异常，发送邮件失败查看提示测试数据：预期结果：1.凭证状态右边红色感叹号提示邮件发送失败，网络异常实际结果：移动凭证管理处重新发送邮件网络异常时无错误提示",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "系统平台/人员",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090501370",
+  "title": "[AA18_混合云移动凭证] 【安卓和IOS】APP实际显示图标和交互不一致",
+  "description": "用例名称：验证引导页图片文字提示正确前置条件：操作步骤：1.进入引导页，查看图片和文字显示测试数据：预期结果：1.引导页显示和交互一致https://pixso.hikvision.com.cn/app/design/FtcoaEqoq-tGT5c1OqZ5Ww?page-id=318%3A259788&item-id=318%3A312064实际结果：【安卓和IOS】APP实际显示图标和交互不一致",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "混合云/移动凭证",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090501332",
+  "title": "[AA18_混合云移动凭证] 【安卓】蓝牙开关和蓝牙权限以及网络异常时提示优先级错误",
+  "description": "用例名称：验证蓝牙未开启网络未开启时顶部提示优先级正确前置条件：蓝牙权限未打开操作步骤：1.进入首页，查看提示测试数据：预期结果：1.优先级：蓝牙权限 > 蓝牙开关>网络异常实际结果：【安卓】蓝牙开关和蓝牙权限以及网络异常时提示优先级错误",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "混合云/移动凭证",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090501275",
+  "title": "[AA18_混合云移动凭证] 【安卓】蓝牙关闭时点击开启蓝牙按钮无反应",
+  "description": "用例名称：验证蓝牙未开启时顶部提示成功前置条件：手机蓝牙未打开操作步骤：1.进入首页，查看提示测试数据：预期结果：1.提示蓝牙未开启，点击打开蓝牙按钮可跳转蓝牙设置，开启蓝牙成功，提示消失实际结果：【安卓】蓝牙关闭时点击开启蓝牙按钮无反应",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "混合云/移动凭证",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090500322",
+  "title": "[AA18_混合云移动凭证] 按AL分配人员缺少移动凭证",
+  "description": "用例名称：验证按AL分配人员正确显示移动凭证前置条件：操作步骤：1.查看右侧分配AL的人员测试数据：预期结果：1.包含移动凭证，数量正确实际结果：按AL分配人员缺少移动凭证",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "系统平台/人员",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090405013",
+  "title": "[AA18_混合云移动凭证] 【安卓】人员名称超长未省略一行展示",
+  "description": "用例名称：验证人员姓名过长省略成功前置条件：存在已激活的授权码操作步骤：1.人员姓名过长时查看显示测试数据：预期结果：1.人员姓名过长省略处理，一行展示实际结果：【安卓】人员名称超长未省略一行展示",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "视觉交互和文案/视觉交互和文案",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090404848",
+  "title": "[AA18_混合云移动凭证] 【安卓和IOS】输入错误的激活码提示未翻译",
+  "description": "用例名称：验证输入错误的授权码激活失败前置条件：操作步骤：1.输入错误的激活码，点击激活测试数据：预期结果：1.激活失败，提示授权码不存在实际结果：【安卓和IOS】输入错误的激活码提示未翻译",
+  "status": "Closed",
+  "severity": "中",
+  "quality": "功能性",
+  "moduleTag": "混合云/移动凭证",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090403527",
+  "title": "[Q01_人员管理] 移动凭证管理列表没有展示手机型号，交互上有",
+  "description": "用例名称：验证列表处手机型号显示正确前置条件：操作步骤：1.查看列表处手机型号测试数据：预期结果：1.正确显示手机型号,待激活时显示--实际结果：移动凭证管理列表没有展示手机型号，交互上有",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "系统平台/人员",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090403164",
+  "title": "[Q01_人员管理] 过期时间输入大于7天再点击取消重新打开错误提示仍然存在",
+  "description": "用例名称：验证过期时间设置天数大于7天失败前置条件：操作步骤：1.过期时间设置8天测试数据：过期时间最小1天，最大7天预期结果：1.设置失败，提示最大7天实际结果：过期时间输入大于7天再点击取消重新打开错误提示仍然存在 ",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "系统平台/人员",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090403026",
+  "title": "[Q01_人员管理] 点击重新发送邮件无发送成功提示",
+  "description": "用例名称：验证待激活凭证重新发送成功前置条件：操作步骤：1.点击人员详情进入凭证管理，点击移动凭证卡片右上角重新发送按钮测试数据：预期结果：1.提示发送成功，收到邮件，授权码不变实际结果：点击重新发送邮件，实际已经发送成功了，且收到了邮件，页面没有发送成功的提示",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "系统平台/人员",
+  "duplicateOf": ""
+ },
+ {
+  "defectId": "BGCM2026090402706",
+  "title": "[Q01_人员管理] 未勾选人员时凭证管理挂失解挂卡片按钮没有置灰",
+  "description": "用例名称：验证凭证管理下拉项显示正确前置条件：操作步骤：1.点击列表顶部凭证管理下拉项测试数据：预期结果：1.下拉项包含批量发卡、卡片挂失、卡片解挂、禁用卡片、恢复卡片、卡片打印、移动凭证管理实际结果：未勾选人员时凭证管理挂失解挂卡片按钮没有置灰",
+  "status": "Closed",
+  "severity": "低",
+  "quality": "功能性",
+  "moduleTag": "系统平台/人员",
+  "duplicateOf": ""
+ }
+]

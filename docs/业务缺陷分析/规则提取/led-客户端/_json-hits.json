@@ -1,0 +1,110 @@
+{
+ "1400655": [
+  5,
+  "web",
+  "CalibrationTool.boxConfig.cameraNoConnected.name",
+  "相机未连接"
+ ],
+ "1206385": [
+  4,
+  "web",
+  "CalibrationTool.calibrationTarget.colorTemperature.name",
+  "色温调节"
+ ],
+ "0102025": [
+  4,
+  "web",
+  "CalibrationTool.config.regionalPosition.name",
+  "区域定位"
+ ],
+ "0502981": [
+  4,
+  "web",
+  "CalibrationTool.project.factorSimulation.name",
+  "系数仿真"
+ ],
+ "1206817": [
+  4,
+  "web",
+  "CalibrationTool.calibrationTarget.autoCollect.name",
+  "自动采集"
+ ],
+ "1104839": [
+  6,
+  "web",
+  "CalibrationTool.projectDetail.projectInfo.edit.name",
+  "修改任务信息"
+ ],
+ "1201340": [
+  4,
+  "web",
+  "CalibrationTool.project.cameraAdjust.name",
+  "相机调节"
+ ],
+ "1304028": [
+  4,
+  "web",
+  "CalibrationTool.project.startCalibration.name",
+  "开始校正"
+ ],
+ "1201008": [
+  4,
+  "web",
+  "CalibrationTool.project.startCalibration.name",
+  "开始校正"
+ ],
+ "1400397": [
+  5,
+  "web",
+  "CalibrationTool.boxConfig.cameraNoConnected.name",
+  "相机未连接"
+ ],
+ "1205380": [
+  6,
+  "web",
+  "CalibrationTool.boxConfig.upgradeImportConfig.name",
+  "升级导入配置"
+ ],
+ "2501412": [
+  4,
+  "subsystem",
+  "calibration_subsystem.boxCalibration_0013",
+  "相机采集参数未配置"
+ ],
+ "0203199": [
+  6,
+  "web",
+  "CalibrationTool.config.temperatureRiseCurveCollection.name",
+  "温升曲线采集"
+ ],
+ "1305628": [
+  4,
+  "web",
+  "CalibrationTool.project.startCalibration.name",
+  "开始校正"
+ ],
+ "1403295": [
+  4,
+  "web",
+  "CalibrationTool.project.cameraAdjust.name",
+  "相机调节"
+ ],
+ "2802312": [
+  4,
+  "web",
+  "CalibrationTool.projectDetail.partitionConfig.toast.savePartitionFailed.msg",
+  "保存分区配置数据失败"
+ ],
+ "1503765": [
+  5,
+  "web",
+  "CalibrationTool.emptyByWebNesting.name",
+  "该设备不支持，请选择其它设备"
+ ],
+ "2901090": [
+  6,
+  "subsystem",
+  "calibration_subsystem.projectDetail_1201",
+  "自动分区计算失败"
+ ]
+}

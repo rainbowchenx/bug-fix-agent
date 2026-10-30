@@ -40,7 +40,12 @@
     "swe:baseline:20": "tsx adapters/swe-bench/cli.ts --instances eval/swe/data/lite-20.jsonl --work-dir eval/swe/runs/baseline-20 --predictions eval/swe/runs/baseline-20/predictions.jsonl --limit 20",
     "swe:fetch": "py -3.12 adapters/swe-bench/fetch-instances.py --out eval/swe/data/lite-50.jsonl --limit 50",
     "swe:export:official": "py -3.12 eval/swe/export-official-lite.py --out eval/swe/data/official-lite-20.jsonl --limit 20",
+    "swe:export:official:all": "py -3.12 eval/swe/export-official-lite.py --out eval/swe/data/official-lite-300.jsonl --limit 300",
+    "swe:prefetch": "py -3.12 eval/swe/prefetch-repos.py --instances eval/swe/data/official-lite-50.jsonl --cache eval/swe/cache/mirrors",
+    "swe:prefetch:300": "py -3.12 eval/swe/prefetch-repos.py --instances eval/swe/data/official-lite-300.jsonl --cache eval/swe/cache/mirrors",
+    "swe:prefetch:docker": "py -3.12 -u eval/swe/prefetch-from-docker.py --images eval/swe/data/official-lite-50.images.json --cache eval/swe/cache/mirrors",
     "swe:baseline:official20": "tsx adapters/swe-bench/cli.ts --instances eval/swe/data/official-lite-20.jsonl --work-dir eval/swe/runs/official-20 --predictions eval/swe/runs/official-20/predictions.jsonl --limit 20",
+    "swe:baseline:official50": "tsx adapters/swe-bench/cli.ts --instances eval/swe/data/official-lite-50.jsonl --work-dir eval/swe/runs/official-50 --predictions eval/swe/runs/official-50/predictions.jsonl --limit 50",
     "swe:eval": "py -3.12 -m swebench.harness.run_evaluation --dataset_name SWE-bench/SWE-bench_Lite --predictions_path eval/swe/runs/official-20/predictions.jsonl --max_workers 1 --run_id official-20",
     "prepack": "npm run build"
   },

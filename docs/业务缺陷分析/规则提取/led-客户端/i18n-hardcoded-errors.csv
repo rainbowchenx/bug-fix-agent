@@ -1,0 +1,67 @@
+layer,file,line,code,kind
+subsystem,subsystem/src\controllers\boxManageController.ts,115,"throw new Error(this.progressResult || ""任务执行中断"");",裸中文
+subsystem,subsystem/src\controllers\projectDetail.ts,141,return Promise.reject(new Error(`未找到发送卡设备: ${disp.id}`));,裸中文
+subsystem,subsystem/src\controllers\brightnessManage\index.ts,1146,throw new Error(`在目录 ${filterDirPath} 中未找到匹配的校正文件`);,裸中文
+subsystem,subsystem/src\controllers\brightnessManage\index.ts,1321,throw new Error(`在目录 ${filterDirPath} 中未找到匹配的校正文件`);,裸中文
+subsystem,subsystem/src\controllers\common\autoExposure\index.ts,188,"new Error(""自动曝光任务已在运行中，请先调用 stop() 停止"")",裸中文
+subsystem,subsystem/src\controllers\thermalManage\index.ts,1017,"throw new Error(""发送卡拓扑信息无效"");",裸中文
+subsystem,subsystem/src\controllers\thermalManage\index.ts,1094,throw new Error(`热力系数上传失败: ${error}`);,裸中文
+subsystem,subsystem/src\controllers\thermalManage\thermalCalibrationController.ts,327,"throw new Error(""发送卡拓扑信息无效"");",裸中文
+subsystem,subsystem/src\service\CameraManage.ts,293,"throw new Error(""获取相机单帧抓图最大数据长度失败"");",裸中文
+subsystem,subsystem/src\service\CameraManage.ts,303,"throw new Error(""获取相机单帧抓图失败"");",裸中文
+subsystem,subsystem/src\service\CameraManage.ts,378,"throw new Error(""设置相机参数失败"");",裸中文
+subsystem,subsystem/src\service\temperature.ts,173,"throw new Error(""响应数据太短"");",裸中文
+subsystem,subsystem/src\service\temperature.ts,184,throw new Error(`设备返回异常码: 0x${exceptionCode.toString(16)}`);,裸中文
+subsystem,subsystem/src\service\temperature.ts,260,"reject(new Error(""读取超时""));",裸中文
+electron,tool/electron/electron\controller\boxCalibration\boxManage.ts,58,throw new Error('任务执行异常暂停');,裸中文
+electron,tool/electron/electron\controller\boxCalibration\boxManage.ts,71,throw new Error(data?.msg || '任务执行异常暂停');,裸中文
+electron,tool/electron/electron\controller\calibrationTask\index.ts,1848,throw new Error('项目ID不能为空'),裸中文
+electron,tool/electron/electron\controller\calibrationTask\index.ts,2392,throw new Error(`初始化任务结果路径失败: ${error.message}`),裸中文
+electron,tool/electron/electron\controller\calibrationTask\index.ts,2543,throw new Error('找不到对应的工程详情'),裸中文
+electron,tool/electron/electron\controller\calibrationTask\index.ts,2569,throw new Error('保存初始化数据失败'),裸中文
+electron,tool/electron/electron\controller\calibrationTask\index.ts,2713,throw new Error('更新分区亮度保存数据失败'),裸中文
+electron,tool/electron/electron\controller\calibrationTask\index.ts,2717,throw new Error('找不到对应的工程详情'),裸中文
+electron,tool/electron/electron\controller\calibrationTask\index.ts,2750,throw new Error('更新分区保存数据失败'),裸中文
+electron,tool/electron/electron\controller\calibrationTask\index.ts,2754,throw new Error('找不到对应的工程详情'),裸中文
+electron,tool/electron/electron\controller\calibrationTask\index.ts,2777,throw new Error('更新分区保存数据失败'),裸中文
+electron,tool/electron/electron\controller\calibrationTask\index.ts,2781,throw new Error('找不到对应的工程详情'),裸中文
+electron,tool/electron/electron\controller\luxMeter\index.ts,69,"throw new Error(res.msg || ""连接亮度计失败"")",裸中文
+electron,tool/electron/electron\controller\polling\luxMeterPolling.ts,167,throw new Error((res2 as any)?.msg || '亮度计自动重连失败'),裸中文
+electron,tool/electron/electron\controller\projectDetail\index.ts,768,throw new Error('缺少对应hik文件，请先执行完参数分析'),裸中文
+electron,tool/electron/electron\main\SQLChannel.ts,38,"error: new Error(`initializeSQL: 捕获到一个错误 '${error}'`),",裸中文
+electron,tool/electron/electron\main\SQLChannel.ts,52,throw new Error('sqlChannels: 已经初始化!'),裸中文
+electron,tool/electron/electron\main\SQLChannel.ts,60,throw new Error(`${SQL_CHANNEL_KEY}: 还没初始化!`),裸中文
+electron,tool/electron/electron\module\db\main.ts,94,if (!pair) throw new Error(`响应事件不存在: ${seq}`),裸中文
+electron,tool/electron/electron\module\db\main.ts,111,throw new Error('已经初始化'),裸中文
+electron,tool/electron/electron\module\db\main.ts,129,if (!this.isReady) throw new Error('未初始化'),裸中文
+electron,tool/electron/electron\module\db\main.ts,148,if (!this.isReady) throw new Error('未初始化'),裸中文
+electron,tool/electron/electron\module\db\mainWorker.ts,12,if (!parentPort) throw new Error('mainWorker文件必须在worker_threads中执行'),裸中文
+electron,tool/electron/electron\module\db\mainWorker.ts,101,throw new Error(`执行sql方法不是一个函数: ${request.method}`),裸中文
+electron,tool/electron/electron\module\db\mainWorker.ts,121,throw new Error('不存在的请求类型'),裸中文
+electron,tool/electron/electron\module\db\server.ts,59,throw new Error('migrateDatabase: 创建数据库时失败'),裸中文
+electron,tool/electron/electron\module\db\server.ts,66,throw new Error(`setupSQLCipher: key '${key}' 错误，只能为数字与字母组成`),裸中文
+electron,tool/electron/electron\module\db\server.ts,89,if (globalInstance) throw new Error('不能多次初始化!'),裸中文
+electron,tool/electron/electron\module\db\server.ts,91,if (!isString(configDir)) throw new Error('initialize: configDir 不存在!'),裸中文
+electron,tool/electron/electron\module\db\server.ts,93,if (!isString(key)) throw new Error('initialize: key 不存在!'),裸中文
+electron,tool/electron/electron\module\db\server.ts,142,if (!databaseFilePath) throw new Error('removeDB: 没有databaseFilePath就无法删除数据库!'),裸中文
+electron,tool/electron/electron\module\db\server.ts,152,throw new Error('数据库未初始化'),裸中文
+electron,tool/electron/electron\utils\util.ts,448,callback(new Error('流校验不通过')),裸中文
+web,tool/web/src\request\ipcRequest.ts,34,throw new Error(`${config.url}接口不存在`),裸中文
+web,tool/web/src\stores\modules\projectDetail\calibrationTarget.ts,321,throw new Error(res.msg || '计算灯珠亮度分布 + 目标值实现比例计算实现失败'),裸中文
+web,tool/web/src\stores\modules\projectDetail\calibrationTarget.ts,330,throw new Error(res.msg || '计算灯珠亮度分布 + 目标值实现比例计算实现失败：缺少 lumDistr'),裸中文
+web,tool/web/src\stores\modules\projectDetail\calibrationTarget.ts,333,throw new Error(res.msg || '计算灯珠亮度分布 + 目标值实现比例计算实现失败：缺少 targetAchieveRatio'),裸中文
+web,tool/web/src\stores\modules\projectDetail\index.ts,121,throw new Error('获取项目详情失败: 未获取到id对应的项目详情数据'),裸中文
+web,tool/web/src\utils\utils.ts,25,"throw new Error(""XML解析错误: "" + parseError.textContent);",裸中文
+web,tool/web/src\views\ConfigView.vue,588,throw new Error(res?.msg || '断开相机连接失败'),裸中文
+web,tool/web/src\views\ConfigView.vue,616,throw new Error(res?.msg || '断开亮度计连接失败'),裸中文
+web,tool/web/src\views\config\StartCalibration.vue,283,throw new Error('设置相机滤片失败'),裸中文
+web,tool/web/src\views\config\StartCalibration.vue,295,throw new Error('设置相机曝光失败'),裸中文
+web,tool/web/src\views\config\components\PicturePreview.vue,214,throw new Error('无法识别的 Buffer 数据格式'),裸中文
+web,tool/web/src\views\config\components\PicturePreview.vue,218,throw new Error('无法创建 Uint8Array，数据为空或格式错误'),裸中文
+web,tool/web/src\views\config\components\PicturePreview.vue,270,throw new Error('无法识别的 Buffer 数据格式'),裸中文
+web,tool/web/src\views\config\components\PicturePreview.vue,274,throw new Error('无法创建 Uint8Array，数据为空或格式错误'),裸中文
+web,tool/web/src\views\config\components\colorGamutModule\colorGamut.js,724,throw new Error('XYZ三刺激值之和为零，无法计算色度坐标！'),裸中文
+web,tool/web/src\views\config\starCalibration\taskList.vue,428,throw new Error('无法获取当前项目信息'),裸中文
+web,tool/web/src\views\config\starCalibration\taskList.vue,615,throw new Error('无法获取当前项目信息'),裸中文
+web,tool/web/src\views\config\starCalibration\thermalTaskList.vue,270,throw new Error('无法获取当前项目信息'),裸中文
+web,tool/web/src\views\config\starCalibration\thermalTaskList.vue,484,throw new Error('无法获取当前项目信息'),裸中文
