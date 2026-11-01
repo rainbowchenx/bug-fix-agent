@@ -372,11 +372,11 @@ CodeGraph（主查找）+ 形态探测（electron_node|micro_frontend|device_web
 
 | ID | 问题 | 备注 |
 |---|---|---|
-| Q-A | 缺陷拉取是否进入 Agent-1 | 凭据仍不进模型上下文 |
-| Q-B | 报告结论：可修/不可修 vs confidence+suggestedAction | 见 §4.2 |
-| Q-C | Agent-2 默认采用哪些市场 skill（移植清单） | 见 §3.7；CodeGraph 仓内优先 |
+| Q-A | 缺陷拉取是否进入 Agent-1 | ✅ 纳入；MCP 准/爬虫备；`raw-defects` 解耦 |
+| Q-B | 报告结论：可修/不可修 vs confidence+suggestedAction | 见 §4.2（偏 Agent-3） |
+| Q-C | Agent-2 市场 skill / CodeGraph | CodeGraph **仓内**；匹配 **按条**（≤~30）；市场 skill 移植清单仍开 |
 | Q-D | `code-knowledge` / `defect-batch` / `analysis-report` 最终 schema | 探讨后单开契约文 |
-| Q-E | 三 Agent 同进程阶段 vs 分进程/分服务 | 影响部署与缓存 |
+| Q-E | 三 Agent 同进程阶段 vs 分进程/分服务 | Agent-1 已降为 Skill+管线；2/3 待定 |
 | Q-F | 是否先写正式规格再实现，还是边定契约边开 PR | 当前明确：**继续探讨，不实现** |
 
 ---
