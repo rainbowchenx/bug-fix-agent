@@ -17,7 +17,8 @@
 | 匹配 | **按缺陷条目**；批次预估 ≤30 |
 | 产出 | `code-knowledge`（含架构、skill/SDD/DR·DS、`defectCodeMatches`） |
 | SDD | **封闭已知集合**（几种固定框架）；通读仓内即可识别；不写死单一品牌，也不做成开放臆造 |
-| 运行时 | **推荐：LangGraph 编排 + Claude Agent SDK 会话**；Skill / MCP 为附着能力（§6 评估） |
+| 运行时 | LangGraph 编排 + Claude Agent SDK；Skill / MCP 附着（§6） |
+| 通用 Skill | **§7.1 已确认**：investigating-codebases + codebase-explorer（裁剪）+ 可选脚本 |
 | 业务 Skill | **允许注入**（`profiles: cartography`）；指导形态/子应用/设备桥等业务通读要点 |
 | 对外耦合 | **仅**消费已校验的 `defect-batch`，产出已校验的 `code-knowledge`；不与 Agent-1/3 内部实现耦合 |
 | I/O 校验 | 输入前校验 batch；输出后校验 knowledge；失败不进入 Agent-3 |
@@ -263,8 +264,7 @@ Agent-2 **段内**仍可拆节点（架构 vs 匹配），但对外仍是一个�
 - [x] 允许用户注入业务特性 Skill（cartography profile）  
 - [x] 工作流独立单元；I/O 仅契约 + 固定脚本校验  
 - [x] 不共享跨 Agent 会话上下文；一事一 Agent  
-- [x] 通用 skill 建议：investigating-codebases + codebase-explorer（裁剪）；脚本辅 codebase-explainer/repo-map（§7.1）  
-- [ ] 是否按 §7.1 冻结为默认内置清单（待你确认）  
+- [x] 通用 skill 默认清单（§7.1）：investigating-codebases + codebase-explorer（裁剪）；脚本辅 codebase-explainer/repo-map（2026-11-01 确认）  
 - [ ] SDD `frameworkId` 封闭名单终版  
 - [ ] `code-knowledge` schemaVersion 终版（跨段 Q-D）  
 - [ ] 单条匹配置信度规则  
@@ -286,3 +286,4 @@ Agent-2 **段内**仍可拆节点（架构 vs 匹配），但对外仍是一个�
 | 2026-11-01 | 明确业务特性 Skill 可注入 |
 | 2026-11-01 | 松耦合工作流；batch/knowledge 进出校验 |
 | 2026-11-01 | 否决跨 Agent 共享上下文；通用通读 skill 选型建议 §7.1 |
+| 2026-11-01 | **§7.1 通用 skill 清单确认按此落地** |
