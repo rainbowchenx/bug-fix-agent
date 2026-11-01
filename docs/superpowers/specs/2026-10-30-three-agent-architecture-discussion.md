@@ -198,32 +198,80 @@ src/pipeline/{distill,screen,cluster-*}  ← 规则管线
 3. **需求文档 DR/DS 位置**（如有；框架无关探测 + 路径收录）  
 4. **缺陷 ↔ 代码匹配**（用标题/簇键 + CodeGraph 快速定位候选）  
 
-### 3.2 业务线代码三种形态（Cartography Profile）
+### 3.2 业务线代码三种形态（初步框架，待样本特化）
 
-通读策略按形态分流（与旧「install/verify 用 Stack Profile」正交；此处是**理解策略**，不假设要起服务）：
+> **状态**：先给通读**分析框架**；各业务示例仓到位后再填探测指纹、目录约定与 skill 条件暴露。  
+> 与旧「install/verify Stack Profile」正交：此处只服务**理解与匹配**，不假设起服务 / 跑测。
 
-| Profile | 典型 | 通读关注点 |
+通读共用骨架（三形态都走）：
+
+```text
+1. 读 CLAUDE.md / .claude → 约定、skills、SDD、CodeGraph 用法
+2. 判 primaryProfile（可带 secondaryHints）
+3. 按形态清单填 architecture / techStack / modules
+4. 收 DR/DS 与 spec 绑定
+5. 对 ≤~30 条缺陷逐条 CodeGraph 匹配 → defectCodeMatches
+```
+
+#### 粗探测信号（初版，非正式指纹）
+
+| Profile | 正向信号（示例） | 负向/注意 |
 |---|---|---|
-| **`electron_node`** | Electron + Node 全栈客户端，或 Node 后端（如 led） | 主/渲染/preload 边界、IPC、主进程入口、打包配置；可复用既有 `electron-process-boundary` 类知识 |
-| **`micro_frontend`** | 公司自研微前端（**single-spa** 基座） | 根配置 / 应用注册表、子应用入口、共享依赖与路由前缀、跨应用通信；按子应用目录分模块图 |
-| **`device_web`** | 设备 Web：Web 技术嵌入设备（如监控摄像头页） | 嵌入宿主约束、设备 API/桥、资源体积与离线、与桌面 Web 不同的路由/权限假设 |
+| `electron_node` | 依赖 `electron`；`main`/`preload`；electron-builder / electron-vite；双进程目录 | 纯 Node 库无 UI 时仍可归此类「Node 后端」子型 |
+| `micro_frontend` | `single-spa`；根应用注册表；多 `apps/`/`packages/*` 子应用入口 | 与 monorepo 库仓区分：看是否有 spa 注册/导入映射 |
+| `device_web` | 设备/嵌入语义（原生桥、设备 SDK、固定分辨率壳）；弱桌面路由假设 | 技术栈仍可能是 Vue/React——**形态看嵌入约束，不看 UI 框架名** |
 
-探测：`package.json` 依赖（`electron` / `single-spa`）、目录约定、`.claude` 自述、构建配置；命中多个时记 `primaryProfile` + `secondaryHints`，**不强行互斥丢信息**。
+命中多个 → `primaryProfile` + `secondaryHints[]`，不互斥丢信息。`unknown` 时仍出通用地图 + 匹配，置信度下调。
 
-> 旧包内 `node-web` / `node-lib` / `electron` 仍可能服务验证侧；Agent-2 的三种形态是**业务现实分类**，实现时可映射或并行扩展。
+#### A. `electron_node`（Electron 全栈客户端 / Node 后端）
+
+| 分析维 | 要回答的问题 | 落盘提示 |
+|---|---|---|
+| 进程边界 | 主进程 / 渲染 / preload 各自入口？ | `modules[].role = main\|renderer\|preload\|node_service` |
+| IPC 面 | 哪些 channel / invoke？谁暴露给渲染？ | `architecture.ipcSurface[]` |
+| 窗口与路由 | BrowserWindow 创建点；渲染侧路由/状态 | `entryPoints` + 页面模块 |
+| 打包与环境 | 开发/生产差异、额外 Node 服务 | `techStack.notes` |
+| 缺陷匹配偏置 | 标题含「闪退/托盘/升级/IPC」→ 主进程；纯 UI 文案 → 渲染 | 写入 `candidates[].why` |
+
+可挂仓内/内置只读 skill 方向：进程边界、Node 服务定位（样本到了再钉 skill id）。
+
+#### B. `micro_frontend`（自研微前端 · single-spa）
+
+| 分析维 | 要回答的问题 | 落盘提示 |
+|---|---|---|
+| 基座 | 根配置在哪？如何 `registerApplication`？ | `architecture.shell` |
+| 子应用目录 | 每个子应用入口、路由前缀、部署名 | `modules[]` 一应用一模块 |
+| 共享层 | 公共依赖、工具包、样式/权限 | `modules[].shared` |
+| 跨应用通信 | props / 事件总线 / 全局状态 | `architecture.crossApp` |
+| 缺陷匹配偏置 | `测试模块`/标题括注 → 子应用名；先锁定子应用再 CodeGraph | `moduleHint` 优先 |
+
+样本特化时重点：公司注册表文件名、子应用命名与测试模块字段的对照表。
+
+#### C. `device_web`（设备嵌入 Web）
+
+| 分析维 | 要回答的问题 | 落盘提示 |
+|---|---|---|
+| 嵌入宿主 | 如何被设备壳加载？URL/本地资源？ | `architecture.embedHost` |
+| 设备桥 | JSBridge / 原生 API / 插件列表 | `architecture.deviceBridge[]` |
+| 运行约束 | 离线、分辨率、浏览器内核版本、权限 | `techStack.constraints` |
+| 页面结构 | 预览/回放/设置等设备场景入口 | `modules[]` 按设备功能面 |
+| 缺陷匹配偏置 | 「预览/云台/码流/OSD」等设备词 → 对应模块 + 桥层 | 区分「纯 H5」vs「桥调用失败」 |
+
+样本特化时重点：各设备线桥接口文档位置、与 DR/DS 的对应。
+
+#### 与缺陷匹配的共用规则（已定）
+
+- **按条**匹配；批次预估 ≤30。  
+- 查询词：标题 + titleTag + testModule +（可选）intent。  
+- 形态只影响**优先搜哪类模块/边界**，不改变按条粒度。
 
 ### 3.3 CodeGraph（默认能力）
 
-**共识**：CodeGraph **安装在用户仓库代码中**（目标 `workDir` 内），不是本产品外挂的独立服务；通读时在仓内发现并调用其既有入口（CLI/脚本/本地 MCP 等，以仓内实际为准）。
+**共识**：
 
-| 项 | 约定 |
-|---|---|
-| 位置 | **用户仓内**；探测路径/调用方式随仓约定（可读 `.claude`、README、package scripts） |
-| 角色 | Agent-2 **优先**用仓内 CodeGraph 做符号/引用/「谁实现 X」检索；Glob/Grep/Read 为兜底 |
-| 降级 | 仓内未找到或调用失败 → `capabilities.codeGraph=false`，退回脚本 map + Grep；不阻断整批，匹配置信度上限下调 |
-| 与缺陷匹配 | **按缺陷条目**匹配（见下）；用标题 / titleTag / 模块词查询，写入 `defectCodeMatches[]` |
-
-**匹配粒度（已确认）**：**每条缺陷一条** `defectCodeMatches` 记录。批次规模小（**预估每次最多约 30 条**），不按簇折叠，避免同簇多症状被平均掉。
+- CodeGraph 在**用户仓库**内。  
+- **如何调用以该仓 `CLAUDE.md`（及其指向）为准**——本产品**不另写**发现协议、入口白名单或特殊探测逻辑。  
+- Agent-2 通读时必读 `CLAUDE.md`；按其说明使用 CodeGraph；未说明或调用失败再降级 Glob/Grep/Read，并记 `capabilities.codeGraph=false`（匹配置信度上限下调）。
 
 ### 3.4 产物形态（探讨修订）
 
@@ -307,22 +355,22 @@ cartographer（默认写目标仓）、Understand-Anything（耦合重）、expl
 探讨中的默认栈：
 
 ```text
-CodeGraph（主查找）+ 形态探测（electron_node|micro_frontend|device_web）
+读 CLAUDE.md（含 CodeGraph 用法）+ 形态框架（§3.2）
   + .claude / DR·DS 发现
-  + defect-batch 标题 → 匹配候选
+  + defect-batch 逐条匹配（≤~30）
   +（可选）repo-map / import graph 补全
-  → code-knowledge.json（含 defectCodeMatches）
+  → code-knowledge.json
 ```
 
 ### 3.8 Agent-2 拍板状态
 
 - [x] `defectCodeMatches` **按条**（非按簇）；批次规模预估 ≤30  
-- [x] CodeGraph **在用户仓库内**，通读时仓内发现/调用（非本产品外挂中心服务）  
-- [ ] 三种形态的探测规则与 skill 条件暴露表  
-- [ ] 仓内 CodeGraph 的发现约定（常见入口/脚本名，实现前按样本仓补）  
+- [x] CodeGraph 在用户仓内；**用法跟 `CLAUDE.md`，不另订发现协议**  
+- [x] 三形态：**初步分析框架已写入 §3.2**；细探测/skill 暴露等业务示例仓后再特化  
 - [ ] 单条匹配置信度规则  
 - [ ] 运行时：独立会话 Agent vs「cartography skill + 单次会话」  
-- [ ] 架构段缓存与缺陷匹配段失效策略（缺陷集 ≤30 时匹配段可随 batch 全量重算）  
+- [ ] 架构段缓存与缺陷匹配段失效策略（≤30 条时可随 batch 全量重算匹配段）  
+- [ ] （阻塞特化）各形态业务示例仓 + 测试模块↔子应用/进程对照 
 
 ---
 
@@ -399,3 +447,4 @@ CodeGraph（主查找）+ 形态探测（electron_node|micro_frontend|device_web
 | 2026-11-01 | **Agent-1 探讨收口**（用户确认）；遗留仅枚举/MCP 字段契约等实现前细节 |
 | 2026-11-01 | Agent-2 补充：三形态、持全部缺陷标题、DR/DS、CodeGraph 主查找、缺陷↔代码匹配 |
 | 2026-11-01 | Agent-2：匹配按条（≤~30）；CodeGraph 位于用户仓内 |
+| 2026-11-01 | CodeGraph 跟 CLAUDE.md、不另订发现协议；三形态初步通读框架（待样本特化） |
