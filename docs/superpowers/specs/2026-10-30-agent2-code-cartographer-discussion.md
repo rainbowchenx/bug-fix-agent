@@ -298,6 +298,28 @@ Agent-2 **段内**仍可拆节点（架构 vs 匹配），但对外仍是一个�
 
 与现有代码：已有 `src/graph/*` + `sdk-runner.ts`；Cartographer 宜**独立子图/单元**，复用挂载/MCP 合并；`mountSkillsIntoCwd` 需 merge；`repo-map.ts` 过薄。
 
+### 8.3 继续审阅：跨文档一致性与草案缺口（C 组）
+
+对照 [Agent-1](2026-10-30-agent1-defect-batch-discussion.md)、[筛选分簇](2026-10-30-defect-screen-cluster-design.md)、[索引](2026-10-30-three-agent-architecture-discussion.md) 后的新发现——**比 A 组更影响契约**，建议优先拍。
+
+| ID | 问题 | 矛盾 / 缺口 | 建议默认 |
+|---|---|---|---|
+| **C1** | Agent-2 匹配**哪些池**的缺陷？ | 本文写「全部缺陷」；Agent-1 产出含 strict **主队列** + 旁路（hard_reject / needs_info / locatable_only / 安全） | **默认只匹配 `strict` 主队列**；旁路不进 CodeGraph（省 token）。若要对 locatable_only 做弱匹配，需显式开关 |
+| **C2** | `defect-batch` 顶层形状 | Agent-1 **未定义** JSON（扁票据 vs 簇数组）；Agent-2 按条匹配 | 约定：`{ schemaVersion, productLine, clusters[], tickets[] }`；`tickets[]` 为匹配真源；`clusters[]` 供上下文 |
+| **C3** | 字段名与簇 ID | 筛选文簇 ID=`{line}::{testModule}::{titleTag}::{intent}`；Agent-2 用 clusterId/titleTag | **对齐**筛选文；Agent-2 查询词用 ticket 上的 `testModule`/`titleTag`/`intent`/`title` |
+| **C4** | 「至少标题」过软 | Agent-1 对 strict 已产出模块/括注/意图 | 消费 Agent-1 时：**strict ticket 应带齐** `defectId,title,clusterId,testModule,titleTag,intent`；缺字段 → 输入校验 warn + A1 置信度封顶（不是静默「只有标题」） |
+| **C5** | `code-knowledge` 草案缺字段 | §5 有 `frameworkId`，§4 JSON 未挂；无 `schemaVersion`/`partial`/`secondaryHints`/`productLine`/`workDir` | 补：`schemaVersion, productLine, workDir, baseSha, partial?, secondaryHints?, specAtlas.frameworkId` |
+| **C6** | `partial=true` vs 索引「校验失败硬停」 | A5 允许部分产出；索引写 validate 失败不得下游 | **区分**：schema 合法的 partial 算通过校验；缺必填/类型错误才硬停。父图可读 `partial` 决定是否仍跑 Agent-3 |
+| **C7** | `baseSha` / git 前提 | 未写谁解析、非 git 仓怎么办 | Agent-2 bootstrap：`git rev-parse HEAD`；非 git → 输入校验失败（与「指定代码仓」一致） |
+| **C8** | 蒸馏正文是否进 Agent-2 | 匹配查询现为标题+tag+module+intent；Agent-1 有实际/期望/步骤 | **默认不灌全文**（防爆）；可选 `includeDigest=false`；需要时只带短 `observed/expected` 摘要字段 |
+| **C9** | 与 Agent-3 的最小交接 | 只写了 defectCodeMatches | 明确 Agent-3 **至少**依赖：`defectCodeMatches` + `cartographyProfile` + `modules` + `specAtlas.drDs`；其余可降级缺失 |
+
+**审阅结论（本轮）**：
+
+1. 主路径叙事成立，但 **C1/C2/C5/C6** 不拍清，实现时 I/O 脚本无法写死。  
+2. A 组是行为策略；C 组是**契约对齐**——收口 Agent-2 前建议先定 C，再批量接受 A 默认。  
+3. B 组（样本仓/SDD 名单）仍可不挡「探讨收口」，但挡「开写 zod」。
+
 ---
 
 ## 9. 修订记录
@@ -312,3 +334,4 @@ Agent-2 **段内**仍可拆节点（架构 vs 匹配），但对外仍是一个�
 | 2026-11-01 | 否决跨 Agent 共享上下文；通用通读 skill 选型建议 §7.1 |
 | 2026-11-01 | **§7.1 通用 skill 清单确认按此落地** |
 | 2026-11-01 | 完整审阅：§8.2 拆成 A 本轮可拍 / B 可延后 |
+| 2026-11-01 | **继续审阅**：§8.3 跨文档一致性 C1–C9 |
