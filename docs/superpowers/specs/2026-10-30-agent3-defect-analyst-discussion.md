@@ -4,7 +4,8 @@
 > 状态：**探讨中**（非正式规格）  
 > 索引：[三 Agent 架构索引](2026-10-30-three-agent-architecture-discussion.md)  
 > 上游：[Agent-1](2026-10-30-agent1-defect-batch-discussion.md) · [Agent-2](2026-10-30-agent2-code-cartographer-discussion.md)  
-> 对照：[报告型分析 Agent 设计](2026-10-23-report-agent-design.md)（10-23）· [本地 BugFix 设计](2026-10-14-local-bugfix-agent-design.md)（10-14）
+> 对照：[报告型分析 Agent 设计](2026-10-23-report-agent-design.md)（10-23）· [本地 BugFix 设计](2026-10-14-local-bugfix-agent-design.md)（10-14）  
+> **实现与细则请优先回看仓内既有分析/对比文档**（§1.1），勿从零发明阶段语义与编号。
 
 ---
 
@@ -21,10 +22,36 @@
 | 业务 Skill | 可注入（`profiles: analyze` / `fix` / `verify`） |
 | 对外耦合 | 松耦合契约 I/O；**JSON 终版不急**（Q-D） |
 | 验证口子 | **Agent-3 主责**按条验证；与 Agent-2 `runtimeVerify`（通读期可选探测）分工见 §5 |
+| 设计依据 | **复用仓内既有分析/对比文档**（§1.1）；本专文只定三 Agent 下的边界与差分，不重写 LOC/GATE/CONF 全家 |
 
 ---
 
-## 1. 与 10-23 / 10-14 的关系
+## 1. 与既有文档的关系
+
+### 1.1 仓内分析 / 对比文档（Agent-3 必读参考）
+
+Agent-3 的定位、根因、路由、验证、交付与报告字段，**优先对照下列已有材料**（含编号体系），再在本专文做「三 Agent + 按条修复」差分。拍 D 组 / 写实现时按表回查，避免与历史结论打架却不自知。
+
+| 文档 | 对 Agent-3 的用途 |
+|---|---|
+| [目标流水线设计](2026-10-22-target-pipeline-design.md) | **主流程骨架**：`S0..S10`、`CLS-*` / `LOC-L0..L5` / `GATE-*` / `DEL-*`；定位阶梯与失败收口语义的权威出处。注意文内曾跟 10-23「只分析」对齐——**本探讨下 S7–S9 执行权回到 Agent-3**，但阶段名与判定编号仍应复用 |
+| [报告型分析 Agent 设计](2026-10-23-report-agent-design.md) | 报告契约、`confidence` / `suggestedAction`、`ruledOut` / `openQuestions`、`CONF-*` 降级；**BOUND-1 只分析**对本工作流放宽（见 D1） |
+| [报告型分析 Agent 决策备忘](2026-10-23-report-agent-decision-memo.md) | 落地前 `Q-*` / `U-*` / `J-*` / `R-*`；Agent-3 拍板时对照，避免重复争议 |
+| [缺陷输入形态与来源契约](2026-10-22-defect-input-shape-and-source-contract.md) | 输入现实：`OBS-*` / `INV-*` / 无堆栈文本缺陷等；分析时不可假设「必有 stack」 |
+| [环境适配层与能力降级](2026-10-22-environment-adapter-and-capability-degradation.md) | `EnvironmentProfile`、`capabilities`、`L0..L3` 降级；验证不可用时如何降级（对接 D5） |
+| [实现缺口分析与路线图](2026-10-17-implementation-gap-analysis-and-roadmap.md) | 现状 vs 设计 vs 效果：`GAP-*`；哪些分析/修复能力已有代码可迁入 Agent-3 |
+| [本地 BugFix 设计](2026-10-14-local-bugfix-agent-design.md) | 双结局、GREEN、全自动无断点；与按条 worktree 的产品对齐 |
+| [Phase A 可信闭环](../plans/2026-10-17-phase-a-trusted-loop.md) | **worktree 隔离**、skills 挂载、零改动不开 MR 等已落地决策 |
+| [Phase B 修复真值](../plans/2026-10-18-phase-b-fix-truth.md) | baseline / `verifyLevel` / localization 注入等修复真值字段——报告与门禁可对照 |
+| [SOTA BugFix 调研](../../research/2026-10-14-sota-bugfix-agent-survey.md) | harness × 模型、验证与交付门禁的外部对照 |
+| [Sentry Seer 深潜](../../research/2026-10-14-sentry-seer-autofix-deep-dive.md) | 步进/可修性/hand-off；**刻意分歧**：我们无 stopping_point 等人 |
+| [WorkBuddy 调研](../../research/2026-10-15-workbuddy-bugfix-expert-research.md) | 多专家/子代理拆分；可映射「分析 vs 改码」会话，但本产品仍一事一 Agent-3 单元 |
+| [LangGraph 引擎说明](../../langgraph.md) | 现有 `pipeline` vs `langgraph` 双引擎；Agent-3 子图应复用步骤函数而非分叉两套语义 |
+| [Agent Harness 设计笔记](../../agent-harness-design-notes.md) | 会话/prompt 差分等 harness 机制，编排层可借鉴 |
+
+> **用法约定**：讨论或实现 Agent-3 某能力时，先搜上表编号（如 `LOC-L3`、`GATE-*`、`CONF-*`、`GAP-*`），再决定是「直接采纳」还是「三 Agent 差分覆盖」。差分必须在本专文或后续契约文写明，禁止静默改义。
+
+### 1.2 与 10-23 / 10-14 的关系（产品边界差分）
 
 | 来源 | 采纳 | 废弃 / 放宽 |
 |---|---|---|
@@ -193,9 +220,10 @@ Agent-2 若已写出环境笔记到 `code-knowledge`（可选字段，终版不�
 
 | 现有 | 关系 |
 |---|---|
-| `pipeline/analyze.ts` / `implement` / `verify` / `deliver` | 逻辑可迁入 Agent-3 单元，但编排改为按条 + worktree |
+| `pipeline/analyze.ts` / `implement` / `verify` / `deliver` | 逻辑可迁入 Agent-3 单元，但编排改为按条 + worktree；语义对齐 §1.1 流水线编号 |
 | `src/graph/*` + `sdk-runner.ts` | 复用挂载；Agent-3 **独立子图**，勿与 Cartographer 状态混用 |
 | 10-23 报告渲染 | 可作 MD/JSON 骨架，叠加 fixed/unfixed |
+| Phase A/B 已落地行为 | worktree、baseline、verifyLevel 等——Agent-3 默认**继承精神**，差异进 D/E |
 
 ---
 
@@ -206,3 +234,4 @@ Agent-2 若已写出环境笔记到 `code-knowledge`（可选字段，终版不�
 | 2026-10-30 | 自三 Agent 合稿拆出（较薄） |
 | 2026-11-01 | 业务 Skill；松耦合；按条修复 + worktree；相对止于报告放宽 |
 | 2026-11-01 | **专题深化**：流程/运行时/双结局/验证分工/matches 软起点；D/E 拍板清单 |
+| 2026-11-01 | **§1.1**：明示 Agent-3 须参考仓内既有分析/对比文档（流水线/报告/缺口/调研/Phase A·B 等） |

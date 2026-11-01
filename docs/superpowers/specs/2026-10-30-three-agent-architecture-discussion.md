@@ -4,12 +4,14 @@
 > 状态：**探讨中 / 非正式规格**——**不启动实现**。  
 > 详文已拆开，本文只保留总览与跨段约定。
 
-相关基线：
+相关基线（**Agent-3 尤须对照**，完整表见 [Agent-3 §1.1](2026-10-30-agent3-defect-analyst-discussion.md)）：
 
-- [报告型分析 Agent 设计](2026-10-23-report-agent-design.md)
-- [报告型分析 Agent 决策备忘](2026-10-23-report-agent-decision-memo.md)
-- [目标流水线设计](2026-10-22-target-pipeline-design.md)
+- [报告型分析 Agent 设计](2026-10-23-report-agent-design.md) · [决策备忘](2026-10-23-report-agent-decision-memo.md)
+- [目标流水线设计](2026-10-22-target-pipeline-design.md) · [环境适配与降级](2026-10-22-environment-adapter-and-capability-degradation.md)
+- [缺陷输入形态与来源契约](2026-10-22-defect-input-shape-and-source-contract.md)
+- [实现缺口分析](2026-10-17-implementation-gap-analysis-and-roadmap.md)
 - [缺陷单多轮筛选与分簇设计](2026-10-30-defect-screen-cluster-design.md)
+- 调研：[SOTA](../../research/2026-10-14-sota-bugfix-agent-survey.md) · [Seer](../../research/2026-10-14-sentry-seer-autofix-deep-dive.md) · [WorkBuddy](../../research/2026-10-15-workbuddy-bugfix-expert-research.md)
 
 ---
 
@@ -78,8 +80,9 @@ workflow┤                                              │
 │ defect-batch → … → code-knowledge                      │
 └──────────────────────────┬────────────────────────────┘
                            │ 仅 artifact + 校验
-┌─ Agent-3 分析报告（独立单元）─────────────────────────┐
-│ batch + knowledge → … → analysis-report                │
+┌─ Agent-3 分析 + 按条修复（独立单元）──────────────────┐
+│ batch + knowledge → 按条（worktree）→ analysis-report  │
+│                      fixed[] + unfixed[]               │
 └───────────────────────────────────────────────────────┘
 ```
 
@@ -123,7 +126,8 @@ workflow┤                                              │
 | Agent-2 workDir | 根下可多子仓；不强制单一 git |
 | Agent-3 粒度 | **按条修复**；并发用 worktree；各自抽切片 |
 | 跨 Agent JSON | **终版不急**（Q-D 随实现） |
-| 可修文案 / 边界 | 待 Agent-3 专题（相对「止于报告」已放宽） |
+| Agent-3 | 按条分析+修复；双结局报告；D1–D10 待拍（见专文 §8） |
+| 可修文案 | 倾向 fixed/unfixed 桶 + suggestedAction（待 D2） |
 
 ---
 
@@ -150,3 +154,4 @@ workflow┤                                              │
 | 2026-11-01 | 明确一事一 Agent、不共享会话上下文；Agent-2 通用 skill 选型见专文 §7.1 |
 | 2026-11-01 | Agent-2 §7.1 通用 skill 清单确认按此落地 |
 | 2026-11-01 | Agent-2 A/C 收口要点入索引；Agent-3 按条修复；Q-D 不急 |
+| 2026-11-01 | Agent-3 专题深化（流程/验证分工/D 组清单） |
