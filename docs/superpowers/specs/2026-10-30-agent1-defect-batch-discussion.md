@@ -17,6 +17,7 @@
 | 拉取 | **纳入**；`mcp` 为准、`crawler` 为备；经 `raw-defects` 与后续**解耦** |
 | 分簇 | L1 测试模块 → L2 标题括注 → L3 AI 意图；筛池纯规则 |
 | 产出 | `defect-batch` → Agent-2 / Agent-3 |
+| 业务 Skill | **允许注入**（`profiles: defect-batch` 等）；指导模块别名、话术、线别规则说明——**不替代**筛池硬规则 |
 
 ---
 
@@ -115,6 +116,17 @@ src/pipeline/{distill,screen,cluster-*}
 → defect-batch.json
 ```
 
+### 5.1 业务特性 Skill 注入
+
+与索引「三端均可注入」一致。本段典型用途：
+
+- 产品线模块名 / 测试模块别名 → L1 归一提示  
+- 标题括注习惯、缺陷描述模板变体 → 蒸馏与 L2  
+- 意图类目业务释义 → L3（仍受封闭枚举约束）  
+- **不可**：用 skill 推翻 R2 硬淘汰或绕过 `raw-defects` 边界  
+
+注入入口：Run `options.skills` / `.bugfix/skills` / 仓内 `.claude/skills`（merge；`profiles` 含 `defect-batch`）。
+
 ---
 
 ## 6. 拍板与遗留
@@ -122,10 +134,11 @@ src/pipeline/{distill,screen,cluster-*}
 - [x] 拉取纳入；MCP 准 / 爬虫备；`raw-defects` 解耦  
 - [x] 分簇 L1→L2→L3；筛池纯规则  
 - [x] Skill + 规则管线（2026-11-01 确认）  
+- [x] 允许用户注入业务特性 Skill（不替代硬规则）  
 - [ ] L3 意图封闭枚举终版  
 - [ ] MCP 工具名 / 字段映射契约（按实际缺陷 MCP）  
 
-与现有代码：`pipeline/normalize` + `aggregate` 可为规则层演进基础。
+与现有代码：`pipeline/normalize` + `aggregate` 可为规则层演进基础；`filterSkills` / `mountSkillsIntoCwd` 需支持分段 profile + merge。
 
 ---
 
@@ -135,3 +148,4 @@ src/pipeline/{distill,screen,cluster-*}
 |---|---|
 | 2026-10-30 | 自三 Agent 合稿拆出 |
 | 2026-11-01 | 分簇 / 拉取 / Skill+管线收口（合稿内已确认） |
+| 2026-11-01 | 明确业务特性 Skill 可注入 |

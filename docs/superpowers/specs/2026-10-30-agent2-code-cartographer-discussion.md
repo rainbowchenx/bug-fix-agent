@@ -18,6 +18,7 @@
 | 产出 | `code-knowledge`（含架构、skill/SDD/DR·DS、`defectCodeMatches`） |
 | SDD | **封闭已知集合**（几种固定框架）；通读仓内即可识别；不写死单一品牌，也不做成开放臆造 |
 | 运行时 | **推荐：LangGraph 编排 + Claude Agent SDK 会话**；Skill / MCP 为附着能力（§6 评估） |
+| 业务 Skill | **允许注入**（`profiles: cartography`）；指导形态/子应用/设备桥等业务通读要点 |
 
 ---
 
@@ -207,10 +208,17 @@ LangGraph（Cartographer 子图）
 
 ---
 
-## 7. Skills 注入（附着层）
+## 7. Skills 注入（附着层 + 业务特性）
 
-仓内 `.claude/skills` ∪ Run 额外注入 ∪ 本包 cartography 内置。  
-只读；`profiles: [cartography]`；挂载 **merge**。  
+**三端共识**：用户可注入业务特性 Skill（见[索引](2026-10-30-three-agent-architecture-discussion.md)）。本段：
+
+| 来源 | 用途 |
+|---|---|
+| 仓内 `.claude/skills` | 项目自带通读/SDD/CodeGraph 习惯 |
+| Run / `.bugfix/skills` **业务注入** | 线别：子应用↔测试模块对照、设备桥词表、微前端注册表路径等 |
+| 本包 cartography 内置 | 通用 SOP；可被业务覆盖 |
+
+只读；`profiles: [cartography]`；挂载 **merge**。业务 skill **指导**匹配偏置与目录习惯，**不**改 `code-knowledge` zod 门禁。
 
 市场候选（选型未定）：repo-map、codebase-explainer、investigating-codebases、codebase-explorer 等；CodeGraph 可用时脚本 map 为辅。
 
@@ -223,6 +231,7 @@ LangGraph（Cartographer 子图）
 - [x] 三形态初步框架（§2）；细项待示例仓特化  
 - [x] SDD = 封闭已知集 + 通读识别（名单待样本冻结）  
 - [x] 运行时推荐：**LangGraph + Claude Agent SDK**；Skill/MCP 附着（§6）  
+- [x] 允许用户注入业务特性 Skill（cartography profile）  
 - [ ] SDD `frameworkId` 封闭名单终版  
 - [ ] 单条匹配置信度规则  
 - [ ] Cartographer 子图节点切分终版  
@@ -240,3 +249,4 @@ LangGraph（Cartographer 子图）
 | 2026-10-30 | 自三 Agent 合稿拆出 |
 | 2026-11-01 | 三形态 / CodeGraph / 按条匹配等 |
 | 2026-11-01 | SDD 改为封闭已知集；运行时评估结论为 LangGraph + Claude Agent SDK |
+| 2026-11-01 | 明确业务特性 Skill 可注入 |

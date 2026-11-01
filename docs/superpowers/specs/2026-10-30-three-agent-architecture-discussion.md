@@ -47,6 +47,24 @@
 2. 成本重心在 Agent-3；Agent-1 以规则为主。  
 3. 全自动无审批断点。  
 4. Orchestrator 为确定性代码；各段是可注入阶段，不是互聊 chatbot。  
+5. **三段均允许用户注入业务特性 Skill**，指导适配特定业务场景（见下节）。  
+
+---
+
+## 跨段：业务特性 Skill 注入（已确认）
+
+**三个 Agent 都必须支持**用户注入面向业务线的 Skill，用来教该段「在本业务里怎么拉/筛/读/析」，而不是只靠通用内置 SOP。
+
+| 项 | 约定 |
+|---|---|
+| 谁可注 | **Agent-1 / 2 / 3 全部** |
+| 注什么 | 业务特性：模块别名、缺陷话术、子应用对照、设备桥约定、分析禁忌等 |
+| 来源叠加 | ① Run/`options` 显式 `skillsDir` 或 skill ids ② `{workDir}/.bugfix/skills/` ③ 目标仓 `.claude/skills` ④ 本段内置；同名倾向 **用户/业务覆盖内置** |
+| 分段隔离 | 用 `profiles`（如 `defect-batch` / `cartography` / `analyze`）避免串台；业务 skill 可声明适用多 profile |
+| 挂载 | merge 进会话可见集；**禁止**为挂载而清空仓内已有 `.claude/skills` |
+| 边界 | Skill **增强**模型/SOP；**不替代** Agent-1 筛池硬规则、不替代 zod 产物契约、不开放写缺陷平台 |
+
+各段如何消费见专文；实现前再钉 `options.skills` 请求字段。
 
 ---
 
@@ -56,6 +74,7 @@
 |---|---|
 | 产品边界 | 止于分析报告（对齐 10-23）；改码/MR 下游 |
 | SDD | 封闭已知几种；通读识别；`.claude` 为发现总线 |
+| **业务 Skill** | **1/2/3 均可注入**；分段 profile + merge |
 | Agent-1 形态 | Skill + 管线，非独立长会话 Agent |
 | Agent-2 形态 | **LangGraph 编排 + Claude Agent SDK**；Skill/MCP 附着 |
 | Agent-2 CodeGraph | 用户仓内；跟 `CLAUDE.md` |
@@ -85,3 +104,4 @@
 | 2026-11-01 | Agent-1 收口；Agent-2 补三形态/CodeGraph/按条匹配 |
 | 2026-11-01 | **拆成 Agent-1 / 2 / 3 三份专文**；本稿改为索引 |
 | 2026-11-01 | Agent-2：SDD 封闭集；运行时推荐 LangGraph + Claude Agent SDK |
+| 2026-11-01 | 确认三 Agent 均可注入业务特性 Skill |
