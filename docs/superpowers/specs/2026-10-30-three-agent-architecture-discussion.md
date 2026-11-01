@@ -166,11 +166,12 @@ src/pipeline/{distill,screen,cluster-*}  ← 规则管线
 
 相对「三个对等 Agent」：Agent-2 / Agent-3 仍可能是真会话（通读、分析）；Agent-1 降为 **Prepare Skill + Pipeline**。
 
-### 2.6 待拍板
+### 2.6 拍板状态
 
-- [x] 拉取纳入；MCP 为准、爬虫为备；与后续解耦  
-- [x] Agent-1 运行时倾向 Skill + 规则管线，不作独立长会话 Agent  
-- [ ] L3 意图封闭枚举终版  
+- [x] 拉取纳入；MCP 为准、爬虫为备；与后续解耦（`raw-defects`）  
+- [x] 分簇 L1 测试模块 → L2 标题括注 → L3 AI 意图；筛池纯规则  
+- [x] 运行时 = **Skill + 规则管线**，不作独立长会话 Agent（2026-11-01 确认）  
+- [ ] L3 意图封闭枚举终版（实现前补）  
 - [ ] MCP 工具名/字段映射的具体契约（按实际缺陷 MCP 补）  
 - [ ] 对外报告「可修/不可修」vs `confidence` + `suggestedAction`（见 §4，偏 Agent-3）
 
@@ -356,3 +357,4 @@ src/pipeline/{distill,screen,cluster-*}  ← 规则管线
 | 2026-10-30 | 初稿：三 Agent 切分、Agent-2 SDD 框架无关 + `.claude` 发现、市场 skill 调研记录；状态=探讨中 |
 | 2026-11-01 | Agent-1 分簇改为 L1 测试模块 → L2 标题括注 → L3 AI 意图；补全 Agent-1 端到端流程；同步筛选分簇文 R4/R5 |
 | 2026-11-01 | 拉取纳入（MCP 准/爬虫备）且与后续解耦；结论：Agent-1 宜 Skill+规则管线，不必独立长会话 Agent |
+| 2026-11-01 | **Agent-1 探讨收口**（用户确认）；遗留仅枚举/MCP 字段契约等实现前细节 |
