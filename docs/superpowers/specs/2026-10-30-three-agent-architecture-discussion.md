@@ -18,7 +18,7 @@
 | 段 | 文档 | 状态 |
 |---|---|---|
 | **Agent-1** 缺陷批次准备 | [2026-10-30-agent1-defect-batch-discussion.md](2026-10-30-agent1-defect-batch-discussion.md) | **已收口**（Skill + 管线；MCP 拉取解耦；L1→L2→L3 分簇） |
-| **Agent-2** 代码通读 | [2026-10-30-agent2-code-cartographer-discussion.md](2026-10-30-agent2-code-cartographer-discussion.md) | 探讨中（三形态框架；CodeGraph 跟 CLAUDE.md；按条匹配） |
+| **Agent-2** 代码通读 | [2026-10-30-agent2-code-cartographer-discussion.md](2026-10-30-agent2-code-cartographer-discussion.md) | 探讨中（三形态；SDD 封闭集；**推荐 LangGraph + Claude Agent SDK**） |
 | **Agent-3** 缺陷分析报告 | [2026-10-30-agent3-defect-analyst-discussion.md](2026-10-30-agent3-defect-analyst-discussion.md) | 探讨中（内容较薄，待深化） |
 
 ---
@@ -55,8 +55,9 @@
 | 项 | 倾向 |
 |---|---|
 | 产品边界 | 止于分析报告（对齐 10-23）；改码/MR 下游 |
-| SDD | 框架无关；`.claude` 为发现总线 |
+| SDD | 封闭已知几种；通读识别；`.claude` 为发现总线 |
 | Agent-1 形态 | Skill + 管线，非独立长会话 Agent |
+| Agent-2 形态 | **LangGraph 编排 + Claude Agent SDK**；Skill/MCP 附着 |
 | Agent-2 CodeGraph | 用户仓内；跟 `CLAUDE.md` |
 | Agent-2 匹配 | 按条；批次 ≤~30 |
 | 可修文案 | 待 Agent-3 拍；折中见专文 |
@@ -83,3 +84,4 @@
 | 2026-10-30 | 合稿初版 |
 | 2026-11-01 | Agent-1 收口；Agent-2 补三形态/CodeGraph/按条匹配 |
 | 2026-11-01 | **拆成 Agent-1 / 2 / 3 三份专文**；本稿改为索引 |
+| 2026-11-01 | Agent-2：SDD 封闭集；运行时推荐 LangGraph + Claude Agent SDK |
