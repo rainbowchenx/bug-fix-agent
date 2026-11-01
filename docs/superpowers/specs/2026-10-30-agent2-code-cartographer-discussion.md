@@ -223,7 +223,31 @@ LangGraph（Cartographer 子图）
 
 只读；`profiles: [cartography]`；挂载 **merge**。业务 skill **指导**匹配偏置与目录习惯，**不**改 `code-knowledge` zod 门禁。
 
-市场候选（选型未定）：repo-map、codebase-explainer、investigating-codebases、codebase-explorer 等；CodeGraph 可用时脚本 map 为辅。
+### 7.1 通用通读 Skill 选型（建议）
+
+前提：仓内 **CodeGraph**（跟 `CLAUDE.md`）已是主查找；通用 skill 只补「怎么通读 / 怎么写知识包」，不要再上重型全仓写文档类 skill。
+
+| 优先级 | Skill | 角色 | 理由 |
+|---|---|---|---|
+| **P0 主 SOP** | **investigating-codebases** | 通用侦察流程（结构→入口→依赖→文档） | 轻量、工具面 Read/Grep/Glob，与 CodeGraph 不抢主检索；易裁成只读 cartography |
+| **P0 架构补强** | **codebase-explorer**（精简移植） | 形态/archetype + 纵向切片 | 与三形态（electron / 微前端 / 设备 Web）同构；用于 `map_arch` 节点，勿默认写目标仓 |
+| **P1 脚本辅** | **codebase-explainer** 的 `code_map` 脚本 | import graph → JSON | 确定性补 `dependsOn`/hubs；CodeGraph 降级或要图数据时用 |
+| **P1 导航辅** | **repo-map** | 树 + 顶层符号 +「先 map 再开文件」 | CodeGraph 不可用时的廉价索引；对齐现有 `repo-map.ts` 升级方向 |
+| **P2 可选** | **code-investigator** / **codebase-deep-research** | 证据链、file:line | 匹配节点若要加严举证可摘条款，不必整包 |
+
+**不推荐作 Agent-2 主 skill**：`cartographer`（默认写 `CODEBASE_MAP.md`/改仓内 CLAUDE）、`explore-repo`（多 teammate）、交互 HTML 类 architecture map。
+
+建议内置组合（实现时精简移植，非原样整仓拷贝）：
+
+```text
+code-cartography/SKILL.md          ← 本段总 SOP（读 CLAUDE.md → 形态 → SDD → 架构 → 按条匹配）
+  + investigating-codebases（裁剪）
+  + codebase-explorer 形态/切片条款（裁剪）
+  +（可选脚本）code_map / repo_map
+  + 用户业务 skill（子应用对照、设备桥等）
+```
+
+Agent-2 **段内**仍可拆节点（架构 vs 匹配），但对外仍是一个工作流步骤；**不**把会话上下文传给 Agent-3。
 
 ---
 
@@ -236,6 +260,9 @@ LangGraph（Cartographer 子图）
 - [x] 运行时推荐：**LangGraph + Claude Agent SDK**；Skill/MCP 附着（§6）  
 - [x] 允许用户注入业务特性 Skill（cartography profile）  
 - [x] 工作流独立单元；I/O 仅契约 + 固定脚本校验  
+- [x] 不共享跨 Agent 会话上下文；一事一 Agent  
+- [x] 通用 skill 建议：investigating-codebases + codebase-explorer（裁剪）；脚本辅 codebase-explainer/repo-map（§7.1）  
+- [ ] 是否按 §7.1 冻结为默认内置清单（待你确认）  
 - [ ] SDD `frameworkId` 封闭名单终版  
 - [ ] `code-knowledge` schemaVersion 终版（跨段 Q-D）  
 - [ ] 单条匹配置信度规则  
@@ -256,3 +283,4 @@ LangGraph（Cartographer 子图）
 | 2026-11-01 | SDD 改为封闭已知集；运行时评估结论为 LangGraph + Claude Agent SDK |
 | 2026-11-01 | 明确业务特性 Skill 可注入 |
 | 2026-11-01 | 松耦合工作流；batch/knowledge 进出校验 |
+| 2026-11-01 | 否决跨 Agent 共享上下文；通用通读 skill 选型建议 §7.1 |
