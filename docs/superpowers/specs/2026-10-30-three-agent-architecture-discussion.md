@@ -15,7 +15,8 @@
 | 项 | 当前倾向 |
 |---|---|
 | 整体切分 | **三个独立 Agent**，用结构化 artifact 衔接，不传原始对话 |
-| Agent-1 | 缺陷拉取（可选）→ 规则筛选 → **L1 测试模块 → L2 标题括注 → L3 AI 意图** → 结构化批次 |
+| Agent-1 | **能力边界**含拉取+筛选+分簇；运行时倾向 **Skill + 规则管线**，不必独立长会话 Agent（见 §2.5） |
+| 拉取 | **纳入范围**，与后续步骤**解耦**：`IngestAdapter`（**MCP 为准**，爬虫为备）；产出 `raw-defects` 再进蒸馏 |
 | Agent-2 | 对用户指定目录通读 → 架构/模块知识包 → **可跨 run 缓存共享** |
 | Agent-3 | 消费 ①+② → 定位 / 根因 / 修复方案 → 可行动与不可行动报告 |
 | Orchestrator | 仍为确定性代码；三 Agent 是可注入阶段，不是互相聊天的 chatbot |
@@ -59,11 +60,31 @@
 
 | 做 | 不做 |
 |---|---|
-| 蒸馏描述模板、清洗、模块/标题括注取值 | 通读业务源码 |
-| 规则硬分流（CVE / 端侧 / 偶现 / 信息过薄等） | 根因与改码 |
-| 三层分簇（模块→标题括注→AI 意图）+ 排序 | 绑定缺陷平台写操作（拉取是否纳入见待拍板） |
+| **拉取**（见 §2.2，与后续解耦） | 通读业务源码 |
+| 蒸馏描述模板、清洗、模块/标题括注取值 | 根因与改码 |
+| 规则硬分流（CVE / 端侧 / 偶现 / 信息过薄等） | 缺陷平台**写**操作（关单等） |
+| 三层分簇（模块→标题括注→AI 意图）+ 排序 | 把筛池规则交给模型自由发挥 |
 
-### 2.2 分簇层次（已讨论修订）
+### 2.2 拉取：纳入范围，与后续步骤分开
+
+| 项 | 约定 |
+|---|---|
+| 是否纳入 | **是**（产品能力边界属于「缺陷批次准备」） |
+| 形态 | 两种：`mcp`（**当前为准**）/ `crawler`（手动爬虫备援） |
+| 解耦 | 独立阶段 **Ingest**，唯一产物 `raw-defects.json`（或等价）；蒸馏/筛选/分簇**只读该产物**，不直连平台 |
+| 切换 | `ingest.source = mcp \| crawler \| preloaded`；MCP 不可用时可降级 crawler/预置文件，不改下游契约 |
+| 凭据 | 环境变量 / MCP 配置；不进缺陷正文、不进 skill 正文 |
+
+```text
+IngestAdapter.mcp      ──┐
+IngestAdapter.crawler  ──┼──► raw-defects ──► 蒸馏 → 筛选 → 分簇 → defect-batch
+preloaded file         ──┘         ▲
+                                   │ 下游禁止绕过此边界回查平台
+```
+
+Orchestrator **确定性调用** MCP 白名单工具拉单（推荐）；不宜把「有没有拉全」完全交给模型临场发挥。Skill 可描述「何时用哪个 MCP、字段如何映射」，但拉全与落盘由适配器/编排保证。
+
+### 2.3 分簇层次（已讨论修订）
 
 - **L1** `测试模块`（规则归一；禁用 `所属模块`）  
 - **L2** 标题 `【】` / `[]`（规则；无则 `_untagged`）  
@@ -71,56 +92,86 @@
 
 筛池（R0–R3）不含 AI。细则以 [缺陷筛选分簇设计](2026-10-30-defect-screen-cluster-design.md) 为准。
 
-### 2.3 Agent-1 处理流程（端到端）
+### 2.4 处理流程（端到端）
 
 ```text
-【输入】
-  defects[]（Excel/平台导出已落地，或可选由本 Agent 拉取）
-  productLine / 日批姿势 α|β
-  （可选）intent 枚举与模型配置
+【输入】productLine / α|β / ingest 配置（mcp|crawler|preloaded）/ 可选 intent 配置
         │
         ▼
+┌─ I. Ingest（与后续解耦）─────────────────────────────┐
+│  MCP（准）| 爬虫（备）| 预置文件 → raw-defects         │
+└──────────────────────────┬────────────────────────────┘
+                           ▼
 ┌─ A. 蒸馏（0 LLM）─────────────────────────────────────┐
-│  模板拆解实际/期望/步骤；清洗；descriptionTooThin       │
-│  提取测试模块、标题括注；打 duplicate 标记              │
+│  模板拆解；清洗；模块/标题括注；duplicate              │
 └──────────────────────────┬────────────────────────────┘
                            ▼
 ┌─ B. 筛选漏斗（纯规则）────────────────────────────────┐
-│  R0 体检 → R1 拆池（功能|安全|排除）                   │
-│  R2 硬淘汰 → hard_reject                               │
-│  R3a 信息不足 → needs_info                             │
-│  R3b 期望切割 → strict | locatable_only                │
-│  ※ 代码锚点 L1_strict 只统计，不挡入池                 │
+│  R0→R1→R2→R3a/b → strict | 旁路池                      │
 └──────────────────────────┬────────────────────────────┘
-                           ▼ 仅 strict 进主分簇
+                           ▼ 仅 strict
 ┌─ C. 三层分簇 ─────────────────────────────────────────┐
-│  R4-L1 测试模块（规则）                                │
-│  R4-L2 标题【】/[]（规则）                             │
-│  R4-L3 按 L1×L2 桶批调用 AI → intent(+confidence)      │
-│  R5  仍 oversized → 标题实词兜底或 oversized=true      │
-│  R6  跨簇/簇内排序（不淘汰）                           │
+│  L1/L2 规则 → L3 AI 意图 → R5 兜底 → R6 排序           │
 └──────────────────────────┬────────────────────────────┘
                            ▼
-【输出 · defect-batch】
-  strict 有序簇队列（clusterId = line::module::tag::intent）
-  旁路池：安全 / hard_reject / needs_info / locatable_only
-  funnel / clusters / tickets / metrics（可复算）
-        │
-        ▼ 交给 Agent-2（知识）与 Agent-3（分析）
+【输出 · defect-batch】→ Agent-2 / Agent-3
 ```
 
 | 阶段 | LLM？ | 产物要点 |
 |---|---|---|
+| I Ingest | 否（MCP/爬虫 I/O） | `raw-defects` |
 | A 蒸馏 | 否 | `DefectDigest` |
-| B 筛选 | 否 | `pool` / `verdict` / `expectQuality` / `reasonCode` |
+| B 筛选 | 否 | `pool` / `reasonCode` / `expectQuality` |
 | C L1–L2 | 否 | `testModule` / `titleTag` |
 | C L3 | **是**（意图） | `intent` / `intentSource` / `intentConfidence` |
 | C R5–R6 | 否 | 终态簇 + 优先级 |
 
-### 2.4 待拍板
+### 2.5 形态分析：独立 Agent vs Skill
 
-- [ ] 缺陷平台**拉取**是否纳入 Agent-1  
+**判断（探讨结论）**：所谓「Agent-1」更适合作为**能力边界 / 批次准备管线**，而不是再挂一个与 Agent-2/3 对等的长会话自主 Agent。
+
+| 步骤 | 本质 | 更合适的载体 |
+|---|---|---|
+| Ingest（MCP/爬虫） | I/O 适配 | `IngestAdapter` + MCP 工具；Skill 只写用法与字段映射 |
+| 蒸馏 / R0–R3 / L1–L2 / R5–R6 | 可复算规则 | **代码管线**（单测 + funnel 回归）；不宜靠模型「照 skill 手跑」 |
+| L3 意图 | 短推理 | 管线内一次批处理 LLM，或由宿主会话按 skill 触发分类 |
+
+**为什么不必单独编排一个 Agent-1 进程/会话**
+
+1. 主路径 **0 LLM**，硬门禁与漏斗复算是代码问题，不是对话问题。  
+2. 拉取已有 **MCP**；再包一层「拉单 Agent」只增加失败面（漏拉、重复拉、字段漂移）。  
+3. 与现有设计一致：Skills = 流程知识，MCP = 工具，Orchestrator = 门禁（见原规格 §8/§9）。  
+4. 「三 Agent」仍可作**产品叙事**（批次准备 / 通读 / 分析）；实现上 Agent-1 = **一条 skill 声明的 SOP + 确定性管线**，由总编排或日批 job 调用。
+
+**Skill 适合承担什么**
+
+- 名为如 `defect-batch-prepare` 的 skill：声明触发条件、ingest 选择（mcp 优先）、阶段顺序、产物路径、`defect-batch` 契约、禁止事项（不改码、不关单、筛池不用模型瞎判）。  
+- 宿主（日批 runner / 外层 agent）`Skill` 加载后，按 SOP **调用管线入口**（脚本/库 API），而不是逐步 Raw 读 Excel 假装漏斗。
+
+**Skill 不能单独承担什么**
+
+- 五线正则与 profile 的权威实现（应在 `_stage1-rules` → 代码）。  
+- MCP 拉全、重试、分页、幂等落盘。  
+- funnel/clusters 与 α/β 分母的回归验收。
+
+**推荐落地形状**
+
+```text
+defect-batch-prepare/SKILL.md     ← 给人/宿主 agent 的 SOP
+src/ingest/{mcp,crawler}.ts       ← 拉取适配，产出 raw-defects
+src/pipeline/{distill,screen,cluster-*}  ← 规则管线
+（可选）intent 批处理一次 LLM
+→ defect-batch.json               ← 唯一交给下游的批次契约
+```
+
+相对「三个对等 Agent」：Agent-2 / Agent-3 仍可能是真会话（通读、分析）；Agent-1 降为 **Prepare Skill + Pipeline**。
+
+### 2.6 待拍板
+
+- [x] 拉取纳入；MCP 为准、爬虫为备；与后续解耦  
+- [x] Agent-1 运行时倾向 Skill + 规则管线，不作独立长会话 Agent  
 - [ ] L3 意图封闭枚举终版  
+- [ ] MCP 工具名/字段映射的具体契约（按实际缺陷 MCP 补）  
 - [ ] 对外报告「可修/不可修」vs `confidence` + `suggestedAction`（见 §4，偏 Agent-3）
 
 ---
@@ -304,3 +355,4 @@
 |---|---|
 | 2026-10-30 | 初稿：三 Agent 切分、Agent-2 SDD 框架无关 + `.claude` 发现、市场 skill 调研记录；状态=探讨中 |
 | 2026-11-01 | Agent-1 分簇改为 L1 测试模块 → L2 标题括注 → L3 AI 意图；补全 Agent-1 端到端流程；同步筛选分簇文 R4/R5 |
+| 2026-11-01 | 拉取纳入（MCP 准/爬虫备）且与后续解耦；结论：Agent-1 宜 Skill+规则管线，不必独立长会话 Agent |
