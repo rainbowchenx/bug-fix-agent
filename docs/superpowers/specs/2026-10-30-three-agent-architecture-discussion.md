@@ -119,7 +119,7 @@ workflow┤                                              │
 | Agent-1 | Skill + 管线 |
 | Agent-2 | LangGraph 子图 + Claude Agent SDK（段内）；对外仍只暴露契约 |
 | Agent-2 CodeGraph | 用户仓内；跟 `CLAUDE.md` |
-| Agent-2 匹配 | 按条；≤~30 |
+| Agent-2 匹配 | 按条；**无数量硬限**（「~30」仅预估） |
 | 可修文案 | 待 Agent-3 |
 
 ---

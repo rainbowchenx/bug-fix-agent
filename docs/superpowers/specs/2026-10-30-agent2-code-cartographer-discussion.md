@@ -14,7 +14,7 @@
 | 输入 | `workDir` + 上一轮 **`defect-batch`（全部缺陷，至少标题）** |
 | 形态 | `electron_node` / `micro_frontend` / `device_web`（§2 初步框架，待样本特化） |
 | 查找 | 仓内 **CodeGraph**；用法跟用户仓 **`CLAUDE.md`**，不另订发现协议 |
-| 匹配 | **按缺陷条目**；批次预估 ≤30 |
+| 匹配 | **按缺陷条目**；**不做数量硬限制**（原「≤30」仅为规模预估，非门禁） |
 | 产出 | `code-knowledge`（含架构、skill/SDD/DR·DS、`defectCodeMatches`） |
 | SDD | **封闭已知集合**（几种固定框架）；通读仓内即可识别；不写死单一品牌，也不做成开放臆造 |
 | 运行时 | LangGraph 编排 + Claude Agent SDK；Skill / MCP 附着（§6） |
@@ -22,6 +22,7 @@
 | 业务 Skill | **允许注入**（`profiles: cartography`）；指导形态/子应用/设备桥等业务通读要点 |
 | 对外耦合 | **仅**消费已校验的 `defect-batch`，产出已校验的 `code-knowledge`；不与 Agent-1/3 内部实现耦合 |
 | I/O 校验 | 输入前校验 batch；输出后校验 knowledge；失败不进入 Agent-3 |
+| 写仓 / 验证口子 | **允许写目标仓**；**起开发环境 / 跑验证**默认关，由开关打开，并可注入 skill 指导环境与验证（§8.2 A6） |
 
 ---
 
@@ -55,7 +56,7 @@
 2. 判 primaryProfile（可带 secondaryHints）
 3. 按形态清单填 architecture / techStack / modules
 4. 收 DR/DS 与 spec 绑定
-5. 对 ≤~30 条缺陷逐条匹配 → defectCodeMatches
+5. 对缺陷逐条匹配 → defectCodeMatches（无条数硬限）
 ```
 
 ### 粗探测信号（初版）
@@ -98,7 +99,7 @@
 
 ### 匹配共用规则（已定）
 
-- **按条**；预估 ≤30  
+- **按条**；**无数量硬限制**（规模预估可作运维参考，不进校验门禁）  
 - 查询词：标题 + titleTag + testModule +（可选）intent  
 - 形态只影响优先搜哪类边界，不改粒度  
 
@@ -172,7 +173,7 @@
 
 | 方案 | 含义 | 对 Agent-2 |
 |---|---|---|
-| **A. 仅 Skill + MCP** | 宿主按 skill SOP 调 MCP；无（或极薄）自主会话 | 难扛「架构通读 + ≤30 条匹配」的探索环；阶段状态、重试、产物门禁弱 |
+| **A. 仅 Skill + MCP** | 宿主按 skill SOP 调 MCP；无（或极薄）自主会话 | 难扛「架构通读 + 多条匹配」的探索环；阶段状态、重试、产物门禁弱 |
 | **B. 单次超长 SDK 会话** | 一个 query 做完全部 | 上下文易胀；架构与逐条匹配互相污染；不利缓存架构段 |
 | **C. LangGraph + SDK 会话（推荐）** | 图管阶段与 artifact；节点内 SDK 只读会话；Skill 注入 SOP；MCP/仓内工具按 `CLAUDE.md` | 与仓库已有双引擎定位一致；可拆「地图 / 匹配」 |
 
@@ -186,8 +187,9 @@ Agent-2 主路径是 **探索 + 推理 + 工具环**（读约定、判形态、�
 ```text
 LangGraph（Cartographer 子图）
   ├─ node: bootstrap     读 CLAUDE.md / .claude；探测 profile + frameworkId（可轻量/规则+短会话）
-  ├─ node: map_arch      SDK 只读会话 → architecture / techStack / boundSkills / drDs
-  ├─ node: match_defect  按条（≤30）SDK 或短会话 + CodeGraph（用法跟 CLAUDE.md）
+  ├─ node: map_arch      SDK 会话 → architecture / techStack / boundSkills / drDs
+  ├─ node: match_defect  按条 SDK/短会话 + CodeGraph（无条数硬限；用法跟 CLAUDE.md）
+  │                      （可选）runtimeVerify 开时按 skill 起环境/验证
   └─ node: synthesize    校验合并 → code-knowledge.json（zod）
          ▲
     Skills（cartography / 形态 SOP）  MCP 或仓内 CodeGraph 工具
@@ -205,9 +207,9 @@ LangGraph（Cartographer 子图）
 
 ### 6.4 风险与约束
 
-- 匹配节点按条或小批，避免单会话塞满 30 条全文。  
+- 匹配节点按条或小批，避免单会话塞满过多缺陷全文（条数不设硬限，靠批处理策略控上下文）。  
 - 架构节点与匹配节点产物分离，便于 `baseSha` 缓存架构段。  
-- 只读：`disallow Edit/Write`（或写仅限 run 目录 artifact）。  
+- **允许写目标仓**（改码/落辅助文件等按会话权限）；**起开发环境 / 跑验证**见能力开关 `runtimeVerify`（默认 off）+ 业务 skill 指导。  
 - `mountSkillsIntoCwd` 对目标仓 **merge**。  
 
 ---
@@ -258,31 +260,26 @@ Agent-2 **段内**仍可拆节点（架构 vs 匹配），但对外仍是一个�
 
 ### 8.1 已确认
 
-- [x] 匹配按条（≤~30）  
-- [x] CodeGraph 跟 `CLAUDE.md`，不另订发现协议  
-- [x] 三形态**初步框架**（§2）；细探测待示例仓特化  
-- [x] SDD = 封闭已知集 + 通读识别（**名单**仍待冻）  
-- [x] 运行时：段内 **LangGraph + Claude Agent SDK**；Skill/MCP 附着  
-- [x] 业务 Skill 可注入（cartography）；通用 skill 按 §7.1  
-- [x] 工作流独立单元；I/O 契约 + 进出脚本校验；不共享跨 Agent 会话  
+- [x] 匹配按条；CodeGraph 跟 `CLAUDE.md`；三形态框架；SDD 封闭集原则  
+- [x] 段内 LangGraph + Claude Agent SDK；业务 Skill 可注；通用 skill §7.1  
+- [x] 工作流独立单元；I/O 契约校验；不共享跨 Agent 会话  
+- [x] **A 组（2026-11-01）**——见下表  
 
-### 8.2 仍待确认（审阅清单）
+#### A 组决定（已确认）
 
-按「是否挡住 Agent-2 探讨收口 / 实现」分组。
+| ID | 决定 |
+|---|---|
+| **A1** | 必填 `defectId,title`；强建议 `clusterId,testModule,titleTag,intent`（缺则匹配置信度封顶 medium） |
+| **A2** | **不做数量硬限制**；不为 >N 硬拒或截断。原「≤30」仅规模预估，不进门禁 |
+| **A3** | 单条 candidates 最多 **3**；允许空数组且 `confidence=low` |
+| **A4** | CodeGraph 命中+路径存在→可 high；仅 grep→最多 medium；无候选→low；`codeGraph=false` 时全体上限 medium |
+| **A5** | 中途失败仍产出架构段+已完成匹配，`partial=true`；schema 合法则默认可放行 Agent-3（父图可覆盖） |
+| **A6** | **允许写目标仓**。另留能力口子：`runtimeVerify`（默认 **off**）——打开后允许按注入 skill 指导**配置/启动开发环境并做验证**；skill 描述环境命令、端口、登录、验收步骤等。关闭时不做起服务/跑测 |
+| **A7** | 匹配默认**串行** |
+| **A8** | P2 skill **默认不装** |
+| **A9** | 子图采用 `bootstrap → map_arch → match_defect → synthesize` |
 
-#### A. 建议本轮就拍（产品语义，可不靠样本仓）
-
-| ID | 问题 | 现状缺口 | 可选默认（若不反对可按此） |
-|---|---|---|---|
-| **A1** | `defect-batch` 入参**必填字段** | 现写「至少标题；建议带 clusterId/…」 | 必填：`defectId,title`；强建议：`clusterId,testModule,titleTag,intent`（缺则匹配置信度封顶 medium） |
-| **A2** | 实际条数 **>30** 怎么办 | 只写了预估 ≤30 | **硬拒**整批 Agent-2（校验失败），或截断 Top30 并告警——需选一 |
-| **A3** | 单条 `candidates` 上限与空匹配 | 草案无上限、空数组未定义 | 最多 **3** 条候选；允许空数组且 `confidence=low` |
-| **A4** | 匹配置信度规则 | 仅有枚举 | 有 CodeGraph 命中+路径存在→可 high；仅 grep→最多 medium；无候选→low；`codeGraph=false` 时全体上限 medium |
-| **A5** | 匹配失败 / 中途失败是否仍出 knowledge | 未写 | **仍产出**架构段 + 已完成匹配；`synthesize` 带 `partial=true`；工作流是否放行 Agent-3 由父图策略定（默认：校验过 schema 即放行） |
-| **A6** | 段内写权限 | 「只读」vs「可写 run 目录」 | SDK **禁止改目标仓**；允许写 `{runDir}/…` artifact |
-| **A7** | `match_defect` 串行还是有限并行 | 未写 | 默认**串行**（简）；或并发 3（吞吐）——需选一 |
-| **A8** | P2 skill（investigator/deep-research）默认是否装 | 标可选 | **默认不装**；实现期按需再加 |
-| **A9** | 子图四节点是否定稿 | §6.3 为推荐 | 确认采用 `bootstrap → map_arch → match_defect → synthesize` |
+### 8.2 仍待确认
 
 #### B. 可延后到样本仓 / 契约专文（不挡「主路径收口」叙事）
 
@@ -314,11 +311,7 @@ Agent-2 **段内**仍可拆节点（架构 vs 匹配），但对外仍是一个�
 | **C8** | 蒸馏正文是否进 Agent-2 | 匹配查询现为标题+tag+module+intent；Agent-1 有实际/期望/步骤 | **默认不灌全文**（防爆）；可选 `includeDigest=false`；需要时只带短 `observed/expected` 摘要字段 |
 | **C9** | 与 Agent-3 的最小交接 | 只写了 defectCodeMatches | 明确 Agent-3 **至少**依赖：`defectCodeMatches` + `cartographyProfile` + `modules` + `specAtlas.drDs`；其余可降级缺失 |
 
-**审阅结论（本轮）**：
-
-1. 主路径叙事成立，但 **C1/C2/C5/C6** 不拍清，实现时 I/O 脚本无法写死。  
-2. A 组是行为策略；C 组是**契约对齐**——收口 Agent-2 前建议先定 C，再批量接受 A 默认。  
-3. B 组（样本仓/SDD 名单）仍可不挡「探讨收口」，但挡「开写 zod」。
+**说明**：A 已拍完。C1–C9 释义见对话/下文，待你逐条点头后勾选。B 仍可延后。
 
 ---
 
@@ -328,10 +321,6 @@ Agent-2 **段内**仍可拆节点（架构 vs 匹配），但对外仍是一个�
 |---|---|
 | 2026-10-30 | 自三 Agent 合稿拆出 |
 | 2026-11-01 | 三形态 / CodeGraph / 按条匹配等 |
-| 2026-11-01 | SDD 改为封闭已知集；运行时评估结论为 LangGraph + Claude Agent SDK |
-| 2026-11-01 | 明确业务特性 Skill 可注入 |
-| 2026-11-01 | 松耦合工作流；batch/knowledge 进出校验 |
-| 2026-11-01 | 否决跨 Agent 共享上下文；通用通读 skill 选型建议 §7.1 |
-| 2026-11-01 | **§7.1 通用 skill 清单确认按此落地** |
-| 2026-11-01 | 完整审阅：§8.2 拆成 A 本轮可拍 / B 可延后 |
-| 2026-11-01 | **继续审阅**：§8.3 跨文档一致性 C1–C9 |
+| 2026-11-01 | SDD 封闭集；LangGraph + Claude Agent SDK；业务 Skill；松耦合 |
+| 2026-11-01 | §7.1 skill 确认；审阅 A/B/C |
+| 2026-11-01 | **A 组确认**：A2 无数量硬限；A6 可写仓 + `runtimeVerify` 开关与 skill 口子；其余按默认 |
