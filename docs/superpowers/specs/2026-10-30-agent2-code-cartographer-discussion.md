@@ -19,6 +19,8 @@
 | SDD | **封闭已知集合**（几种固定框架）；通读仓内即可识别；不写死单一品牌，也不做成开放臆造 |
 | 运行时 | **推荐：LangGraph 编排 + Claude Agent SDK 会话**；Skill / MCP 为附着能力（§6 评估） |
 | 业务 Skill | **允许注入**（`profiles: cartography`）；指导形态/子应用/设备桥等业务通读要点 |
+| 对外耦合 | **仅**消费已校验的 `defect-batch`，产出已校验的 `code-knowledge`；不与 Agent-1/3 内部实现耦合 |
+| I/O 校验 | 输入前校验 batch；输出后校验 knowledge；失败不进入 Agent-3 |
 
 ---
 
@@ -197,7 +199,8 @@ LangGraph（Cartographer 子图）
 | **Skills** | 通读 SOP、形态关注点、匹配写法；**不**单独当编排器 |
 | **MCP** | 若 `CLAUDE.md`/仓配置把 CodeGraph 等暴露为 MCP 则挂上；否则按仓内 CLI——**不强制本产品自建 CodeGraph MCP** |
 
-相对 Agent-1：`defect-batch-prepare` = Skill + 代码管线；Agent-2 = **图编排的 Cartographer Agent（SDK）** + Skill/MCP 附着。
+相对 Agent-1：`defect-batch-prepare` = Skill + 代码管线；Agent-2 = **本单元内**图编排的 Cartographer（SDK）+ Skill/MCP 附着。  
+对外仍是工作流上的**独立一步**：只认校验过的 `defect-batch` / `code-knowledge`，不与 Agent-1/3 实现合并。
 
 ### 6.4 风险与约束
 
@@ -232,7 +235,9 @@ LangGraph（Cartographer 子图）
 - [x] SDD = 封闭已知集 + 通读识别（名单待样本冻结）  
 - [x] 运行时推荐：**LangGraph + Claude Agent SDK**；Skill/MCP 附着（§6）  
 - [x] 允许用户注入业务特性 Skill（cartography profile）  
+- [x] 工作流独立单元；I/O 仅契约 + 固定脚本校验  
 - [ ] SDD `frameworkId` 封闭名单终版  
+- [ ] `code-knowledge` schemaVersion 终版（跨段 Q-D）  
 - [ ] 单条匹配置信度规则  
 - [ ] Cartographer 子图节点切分终版  
 - [ ] 缓存失效策略  
@@ -250,3 +255,4 @@ LangGraph（Cartographer 子图）
 | 2026-11-01 | 三形态 / CodeGraph / 按条匹配等 |
 | 2026-11-01 | SDD 改为封闭已知集；运行时评估结论为 LangGraph + Claude Agent SDK |
 | 2026-11-01 | 明确业务特性 Skill 可注入 |
+| 2026-11-01 | 松耦合工作流；batch/knowledge 进出校验 |

@@ -18,6 +18,8 @@
 | 产品边界 | 与 10-23 一致：**止于分析报告**；改码 / MR 留给下游 |
 | 运行时 | 真会话可能性最高（成本重心）；倾向与 Agent-2 同构（LangGraph + Claude Agent SDK，待拍） |
 | 业务 Skill | **允许注入**（`profiles: analyze` 等）；指导业务根因习惯、验收口径、禁忌改动面 |
+| 对外耦合 | **仅**消费已校验的 `defect-batch` + `code-knowledge`；产出已校验的 `analysis-report` |
+| I/O 校验 | 输入前双校验；输出后校验 report；失败不交付下游 |
 
 ---
 
@@ -76,6 +78,8 @@ Skill **不**取消证据链与路径存在性等可计算降级（对齐 10-23 
 ## 5. 待拍板
 
 - [x] 允许用户注入业务特性 Skill（analyze profile）  
+- [x] 工作流独立单元；I/O 仅契约 + 固定脚本校验  
+- [ ] `analysis-report` schemaVersion 终版（跨段 Q-D）  
 - [ ] 对外「可修/不可修」vs `confidence` + `suggestedAction`  
 - [ ] 与 10-23 六段报告的字段差分表  
 - [ ] 运行时形态（LangGraph + SDK 是否与 Agent-2 同构；会话预算；按簇并发）  
@@ -89,3 +93,4 @@ Skill **不**取消证据链与路径存在性等可计算降级（对齐 10-23 
 |---|---|
 | 2026-10-30 | 自三 Agent 合稿拆出（合稿中本节较薄，待深化） |
 | 2026-11-01 | 明确业务特性 Skill 可注入 |
+| 2026-11-01 | 松耦合工作流；双输入与 report 进出校验 |

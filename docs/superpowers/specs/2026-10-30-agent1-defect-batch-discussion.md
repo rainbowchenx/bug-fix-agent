@@ -18,6 +18,8 @@
 | 分簇 | L1 测试模块 → L2 标题括注 → L3 AI 意图；筛池纯规则 |
 | 产出 | `defect-batch` → Agent-2 / Agent-3 |
 | 业务 Skill | **允许注入**（`profiles: defect-batch` 等）；指导模块别名、话术、线别规则说明——**不替代**筛池硬规则 |
+| 对外耦合 | **仅** `defect-batch`（及内部 `raw-defects`）；工作流松耦合，见[索引](2026-10-30-three-agent-architecture-discussion.md) |
+| I/O 校验 | 输出后固定脚本校验 `defect-batch`；下游输入前再校验——失败不交给 Agent-2/3 |
 
 ---
 
@@ -135,8 +137,10 @@ src/pipeline/{distill,screen,cluster-*}
 - [x] 分簇 L1→L2→L3；筛池纯规则  
 - [x] Skill + 规则管线（2026-11-01 确认）  
 - [x] 允许用户注入业务特性 Skill（不替代硬规则）  
+- [x] 作为工作流独立单元；对外只约定 `defect-batch` + 进出脚本校验  
 - [ ] L3 意图封闭枚举终版  
 - [ ] MCP 工具名 / 字段映射契约（按实际缺陷 MCP）  
+- [ ] `defect-batch` schemaVersion 终版（跨段 Q-D）  
 
 与现有代码：`pipeline/normalize` + `aggregate` 可为规则层演进基础；`filterSkills` / `mountSkillsIntoCwd` 需支持分段 profile + merge。
 
@@ -149,3 +153,4 @@ src/pipeline/{distill,screen,cluster-*}
 | 2026-10-30 | 自三 Agent 合稿拆出 |
 | 2026-11-01 | 分簇 / 拉取 / Skill+管线收口（合稿内已确认） |
 | 2026-11-01 | 明确业务特性 Skill 可注入 |
+| 2026-11-01 | 松耦合工作流；defect-batch 进出校验 |
