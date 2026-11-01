@@ -256,23 +256,47 @@ Agent-2 **段内**仍可拆节点（架构 vs 匹配），但对外仍是一个�
 
 ## 8. 拍板状态
 
+### 8.1 已确认
+
 - [x] 匹配按条（≤~30）  
 - [x] CodeGraph 跟 `CLAUDE.md`，不另订发现协议  
-- [x] 三形态初步框架（§2）；细项待示例仓特化  
-- [x] SDD = 封闭已知集 + 通读识别（名单待样本冻结）  
-- [x] 运行时推荐：**LangGraph + Claude Agent SDK**；Skill/MCP 附着（§6）  
-- [x] 允许用户注入业务特性 Skill（cartography profile）  
-- [x] 工作流独立单元；I/O 仅契约 + 固定脚本校验  
-- [x] 不共享跨 Agent 会话上下文；一事一 Agent  
-- [x] 通用 skill 默认清单（§7.1）：investigating-codebases + codebase-explorer（裁剪）；脚本辅 codebase-explainer/repo-map（2026-11-01 确认）  
-- [ ] SDD `frameworkId` 封闭名单终版  
-- [ ] `code-knowledge` schemaVersion 终版（跨段 Q-D）  
-- [ ] 单条匹配置信度规则  
-- [ ] Cartographer 子图节点切分终版  
-- [ ] 缓存失效策略  
-- [ ] （阻塞特化）各形态业务示例仓  
+- [x] 三形态**初步框架**（§2）；细探测待示例仓特化  
+- [x] SDD = 封闭已知集 + 通读识别（**名单**仍待冻）  
+- [x] 运行时：段内 **LangGraph + Claude Agent SDK**；Skill/MCP 附着  
+- [x] 业务 Skill 可注入（cartography）；通用 skill 按 §7.1  
+- [x] 工作流独立单元；I/O 契约 + 进出脚本校验；不共享跨 Agent 会话  
 
-与现有代码：已有 `src/graph/*` + `sdk-runner.ts`；Cartographer 宜新子图，复用挂载/MCP 合并模式。`repo-map.ts` 过薄；`mountSkillsIntoCwd` 需 merge。
+### 8.2 仍待确认（审阅清单）
+
+按「是否挡住 Agent-2 探讨收口 / 实现」分组。
+
+#### A. 建议本轮就拍（产品语义，可不靠样本仓）
+
+| ID | 问题 | 现状缺口 | 可选默认（若不反对可按此） |
+|---|---|---|---|
+| **A1** | `defect-batch` 入参**必填字段** | 现写「至少标题；建议带 clusterId/…」 | 必填：`defectId,title`；强建议：`clusterId,testModule,titleTag,intent`（缺则匹配置信度封顶 medium） |
+| **A2** | 实际条数 **>30** 怎么办 | 只写了预估 ≤30 | **硬拒**整批 Agent-2（校验失败），或截断 Top30 并告警——需选一 |
+| **A3** | 单条 `candidates` 上限与空匹配 | 草案无上限、空数组未定义 | 最多 **3** 条候选；允许空数组且 `confidence=low` |
+| **A4** | 匹配置信度规则 | 仅有枚举 | 有 CodeGraph 命中+路径存在→可 high；仅 grep→最多 medium；无候选→low；`codeGraph=false` 时全体上限 medium |
+| **A5** | 匹配失败 / 中途失败是否仍出 knowledge | 未写 | **仍产出**架构段 + 已完成匹配；`synthesize` 带 `partial=true`；工作流是否放行 Agent-3 由父图策略定（默认：校验过 schema 即放行） |
+| **A6** | 段内写权限 | 「只读」vs「可写 run 目录」 | SDK **禁止改目标仓**；允许写 `{runDir}/…` artifact |
+| **A7** | `match_defect` 串行还是有限并行 | 未写 | 默认**串行**（简）；或并发 3（吞吐）——需选一 |
+| **A8** | P2 skill（investigator/deep-research）默认是否装 | 标可选 | **默认不装**；实现期按需再加 |
+| **A9** | 子图四节点是否定稿 | §6.3 为推荐 | 确认采用 `bootstrap → map_arch → match_defect → synthesize` |
+
+#### B. 可延后到样本仓 / 契约专文（不挡「主路径收口」叙事）
+
+| ID | 问题 | 说明 |
+|---|---|---|
+| **B1** | SDD `frameworkId` 封闭名单 | 等各业务仓看齐后冻结 |
+| **B2** | 三形态探测指纹与业务对照表 | 等 electron / spa / device 示例仓 |
+| **B3** | `code-knowledge` schemaVersion 终版字段表 | 跨段 Q-D；与 Agent-1/3 一起开契约文 |
+| **B4** | 缓存键与失效精策略 | 草案已有方向；实现前可再钉 TTL/目录布局 |
+| **B5** | `specPaths` 是否常驻请求字段 | 现为可选 extras |
+| **B6** | 多仓 / monorepo 多 `workDir` | 现假设单目录；双仓以后再开 |
+| **B7** | `code-cartography` 总 SOP 正文 | 实现时按 §7.1 新写，非现成第三方包 |
+
+与现有代码：已有 `src/graph/*` + `sdk-runner.ts`；Cartographer 宜**独立子图/单元**，复用挂载/MCP 合并；`mountSkillsIntoCwd` 需 merge；`repo-map.ts` 过薄。
 
 ---
 
@@ -287,3 +311,4 @@ Agent-2 **段内**仍可拆节点（架构 vs 匹配），但对外仍是一个�
 | 2026-11-01 | 松耦合工作流；batch/knowledge 进出校验 |
 | 2026-11-01 | 否决跨 Agent 共享上下文；通用通读 skill 选型建议 §7.1 |
 | 2026-11-01 | **§7.1 通用 skill 清单确认按此落地** |
+| 2026-11-01 | 完整审阅：§8.2 拆成 A 本轮可拍 / B 可延后 |
