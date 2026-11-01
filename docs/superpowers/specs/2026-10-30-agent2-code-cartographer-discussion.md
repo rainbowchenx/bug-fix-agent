@@ -11,30 +11,28 @@
 
 | 项 | 倾向 |
 |---|---|
-| 输入 | `workDir` + 上一轮 **`defect-batch`（全部缺陷，至少标题）** |
+| 输入 | `workDir`（其下**可有多个代码目录/仓**）+ `defect-batch` |
 | 形态 | `electron_node` / `micro_frontend` / `device_web`（§2 初步框架，待样本特化） |
-| 查找 | 仓内 **CodeGraph**；用法跟用户仓 **`CLAUDE.md`**，不另订发现协议 |
-| 匹配 | **按缺陷条目**；**不做数量硬限制**（原「≤30」仅为规模预估，非门禁） |
+| 查找 | 各子仓内 **CodeGraph**；用法跟该仓 **`CLAUDE.md`**，不另订发现协议 |
+| 匹配 | **按缺陷条目**；无数量硬限；默认匹配 **strict + locatable_only + needs_info**（见 C1） |
 | 产出 | `code-knowledge`（含架构、skill/SDD/DR·DS、`defectCodeMatches`） |
-| SDD | **封闭已知集合**（几种固定框架）；通读仓内即可识别；不写死单一品牌，也不做成开放臆造 |
-| 运行时 | LangGraph 编排 + Claude Agent SDK；Skill / MCP 附着（§6） |
-| 通用 Skill | **§7.1 已确认**：investigating-codebases + codebase-explorer（裁剪）+ 可选脚本 |
-| 业务 Skill | **允许注入**（`profiles: cartography`）；指导形态/子应用/设备桥等业务通读要点 |
-| 对外耦合 | **仅**消费已校验的 `defect-batch`，产出已校验的 `code-knowledge`；不与 Agent-1/3 内部实现耦合 |
-| I/O 校验 | 输入前校验 batch；输出后校验 knowledge；失败不进入 Agent-3 |
-| 写仓 / 验证口子 | **允许写目标仓**；**起开发环境 / 跑验证**默认关，由开关打开，并可注入 skill 指导环境与验证（§8.2 A6） |
+| SDD | **封闭已知集合**；通读识别；不写死单一品牌 |
+| 运行时 | LangGraph + Claude Agent SDK；Skill / MCP 附着（§6） |
+| 通用 / 业务 Skill | §7.1 + 可注入 `profiles: cartography` |
+| 对外耦合 | 仅契约 I/O；**跨 Agent JSON 终版不急**（与实现同步再冻） |
+| 写仓 / 验证口子 | 允许写仓；`runtimeVerify` 默认 off + skill 指导（A6） |
 
 ---
 
 ## 1. 职责与输入
 
-对用户指定目录只读理解，产出可共享的 `code-knowledge`。
+对用户指定目录理解并产出可共享的 `code-knowledge`。
 
 | 输入 | 说明 |
 |---|---|
-| `workDir` / 仓路径 | 用户指定代码目录 |
-| **`defect-batch`** | 已分类的全部缺陷（至少标题；建议带 clusterId / testModule / titleTag / intent） |
-| 可选 extras | 额外 cartography skills、显式 `specPaths` |
+| `workDir` | 用户指定根目录；**其下可有多个子目录，各自可能是独立代码仓**（不一定根就是单一 git） |
+| **`defect-batch`** | Agent-1 产出；匹配池见 C1；字段形状见 C2/C3（暂缓终版） |
+| 可选 extras | 额外 cartography skills、显式 `specPaths`、子仓路径提示 |
 
 要完成：
 
@@ -99,9 +97,11 @@
 
 ### 匹配共用规则（已定）
 
-- **按条**；**无数量硬限制**（规模预估可作运维参考，不进校验门禁）  
-- 查询词：标题 + titleTag + testModule +（可选）intent  
+- **按条**；无数量硬限制  
+- **默认匹配池**：`strict` + `locatable_only` + `needs_info`（不只 strict）；`hard_reject` 跳过；安全旁路默认跳过（可开弱匹配）  
+- 查询词：标题 +（若有）titleTag / testModule / intent——**不灌蒸馏全文**（全文留给 Agent-3 按条取用，见 C8）  
 - 形态只影响优先搜哪类边界，不改粒度  
+- 多子仓时：按探测到的子仓分别查 CodeGraph / 降级检索，候选带 `repoPath` 提示（字段名终版不急）
 
 ---
 
@@ -117,13 +117,23 @@
 
 ```jsonc
 {
-  "baseSha": "…",
+  // 草案字段方向；跨 Agent JSON 终版不急（Q-D）
+  "schemaVersion": "…",
+  "productLine": "…",
+  "workDir": "…",
+  "partial": false,
+  "repoRoots": [
+    // 根下探测到的子仓；非 git 亦可（指纹用路径+内容哈希等，不强求 baseSha）
+    { "path": ".", "gitHead": null, "fingerprint": "…" }
+  ],
   "cartographyProfile": "electron_node" | "micro_frontend" | "device_web" | "unknown",
+  "secondaryHints": [],
   "techStack": { "languages": [], "frameworks": [], "notes": "" },
   "architecture": { "summary": "", "entryPoints": [], "modules": [] },
   "conventions": { "fromClaudeMd": [], "fromRules": [] },
   "boundSkills": [],
   "specAtlas": {
+    "frameworkId": "…",
     "entries": [],
     "drDs": [{ "path": "", "kind": "DR|DS|unknown", "moduleHint": null }],
     "bindings": []
@@ -132,14 +142,14 @@
   "defectCodeMatches": [
     {
       "defectId": "", "clusterId": "", "title": "",
-      "candidates": [{ "path": "", "symbol": "", "why": "", "source": "codegraph|grep" }],
+      "candidates": [{ "repoPath": "", "path": "", "symbol": "", "why": "", "source": "codegraph|grep" }],
       "confidence": "high|medium|low"
     }
   ]
 }
 ```
 
-缓存：`baseSha` + `.claude`/指南哈希 + skill 集合 + **`defect-batch` 哈希**（匹配段随缺陷集失效；架构段可按 sha 复用）。
+缓存：各 `repoRoots[].fingerprint`（有 git 则可用 `gitHead`）+ `.claude`/指南哈希 + skill 集合 + **`defect-batch` 哈希**。**禁止**假设 `workDir` 根必为单一 git。
 
 ---
 
@@ -208,7 +218,7 @@ LangGraph（Cartographer 子图）
 ### 6.4 风险与约束
 
 - 匹配节点按条或小批，避免单会话塞满过多缺陷全文（条数不设硬限，靠批处理策略控上下文）。  
-- 架构节点与匹配节点产物分离，便于 `baseSha` 缓存架构段。  
+- 架构节点与匹配节点产物分离，便于按 `repoRoots` 指纹缓存架构段。  
 - **允许写目标仓**（改码/落辅助文件等按会话权限）；**起开发环境 / 跑验证**见能力开关 `runtimeVerify`（默认 off）+ 业务 skill 指导。  
 - `mountSkillsIntoCwd` 对目标仓 **merge**。  
 
@@ -287,31 +297,29 @@ Agent-2 **段内**仍可拆节点（架构 vs 匹配），但对外仍是一个�
 |---|---|---|
 | **B1** | SDD `frameworkId` 封闭名单 | 等各业务仓看齐后冻结 |
 | **B2** | 三形态探测指纹与业务对照表 | 等 electron / spa / device 示例仓 |
-| **B3** | `code-knowledge` schemaVersion 终版字段表 | 跨段 Q-D；与 Agent-1/3 一起开契约文 |
-| **B4** | 缓存键与失效精策略 | 草案已有方向；实现前可再钉 TTL/目录布局 |
+| **B3** | `code-knowledge` schemaVersion 终版字段表 | 跨段 Q-D；**不急**，与实现同步 |
+| **B4** | 缓存键与失效精策略 | 实现前再钉；键基于 `repoRoots` 指纹 |
 | **B5** | `specPaths` 是否常驻请求字段 | 现为可选 extras |
-| **B6** | 多仓 / monorepo 多 `workDir` | 现假设单目录；双仓以后再开 |
-| **B7** | `code-cartography` 总 SOP 正文 | 实现时按 §7.1 新写，非现成第三方包 |
+| **B6** | 多仓布局细节 | **原则已由 C7 确认**（根下多子仓）；探测指纹/命名等实现期细化 |
+| **B7** | `code-cartography` 总 SOP 正文 | 实现时按 §7.1 新写 |
 
 与现有代码：已有 `src/graph/*` + `sdk-runner.ts`；Cartographer 宜**独立子图/单元**，复用挂载/MCP 合并；`mountSkillsIntoCwd` 需 merge；`repo-map.ts` 过薄。
 
-### 8.3 继续审阅：跨文档一致性与草案缺口（C 组）
+### 8.3 C 组（跨文档一致性）——2026-11-01 决定
 
-对照 [Agent-1](2026-10-30-agent1-defect-batch-discussion.md)、[筛选分簇](2026-10-30-defect-screen-cluster-design.md)、[索引](2026-10-30-three-agent-architecture-discussion.md) 后的新发现——**比 A 组更影响契约**，建议优先拍。
+| ID | 决定 |
+|---|---|
+| **C1** | **不只匹配 strict**（过窄）。默认匹配 **`strict` + `locatable_only` + `needs_info`**；跳过 `hard_reject`；安全旁路默认跳过（可开弱匹配） |
+| **C2** | **暂缓**。`defect-batch` 顶层形状等 Agent-1 具体开发时再定；跨 Agent JSON 终版不急 |
+| **C3** | **未定**。簇 ID / 字段名对齐暂不锁 |
+| **C4** | **先不动**（维持现状表述，不强加「strict 必带齐字段」） |
+| **C5** | **方向采纳**（补 `schemaVersion` / `productLine` / `workDir` / `partial` / `secondaryHints` / `specAtlas.frameworkId` / `repoRoots`）；**终版字段表不急** |
+| **C6** | **采纳**：schema 合法的 `partial` 算通过校验；缺必填/类型错才硬停；父图可读 `partial` 决定是否仍跑 Agent-3 |
+| **C7** | **不可写死单一 git 仓**。`workDir` 下可有多个目录、各自一仓；探测 `repoRoots[]`；有 git 则记 `gitHead`，无 git 用路径+内容指纹；**禁止**「非 git → 输入失败」 |
+| **C8** | 蒸馏正文（实际/期望/步骤）**送给 Agent-3**，不灌进 Agent-2 匹配会话。Agent-3 **按条修复**（不整批同会话改）；并发最多以 **worktree** 多开，各自只提取该条所需内容 |
+| **C9** | **方向采纳**：Agent-3 至少依赖 `defectCodeMatches` + `cartographyProfile` + `modules` + `specAtlas.drDs`；其余可降级；字段名随契约终版再冻 |
 
-| ID | 问题 | 矛盾 / 缺口 | 建议默认 |
-|---|---|---|---|
-| **C1** | Agent-2 匹配**哪些池**的缺陷？ | 本文写「全部缺陷」；Agent-1 产出含 strict **主队列** + 旁路（hard_reject / needs_info / locatable_only / 安全） | **默认只匹配 `strict` 主队列**；旁路不进 CodeGraph（省 token）。若要对 locatable_only 做弱匹配，需显式开关 |
-| **C2** | `defect-batch` 顶层形状 | Agent-1 **未定义** JSON（扁票据 vs 簇数组）；Agent-2 按条匹配 | 约定：`{ schemaVersion, productLine, clusters[], tickets[] }`；`tickets[]` 为匹配真源；`clusters[]` 供上下文 |
-| **C3** | 字段名与簇 ID | 筛选文簇 ID=`{line}::{testModule}::{titleTag}::{intent}`；Agent-2 用 clusterId/titleTag | **对齐**筛选文；Agent-2 查询词用 ticket 上的 `testModule`/`titleTag`/`intent`/`title` |
-| **C4** | 「至少标题」过软 | Agent-1 对 strict 已产出模块/括注/意图 | 消费 Agent-1 时：**strict ticket 应带齐** `defectId,title,clusterId,testModule,titleTag,intent`；缺字段 → 输入校验 warn + A1 置信度封顶（不是静默「只有标题」） |
-| **C5** | `code-knowledge` 草案缺字段 | §5 有 `frameworkId`，§4 JSON 未挂；无 `schemaVersion`/`partial`/`secondaryHints`/`productLine`/`workDir` | 补：`schemaVersion, productLine, workDir, baseSha, partial?, secondaryHints?, specAtlas.frameworkId` |
-| **C6** | `partial=true` vs 索引「校验失败硬停」 | A5 允许部分产出；索引写 validate 失败不得下游 | **区分**：schema 合法的 partial 算通过校验；缺必填/类型错误才硬停。父图可读 `partial` 决定是否仍跑 Agent-3 |
-| **C7** | `baseSha` / git 前提 | 未写谁解析、非 git 仓怎么办 | Agent-2 bootstrap：`git rev-parse HEAD`；非 git → 输入校验失败（与「指定代码仓」一致） |
-| **C8** | 蒸馏正文是否进 Agent-2 | 匹配查询现为标题+tag+module+intent；Agent-1 有实际/期望/步骤 | **默认不灌全文**（防爆）；可选 `includeDigest=false`；需要时只带短 `observed/expected` 摘要字段 |
-| **C9** | 与 Agent-3 的最小交接 | 只写了 defectCodeMatches | 明确 Agent-3 **至少**依赖：`defectCodeMatches` + `cartographyProfile` + `modules` + `specAtlas.drDs`；其余可降级缺失 |
-
-**说明**：A 已拍完。C1–C9 释义见对话/下文，待你逐条点头后勾选。B 仍可延后。
+**收口**：A 已确认；C 除 C2/C3/C4（及 JSON 终版）外已定。Agent-2 主路径探讨可收；细节随实现与 Agent-1/3 联调补。
 
 ---
 
@@ -320,7 +328,6 @@ Agent-2 **段内**仍可拆节点（架构 vs 匹配），但对外仍是一个�
 | 日期 | 说明 |
 |---|---|
 | 2026-10-30 | 自三 Agent 合稿拆出 |
-| 2026-11-01 | 三形态 / CodeGraph / 按条匹配等 |
-| 2026-11-01 | SDD 封闭集；LangGraph + Claude Agent SDK；业务 Skill；松耦合 |
-| 2026-11-01 | §7.1 skill 确认；审阅 A/B/C |
-| 2026-11-01 | **A 组确认**：A2 无数量硬限；A6 可写仓 + `runtimeVerify` 开关与 skill 口子；其余按默认 |
+| 2026-11-01 | 三形态 / CodeGraph / 按条匹配；SDD；LangGraph+SDK；业务 Skill；松耦合 |
+| 2026-11-01 | §7.1 skill；A 组确认（无数量硬限；可写仓 + runtimeVerify） |
+| 2026-11-01 | **C 组**：C1 扩匹配池；C2/C3/C4 暂缓；C5/C6/C9 方向采纳；C7 多子仓非强制 git；C8 正文归 Agent-3 按条/worktree |

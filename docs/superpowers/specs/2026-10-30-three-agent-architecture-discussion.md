@@ -119,8 +119,11 @@ workflow┤                                              │
 | Agent-1 | Skill + 管线 |
 | Agent-2 | LangGraph 子图 + Claude Agent SDK（段内）；对外仍只暴露契约 |
 | Agent-2 CodeGraph | 用户仓内；跟 `CLAUDE.md` |
-| Agent-2 匹配 | 按条；**无数量硬限**（「~30」仅预估） |
-| 可修文案 | 待 Agent-3 |
+| Agent-2 匹配 | 按条；无数量硬限；池=`strict`+`locatable_only`+`needs_info` |
+| Agent-2 workDir | 根下可多子仓；不强制单一 git |
+| Agent-3 粒度 | **按条修复**；并发用 worktree；各自抽切片 |
+| 跨 Agent JSON | **终版不急**（Q-D 随实现） |
+| 可修文案 / 边界 | 待 Agent-3 专题（相对「止于报告」已放宽） |
 
 ---
 
@@ -129,7 +132,7 @@ workflow┤                                              │
 | ID | 问题 | 归属 |
 |---|---|---|
 | Q-B | 可修/不可修 vs confidence+suggestedAction | Agent-3 |
-| Q-D | 三份 artifact **schema 终版** + `schemaVersion` | 契约专文（优先） |
+| Q-D | 三份 artifact **schema 终版** + `schemaVersion` | 契约专文（**不急**；随实现） |
 | Q-F | 先正式规格再实现 | 当前：继续探讨 |
 
 ~~Q-E 同进程 vs 分服务~~ → **已收敛**：同仓可放，但**逻辑松耦合**；工作流只编排 + 校验，不合并 Agent。
@@ -146,3 +149,4 @@ workflow┤                                              │
 | 2026-11-01 | **工作流松耦合 + I/O 契约 + 进出固定脚本校验** |
 | 2026-11-01 | 明确一事一 Agent、不共享会话上下文；Agent-2 通用 skill 选型见专文 §7.1 |
 | 2026-11-01 | Agent-2 §7.1 通用 skill 清单确认按此落地 |
+| 2026-11-01 | Agent-2 A/C 收口要点入索引；Agent-3 按条修复；Q-D 不急 |

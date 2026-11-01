@@ -12,24 +12,26 @@
 
 | 项 | 倾向 |
 |---|---|
-| 输入 | `defect-batch` + `code-knowledge`（只传 artifact） |
-| 分析三层 | 定位 → 根因 → 修复方案（验证方案设计，不执行） |
-| 产出 | `analysis-report`（JSON + MD）；可行动 / 暂缓 / 非代码等说明 |
-| 产品边界 | 与 10-23 一致：**止于分析报告**；改码 / MR 留给下游 |
-| 运行时 | 真会话可能性最高（成本重心）；倾向与 Agent-2 同构（LangGraph + Claude Agent SDK，待拍） |
-| 业务 Skill | **允许注入**（`profiles: analyze` 等）；指导业务根因习惯、验收口径、禁忌改动面 |
-| 对外耦合 | **仅**消费已校验的 `defect-batch` + `code-knowledge`；产出已校验的 `analysis-report` |
-| I/O 校验 | 输入前双校验；输出后校验 report；失败不交付下游 |
+| 输入 | `defect-batch`（含蒸馏正文）+ `code-knowledge`（只传 artifact；**按条取用**） |
+| 执行粒度 | **一条缺陷一个修复会话**；不整批同上下文改码。并发上限以 **git worktree**（或等价隔离目录）多开，各自只抽该条所需 batch/knowledge 切片 |
+| 分析三层 | 定位 → 根因 → 修复方案（+验证；是否当场执行待拍，与 Agent-2 `runtimeVerify` 口子可对齐） |
+| 产出 | 分析报告 +（探讨方向）按条改码/交付结果；对外 JSON 终版不急 |
+| 产品边界 | **相对 10-23 放宽**：不只「止于报告」——Agent-3 承担按条修复；报告仍要双结局说明 |
+| 运行时 | 倾向 LangGraph + Claude Agent SDK（待专题拍）；会话预算按条核算 |
+| 业务 Skill | **允许注入**（`profiles: analyze` / fix）；指导根因习惯、验收、禁忌面、环境验证 |
+| 对外耦合 | 契约 I/O；跨 Agent schema **不急冻** |
 
 ---
 
-## 1. 三层分析
+## 1. 三层分析 + 按条修复
 
-1. **定位**（localization）——强制引用 `code-knowledge`（含 `defectCodeMatches`）+ `scopeHint`  
-2. **根因**（rootCause）——证据链可核查  
-3. **修复方案**（proposedFix + 验证方案设计，**不执行**）  
+1. **定位**（localization）——引用该条 `defectCodeMatches` + 模块/DR 切片（C9 方向）  
+2. **根因**（rootCause）——证据链可核查；蒸馏正文（实际/期望/步骤）在本段按条注入（C8）  
+3. **修复**（proposedFix → 改码；验证是否执行待拍）  
 
-报告双形态：机器 JSON + 人读 MD；交接字段保留 `ruledOut` / `openQuestions`（见 10-23）。
+**并发模型（已倾向）**：串行为默认心智模型；要吞吐则 **每缺陷独立 worktree**，禁止多缺陷共享同一脏工作树/同一超长会话。
+
+报告双形态仍保留；交接字段对齐 10-23 精神（`ruledOut` / `openQuestions` 等），schema 终版不急。
 
 ---
 
@@ -79,11 +81,13 @@ Skill **不**取消证据链与路径存在性等可计算降级（对齐 10-23 
 
 - [x] 允许用户注入业务特性 Skill（analyze profile）  
 - [x] 工作流独立单元；I/O 仅契约 + 固定脚本校验  
-- [ ] `analysis-report` schemaVersion 终版（跨段 Q-D）  
+- [x] **按条修复**；并发用 worktree；蒸馏正文在本段按条取用（自 Agent-2 C8）  
+- [ ] `analysis-report` / 修复结果 schema 终版（跨段 Q-D，**不急**）  
 - [ ] 对外「可修/不可修」vs `confidence` + `suggestedAction`  
-- [ ] 与 10-23 六段报告的字段差分表  
-- [ ] 运行时形态（LangGraph + SDK 是否与 Agent-2 同构；会话预算；按簇并发）  
-- [ ] 如何消费 Agent-2 的 `defectCodeMatches`（强制起点 vs 参考）  
+- [ ] 与 10-23 六段报告的字段差分；产品边界相对「止于报告」的正式表述  
+- [ ] 运行时：LangGraph + SDK 是否与 Agent-2 同构；会话预算；worktree 编排细节  
+- [ ] `defectCodeMatches`：强制起点 vs 参考；无候选时是否仍尝试修复  
+- [ ] 验证：是否执行、与 Agent-2 `runtimeVerify` / 业务 skill 如何分工  
 
 ---
 
@@ -92,5 +96,5 @@ Skill **不**取消证据链与路径存在性等可计算降级（对齐 10-23 
 | 日期 | 说明 |
 |---|---|
 | 2026-10-30 | 自三 Agent 合稿拆出（合稿中本节较薄，待深化） |
-| 2026-11-01 | 明确业务特性 Skill 可注入 |
-| 2026-11-01 | 松耦合工作流；双输入与 report 进出校验 |
+| 2026-11-01 | 业务 Skill；松耦合工作流 |
+| 2026-11-01 | **按条修复 + worktree 并发**；蒸馏正文归本段；相对 10-23「止于报告」放宽 |
