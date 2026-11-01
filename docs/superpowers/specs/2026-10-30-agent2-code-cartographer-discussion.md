@@ -16,7 +16,8 @@
 | 查找 | 仓内 **CodeGraph**；用法跟用户仓 **`CLAUDE.md`**，不另订发现协议 |
 | 匹配 | **按缺陷条目**；批次预估 ≤30 |
 | 产出 | `code-knowledge`（含架构、skill/SDD/DR·DS、`defectCodeMatches`） |
-| 运行时 | 相对 Agent-1 更像真会话；倾向 cartography **Skill + 只读会话**（待拍） |
+| SDD | **封闭已知集合**（几种固定框架）；通读仓内即可识别；不写死单一品牌，也不做成开放臆造 |
+| 运行时 | **推荐：LangGraph 编排 + Claude Agent SDK 会话**；Skill / MCP 为附着能力（§6 评估） |
 
 ---
 
@@ -137,56 +138,105 @@
 
 ---
 
-## 5. SDD / `.claude`（框架无关）
+## 5. SDD / `.claude`（封闭已知集 + 通读识别）
 
-- 不以 OpenSpec / Superpowers / Trellis 等品牌为准。  
-- `.claude` = 发现总线；`CLAUDE.md` / `AGENTS.md` 一并读。  
-- DR/DS 探测写入 `specAtlas.drDs`。  
+修正此前「完全不定品牌」的表述：
+
+| 原则 | 说明 |
+|---|---|
+| **不指定唯一** | 不以某一 SDD 为产品绑定 |
+| **集合固定** | 业务侧会出现的是**有限几种**（如 Superpowers / OpenSpec / Trellis / 自研变体等——**名单随样本仓冻结**） |
+| **通读识别** | 读 `CLAUDE.md`、`.claude/`、目录指纹即可判定命中哪一种；写入 `specAtlas.frameworkId` |
+| **未知** | 不在名单内 → `frameworkId=unknown` + 仍收录 paths；**禁止**模型编造新品牌名当权威 |
+
+`.claude` 仍是发现总线；DR/DS → `specAtlas.drDs`。
 
 | 字段 | 含义 |
 |---|---|
+| `frameworkId` | 封闭枚举之一或 `unknown`（名单待样本冻结） |
 | `source` | `claude_dir` \| `repo_root` \| `explicit` \| `follow_ref` |
 | `kind` | `guide` / `skill` / `rule` / `command` / `agent_def` / `doc_ref` / `dr` / `ds` / `unknown` |
-| `frameworkHint` | 可选弱提示，**不作**控制流 |
 
 ---
 
-## 6. Skills 注入
+## 6. 运行时评估：Skill+MCP vs Agent（结论）
 
-仓内 `.claude/skills` ∪ Run 额外注入 ∪ 本包 cartography 内置（通用 SOP）。  
-只读；`profiles: [cartography]`；挂载 **merge**。  
+固定约束：**编排 = LangGraph**；**会话内核 = `@anthropic-ai/claude-agent-sdk`（Claude Code SDK）**。  
+问题不是二选一「只要 Skill」或「只要 Agent」，而是 **Agent-2 节点里要不要上 SDK 会话**，以及 Skill/MCP 放哪一层。
 
-市场候选（选型未定）：repo-map、codebase-explainer、investigating-codebases、codebase-explorer、deep-research / code-investigator。慎用默认写目标仓的 cartographer 类。
+### 6.1 对照
 
-默认栈：
+| 方案 | 含义 | 对 Agent-2 |
+|---|---|---|
+| **A. 仅 Skill + MCP** | 宿主按 skill SOP 调 MCP；无（或极薄）自主会话 | 难扛「架构通读 + ≤30 条匹配」的探索环；阶段状态、重试、产物门禁弱 |
+| **B. 单次超长 SDK 会话** | 一个 query 做完全部 | 上下文易胀；架构与逐条匹配互相污染；不利缓存架构段 |
+| **C. LangGraph + SDK 会话（推荐）** | 图管阶段与 artifact；节点内 SDK 只读会话；Skill 注入 SOP；MCP/仓内工具按 `CLAUDE.md` | 与仓库已有双引擎定位一致；可拆「地图 / 匹配」 |
+
+### 6.2 为何 Agent-2 不宜学 Agent-1「纯 Skill+管线」
+
+Agent-1 主路径 **0 LLM、可复算规则** → Skill 只声明 SOP + 代码跑漏斗。  
+Agent-2 主路径是 **探索 + 推理 + 工具环**（读约定、判形态、认 SDD、CodeGraph 查询、逐条写匹配）→ 需要 **SDK Agent 会话**；Skill/MCP 是增强，替不了会话。
+
+### 6.3 推荐形状
 
 ```text
-读 CLAUDE.md（含 CodeGraph）+ 形态框架
-  + .claude / DR·DS
-  + defect-batch 逐条匹配
-  +（可选）repo-map / import graph
-  → code-knowledge.json
+LangGraph（Cartographer 子图）
+  ├─ node: bootstrap     读 CLAUDE.md / .claude；探测 profile + frameworkId（可轻量/规则+短会话）
+  ├─ node: map_arch      SDK 只读会话 → architecture / techStack / boundSkills / drDs
+  ├─ node: match_defect  按条（≤30）SDK 或短会话 + CodeGraph（用法跟 CLAUDE.md）
+  └─ node: synthesize    校验合并 → code-knowledge.json（zod）
+         ▲
+    Skills（cartography / 形态 SOP）  MCP 或仓内 CodeGraph 工具
 ```
+
+| 层 | 职责 |
+|---|---|
+| **LangGraph** | 阶段边、checkpoint、失败重试、与 run 目录 artifact 对齐 |
+| **Claude Agent SDK** | 节点内只读工具环（Read/Glob/Grep/Skill + 仓内声明的 CodeGraph） |
+| **Skills** | 通读 SOP、形态关注点、匹配写法；**不**单独当编排器 |
+| **MCP** | 若 `CLAUDE.md`/仓配置把 CodeGraph 等暴露为 MCP 则挂上；否则按仓内 CLI——**不强制本产品自建 CodeGraph MCP** |
+
+相对 Agent-1：`defect-batch-prepare` = Skill + 代码管线；Agent-2 = **图编排的 Cartographer Agent（SDK）** + Skill/MCP 附着。
+
+### 6.4 风险与约束
+
+- 匹配节点按条或小批，避免单会话塞满 30 条全文。  
+- 架构节点与匹配节点产物分离，便于 `baseSha` 缓存架构段。  
+- 只读：`disallow Edit/Write`（或写仅限 run 目录 artifact）。  
+- `mountSkillsIntoCwd` 对目标仓 **merge**。  
 
 ---
 
-## 7. 拍板状态
+## 7. Skills 注入（附着层）
+
+仓内 `.claude/skills` ∪ Run 额外注入 ∪ 本包 cartography 内置。  
+只读；`profiles: [cartography]`；挂载 **merge**。  
+
+市场候选（选型未定）：repo-map、codebase-explainer、investigating-codebases、codebase-explorer 等；CodeGraph 可用时脚本 map 为辅。
+
+---
+
+## 8. 拍板状态
 
 - [x] 匹配按条（≤~30）  
 - [x] CodeGraph 跟 `CLAUDE.md`，不另订发现协议  
 - [x] 三形态初步框架（§2）；细项待示例仓特化  
+- [x] SDD = 封闭已知集 + 通读识别（名单待样本冻结）  
+- [x] 运行时推荐：**LangGraph + Claude Agent SDK**；Skill/MCP 附着（§6）  
+- [ ] SDD `frameworkId` 封闭名单终版  
 - [ ] 单条匹配置信度规则  
-- [ ] 运行时：独立会话 vs cartography skill + 单次会话  
+- [ ] Cartographer 子图节点切分终版  
 - [ ] 缓存失效策略  
 - [ ] （阻塞特化）各形态业务示例仓  
 
-与现有代码：`repo-map.ts` 过薄；`mountSkillsIntoCwd` 需 merge。
+与现有代码：已有 `src/graph/*` + `sdk-runner.ts`；Cartographer 宜新子图，复用挂载/MCP 合并模式。`repo-map.ts` 过薄；`mountSkillsIntoCwd` 需 merge。
 
 ---
 
-## 8. 修订记录
+## 9. 修订记录
 
 | 日期 | 说明 |
 |---|---|
 | 2026-10-30 | 自三 Agent 合稿拆出 |
-| 2026-11-01 | 三形态 / CodeGraph / 按条匹配等（合稿内已记） |
+| 2026-11-01 | 三形态 / CodeGraph / 按条匹配等 |
+| 2026-11-01 | SDD 改为封闭已知集；运行时评估结论为 LangGraph + Claude Agent SDK |
