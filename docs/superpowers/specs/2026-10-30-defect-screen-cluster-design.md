@@ -13,11 +13,11 @@
 |---|---|
 | 主候选池 | **`strict`** = 过硬淘汰后 `verdict=FIXABLE` 且 `expectQuality ∈ {explicit, inferred}` |
 | 不设闸 | `anchorTier=L1` / `L1_strict` —— 仅作诊断指标与黄金对照集 |
-| 流程 | **R0 体检 → R1 拆池 → R2 硬淘汰 → R3 信息质量（含 strict 切割）→ R4 一级分簇 → R5 胖簇二级 → R6 排序** |
-| 分簇键 | 有 `测试模块` 用归一后的模块；无则标题前缀。**禁用 `所属模块`** |
-| 交付 | 漏斗表 + 簇表 + 逐条表（可复算） |
+| 流程 | **R0 体检 → R1 拆池 → R2 硬淘汰 → R3 信息质量（含 strict 切割）→ R4 三层分簇 → R5（可选）残胖兜底 → R6 排序** |
+| 分簇键 | **L1 `测试模块` → L2 标题 `【】`/`[]` → L3 AI 意图类别**（表字段 `type` 仅作先验）。**禁用 `所属模块`** |
+| 交付 | 漏斗表 + 簇表 + 逐条表（可复算；L3 带 `intentSource`） |
 
-一句话：筛的是「**测试语言里期望是否唯一**」，簇的是「**功能模块**」；技术落点留给有仓之后的步骤，不在本漏斗强求。
+一句话：筛的是「**测试语言里期望是否唯一**」（纯规则）；簇的是「**测试模块 → 标题括注 → 意图类别**」（前两层规则，第三层 AI）；技术落点留给有仓之后的步骤，不在本漏斗强求。
 
 ---
 
@@ -74,12 +74,16 @@ strict ⇔
   R2 硬淘汰 → hard_reject
   R3a 信息不足 → needs_info
   R3b 期望切割 → strict（主池）| locatable_only
-  R4 一级分簇（模块）
-  R5 胖簇二级（type / 实词）
+  R4 三层分簇（仅 strict）
+       L1 测试模块（规则）
+       L2 标题【】/[]（规则）
+       L3 缺陷意图（AI；表字段 type 作先验）
+  R5 可选：L3 后仍 oversized → 标题实词兜底或标 oversized
   R6 排序 → 有序簇队列
 ```
 
-规则细节（正则、profile、豁免）以 `_stage1-rules.md` 为唯一权威；本稿只定**轮次语义、入池边界、分簇策略与交付物**。
+规则细节（正则、profile、豁免）以 `_stage1-rules.md` 为唯一权威；本稿只定**轮次语义、入池边界、分簇策略与交付物**。  
+**边界**：进不进主池、L1/L2 结构键 → 纯规则；L3 意图类别 → AI（可复算落盘，低置信度 → `unclear`）。
 
 ---
 
@@ -132,40 +136,68 @@ R3 之后才允许分簇；**不对 hard_reject / needs_info 做业务簇统计*
 
 ---
 
-### R4 · 一级分簇（主池内）
+### R4 · 三层分簇（仅 strict 主池）
 
-| 产品线 | 簇键 | 归一 |
-|---|---|---|
-| hc / hcp / 配套 / hitools | `测试模块` | `normalizeTestModule`（剥版本/回归/端别后缀） |
-| led | 标题 `[...]` / `【...】` 前缀 | 剥离端侧修饰后再并 |
+三层是**固定分层键**，不是「择一优先级」。`所属模块` 禁用。  
+`locatable_only` 可选用同一 L1/L2 做对照表，但不进主队列、默认不跑 L3。
+
+#### L1 · 测试模块（规则）
+
+| 条件 | 键 |
+|---|---|
+| `测试模块` 非空 | `normalizeTestModule`（剥版本/回归/端别后缀） |
+| 缺失 | `_unmoduled`（仍进入 L2，不整条丢弃） |
 
 强制：
 
 1. **不读 `所属模块`**
-2. 端侧修饰合并：`（APP）`/`（H5）`/`（iOS）`/`（HPP Portal）` 等（坑 4）
-3. `MODULE_SEMANTIC_FREE` / `SEMANTIC_FREE_TAGS` → `semanticFree=true`，**不单独成业务主簇**；此类 strict 条进入 `misc/<标签>` 或并入「待人工归模块」桶
-4. `clusterFrom` 按线配置；键缺失时退回标题前缀
+2. 端侧修饰合并：`（APP）`/`（H5）`/`（iOS）`/`（HPP Portal）` 等
+3. `MODULE_SEMANTIC_FREE` / `SEMANTIC_FREE_TAGS` → `semanticFree=true`，进 `misc/<标签>` 或「待人工归模块」，**不单独成业务主簇**
+4. 与旧口径 `INV-2`（标题前缀 > 测试模块）的关系：Agent-1 **改为分层**——测试模块恒为 L1，标题括注恒为 L2，不再互相替代
 
-簇 ID 建议：`{productLine}::{normalizedModule}`。
+#### L2 · 标题 `【】` / `[]`（规则）
+
+1. 从标题提取首个（或配置约定的）`[...]` / `【...】` 前缀，归一（去端侧修饰）
+2. 无括注 → `_untagged`
+3. led 等「模块信号弱、标题括注强」的线：L1 可能大量 `_unmoduled`，L2 承担主业务面——仍保持两层字段，便于跨线统一 schema
+
+#### L3 · 缺陷意图（AI 意图识别）
+
+**目的**：在 L1×L2 桶内标「哪类问题」，供拆队列与下游路由；**不替代** R1–R3 硬规则。
+
+| 项 | 约定 |
+|---|---|
+| 输入 | 标题 + 蒸馏后的实际/期望/步骤 + 可选表字段 `type`（先验，非唯一真相） |
+| 输出 | `intent`（封闭枚举）+ `intentConfidence` + 短 `rationale` |
+| 来源标记 | `intentSource = ai \| field_fallback \| unclear` |
+| 低置信 | → `intent=unclear`，不硬塞类目 |
+| 批处理 | **按 L1×L2 桶批推理**（同桶多条一次请求），控成本 |
+| 表字段 `type` | 仅 prior / 审计；与 AI 冲突时以 AI 为准并留 `fieldType` 对照列 |
+
+意图枚举（首版探讨，可对齐 `CLS-*` 后冻结），示例：
+
+`ui_layout` / `i18n` / `logic` / `data_wrong` / `perf` / `compat` / `config` / `security_scan` / `unclear`
+
+小桶策略（配置项）：若某 L1×L2 已 ≤5 条，可「只打标、不因 L3 再拆队列」；默认仍写入 `intent` 供 R6/报告使用。
+
+簇 ID：
+
+```text
+{productLine}::{testModule}::{titleTag}::{intent}
+```
 
 ---
 
-### R5 · 胖簇二级切分
+### R5 · 残胖兜底（可选）
 
-**触发**（满足任一即切，只切主池 strict）：
+R4 之后若某终态簇仍满足胖阈值（`size/|strict| > 25%` 或 `size > 40`，或软上限 15～25）：
 
-- `size / |strict| > 25%`，或
-- `size > 40`
+1. 优先检查是否 L3 大量塌成 `unclear` / 单一 intent —— 先修类目或重跑意图，而非盲切  
+2. 仍胖 → 对该簇用**标题实词**（去前缀与端侧词后，长度 ≥2 的中/英 token 或稳定 2-gram）做兜底子桶  
+3. **禁止**用「实际结果全文相似度」做主细簇  
+4. 再胖 → `oversized=true`，交人工/后续，不再自动切
 
-**二级键（按序尝试）**：
-
-1. **`type`（E 组类型）** —— 默认；hitools / led / hcp 胖簇已验证有效  
-2. 若某一 type 子集仍触发胖阈值 → 对该子集用**标题实词**：去掉前缀与端侧词后，取长度 ≥2 的中文/英文 token，按高频 token 或简单 2-gram 归并  
-3. **禁止**用「实际结果全文相似度」做主细簇（实际段大量复读标题，会假合并）
-
-簇 ID：`{一级}::{type}` 或 `{一级}::{type}::{tokenBucket}`。
-
-**经验目标**：二级后单簇以可消化为准（建议软上限 15～25；超过则继续 token 切，或标 `oversized=true` 交人工拆）。
+簇 ID 追加：`…::{intent}::{tokenBucket}`（仅触发时）。
 
 ---
 
@@ -196,13 +228,15 @@ R3 之后才允许分簇；**不对 hard_reject / needs_info 做业务簇统计*
 
 > 数字由 `.run1029/*-detail.csv` 按本稿口径近似重算（排除 Cancel/Not a bug 后切 strict；与 `_run-1029` 全量口径可能差数条状态边界，以复跑脚本为准）。
 
-| 线 | 功能池约 | FIXABLE | **strict 主池** | L1_strict（仅统计） | 一级簇数 | 需 R5 的胖簇 |
+| 线 | 功能池约 | FIXABLE | **strict 主池** | L1_strict（仅统计） | 原「仅模块」一级簇数 | 新三层下的预期 |
 |---|---|---|---|---|---|---|
-| hitools | 636 | 620 | **~503（79%）** | 92 | 13 | `AI助手-智能配置` ~76%；`楼宇对讲` 可切 |
-| led | ~308 | ~298 | **~214（69%）** | 5 | 2 | `LED Tool-校正工具` ~97% → **必 R5** |
-| hcp | 209 | 193 | **~129（63%）** | 5 | 10 | `B02_BS_回放` ~44% → R5 |
-| hc | ~292 | ~245 | **~149（51%）** | 4 | 36 | 最大 ~18%，**可不强制 R5** |
-| 配套 | ~193 | ~152 | **~64（33%）** | 3 | 17 | `抓拍参数` ~38% → R5；semanticFree 多 |
+| hitools | 636 | 620 | **~503（79%）** | 92 | 13 | L2/L3 切开 `AI助手-智能配置` 等胖面；再胖走 R5 |
+| led | ~308 | ~298 | **~214（69%）** | 5 | 2 | L1 弱、L2 标题括注为主；L3 意图拆校正工具大盘 |
+| hcp | 209 | 193 | **~129（63%）** | 5 | 10 | L2+L3 处理 `B02_BS_回放` 类胖模块 |
+| hc | ~292 | ~245 | **~149（51%）** | 4 | 36 | 模块已较散，L3 多作打标；未必触发 R5 |
+| 配套 | ~193 | ~152 | **~64（33%）** | 3 | 17 | semanticFree + L2/L3；`抓拍参数` 视 L3 分布 |
+
+> 上表「一级簇数」仍是旧口径快照；三层落盘后需按 `testModule×titleTag×intent` 复跑刷新。
 
 **姿势 β（Open）粗估**（样本极少，仅示意）：hc strict≈5 / hcp≈10 / hitools≈7；led、配套本批 Open=0。
 
@@ -213,18 +247,21 @@ R3 之后才允许分簇；**不对 hard_reject / needs_info 做业务簇统计*
 ```
 每条产品线一次跑批 →
   funnel.csv          # 各轮留存 / 淘汰 reason 计数（α、β 分表或分列）
-  clusters.csv        # clusterId, level(1|2), size, openCount, typeMix, oversized, priority
+  clusters.csv        # clusterId, level(1|2|3), parentId, testModule, titleTag, intent,
+                      #   size, openCount, oversized, priority
   tickets.csv         # defectId, pool, roundDropped?, clusterId, expectQuality,
-                      #   anchorTier, strict, type, dlevel, priority, title
-  metrics.json        # 含 L1_strict 计数与占比（标明「非入池门槛」）
+                      #   anchorTier, strict, fieldType, intent, intentSource,
+                      #   intentConfidence, dlevel, priority, title
+  metrics.json        # 含 L1_strict 计数与占比（标明「非入池门槛」）；
+                      #   intent 分布与 ai/field_fallback/unclear 占比
 ```
 
 验收：
 
-- [ ] 主池定义与 §2 一致；无条目因非 L1 被拒入主池  
+- [ ] 主池定义与 §2 一致；无条目因非代码锚点 L1 被拒入主池  
 - [ ] 无 `所属模块` / 闭环字段参与判定或分簇  
-- [ ] 胖簇触发 R5；led / hitools 主簇切开后可指出二级分布  
-- [ ] α / β 两套分母不混报  
+- [ ] 分簇为 L1→L2→L3；筛池不含 AI；L3 有 `intentSource` 可审计  
+- [ ] 残胖触发 R5 或 `oversized`；α / β 两套分母不混报  
 - [ ] 与 `_stage1-rules` 冲突时改本稿或显式修订 rules，不双源
 
 ---
@@ -243,9 +280,9 @@ R3 之后才允许分簇；**不对 hard_reject / needs_info 做业务簇统计*
 
 ## 7. 后续（评审通过后再做）
 
-1. 按本稿口径出一版五线 `funnel/clusters/tickets`（可先脚本离线，不必进主包）  
-2. 冻结 led / hitools 的 R5 二级词表（若 type 仍过胖）  
-3. 若要进 Agent：另开规格定义 ingest ↔ strict 簇队列的接口（非本稿范围）
+1. 按本稿口径出一版五线 `funnel/clusters/tickets`（L1×L2 规则 + L3 AI；可先离线）  
+2. 冻结 L3 意图封闭枚举（对齐或取代散落的 `CLS-*` 叙事）  
+3. 若要进 Agent：另开规格定义 ingest ↔ strict 簇队列的接口（见三 Agent 探讨备忘）
 
 ---
 
@@ -253,7 +290,8 @@ R3 之后才允许分簇；**不对 hard_reject / needs_info 做业务簇统计*
 
 请确认或改正：
 
-1. 主池 = `strict`，L1 只统计 —— **已按你的结论写入**  
-2. R5 触发阈值：`>25%` 或 `>40` —— 是否要按线调整？  
-3. 二级默认先 `type` 再实词 —— 是否接受？  
-4. semanticFree 的 strict 条进 `misc` 还是强制人工归模块？
+1. 主池 = `strict`，代码锚点 L1 只统计 —— **已写入**  
+2. 分簇 = **测试模块 → 标题括注 → AI 意图** —— **已按讨论改写**  
+3. R5 残胖阈值：`>25%` 或 `>40` —— 是否按线调整？  
+4. semanticFree 的 strict 条进 `misc` 还是强制人工归模块？  
+5. L3 意图枚举首版是否采用 §R4 示例集？
