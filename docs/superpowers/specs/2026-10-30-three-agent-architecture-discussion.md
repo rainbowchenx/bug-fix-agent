@@ -17,7 +17,7 @@
 | 整体切分 | **三个独立 Agent**，用结构化 artifact 衔接，不传原始对话 |
 | Agent-1 | **能力边界**含拉取+筛选+分簇；运行时倾向 **Skill + 规则管线**，不必独立长会话 Agent（见 §2.5） |
 | 拉取 | **纳入范围**，与后续步骤**解耦**：`IngestAdapter`（**MCP 为准**，爬虫为备）；产出 `raw-defects` 再进蒸馏 |
-| Agent-2 | 对用户指定目录通读 → 架构/模块知识包 → **可跨 run 缓存共享** |
+| Agent-2 | 持 `defect-batch` 通读指定仓；三形态（electron/微前端/设备 Web）；CodeGraph 主查找；产出含缺陷匹配的 `code-knowledge` |
 | Agent-3 | 消费 ①+② → 定位 / 根因 / 修复方案 → 可行动与不可行动报告 |
 | Orchestrator | 仍为确定性代码；三 Agent 是可注入阶段，不是互相聊天的 chatbot |
 | 产品边界 | 与 10-23 一致倾向：**本产品止于分析报告**；改码/MR 留给下游（待与「可修/不可修」文案对齐） |
@@ -179,111 +179,146 @@ src/pipeline/{distill,screen,cluster-*}  ← 规则管线
 
 ## 3. Agent-2：代码通读（Code Cartographer）
 
-### 3.1 职责
+### 3.1 职责与输入
 
 对用户指定目录（git 仓）做只读理解，产出可共享的 `code-knowledge`，供 Agent-3 与后续 run 复用。
 
-建议产物形态（探讨）：
+**输入（相对初稿补充）**：
+
+| 输入 | 说明 |
+|---|---|
+| `workDir` / 仓路径 | 用户指定代码目录 |
+| **上一轮 `defect-batch`** | 持有已分类的**全部**缺陷（至少标题；建议带 clusterId / testModule / titleTag / intent） |
+| 可选 extras | 额外 cartography skills、显式 `specPaths` |
+
+目的不只是「画仓库地图」，而是同时完成：
+
+1. **技术架构 / 技术栈**（见 §3.2 三种形态）  
+2. **已绑定 skill**、**已使用 SDD**、**开发约定**（`.claude` 发现总线）  
+3. **需求文档 DR/DS 位置**（如有；框架无关探测 + 路径收录）  
+4. **缺陷 ↔ 代码匹配**（用标题/簇键 + CodeGraph 快速定位候选）  
+
+### 3.2 业务线代码三种形态（Cartography Profile）
+
+通读策略按形态分流（与旧「install/verify 用 Stack Profile」正交；此处是**理解策略**，不假设要起服务）：
+
+| Profile | 典型 | 通读关注点 |
+|---|---|---|
+| **`electron_node`** | Electron + Node 全栈客户端，或 Node 后端（如 led） | 主/渲染/preload 边界、IPC、主进程入口、打包配置；可复用既有 `electron-process-boundary` 类知识 |
+| **`micro_frontend`** | 公司自研微前端（**single-spa** 基座） | 根配置 / 应用注册表、子应用入口、共享依赖与路由前缀、跨应用通信；按子应用目录分模块图 |
+| **`device_web`** | 设备 Web：Web 技术嵌入设备（如监控摄像头页） | 嵌入宿主约束、设备 API/桥、资源体积与离线、与桌面 Web 不同的路由/权限假设 |
+
+探测：`package.json` 依赖（`electron` / `single-spa`）、目录约定、`.claude` 自述、构建配置；命中多个时记 `primaryProfile` + `secondaryHints`，**不强行互斥丢信息**。
+
+> 旧包内 `node-web` / `node-lib` / `electron` 仍可能服务验证侧；Agent-2 的三种形态是**业务现实分类**，实现时可映射或并行扩展。
+
+### 3.3 CodeGraph（默认能力）
+
+**共识**：业务仓**基本都装有 CodeGraph**，用于快速查找代码。
+
+| 项 | 约定 |
+|---|---|
+| 角色 | Agent-2 **优先**用 CodeGraph 做符号/引用/「谁实现 X」检索；Glob/Grep/Read 为兜底 |
+| 接入 | 倾向 MCP 或仓内既有工具链；具体工具名待对接时补契约 |
+| 降级 | CodeGraph 不可用 → 记 `capabilities.codeGraph=false`，退回脚本 map + Grep；不阻断整批，但缺陷匹配置信度上限下调 |
+| 与缺陷匹配 | 用缺陷标题 / titleTag / 模块词作查询，把命中写回 `defectCodeMatches[]`（见产物） |
+
+### 3.4 产物形态（探讨修订）
 
 ```jsonc
 {
   "baseSha": "…",
-  "modules": [{ "name", "dirs", "entryPoints", "dependsOn", "specRefs" }],
-  "routes": [],
-  "i18nIndex": {},
-  "hotPaths": [],
+  "cartographyProfile": "electron_node" | "micro_frontend" | "device_web" | "unknown",
+  "techStack": { "languages": [], "frameworks": [], "notes": "" },
+  "architecture": { "summary": "", "entryPoints": [], "modules": [] },
+  "conventions": { "fromClaudeMd": [], "fromRules": [] },
+  "boundSkills": [ /* 仓内 .claude/skills 元数据 */ ],
   "specAtlas": {
-    "entries": [ /* 见 §3.2 */ ],
+    "entries": [ /* guide/skill/rule/doc_ref；含 DR/DS 若发现 */ ],
+    "drDs": [{ "path": "", "kind": "DR|DS|unknown", "moduleHint": null }],
     "bindings": [ /* spec ↔ module/code */ ]
-  }
+  },
+  "capabilities": { "codeGraph": true },
+  "defectCodeMatches": [
+    {
+      "defectId": "", "clusterId": "", "title": "",
+      "candidates": [{ "path": "", "symbol": "", "why": "", "source": "codegraph|grep" }],
+      "confidence": "high|medium|low"
+    }
+  ]
 }
 ```
 
-缓存键倾向：`baseSha` + 指南/`.claude` 内容哈希 + 注入 skill 集合。
+缓存键倾向：`baseSha` + `.claude`/指南哈希 + 注入 skill 集合 + **`defect-batch` 内容哈希**（缺陷集变则匹配段失效；纯架构段可按 sha 复用）。
 
-### 3.2 SDD / 项目约定：框架无关发现
+### 3.5 SDD / 项目约定：框架无关发现
 
-**共识（已强调多次）**：
+**共识**：
 
-- SDD 形态很多（OpenSpec、Superpowers、Trellis、自研……），**禁止**做成品牌白名单主路径。  
-- 一般约定与 skills **集中在用户指定仓的 `.claude/`**（另加根目录 `CLAUDE.md` 等 Claude 生态惯例文件）。  
-- `.claude` 是**发现总线**；具体 SDD 是总线上的乘客。
-
-探测姿态：
+- SDD 形态很多（OpenSpec、Superpowers、Trellis、自研……），**禁止**品牌白名单主路径。  
+- 约定与 skills **集中在仓内 `.claude/`**（+ 根目录 `CLAUDE.md` 等）。  
+- `.claude` = **发现总线**；具体 SDD 是乘客。  
+- **DR/DS**：按路径/命名/文档索引探测并写入 `specAtlas.drDs`，不假设唯一目录约定。
 
 ```text
 {repo}/CLAUDE.md | AGENTS.md（若存在）
-{repo}/.claude/
-  skills/**/SKILL.md
-  rules/**
-  commands/** | agents/** | settings*.json
-  …任意自定义结构 → 一律收录，kind=unknown 亦可
+{repo}/.claude/   skills | rules | commands | agents | settings | …
+需求/设计：DR、DS 及文档内相对路径引用（二次展开）
 ```
-
-索引字段倾向：
 
 | 字段 | 含义 |
 |---|---|
 | `source` | `claude_dir` \| `repo_root` \| `explicit` \| `follow_ref` |
-| `kind` | `guide` / `skill` / `rule` / `command` / `agent_def` / `doc_ref` / `unknown` |
-| `frameworkHint` | **可选弱提示**，允许 `null`；**不得**作为控制流分支 |
+| `kind` | `guide` / `skill` / `rule` / `command` / `agent_def` / `doc_ref` / `dr` / `ds` / `unknown` |
+| `frameworkHint` | 可选弱提示，**不得**作控制流分支 |
 
-从清单内的相对路径再展开到真实 spec/需求（二次发现）。`business.specPaths` / 显式路径为最高优先覆盖。
+### 3.6 Skills 注入与形态（相对 Agent-1）
 
-### 3.3 Skills 注入
+三路来源：仓内 `.claude/skills` ∪ Run 额外注入 ∪ 本包 cartography 内置（通用 SOP，不教具体 SDD 品牌）。
 
-三路来源（同名策略待定；倾向用户/仓覆盖内置）：
+约束：只读工具；`profiles: [cartography]`；挂载 **merge** 不清空仓内 skills。
 
-1. **仓内** `{repo}/.claude/skills`  
-2. **Run 额外注入** `extras.skillsDir` / skill 列表  
-3. **本包 cartography 内置**——只保留通用 SOP（如何遍历 `.claude`、追文档引用、写 modules/bindings），**不教某个 SDD 产品**
+**与 Agent-1 的差异（待拍）**：Agent-2 含架构理解 + 缺陷匹配，更可能需要**真会话**；CodeGraph + 仓内 skill 是主力。是否也收成「一个 cartography skill + 短会话」、还是独立 Cartographer Agent，探讨中倾向于：
 
-约束：
+- SOP 用 skill（如 `code-cartography`）声明；  
+- 执行上仍是一次（或按形态一次）只读 SDK 会话；  
+- **不是**纯 0-LLM 管线（与 Agent-1 不同）。
 
-- 会话只读：`Read` / `Glob` / `Grep` / `Skill`；无 Edit。  
-- `profiles: [cartography]`，与修复向 skill 隔离。  
-- 挂载时应对仓内 `.claude/skills` **merge 而非清空**（现有 `mountSkillsIntoCwd` 的 `rm` 整树行为在 Cartographer 路径需改）。
-
-### 3.4 市场 skill 调研（2026-10-30，选型未定）
+### 3.7 市场 skill 调研（2026-10-30，选型未定）
 
 检索范围：Cult of Claude、skills.sh、agentskills、GitHub、LobeHub 等。
 
-#### 较适合 Agent-2 的候选
+#### 较适合的候选
 
 | 层 | Skill | 来源 | 备注 |
 |---|---|---|---|
-| 确定性地图 | **repo-map** | [pm-claude-skills/repo-map](https://github.com/mohitagw15856/pm-claude-skills/blob/main/skills/repo-map/SKILL.md) | 树 + 行数 + 顶层符号；先 map 再开文件；与现有 `repo-map.ts` 同构 |
-| 确定性地图 | **codebase-explainer** | [milad-ahmd/agent-skills](https://milad-ahmd.github.io/agent-skills/skills/codebase-explainer/) | 真实 import graph → JSON；可喂 `dependsOn` |
-| 理解 SOP | **investigating-codebases** | [investigating-codebases/SKILL.md](https://github.com/C0ntr0lledCha0s/claude-code-plugin-automations/blob/main/research-agent/skills/investigating-codebases/SKILL.md) | 轻量侦察流程；易裁成只读 |
-| 理解 SOP | **codebase-explorer** | [quicksilversurfer/codebase-explorer](https://github.com/quicksilversurfer/codebase-explorer) | archetype + 纵向切片 + smell |
-| 理解 SOP | **codebase-deep-research** | [skills.sh](https://www.skills.sh/bleedingdev/training-skills/codebase-deep-research) | 多角度 + 主张需文件证据 |
-| 理解 SOP | **code-investigator** | [skills.sh](https://www.skills.sh/atman-33/skills/code-investigator) | 证据链 / Mermaid / confirmed vs unknown |
+| 确定性地图 | **repo-map** | [pm-claude-skills/repo-map](https://github.com/mohitagw15856/pm-claude-skills/blob/main/skills/repo-map/SKILL.md) | 树 + 符号；与 `repo-map.ts` 同构；**CodeGraph 可用时降为辅** |
+| 确定性地图 | **codebase-explainer** | [milad-ahmd/agent-skills](https://milad-ahmd.github.io/agent-skills/skills/codebase-explainer/) | import graph → JSON |
+| 理解 SOP | **investigating-codebases** | [investigating-codebases](https://github.com/C0ntr0lledCha0s/claude-code-plugin-automations/blob/main/research-agent/skills/investigating-codebases/SKILL.md) | 轻量侦察 |
+| 理解 SOP | **codebase-explorer** | [quicksilversurfer/codebase-explorer](https://github.com/quicksilversurfer/codebase-explorer) | archetype + 纵向切片 |
+| 理解 SOP | **codebase-deep-research** / **code-investigator** | skills.sh | 证据链导向 |
 
-#### 可选增强（重，慎用）
+#### 慎用 / 不建议作主路径
 
-| Skill / 产品 | 来源 | 风险 |
-|---|---|---|
-| cartographer | [kingbootoshi/cartographer](https://github.com/kingbootoshi/cartographer) | 默认写目标仓 `docs/CODEBASE_MAP.md` / 改 `CLAUDE.md`；依赖子 agent |
-| Understand-Anything | [Lum1104/Understand-Anything](https://github.com/Lum1104/Understand-Anything) | 知识图谱能力强；与「落盘 JSON 交接」耦合重 |
-| mapping-codebases | [oaustegard/claude-skills](https://github.com/oaustegard/claude-skills/tree/main/mapping-codebases) | AST map 好，但易在仓内撒 `_MAP.md` |
-| Archify / AOCI | Cult of Claude 等 | 可视化 IR / 持久索引；不适合 MVP 主干 |
+cartographer（默认写目标仓）、Understand-Anything（耦合重）、explore-repo（多 teammate）、默认 Write 进仓的 map skill。
 
-#### 不太建议作主 skill
-
-- **explore-repo**（多 teammate / `TeamCreate`）——与本包 SDK 会话模型不合  
-- **understand-codebase-architecture**（交互 HTML）——偏人读，非 Agent-3 机器契约  
-- 任何默认 **Write 进目标仓** 的 map skill——须改输出到 run 目录后方可考虑  
-
-#### 探讨中的默认栈（未拍板）
+探讨中的默认栈：
 
 ```text
-确定性: repo-map 脚本 + codebase-explainer import graph
-     ↓
-模型 SOP: investigating-codebases / codebase-explorer（精简移植）
-     + 仓内 .claude skills
-     ↓
-落盘: code-knowledge.json
+CodeGraph（主查找）+ 形态探测（electron_node|micro_frontend|device_web）
+  + .claude / DR·DS 发现
+  + defect-batch 标题 → 匹配候选
+  +（可选）repo-map / import graph 补全
+  → code-knowledge.json（含 defectCodeMatches）
 ```
+
+### 3.8 Agent-2 待拍板
+
+- [ ] 三种形态的探测规则与 skill 条件暴露表  
+- [ ] CodeGraph MCP/工具契约  
+- [ ] `defectCodeMatches` 粒度（每条 vs 每簇）与置信度规则  
+- [ ] 运行时：独立会话 Agent vs「cartography skill + 单次会话」  
+- [ ] 架构段缓存与缺陷匹配段失效策略  
 
 ---
 
@@ -358,3 +393,4 @@ src/pipeline/{distill,screen,cluster-*}  ← 规则管线
 | 2026-11-01 | Agent-1 分簇改为 L1 测试模块 → L2 标题括注 → L3 AI 意图；补全 Agent-1 端到端流程；同步筛选分簇文 R4/R5 |
 | 2026-11-01 | 拉取纳入（MCP 准/爬虫备）且与后续解耦；结论：Agent-1 宜 Skill+规则管线，不必独立长会话 Agent |
 | 2026-11-01 | **Agent-1 探讨收口**（用户确认）；遗留仅枚举/MCP 字段契约等实现前细节 |
+| 2026-11-01 | Agent-2 补充：三形态、持全部缺陷标题、DR/DS、CodeGraph 主查找、缺陷↔代码匹配 |
