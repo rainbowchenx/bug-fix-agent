@@ -223,7 +223,9 @@ LangGraph（Cartographer 子图）
 
 只读；`profiles: [cartography]`；挂载 **merge**。业务 skill **指导**匹配偏置与目录习惯，**不**改 `code-knowledge` zod 门禁。
 
-### 7.1 通用通读 Skill 选型（建议）
+### 7.1 通用通读 Skill 选型（**已确认**，按此落地）
+
+> 2026-11-01 确认：先按本表内置/裁剪移植；业务 skill 仍可叠加注入。
 
 前提：仓内 **CodeGraph**（跟 `CLAUDE.md`）已是主查找；通用 skill 只补「怎么通读 / 怎么写知识包」，不要再上重型全仓写文档类 skill。
 

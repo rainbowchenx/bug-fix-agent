@@ -18,7 +18,7 @@
 | 段 | 文档 | 状态 |
 |---|---|---|
 | **Agent-1** 缺陷批次准备 | [2026-10-30-agent1-defect-batch-discussion.md](2026-10-30-agent1-defect-batch-discussion.md) | **已收口**（Skill + 管线；MCP 拉取解耦；L1→L2→L3 分簇） |
-| **Agent-2** 代码通读 | [2026-10-30-agent2-code-cartographer-discussion.md](2026-10-30-agent2-code-cartographer-discussion.md) | 探讨中（三形态；SDD 封闭集；LangGraph + Claude Agent SDK） |
+| **Agent-2** 代码通读 | [2026-10-30-agent2-code-cartographer-discussion.md](2026-10-30-agent2-code-cartographer-discussion.md) | 主路径已定（通读+匹配+Skill 清单）；细项待样本/schema |
 | **Agent-3** 缺陷分析报告 | [2026-10-30-agent3-defect-analyst-discussion.md](2026-10-30-agent3-defect-analyst-discussion.md) | 探讨中（内容较薄，待深化） |
 
 ---
