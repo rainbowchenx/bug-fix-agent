@@ -26,7 +26,7 @@
 ### 1.1 范围
 
 - 五条产品线缺陷（Excel / **MCP 拉取** / 爬虫落盘后的同结构行）的**分析漏斗**
-- 输入：以 **`raw-defects` 为界**（创建时刻可用字段，见 `_stage1-rules.md` S0）；拉取适配器不在本稿展开，见三 Agent 探讨备忘 §2.2
+- 输入：以 **`raw-defects` 为界**（创建时刻可用字段，见 `_stage1-rules.md` S0）；拉取适配器不在本稿展开，见 [Agent-1 探讨](2026-10-30-agent1-defect-batch-discussion.md) §2
 - 输出：有序的 **strict 簇队列** + 旁路池（安全 / 硬淘汰 / 信息不足 / locatable_only）
 
 ### 1.2 非目标（本稿不做）
@@ -284,7 +284,7 @@ R4 之后若某终态簇仍满足胖阈值（`size/|strict| > 25%` 或 `size > 4
 
 1. 按本稿口径出一版五线 `funnel/clusters/tickets`（L1×L2 规则 + L3 AI；可先离线）  
 2. 冻结 L3 意图封闭枚举（对齐或取代散落的 `CLS-*` 叙事）  
-3. 若要进 Agent：另开规格定义 ingest ↔ strict 簇队列的接口（见三 Agent 探讨备忘）
+3. 若要进 Agent：另开规格定义 ingest ↔ strict 簇队列的接口（见 [Agent-1 探讨](2026-10-30-agent1-defect-batch-discussion.md) / [架构索引](2026-10-30-three-agent-architecture-discussion.md)）
 
 ---
 
