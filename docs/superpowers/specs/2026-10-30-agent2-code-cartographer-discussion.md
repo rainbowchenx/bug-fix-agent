@@ -1,7 +1,8 @@
 # Agent-2 探讨：代码通读（Code Cartographer）
 
-> 日期：2026-10-30（2026-11-01 修订）  
-> 状态：**探讨中**（非正式规格）  
+> 日期：2026-10-30  
+> **最近修订：2026-11-01 23:24（Asia/Shanghai）**  
+> 状态：**主路径已收口**（非正式规格；C2/C3/C4 与 JSON 终版暂缓）  
 > 索引：[三 Agent 架构索引](2026-10-30-three-agent-architecture-discussion.md)  
 > 上游：[Agent-1](2026-10-30-agent1-defect-batch-discussion.md) · 下游：[Agent-3](2026-10-30-agent3-defect-analyst-discussion.md)
 
@@ -331,3 +332,4 @@ Agent-2 **段内**仍可拆节点（架构 vs 匹配），但对外仍是一个�
 | 2026-11-01 | 三形态 / CodeGraph / 按条匹配；SDD；LangGraph+SDK；业务 Skill；松耦合 |
 | 2026-11-01 | §7.1 skill；A 组确认（无数量硬限；可写仓 + runtimeVerify） |
 | 2026-11-01 | **C 组**：C1 扩匹配池；C2/C3/C4 暂缓；C5/C6/C9 方向采纳；C7 多子仓非强制 git；C8 正文归 Agent-3 按条/worktree |
+| 2026-11-01 23:24 Asia/Shanghai | 时间戳标注；随三 Agent 探讨 PR 同步 |

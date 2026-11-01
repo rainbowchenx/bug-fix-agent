@@ -1,6 +1,7 @@
 # Agent-1 探讨：缺陷批次准备（拉取 / 筛选 / 分簇）
 
-> 日期：2026-10-30（2026-11-01 修订）  
+> 日期：2026-10-30  
+> **最近修订：2026-11-01 23:24（Asia/Shanghai）**  
 > 状态：**Agent-1 探讨已收口**（非正式规格；实现前细节见文末）  
 > 索引：[三 Agent 架构索引](2026-10-30-three-agent-architecture-discussion.md)  
 > 漏斗细则：[缺陷单多轮筛选与分簇设计](2026-10-30-defect-screen-cluster-design.md)  
@@ -155,3 +156,4 @@ src/pipeline/{distill,screen,cluster-*}
 | 2026-11-01 | 分簇 / 拉取 / Skill+管线收口（合稿内已确认） |
 | 2026-11-01 | 明确业务特性 Skill 可注入 |
 | 2026-11-01 | 松耦合工作流；defect-batch 进出校验 |
+| 2026-11-01 23:24 Asia/Shanghai | 时间戳标注；随三 Agent 探讨 PR 同步 |

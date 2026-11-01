@@ -1,7 +1,8 @@
 # Agent-3 探讨：缺陷分析与按条修复
 
-> 日期：2026-10-30（2026-11-01 专题深化）  
-> 状态：**探讨中**（非正式规格）  
+> 日期：2026-10-30  
+> **最近修订：2026-11-01 23:24（Asia/Shanghai）**  
+> 状态：**探讨中**（非正式规格；D1–D10 待拍）  
 > 索引：[三 Agent 架构索引](2026-10-30-three-agent-architecture-discussion.md)  
 > 上游：[Agent-1](2026-10-30-agent1-defect-batch-discussion.md) · [Agent-2](2026-10-30-agent2-code-cartographer-discussion.md)  
 > 对照：[报告型分析 Agent 设计](2026-10-23-report-agent-design.md)（10-23）· [本地 BugFix 设计](2026-10-14-local-bugfix-agent-design.md)（10-14）  
@@ -235,3 +236,4 @@ Agent-2 若已写出环境笔记到 `code-knowledge`（可选字段，终版不�
 | 2026-11-01 | 业务 Skill；松耦合；按条修复 + worktree；相对止于报告放宽 |
 | 2026-11-01 | **专题深化**：流程/运行时/双结局/验证分工/matches 软起点；D/E 拍板清单 |
 | 2026-11-01 | **§1.1**：明示 Agent-3 须参考仓内既有分析/对比文档（流水线/报告/缺口/调研/Phase A·B 等） |
+| 2026-11-01 23:24 Asia/Shanghai | 时间戳标注；随三 Agent 探讨 PR 同步 |
