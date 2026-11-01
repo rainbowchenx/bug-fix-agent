@@ -214,14 +214,16 @@ src/pipeline/{distill,screen,cluster-*}  ← 规则管线
 
 ### 3.3 CodeGraph（默认能力）
 
-**共识**：业务仓**基本都装有 CodeGraph**，用于快速查找代码。
+**共识**：CodeGraph **安装在用户仓库代码中**（目标 `workDir` 内），不是本产品外挂的独立服务；通读时在仓内发现并调用其既有入口（CLI/脚本/本地 MCP 等，以仓内实际为准）。
 
 | 项 | 约定 |
 |---|---|
-| 角色 | Agent-2 **优先**用 CodeGraph 做符号/引用/「谁实现 X」检索；Glob/Grep/Read 为兜底 |
-| 接入 | 倾向 MCP 或仓内既有工具链；具体工具名待对接时补契约 |
-| 降级 | CodeGraph 不可用 → 记 `capabilities.codeGraph=false`，退回脚本 map + Grep；不阻断整批，但缺陷匹配置信度上限下调 |
-| 与缺陷匹配 | 用缺陷标题 / titleTag / 模块词作查询，把命中写回 `defectCodeMatches[]`（见产物） |
+| 位置 | **用户仓内**；探测路径/调用方式随仓约定（可读 `.claude`、README、package scripts） |
+| 角色 | Agent-2 **优先**用仓内 CodeGraph 做符号/引用/「谁实现 X」检索；Glob/Grep/Read 为兜底 |
+| 降级 | 仓内未找到或调用失败 → `capabilities.codeGraph=false`，退回脚本 map + Grep；不阻断整批，匹配置信度上限下调 |
+| 与缺陷匹配 | **按缺陷条目**匹配（见下）；用标题 / titleTag / 模块词查询，写入 `defectCodeMatches[]` |
+
+**匹配粒度（已确认）**：**每条缺陷一条** `defectCodeMatches` 记录。批次规模小（**预估每次最多约 30 条**），不按簇折叠，避免同簇多症状被平均掉。
 
 ### 3.4 产物形态（探讨修订）
 
@@ -312,13 +314,15 @@ CodeGraph（主查找）+ 形态探测（electron_node|micro_frontend|device_web
   → code-knowledge.json（含 defectCodeMatches）
 ```
 
-### 3.8 Agent-2 待拍板
+### 3.8 Agent-2 拍板状态
 
+- [x] `defectCodeMatches` **按条**（非按簇）；批次规模预估 ≤30  
+- [x] CodeGraph **在用户仓库内**，通读时仓内发现/调用（非本产品外挂中心服务）  
 - [ ] 三种形态的探测规则与 skill 条件暴露表  
-- [ ] CodeGraph MCP/工具契约  
-- [ ] `defectCodeMatches` 粒度（每条 vs 每簇）与置信度规则  
+- [ ] 仓内 CodeGraph 的发现约定（常见入口/脚本名，实现前按样本仓补）  
+- [ ] 单条匹配置信度规则  
 - [ ] 运行时：独立会话 Agent vs「cartography skill + 单次会话」  
-- [ ] 架构段缓存与缺陷匹配段失效策略  
+- [ ] 架构段缓存与缺陷匹配段失效策略（缺陷集 ≤30 时匹配段可随 batch 全量重算）  
 
 ---
 
@@ -370,7 +374,7 @@ CodeGraph（主查找）+ 形态探测（electron_node|micro_frontend|device_web
 |---|---|---|
 | Q-A | 缺陷拉取是否进入 Agent-1 | 凭据仍不进模型上下文 |
 | Q-B | 报告结论：可修/不可修 vs confidence+suggestedAction | 见 §4.2 |
-| Q-C | Agent-2 默认采用哪些市场 skill（移植清单） | 见 §3.4 |
+| Q-C | Agent-2 默认采用哪些市场 skill（移植清单） | 见 §3.7；CodeGraph 仓内优先 |
 | Q-D | `code-knowledge` / `defect-batch` / `analysis-report` 最终 schema | 探讨后单开契约文 |
 | Q-E | 三 Agent 同进程阶段 vs 分进程/分服务 | 影响部署与缓存 |
 | Q-F | 是否先写正式规格再实现，还是边定契约边开 PR | 当前明确：**继续探讨，不实现** |
@@ -394,3 +398,4 @@ CodeGraph（主查找）+ 形态探测（electron_node|micro_frontend|device_web
 | 2026-11-01 | 拉取纳入（MCP 准/爬虫备）且与后续解耦；结论：Agent-1 宜 Skill+规则管线，不必独立长会话 Agent |
 | 2026-11-01 | **Agent-1 探讨收口**（用户确认）；遗留仅枚举/MCP 字段契约等实现前细节 |
 | 2026-11-01 | Agent-2 补充：三形态、持全部缺陷标题、DR/DS、CodeGraph 主查找、缺陷↔代码匹配 |
+| 2026-11-01 | Agent-2：匹配按条（≤~30）；CodeGraph 位于用户仓内 |
