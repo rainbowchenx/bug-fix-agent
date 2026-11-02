@@ -1,8 +1,8 @@
 # Agent-3 探讨：缺陷分析与按条修复
 
 > 日期：2026-10-30  
-> **最近修订：2026-11-02 08:42（Asia/Shanghai）**  
-> 状态：**探讨中**（非正式规格；D1/D2/D3/D5 已拍，其余 D 待确认）  
+> **最近修订：2026-11-02 08:48（Asia/Shanghai）**  
+> 状态：**探讨中**（非正式规格；**D 组已收口**；E 组可延后）  
 > 索引：[三 Agent 架构索引](2026-10-30-three-agent-architecture-discussion.md)  
 > 上游：[Agent-1](2026-10-30-agent1-defect-batch-discussion.md) · [Agent-2](2026-10-30-agent2-code-cartographer-discussion.md)  
 > 对照：[报告型分析 Agent 设计](2026-10-23-report-agent-design.md)（10-23）· [本地 BugFix 设计](2026-10-14-local-bugfix-agent-design.md)（10-14）  
@@ -15,14 +15,11 @@
 | 项 | 倾向 |
 |---|---|
 | 职责（**D1**） | **按条主做分析**：定位 → **根因** → **修复方案** →（可行动则）产出 **代码 patch** |
-| 报告（**D2**） | **每票完整报告**（单信息+根因+方案或分类不可修原因）；`needs_test_env` / `needs_ticket_info`（含补什么）等须区分 |
-| 输入 | `defect-batch`（含蒸馏正文）+ `code-knowledge`；只传 artifact；按条切片 |
-| 粒度 | 一条一会话；并发可用 worktree |
-| 相对 10-23 | 仍以分析报告为核心；**额外产出 patch**（非 BOUND-1 纯报告）；保留路由/举证纪律 |
-| 相对 10-14 | 对齐全自动、双结局；**不沿用「没有 GREEN 就没有成功交付」**（见 D3/D5） |
-| 验证（**D5**） | **不强制本地验证环境**（业务环境复杂、常无法本机拉起）；验证为可选增强，缺省可完全跳过 |
-| 运行时 | LangGraph + Claude Agent SDK（待 D8 确认） |
-| 业务 Skill | 可注入（`analyze` / `fix`；`verify` 可选） |
+| 报告（**D2**） | **每票完整报告**；结局分类须区分（§4） |
+| 匹配（**D4**） | `defectCodeMatches` **软起点**：有则优先，空/低置信可降级再搜 |
+| 交付（**D6/D7**） | **`openMr` 入参开关**（默认 off）。关闭=报告+patch/本地提交；开启=见 §5.1 **并行本地提交 → 本地合冲突 → 一个 MR**（推荐） |
+| 验证（**D5**） | 不强制本机验证环境 |
+| 运行时（**D8–D10**） | LangGraph + Claude Agent SDK；可配并行 worktree；`maxIterate=3` |
 | 设计依据 | 复用仓内分析/对比文档（§1.1） |
 
 ---
@@ -71,7 +68,7 @@ Agent-3 的定位、根因、路由、验证、交付与报告字段，**优先�
         ▼
 ┌─ batch_orchestrator（LangGraph）──────────────────────────┐
 │  展开待处理票（池对齐 Agent-2 C1：strict+locatable+needs_info 等）│
-│  串行 或 有限并发（每票独立 worktree）                         │
+│  有限并发（每票独立 worktree；maxParallelWorktrees）         │
 └──────────────────────────┬────────────────────────────────┘
                            ▼  per defectId
 ┌─ ticket_subgraph ─────────────────────────────────────────┐
@@ -83,13 +80,11 @@ Agent-3 的定位、根因、路由、验证、交付与报告字段，**优先�
 │     ├─ 非 code_fix → unfixed（原因码）+ 分析正文         │
 │     └─ code_fix →                                        │
 │  6. patch      产出代码 patch（worktree / diff 产物）        │
-│  7. verify?    **可选**（默认跳过；环境复杂常无法本机启动）   │
-│  8. deliver?   MR 等交付见 D6/D7（待拍；非主路径必选项）     │
-│                → patched / unfixed                          │
+│  7. verify?    可选（默认跳过）                               │
+│  8. localCommit 可行动则本地提交（worktree 内）               │
 └──────────────────────────┬────────────────────────────────┘
-                           ▼
-【输出】analysis-report：分析 + 方案 +（有则）patch 路径/diff
-         桶名倾向 patched[] / unfixed[]（或 fixed=已出 patch，见 §4）
+        openMr=false → 汇总报告（每票完整条目，§4）
+        openMr=true  → integrate（本地合冲突）→ 单一 MR → 报告
 ```
 
 
@@ -183,27 +178,50 @@ Agent-3 的定位、根因、路由、验证、交付与报告字段，**优先�
 
 ---
 
-## 5. 验证：不强制本机环境（D5）
+## 5. 验证与交付
 
-业务验证环境复杂，**不一定能在本地启动** → Agent-3 **不对验证环境做硬性要求**。
+### 5.0 验证：不强制本机环境（D5）
 
-| 能力 | Agent-2 `runtimeVerify` | Agent-3 |
-|---|---|---|
-| 默认 | off | **`verifyMode=off`（默认）** |
-| 可选 | 通读期摸环境 | 若用户注入 skill / 显式打开，才尝试命令或引导验证 |
-| 失败 / 不可用 | 不影响主路径 | **不影响** patched 归桶；只记 `verifyStatus` |
+业务验证环境复杂，**不一定能在本地启动** → 默认 `verifyMode=off`。报告里仍写「建议怎么验」；与 D2 的 `needs_test_env` 分类不矛盾。
 
-验证方案仍应写进分析（「建议怎么验」），与 10-23「设计验证方案、不强制执行」一致；差别是本段**额外可出 patch**。
+### 5.1 开 MR 开关与合并策略（D6/D7）——分析与决定
+
+**入参**：`openMr: boolean`（或等价配置，默认 **`false`**）。关闭时主交付仍是每票完整报告 + patch/本地产物，**不** push、不建 MR。
+
+开启后有两条常见路，对比如下：
+
+| 模式 | 做法 | 优点 | 风险 |
+|---|---|---|---|
+| **A. 一票一 MR** | 每票独立分支 push + 建 MR；登记全部 `mrUrl`；之后再合入主干时处理冲突 | 评审粒度细；单票失败不影响其它 MR 已存在 | N 个 MR 审阅成本高；**冲突爆发在远端/合主干阶段**；要维护 MR 清单与合入顺序；与「一批日修」心智不合 |
+| **B. 并行本地提交 → 本地合冲突 → 一个 MR**（建议） | 每票 worktree 并行改码并 **只本地 commit**；编排器按序/拓扑 **merge 到集成分支**，冲突在本地解（可再调 SDK 助解）；最后 **一次 push + 一个 MR** | 冲突在本地闭环；远端只一个评审面；仍保留按条会话隔离；与 D9 并行天然契合 | 集成步要编排好顺序；单票烂 diff 可能拖累整 MR（可用「该票不进集成、只留报告」降级） |
+
+**决定（2026-11-02）**：
+
+1. **`openMr` 为入参开关**，默认 off。  
+2. **`openMr=true` 时默认走模式 B**（并行本地提交 → 本地合并冲突 → **单一 MR**）。  
+3. 模式 A（一票一 MR + 记录全部 MR 再后续合）保留为 **可选 `mrStrategy=per_ticket`**，不作为默认——避免「先开一堆 MR 再在 GitLab 上打仗」。  
+4. 无论 A/B：每票报告仍完整（D2）；集成结果写入汇总（`integrationBranch`、`mrUrl?`、每票 `localCommit` / `includedInMr`）。  
+5. **不自动 merge** 到默认分支。
+
+```text
+openMr=false:  按条分析/patch → 报告（可有本地 commit，不推）
+openMr=true (默认 B):
+  按条 worktree 并行 → 本地 commit
+       → integrate（本地 merge / 解冲突）
+       → 单一 MR + 报告标明各票是否纳入
+```
 
 ---
 
-## 6. `defectCodeMatches` 用法
+## 6. D4：`defectCodeMatches` 是什么？
 
-| 策略 | 说明 | 建议 |
-|---|---|---|
-| 强制起点 | 无候选则不改码 | 过严（C1 旁路票可能无强匹配） |
-| 仅参考 | 可完全忽略 matches | 浪费 Agent-2 |
-| **软起点（推荐）** | 有候选→优先；空/低置信→本段可降级 Glob/Grep/CodeGraph 再搜；仍无则 `suggestedAction` 倾向 needs_* 或 unfixed | **默认** |
+**含义**：Agent-2 写在 `code-knowledge` 里、按缺陷给出的代码候选（路径/符号/理由）。Agent-3 定位时怎么用这些候选。
+
+| 策略 | 说明 |
+|---|---|
+| 强制起点 | 无候选就不出 patch / 直接阻断 |
+| 仅参考 | 可完全忽略（浪费 Agent-2） |
+| **软起点（已确认）** | 有候选→优先顺着查；空或低置信→本段可降级 Glob/Grep/CodeGraph 再搜；仍无则结局走 `unlocalized` / `needs_*`，**仍出完整报告** |
 
 ---
 
@@ -228,17 +246,15 @@ Agent-3 的定位、根因、路由、验证、交付与报告字段，**优先�
 - [x] **D2（2026-11-02）**：**每票完整报告**（单信息+根因+方案或分类不可修原因）；`needs_test_env` / `needs_ticket_info`（含要补什么）等必须区分（§4）  
 - [x] **D3（2026-11-02）**：取消「无 GREEN 不进成功桶」（见 §4.4）  
 - [x] **D5（2026-11-02）**：不强制本机验证环境；与 D2 的 `needs_test_env` **原因分类**不矛盾  
+- [x] **D4（2026-11-02）**：`defectCodeMatches` = Agent-2 代码候选；用法 **软起点**（§6）  
+- [x] **D6/D7（2026-11-02）**：`openMr` 入参开关（默认 off）；开启后默认 **并行本地提交 → 本地合冲突 → 一个 MR**；一票一 MR 为可选非默认（§5.1）  
+- [x] **D8（2026-11-02）**：LangGraph + Claude Agent SDK  
+- [x] **D9（2026-11-02）**：支持多票并行（worktree）；`maxParallelWorktrees` 可配（建议默认 1~3，与集成策略配合）  
+- [x] **D10（2026-11-02）**：`maxIterate=3`  
 
-### 8.2 D 组——仍待确认
+### 8.2 D 组——已全部收口
 
-| ID | 问题 | 建议默认（可改） |
-|---|---|---|
-| **D4** | `defectCodeMatches` | **软起点**（§6） |
-| **D6** | 交付形态 | 主交付 = 报告 + patch 产物；**默认不开 MR**（分析+patch 工作流）；开 MR 作可选开关 |
-| **D7** | 若开 MR：一票一 MR？ | 开 MR 时默认一票一 MR |
-| **D8** | 运行时 | LangGraph + Claude Agent SDK |
-| **D9** | 并发 | 默认串行；`maxParallelWorktrees` 可配 |
-| **D10** | 迭代预算 | 出 patch 的尝试次数默认 `maxIterate=3` |
+见 §8.1；细节 §4–§6、§5.1。
 
 ### 8.3 E 组——可延后
 
@@ -274,3 +290,4 @@ Agent-3 的定位、根因、路由、验证、交付与报告字段，**优先�
 | 2026-11-01 23:24 Asia/Shanghai | 时间戳标注；随三 Agent 探讨 PR 同步 |
 | 2026-11-02 08:38 Asia/Shanghai | **D1/D3/D5**：主责分析+方案+patch；取消 GREEN 门禁；不强制验证环境 |
 | 2026-11-02 08:42 Asia/Shanghai | **D2**：每票完整报告；结局分类区分（方案/patch vs 需测试环境 vs 需补单信息等） |
+| 2026-11-02 08:48 Asia/Shanghai | **D4/D6–D10**：软起点；openMr 开关+本地集成单 MR；运行时/并行/迭代按默认 |

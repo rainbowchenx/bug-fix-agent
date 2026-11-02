@@ -1,7 +1,7 @@
 # 三 Agent 架构探讨 · 索引
 
 > 日期：2026-10-30  
-> **最近修订：2026-11-02 08:42（Asia/Shanghai）**  
+> **最近修订：2026-11-02 08:48（Asia/Shanghai）**  
 > 状态：**探讨中 / 非正式规格**——**不启动实现**。  
 > 详文已拆开，本文只保留总览与跨段约定。
 
@@ -22,7 +22,7 @@
 |---|---|---|
 | **Agent-1** 缺陷批次准备 | [2026-10-30-agent1-defect-batch-discussion.md](2026-10-30-agent1-defect-batch-discussion.md) | **已收口**（Skill + 管线；MCP 拉取解耦；L1→L2→L3 分簇） |
 | **Agent-2** 代码通读 | [2026-10-30-agent2-code-cartographer-discussion.md](2026-10-30-agent2-code-cartographer-discussion.md) | 主路径 + A/C（除 C2/C3/C4）已收口 |
-| **Agent-3** 分析与按条 patch | [2026-10-30-agent3-defect-analyst-discussion.md](2026-10-30-agent3-defect-analyst-discussion.md) | 每票完整报告+结局分类（D2）；分析+patch；不强制本机验证；D4/D6–D10 待拍 |
+| **Agent-3** 分析与按条 patch | [2026-10-30-agent3-defect-analyst-discussion.md](2026-10-30-agent3-defect-analyst-discussion.md) | **D 组已收口**：每票完整报告；openMr 开关；默认并行本地提交后合一个 MR |
 
 ---
 
@@ -127,7 +127,7 @@ workflow┤                                              │
 | Agent-2 workDir | 根下可多子仓；不强制单一 git |
 | Agent-3 粒度 | **按条修复**；并发用 worktree；各自抽切片 |
 | 跨 Agent JSON | **终版不急**（Q-D 随实现） |
-| Agent-3 | 每票完整报告；结局分类（方案/patch / 需测试环境 / 需补单信息…）；D1/D2/D3/D5 已拍 |
+| Agent-3 | D 组已收口：完整报告+outcome 分类；matches 软起点；`openMr` 默认 off，开则本地集成单 MR |
 | 可修文案 | 底层 `outcome` 区分；禁止只贴标签无正文 |
 
 ---
@@ -159,3 +159,4 @@ workflow┤                                              │
 | 2026-11-01 23:24 Asia/Shanghai | 时间戳标注；PR 同步提交本批探讨备忘 |
 | 2026-11-02 08:38 Asia/Shanghai | Agent-3 D1/D3/D5：分析+patch；取消 GREEN 门禁；不强制验证环境 |
 | 2026-11-02 08:42 Asia/Shanghai | Agent-3 D2：每票完整报告与结局分类 |
+| 2026-11-02 08:48 Asia/Shanghai | Agent-3 D 组收口（D4/D6–D10）；推荐本地集成后单 MR |
