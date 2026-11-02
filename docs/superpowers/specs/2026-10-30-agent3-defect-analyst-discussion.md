@@ -1,8 +1,8 @@
 # Agent-3 探讨：缺陷分析与按条修复
 
 > 日期：2026-10-30  
-> **最近修订：2026-11-02 08:52（Asia/Shanghai）**  
-> 状态：**探讨中**（非正式规格；**D 组已收口**；E 组可延后）  
+> **最近修订：2026-11-02 08:57（Asia/Shanghai）**  
+> 状态：**D 组已收口**（非正式规格；随三 Agent 主路径总览收口；E 组可延后）  
 > 索引：[三 Agent 架构索引](2026-10-30-three-agent-architecture-discussion.md)  
 > 上游：[Agent-1](2026-10-30-agent1-defect-batch-discussion.md) · [Agent-2](2026-10-30-agent2-code-cartographer-discussion.md)  
 > 对照：[报告型分析 Agent 设计](2026-10-23-report-agent-design.md)（10-23）· [本地 BugFix 设计](2026-10-14-local-bugfix-agent-design.md)（10-14）  
