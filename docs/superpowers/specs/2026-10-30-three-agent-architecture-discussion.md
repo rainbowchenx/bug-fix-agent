@@ -160,3 +160,4 @@ workflow┤                                              │
 | 2026-11-02 08:38 Asia/Shanghai | Agent-3 D1/D3/D5：分析+patch；取消 GREEN 门禁；不强制验证环境 |
 | 2026-11-02 08:42 Asia/Shanghai | Agent-3 D2：每票完整报告与结局分类 |
 | 2026-11-02 08:48 Asia/Shanghai | Agent-3 D 组收口（D4/D6–D10）；推荐本地集成后单 MR |
+| 2026-11-02 08:52 Asia/Shanghai | Agent-3 §1.2：SOTA/Seer/WorkBuddy/aiservice 对照采纳表 |

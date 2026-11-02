@@ -49,7 +49,55 @@ Agent-3 的定位、根因、路由、验证、交付与报告字段，**优先�
 
 > **用法约定**：讨论或实现 Agent-3 某能力时，先搜上表编号（如 `LOC-L3`、`GATE-*`、`CONF-*`、`GAP-*`），再决定是「直接采纳」还是「三 Agent 差分覆盖」。差分必须在本专文或后续契约文写明，禁止静默改义。
 
-### 1.2 与 10-23 / 10-14 的关系（产品边界差分）
+### 1.2 开源 / 工业对照：是否参考了？优秀部分怎么用？
+
+**结论**：三 Agent 探讨**有参考**——仓内已有完整调研（SOTA / Seer / WorkBuddy）并写进 10-14 §12–§13；Agent-3 §1.1 也挂了这些文。但此前 Agent-3 专文**缺少一张「对照→本段采纳」表**，易显得「只写了自家流程」。下表补齐；并纳入旧仓 `aiservice-for-monitor`（见下）。
+
+#### 已参考材料
+
+| 来源 | 仓内文档 | 与 Agent-3 的关系 |
+|---|---|---|
+| SWE-agent / Agentless / Aider / OpenHands / Moatless 等 | [SOTA 调研](../../research/2026-10-14-sota-bugfix-agent-survey.md) | 阶段产物、定位分层、architect–editor、选优思想 |
+| Sentry Seer Autofix | [Seer 深潜](../../research/2026-10-14-sentry-seer-autofix-deep-dive.md) | 自动步进、artifact 合同、分析/改码分离、双结局；**不抄** stopping_point 等人 |
+| WorkBuddy / CodeBuddy 专家 | [WorkBuddy 调研](../../research/2026-10-15-workbuddy-bugfix-expert-research.md) | IRON LAW / 3-strike / scope lock / Bug 轻路径 SOP（学纪律不学货架） |
+| 旧项目 aiservice-for-monitor | 10-14 §12 已点名；**本环境暂无法拉仓**（私有/404） | 见下「旧仓可借鉴」——需你授权或贴关键路径后补深潜 |
+
+#### 优秀机制 → Agent-3 采纳建议（在 D 组约束下）
+
+| 机制 | 来自 | Agent-3 怎么用（与 D1–D10 对齐） |
+|---|---|---|
+| **分阶段产物**（定位→根因→方案→改码） | Agentless / Seer / SOTA P0 | **已对齐**：ticket_subgraph；每阶段落盘进每票报告（D2） |
+| **无根因不改码（IRON LAW）** | WorkBuddy investigator | **应强化**：`outcome≠patch_ready` 时禁止 silent patch；先写根因/阻断分类 |
+| **3-strike / 有限回环** | WorkBuddy；Seer iterate | **已对齐 D10**：`maxIterate=3`；假设失败停手改 `openQuestions`/`unlocalized` |
+| **Scope lock / minimal-diff** | WorkBuddy；本仓 skills | patch 阶段强制 skill；报告写改动边界 |
+| **Architect–Editor 分离** | Aider / Seer handoff | 分析节点只读工具；patch 节点才写；handoff 拼 artifact |
+| **层次化 localization** | Agentless | 软消费 Agent-2 matches（D4）+ 本段补 `suspectFiles→symbols→editTargets` |
+| **Edit 后静态反馈** | SWE-agent ACI | **轻量采纳**：语法/lint 挡坏编辑（≠ D3 的 GREEN 测绿门禁） |
+| **失败日志结构化回灌** | Seer pr_iteration | iterate 只灌失败片段；集成冲突解析同样结构化 |
+| **确定性 git/MR** | Samba / Seer | `openMr` 开启后 push/create MR **不**交给模型自由 Bash（D6/D7） |
+| **本地集成再单 MR** | 结合 SOTA 多样本 worktree + 你的集成偏好 | **已定**：并行 worktree 本地 commit → 合冲突 → 一个 MR |
+| **完整不可修说明** | Seer 双结局精神；10-23 路由 | **已对齐 D2**：`needs_test_env` / `needs_ticket_info` 等分类正文 |
+| **不抄 stopping_point** | Seer 刻意分歧 | **已定**：全自动；阻断写进报告，不等人工点继续 |
+| **多样本选优** | OpenHands / Agentless | E 组可选：难票 N=2 patch 再挑；无测绿时用静态/评审启发式 |
+| **独立 Reviewer** | SpecRover / adversarial | E 组可选：合 MR 前只读 diff 审查 |
+
+**相对早期「GREEN 硬门禁」的差分**：SOTA/Seer 强调测试真值；本段 D3/D5 决定**不强制本机验绿**。仍保留：建议验证步骤、可选 verify、静态反馈、报告诚实标注 `verifyStatus=skipped`——避免假装测过。
+
+#### 旧仓 `aiservice-for-monitor`（https://github.com/rainbowchenx/aiservice-for-monitor）
+
+10-14 §12 已写可参考：**`agent-fix` runner、分层 Autofix 语义、handoff、GitLab MR publish**；不应整仓搬 Redis/多租户/「不装依赖的 ephemeral」模型。
+
+| 预期优秀点（待对照源码确认） | 迁到 Agent-3 的用法 |
+|---|---|
+| 分层 Autofix（分析 / 方案 / 改码步骤语义） | 对齐 ticket_subgraph 与每票报告区块 |
+| `agent-fix` runner 编排 | 对照 LangGraph 节点边界与重试 |
+| handoff（分析产物交给改码会话） | Architect→Editor；禁止共享整段 transcript |
+| GitLab MR publish | `openMr` 路径的确定性交付；集成单 MR 时复用 publish 细节 |
+| （若有）缺陷单字段映射 / 报告模板 | 反哺 D2 单信息切片与 outcome 文案 |
+
+> **缺口**：当前 Cloud Agent **读不到**该私有仓。请任选：① 授予本环境读权限；② 指出 `agent-fix` / Autofix / MR 关键目录；③ 粘贴核心 README/流程。补读后开短文 `docs/research/…-aiservice-for-monitor-adoption.md` 并回链本节。
+
+### 1.3 与 10-23 / 10-14 的关系（产品边界差分）
 
 | 来源 | 采纳 | 废弃 / 放宽 |
 |---|---|---|
@@ -266,6 +314,8 @@ openMr=true (默认 B):
 | **E3** | worktree 在「多子仓 workDir」下的路径约定 |
 | **E4** | 安全旁路票是否进入 Agent-3 |
 | **E5** | 实机/设备 web 验证的专用 skill 样例 |
+| **E6** | `aiservice-for-monitor` 源码深潜与采纳短文（待读仓权限） |
+| **E7** | 难票多样本选优 / 合 MR 前 Reviewer（SOTA P1） |
 
 ---
 
@@ -292,3 +342,4 @@ openMr=true (默认 B):
 | 2026-11-02 08:38 Asia/Shanghai | **D1/D3/D5**：主责分析+方案+patch；取消 GREEN 门禁；不强制验证环境 |
 | 2026-11-02 08:42 Asia/Shanghai | **D2**：每票完整报告；结局分类区分（方案/patch vs 需测试环境 vs 需补单信息等） |
 | 2026-11-02 08:48 Asia/Shanghai | **D4/D6–D10**：软起点；openMr 开关+本地集成单 MR；运行时/并行/迭代按默认 |
+| 2026-11-02 08:52 Asia/Shanghai | **§1.2**：SOTA/Seer/WorkBuddy/旧仓对照与 Agent-3 可借鉴表；aiservice 待读仓 |
