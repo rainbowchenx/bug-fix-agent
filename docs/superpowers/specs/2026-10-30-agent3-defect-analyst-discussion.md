@@ -1,7 +1,7 @@
 # Agent-3 探讨：缺陷分析与按条修复
 
 > 日期：2026-10-30  
-> **最近修订：2026-11-02 08:48（Asia/Shanghai）**  
+> **最近修订：2026-11-02 08:52（Asia/Shanghai）**  
 > 状态：**探讨中**（非正式规格；**D 组已收口**；E 组可延后）  
 > 索引：[三 Agent 架构索引](2026-10-30-three-agent-architecture-discussion.md)  
 > 上游：[Agent-1](2026-10-30-agent1-defect-batch-discussion.md) · [Agent-2](2026-10-30-agent2-code-cartographer-discussion.md)  
@@ -105,9 +105,10 @@ Agent-3 的定位、根因、路由、验证、交付与报告字段，**优先�
 |---|---|
 | 父工作流 | validate(batch, knowledge) → 调 Agent-3 单元 → validate(report) |
 | Agent-3 LangGraph | `batch_orchestrator`：调度票、worktree 生命周期、汇总 |
-| `ticket_subgraph` | slice → localize → rootCause → propose → route → patch →（可选）verify/deliver → emit |
-| Claude Agent SDK | 分析与出 patch 的会话；挂载 analyze/fix skills（verify 可选） |
-| 确定性代码 | worktree、落盘 patch/diff、schema 校验、结局归桶；**不依赖**本机起全套业务环境 |
+| `ticket_subgraph` | slice → localize → rootCause → propose → route → patch → localCommit → emit |
+| `integrate`（可选） | `openMr=true`：合并各票本地提交、解冲突、开**一个** MR |
+| Claude Agent SDK | 分析与出 patch（及助解冲突）会话；analyze/fix skills |
+| 确定性代码 | worktree、本地 commit、集成 merge、schema 校验；不依赖本机起全套业务环境 |
 
 **不宜**学 Agent-1 做成纯 Skill+管线：分析+方案+patch 仍需 SDK 会话。
 
