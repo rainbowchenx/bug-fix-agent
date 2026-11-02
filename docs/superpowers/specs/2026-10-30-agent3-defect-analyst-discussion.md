@@ -1,8 +1,8 @@
 # Agent-3 探讨：缺陷分析与按条修复
 
 > 日期：2026-10-30  
-> **最近修订：2026-11-02 08:38（Asia/Shanghai）**  
-> 状态：**探讨中**（非正式规格；D1/D3/D5 已拍，其余 D 待确认）  
+> **最近修订：2026-11-02 08:42（Asia/Shanghai）**  
+> 状态：**探讨中**（非正式规格；D1/D2/D3/D5 已拍，其余 D 待确认）  
 > 索引：[三 Agent 架构索引](2026-10-30-three-agent-architecture-discussion.md)  
 > 上游：[Agent-1](2026-10-30-agent1-defect-batch-discussion.md) · [Agent-2](2026-10-30-agent2-code-cartographer-discussion.md)  
 > 对照：[报告型分析 Agent 设计](2026-10-23-report-agent-design.md)（10-23）· [本地 BugFix 设计](2026-10-14-local-bugfix-agent-design.md)（10-14）  
@@ -14,7 +14,8 @@
 
 | 项 | 倾向 |
 |---|---|
-| 职责（**D1**） | **按条主做分析**：定位 → **根因** → **修复方案** →（可行动则）产出 **代码 patch**；不可行动写清原因。汇总双结局报告 |
+| 职责（**D1**） | **按条主做分析**：定位 → **根因** → **修复方案** →（可行动则）产出 **代码 patch** |
+| 报告（**D2**） | **每票完整报告**（单信息+根因+方案或分类不可修原因）；`needs_test_env` / `needs_ticket_info`（含补什么）等须区分 |
 | 输入 | `defect-batch`（含蒸馏正文）+ `code-knowledge`；只传 artifact；按条切片 |
 | 粒度 | 一条一会话；并发可用 worktree |
 | 相对 10-23 | 仍以分析报告为核心；**额外产出 patch**（非 BOUND-1 纯报告）；保留路由/举证纪律 |
@@ -117,26 +118,60 @@ Agent-3 的定位、根因、路由、验证、交付与报告字段，**优先�
 
 ---
 
-## 4. 双结局与「可修」语义
+## 4. 单票完整报告与结局分类（D2）
 
-### 4.1 报告桶（对外）
+### 4.1 原则（已确认）
 
-| 桶 | 含义 |
+**每一条缺陷都必须有一份完整报告**，不能只给「可修/不可修」标签。至少包含：
+
+| 区块 | 内容 |
 |---|---|
-| `patched[]`（或对外仍称「已出补丁」） | 已完成定位/根因/方案，并产出 **patch**（路径或 diff）；**不要求**本地测绿 |
-| `unfixed[]` | 未出 patch；含 `reasonCode` + 已做分析（定位/根因/方案草稿可有） |
+| **缺陷单信息** | 来自 batch 的原文切片：id、标题、模块/括注/意图（若有）、实际/期望/步骤摘要、附件提示等 |
+| **定位** | 代码候选 / 范围（消费 `defectCodeMatches`，可扩展） |
+| **根因分析** | 证据链、`ruledOut`、`openQuestions` |
+| **结局正文（互斥分区，必须区分开）** | 见 §4.2——要么写清**修复方案**（+ 可选 patch），要么写清**不可修/暂不可行动原因**（分类 + 要补什么） |
+| **建议验证** | 文档级「建议怎么验」（不强制本机执行，对齐 D5） |
 
-口头「可修/不可修」可映射到：能出 patch 的建议改码项 vs 路由到非改码/需补证项（D2 待确认）。
+汇总层仍可按结局码分组浏览，但 **MD/JSON 都以「每票完整条目」为真源**，禁止只有桶名没有正文。
 
-### 4.2 路由（对内，对齐 10-23）
+### 4.2 结局类型（须区分，不可混写）
 
-| `suggestedAction` | 默认进哪一桶 |
-|---|---|
-| `code_fix` | 尝试出 patch；成功→patched，失败→unfixed |
-| `needs_runtime_info` / `needs_design_input` | 默认不出 patch → unfixed（可仍写分析） |
-| `config_or_dependency` / `not_code` | 默认不出 patch → unfixed |
+对外可用文案「可修 / 不可修」，底层用 **`outcome` + 专用字段**（对齐 10-23 `suggestedAction` 精神，字段名终版不急）：
 
-### 4.3 关于 D3「GREEN」——说明与决定
+| `outcome` | 含义 | 强制正文 |
+|---|---|---|
+| `patch_ready` | 已给出修复方案，并产出 patch（或不强制 patch 时至少方案可落地） | **修复方案**；`patchPath` / diff 摘要（有则） |
+| `plan_only` | 方案已写清，因策略未出 patch（可选细分） | **修复方案**；说明为何未出 diff |
+| `needs_test_env` | **必须依赖测试/运行环境**才能继续定因或给出可靠 patch（Agent-3 **本机不起环境**，故停在此） | 不可修原因；**需要什么样的环境/数据/机台**；建议验证步骤 |
+| `needs_ticket_info` | **缺陷单信息不足**，需业务/测试补单 | 不可修原因；**`missingInfo[]`：要补充哪些字段/材料**（复现步骤、期望、日志、截图、版本、机型…） |
+| `needs_design_input` | 缺设计/产品确认 | 缺什么决策、问谁 |
+| `not_code` / `config_or_dependency` | 非代码或配置/依赖侧 | 建议流转路径 |
+| `unlocalized` | 无法定位到代码 | 已尝试范围、`openQuestions` |
+| `other_blocked` | 其它阻断 | `reasonDetail` |
+
+> **与 D5 的关系**：D5 = Agent-3 **不强制本机起验证环境**。`needs_test_env` 不是「没起环境就失败」，而是报告里的一种**明确分类**：继续推进**强制需要**测试环境/实机信息——与「缺单信息」「已出方案/patch」必须分开写，禁止糊成一句「不可修」。
+
+### 4.3 单票条目草案（字段方向，schema 不急冻）
+
+```jsonc
+{
+  "defectId": "",
+  "ticket": { /* 缺陷单信息切片 */ },
+  "localization": { /* … */ },
+  "rootCause": { "summary": "", "ruledOut": [], "openQuestions": [] },
+  "outcome": "patch_ready | plan_only | needs_test_env | needs_ticket_info | …",
+  "proposedFix": null,           // outcome∈{patch_ready,plan_only} 时必填
+  "patch": null,                 // 可选 { "path": "", "summary": "" }
+  "blockers": null,              // 不可行动时必填
+  // blockers 示例：
+  // { "kind": "needs_ticket_info", "missingInfo": ["复现步骤", "期望结果截图"], "detail": "" }
+  // { "kind": "needs_test_env", "envNeeds": ["实机摄像头固件 x.y", "可登录的测试账号"], "detail": "" }
+  "suggestedVerify": { "steps": [], "executed": false },
+  "confidence": "high|medium|low"
+}
+```
+
+### 4.4 关于 D3「GREEN」——说明与决定
 
 **D3 原意**：沿用 10-14 的 **「没有 GREEN，就没有 MR / 不进成功桶」**——这里的 GREEN = **本地验证命令跑通**（测试/构建等变绿），不是「代码语法绿」或「CI 远程绿」的别称 alone。
 
@@ -190,14 +225,14 @@ Agent-3 的定位、根因、路由、验证、交付与报告字段，**优先�
 - [x] 按条处理；worktree 并发；蒸馏正文本段按条取用  
 - [x] 跨 Agent JSON 终版不急  
 - [x] **D1（2026-11-02）**：Agent-3 **主做分析**——根因、修复方案、**代码 patch**（不是以本地验绿/开 MR 为中心）  
-- [x] **D3（2026-11-02）**：原「无 GREEN 不进成功桶」——GREEN=本地验证跑通；**现取消该门禁**（见 §4.3）  
-- [x] **D5（2026-11-02）**：**不要求**验证环境；默认不跑本机验证；环境复杂无法启动属预期  
+- [x] **D2（2026-11-02）**：**每票完整报告**（单信息+根因+方案或分类不可修原因）；`needs_test_env` / `needs_ticket_info`（含要补什么）等必须区分（§4）  
+- [x] **D3（2026-11-02）**：取消「无 GREEN 不进成功桶」（见 §4.4）  
+- [x] **D5（2026-11-02）**：不强制本机验证环境；与 D2 的 `needs_test_env` **原因分类**不矛盾  
 
 ### 8.2 D 组——仍待确认
 
 | ID | 问题 | 建议默认（可改） |
 |---|---|---|
-| **D2** | 「可修/不可修」vs 路由字段 | 双轨：`patched`/`unfixed` + `suggestedAction`/`confidence` |
 | **D4** | `defectCodeMatches` | **软起点**（§6） |
 | **D6** | 交付形态 | 主交付 = 报告 + patch 产物；**默认不开 MR**（分析+patch 工作流）；开 MR 作可选开关 |
 | **D7** | 若开 MR：一票一 MR？ | 开 MR 时默认一票一 MR |
@@ -238,3 +273,4 @@ Agent-3 的定位、根因、路由、验证、交付与报告字段，**优先�
 | 2026-11-01 | **§1.1**：明示 Agent-3 须参考仓内既有分析/对比文档（流水线/报告/缺口/调研/Phase A·B 等） |
 | 2026-11-01 23:24 Asia/Shanghai | 时间戳标注；随三 Agent 探讨 PR 同步 |
 | 2026-11-02 08:38 Asia/Shanghai | **D1/D3/D5**：主责分析+方案+patch；取消 GREEN 门禁；不强制验证环境 |
+| 2026-11-02 08:42 Asia/Shanghai | **D2**：每票完整报告；结局分类区分（方案/patch vs 需测试环境 vs 需补单信息等） |
