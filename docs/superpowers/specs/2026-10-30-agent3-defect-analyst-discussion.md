@@ -1,8 +1,8 @@
 # Agent-3 探讨：缺陷分析与按条修复
 
 > 日期：2026-10-30  
-> **最近修订：2026-11-01 23:24（Asia/Shanghai）**  
-> 状态：**探讨中**（非正式规格；D1–D10 待拍）  
+> **最近修订：2026-11-02 08:38（Asia/Shanghai）**  
+> 状态：**探讨中**（非正式规格；D1/D3/D5 已拍，其余 D 待确认）  
 > 索引：[三 Agent 架构索引](2026-10-30-three-agent-architecture-discussion.md)  
 > 上游：[Agent-1](2026-10-30-agent1-defect-batch-discussion.md) · [Agent-2](2026-10-30-agent2-code-cartographer-discussion.md)  
 > 对照：[报告型分析 Agent 设计](2026-10-23-report-agent-design.md)（10-23）· [本地 BugFix 设计](2026-10-14-local-bugfix-agent-design.md)（10-14）  
@@ -14,16 +14,15 @@
 
 | 项 | 倾向 |
 |---|---|
-| 职责 | **按条**：定位 → 根因 →（可行动则）改码/验证/交付说明；不可行动写清原因。汇总双结局报告 |
-| 输入 | `defect-batch`（含蒸馏正文）+ `code-knowledge`；**只传 artifact**；按条切片进会话 |
-| 粒度 | **一条缺陷一个修复会话**；禁止整批同上下文改码。并发：独立 **worktree**（或等价隔离目录） |
-| 相对 10-23 | **产品边界放宽**：Agent-3 **做修复**，不只出报告；仍保留 10-23 的路由/举证纪律（`confidence` / `suggestedAction` / `ruledOut` / `openQuestions`） |
-| 相对 10-14 | 对齐「全自动、双结局、无中间等人」；**GREEN 门禁精神保留**（验证不过 → 记 unfixed，不伪造成功交付） |
-| 运行时 | **LangGraph（批编排 + 按条子图）+ Claude Agent SDK**（与 Agent-2 同构）；Skill/MCP 附着 |
-| 业务 Skill | 可注入（`profiles: analyze` / `fix` / `verify`） |
-| 对外耦合 | 松耦合契约 I/O；**JSON 终版不急**（Q-D） |
-| 验证口子 | **Agent-3 主责**按条验证；与 Agent-2 `runtimeVerify`（通读期可选探测）分工见 §5 |
-| 设计依据 | **复用仓内既有分析/对比文档**（§1.1）；本专文只定三 Agent 下的边界与差分，不重写 LOC/GATE/CONF 全家 |
+| 职责（**D1**） | **按条主做分析**：定位 → **根因** → **修复方案** →（可行动则）产出 **代码 patch**；不可行动写清原因。汇总双结局报告 |
+| 输入 | `defect-batch`（含蒸馏正文）+ `code-knowledge`；只传 artifact；按条切片 |
+| 粒度 | 一条一会话；并发可用 worktree |
+| 相对 10-23 | 仍以分析报告为核心；**额外产出 patch**（非 BOUND-1 纯报告）；保留路由/举证纪律 |
+| 相对 10-14 | 对齐全自动、双结局；**不沿用「没有 GREEN 就没有成功交付」**（见 D3/D5） |
+| 验证（**D5**） | **不强制本地验证环境**（业务环境复杂、常无法本机拉起）；验证为可选增强，缺省可完全跳过 |
+| 运行时 | LangGraph + Claude Agent SDK（待 D8 确认） |
+| 业务 Skill | 可注入（`analyze` / `fix`；`verify` 可选） |
+| 设计依据 | 复用仓内分析/对比文档（§1.1） |
 
 ---
 
@@ -35,7 +34,7 @@ Agent-3 的定位、根因、路由、验证、交付与报告字段，**优先�
 
 | 文档 | 对 Agent-3 的用途 |
 |---|---|
-| [目标流水线设计](2026-10-22-target-pipeline-design.md) | **主流程骨架**：`S0..S10`、`CLS-*` / `LOC-L0..L5` / `GATE-*` / `DEL-*`；定位阶梯与失败收口语义的权威出处。注意文内曾跟 10-23「只分析」对齐——**本探讨下 S7–S9 执行权回到 Agent-3**，但阶段名与判定编号仍应复用 |
+| [目标流水线设计](2026-10-22-target-pipeline-design.md) | **主流程骨架**：`S0..S6` 定位/根因/方案 + **产出 patch**；`LOC-*` 等编号复用。`S7` 验证执行 **非默认门禁**（D5）；`S8–S9` MR 交付见 D6/D7（待拍） |
 | [报告型分析 Agent 设计](2026-10-23-report-agent-design.md) | 报告契约、`confidence` / `suggestedAction`、`ruledOut` / `openQuestions`、`CONF-*` 降级；**BOUND-1 只分析**对本工作流放宽（见 D1） |
 | [报告型分析 Agent 决策备忘](2026-10-23-report-agent-decision-memo.md) | 落地前 `Q-*` / `U-*` / `J-*` / `R-*`；Agent-3 拍板时对照，避免重复争议 |
 | [缺陷输入形态与来源契约](2026-10-22-defect-input-shape-and-source-contract.md) | 输入现实：`OBS-*` / `INV-*` / 无堆栈文本缺陷等；分析时不可假设「必有 stack」 |
@@ -56,8 +55,8 @@ Agent-3 的定位、根因、路由、验证、交付与报告字段，**优先�
 
 | 来源 | 采纳 | 废弃 / 放宽 |
 |---|---|---|
-| 10-23 | 不丢条只路由；`confidence`+`suggestedAction`；`ruledOut`/`openQuestions`；证据降级纪律；JSON+MD 双形态 | **BOUND-1「只分析不出码」**——本三 Agent 探讨下由 Agent-3 承担按条修复 |
-| 10-14 | 全自动闭环；双结局（fixed / unfixed）；没有 GREEN 不交付成功态；按隔离工作区改码 | 「一簇一 MR」可改为 **一条一交付单元**（簇仅作报告分组）；具体 MR 策略见 §8 D 组 |
+| 10-23 | 分析为核心；路由/举证/双形态报告 | BOUND-1 放宽为 **可出 patch**（D1）；不是「以开 MR 为成功」 |
+| 10-14 | 全自动、双结局、按隔离区改码 | **废弃对本段的 GREEN 硬门禁**（D3/D5）：本地测绿不是成功前提 |
 
 对外仍可说「可修 / 不可修」**文案**，底层建议映射到 `suggestedAction` + 结局桶，避免重新发明 fixability gate。
 
@@ -75,22 +74,23 @@ Agent-3 的定位、根因、路由、验证、交付与报告字段，**优先�
 └──────────────────────────┬────────────────────────────────┘
                            ▼  per defectId
 ┌─ ticket_subgraph ─────────────────────────────────────────┐
-│  1. slice     抽该条 digest + matches + 相关 modules/DR     │
-│  2. localize  以 defectCodeMatches 为起点（可扩展检索）      │
-│  3. rootCause 证据链；写 ruledOut / openQuestions           │
-│  4. route     confidence + suggestedAction                  │
-│     ├─ 非 code_fix → 记 unfixed（原因码）→ 结束该条      │
+│  1. slice      抽该条 digest + matches + modules/DR         │
+│  2. localize   定位（matches 软起点）                        │
+│  3. rootCause  根因；ruledOut / openQuestions               │
+│  4. propose    修复方案（不要求当场可跑验证）                 │
+│  5. route      confidence + suggestedAction                 │
+│     ├─ 非 code_fix → unfixed（原因码）+ 分析正文         │
 │     └─ code_fix →                                        │
-│  5. implement SDK 改码（minimal-diff / 业务 skill）          │
-│  6. verify    按 profile / 注入 skill 跑验证（§5）           │
-│     ├─ GREEN → deliver（push/MR 或仅本地结果，见 D 组）     │
-│     │          → fixed                                      │
-│     └─ RED / 预算耗尽 → iterate? → 仍失败 → unfixed         │
+│  6. patch      产出代码 patch（worktree / diff 产物）        │
+│  7. verify?    **可选**（默认跳过；环境复杂常无法本机启动）   │
+│  8. deliver?   MR 等交付见 D6/D7（待拍；非主路径必选项）     │
+│                → patched / unfixed                          │
 └──────────────────────────┬────────────────────────────────┘
                            ▼
-【输出】analysis-report（JSON + MD）：fixed[] + unfixed[] + 汇总
-         （schema 终版不急；进出仍做「有则校验」）
+【输出】analysis-report：分析 + 方案 +（有则）patch 路径/diff
+         桶名倾向 patched[] / unfixed[]（或 fixed=已出 patch，见 §4）
 ```
+
 
 原则：
 
@@ -109,11 +109,11 @@ Agent-3 的定位、根因、路由、验证、交付与报告字段，**优先�
 |---|---|
 | 父工作流 | validate(batch, knowledge) → 调 Agent-3 单元 → validate(report) |
 | Agent-3 LangGraph | `batch_orchestrator`：调度票、worktree 生命周期、汇总 |
-| `ticket_subgraph` | slice → localize → rootCause → route →（可选）implement → verify → deliver → emit |
-| Claude Agent SDK | 探索/改码会话；挂载 analyze/fix/verify skills + MCP |
-| 确定性代码 | worktree 创建/回收、验证命令执行、schema 校验、结局归桶 |
+| `ticket_subgraph` | slice → localize → rootCause → propose → route → patch →（可选）verify/deliver → emit |
+| Claude Agent SDK | 分析与出 patch 的会话；挂载 analyze/fix skills（verify 可选） |
+| 确定性代码 | worktree、落盘 patch/diff、schema 校验、结局归桶；**不依赖**本机起全套业务环境 |
 
-**不宜**学 Agent-1 做成纯 Skill+管线：本段是探索+改码+验证环，必须有 SDK 会话。
+**不宜**学 Agent-1 做成纯 Skill+管线：分析+方案+patch 仍需 SDK 会话。
 
 ---
 
@@ -123,36 +123,42 @@ Agent-3 的定位、根因、路由、验证、交付与报告字段，**优先�
 
 | 桶 | 含义 |
 |---|---|
-| `fixed[]` | 已改码且验证通过（及可选已开 MR）；含证据摘要、`mrUrl?` |
-| `unfixed[]` | 未改或未通过；含 `reasonCode` + `reasonDetail` + 已做分析（定位/根因/方案草稿） |
+| `patched[]`（或对外仍称「已出补丁」） | 已完成定位/根因/方案，并产出 **patch**（路径或 diff）；**不要求**本地测绿 |
+| `unfixed[]` | 未出 patch；含 `reasonCode` + 已做分析（定位/根因/方案草稿可有） |
+
+口头「可修/不可修」可映射到：能出 patch 的建议改码项 vs 路由到非改码/需补证项（D2 待确认）。
 
 ### 4.2 路由（对内，对齐 10-23）
 
 | `suggestedAction` | 默认进哪一桶 |
 |---|---|
-| `code_fix` | 尝试 implement；成功→fixed，失败→unfixed |
-| `needs_runtime_info` / `needs_design_input` | 默认 **不改码** → unfixed（原因=需补证/需设计） |
-| `config_or_dependency` / `not_code` | 默认不改码 → unfixed |
+| `code_fix` | 尝试出 patch；成功→patched，失败→unfixed |
+| `needs_runtime_info` / `needs_design_input` | 默认不出 patch → unfixed（可仍写分析） |
+| `config_or_dependency` / `not_code` | 默认不出 patch → unfixed |
 
-> 若产品坚持口头「可修复/不可修复」：`fixed` ∪（尝试过 code_fix 但失败）可再分子类；**路由标签仍保留**，避免只剩自然语言。
+### 4.3 关于 D3「GREEN」——说明与决定
 
-### 4.3 硬门禁（建议默认，待 D 组确认）
+**D3 原意**：沿用 10-14 的 **「没有 GREEN，就没有 MR / 不进成功桶」**——这里的 GREEN = **本地验证命令跑通**（测试/构建等变绿），不是「代码语法绿」或「CI 远程绿」的别称 alone。
 
-- **没有 GREEN，不进 `fixed`**，也不宣称交付成功。  
-- 验证跳过（环境不可用）→ 不得冒充 GREEN；记 `unfixed` 或单独 `fixed_unverified`（**是否允许后者见 D5**）。
+| 原建议 | 现决定（2026-11-02） |
+|---|---|
+| 无 GREEN 不进 fixed | **取消该门禁**。成功以「分析完整 +（可行动时）已出 patch」为准；**不以本地测绿为条件** |
+
+报告中若偶尔跑过验证，可记 `verifyStatus=passed|failed|skipped`（默认 **skipped**），**不**用它挡 patched 归桶。
 
 ---
 
-## 5. 验证分工（相对 Agent-2 `runtimeVerify`）
+## 5. 验证：不强制本机环境（D5）
 
-| 能力 | Agent-2 | Agent-3 |
+业务验证环境复杂，**不一定能在本地启动** → Agent-3 **不对验证环境做硬性要求**。
+
+| 能力 | Agent-2 `runtimeVerify` | Agent-3 |
 |---|---|---|
-| 目的 | 通读期可选：摸清如何起环境（默认 **off**） | **修复后验收**（主路径） |
-| 开关 | `runtimeVerify` | 建议 `verifyMode`: `off` \| `commands` \| `skill_guided`（默认倾向 `commands` 或 profile 探测） |
-| Skill | 可注「环境怎么起」 | 可注「怎么验这条/这个业务」 |
-| 失败影响 | 最多 `partial` knowledge | 直接影响 fixed/unfixed |
+| 默认 | off | **`verifyMode=off`（默认）** |
+| 可选 | 通读期摸环境 | 若用户注入 skill / 显式打开，才尝试命令或引导验证 |
+| 失败 / 不可用 | 不影响主路径 | **不影响** patched 归桶；只记 `verifyStatus` |
 
-Agent-2 若已写出环境笔记到 `code-knowledge`（可选字段，终版不急），Agent-3 verify 应优先消费，避免重复摸索。
+验证方案仍应写进分析（「建议怎么验」），与 10-23「设计验证方案、不强制执行」一致；差别是本段**额外可出 patch**。
 
 ---
 
@@ -168,42 +174,36 @@ Agent-2 若已写出环境笔记到 `code-knowledge`（可选字段，终版不�
 
 ## 7. 业务 Skill 注入
 
-`profiles` 建议：`analyze` | `fix` | `verify`（可多选）。
+`profiles` 建议：`analyze` | `fix`（主）；`verify` 仅当显式打开验证时有用。
 
-典型：
-
-- 业务根因话术 / 禁忌改动目录  
-- 微前端子应用对照、Electron IPC 边界、设备 JSBridge  
-- 验收命令、账号、固件/实机限制  
-- MR 标题/描述模板  
-
-不取消：路径存在性检查、GREEN 纪律、schema 校验。
+典型：业务根因话术、禁忌目录、子应用/IPC/桥、**建议验收步骤（文档级）**。  
+不取消：路径存在性等可计算检查、schema 校验。**不**把本机测绿当纪律门禁。
 
 ---
 
-## 8. 拍板清单（本轮请逐组表态）
+## 8. 拍板清单
 
-### 8.1 已确认（来自既有探讨）
+### 8.1 已确认
 
 - [x] 松耦合；只传 artifact；不共享跨 Agent 会话  
 - [x] 业务 Skill 可注入  
-- [x] **按条修复**；并发用 worktree；蒸馏正文本段按条取用  
+- [x] 按条处理；worktree 并发；蒸馏正文本段按条取用  
 - [x] 跨 Agent JSON 终版不急  
+- [x] **D1（2026-11-02）**：Agent-3 **主做分析**——根因、修复方案、**代码 patch**（不是以本地验绿/开 MR 为中心）  
+- [x] **D3（2026-11-02）**：原「无 GREEN 不进成功桶」——GREEN=本地验证跑通；**现取消该门禁**（见 §4.3）  
+- [x] **D5（2026-11-02）**：**不要求**验证环境；默认不跑本机验证；环境复杂无法启动属预期  
 
-### 8.2 D 组——建议本轮就拍
+### 8.2 D 组——仍待确认
 
-| ID | 问题 | 建议默认 |
+| ID | 问题 | 建议默认（可改） |
 |---|---|---|
-| **D1** | 相对 10-23：Agent-3 **是否正式承担改码** | **是**（本探讨主路径）；10-23 BOUND-1 对本工作流不适用 |
-| **D2** | 对外「可修/不可修」vs 路由字段 | **双轨**：报告桶 fixed/unfixed + 内层 `suggestedAction`/`confidence`；不恢复 fixability gate |
-| **D3** | 无 GREEN 能否进 fixed | **否**（对齐 10-14） |
+| **D2** | 「可修/不可修」vs 路由字段 | 双轨：`patched`/`unfixed` + `suggestedAction`/`confidence` |
 | **D4** | `defectCodeMatches` | **软起点**（§6） |
-| **D5** | 验证环境缺失时 | **不得** `fixed`；记 unfixed/`verify_unavailable`；不发明 `fixed_unverified`（一期） |
-| **D6** | 交付形态 | 默认：**可开 MR**（有凭据时）；无凭据则本地 branch + 报告链到路径；不自动 merge |
-| **D7** | 一票一 MR 还是可合并 | 默认 **一票一 MR**（与按条隔离一致）；同簇合并以后再开 |
-| **D8** | 运行时 | 确认 **LangGraph + Claude Agent SDK** |
-| **D9** | 批内并发度 | 默认串行；`maxParallelWorktrees` 可配（建议默认 1~3） |
-| **D10** | 迭代预算 | 默认 `maxIterate=3`（对齐旧管线精神） |
+| **D6** | 交付形态 | 主交付 = 报告 + patch 产物；**默认不开 MR**（分析+patch 工作流）；开 MR 作可选开关 |
+| **D7** | 若开 MR：一票一 MR？ | 开 MR 时默认一票一 MR |
+| **D8** | 运行时 | LangGraph + Claude Agent SDK |
+| **D9** | 并发 | 默认串行；`maxParallelWorktrees` 可配 |
+| **D10** | 迭代预算 | 出 patch 的尝试次数默认 `maxIterate=3` |
 
 ### 8.3 E 组——可延后
 
@@ -237,3 +237,4 @@ Agent-2 若已写出环境笔记到 `code-knowledge`（可选字段，终版不�
 | 2026-11-01 | **专题深化**：流程/运行时/双结局/验证分工/matches 软起点；D/E 拍板清单 |
 | 2026-11-01 | **§1.1**：明示 Agent-3 须参考仓内既有分析/对比文档（流水线/报告/缺口/调研/Phase A·B 等） |
 | 2026-11-01 23:24 Asia/Shanghai | 时间戳标注；随三 Agent 探讨 PR 同步 |
+| 2026-11-02 08:38 Asia/Shanghai | **D1/D3/D5**：主责分析+方案+patch；取消 GREEN 门禁；不强制验证环境 |
