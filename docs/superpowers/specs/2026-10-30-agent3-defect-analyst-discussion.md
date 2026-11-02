@@ -343,3 +343,4 @@ openMr=true (默认 B):
 | 2026-11-02 08:42 Asia/Shanghai | **D2**：每票完整报告；结局分类区分（方案/patch vs 需测试环境 vs 需补单信息等） |
 | 2026-11-02 08:48 Asia/Shanghai | **D4/D6–D10**：软起点；openMr 开关+本地集成单 MR；运行时/并行/迭代按默认 |
 | 2026-11-02 08:52 Asia/Shanghai | **§1.2**：SOTA/Seer/WorkBuddy/旧仓对照与 Agent-3 可借鉴表；aiservice 待读仓 |
+| 2026-11-02 08:57 Asia/Shanghai | 随三 Agent 主路径总览收口；aiservice 深潜仍待读仓 |
