@@ -1,49 +1,69 @@
 ---
 name: defect-batch-prepare
-description: Prepare a defect-batch via ingest → distill → rule screen → L1/L2/L3 cluster. Deterministic pipeline; do not freestyle screen rules.
+description: Prepares defect-batch JSON from raw defects via ingest, rule distill/screen, and L1→L2→L3 clustering. Use when running Agent-1, converting Excel/MCP defect exports, screening/clustering tickets, or validating defect-batch output—never freestyle R0–R3 or L1/L2 in the model.
 profiles: defect-batch
 ---
 
 # Defect Batch Prepare（Agent-1）
 
-**形态**：本 Skill 描述 SOP；**筛池与 L1/L2 必须由代码管线执行**，禁止用模型「手跑」替代 R0–R3 / L1–L2。
+SOP only. **R0–R3 and L1/L2 run in code** (`prepareDefectBatch` / `runDefectBatchPrepare`). Do not re-implement screen rules in chat.
 
-## 边界
+## When to use
 
-| 做 | 不做 |
+- Building or refreshing a `defect-batch` for Agent-2/3
+- Ingesting preloaded JSON / Excel exports (see `scripts/xlsx_to_raw_defects.py`)
+- Checking funnel pools: `strict` / `locatable_only` / `needs_info` / `hard_reject` / `security` / `excluded`
+
+## Do / Don't
+
+| Do | Don't |
 |---|---|
-| 拉取（MCP 准 / 爬虫备 / preloaded）→ `raw-defects` | 通读业务源码、根因、改码 |
-| 蒸馏描述模板、测试模块 / 标题括注 | 读取 `所属模块` 等闭环字段 |
-| 规则筛选 → `strict` 与旁路池 | 缺陷平台写操作 |
-| L1→L2→L3 分簇与排序 → `defect-batch` | 推翻 R2 硬淘汰 |
+| Ingest → `raw-defects` → distill → screen → cluster → validate | Read `所属模块` or other closed-loop fields |
+| Call code entrypoints below | Hand-run R2/R3 regexes in the model |
+| Inject business skills for aliases / intent gloss only | Override hard rejects via skill text |
 
-权威规则：`docs/defect-input-analysis/_stage1-rules.md` + `docs/superpowers/specs/2026-10-30-defect-screen-cluster-design.md`。
-
-## 流程
+## Pipeline
 
 ```text
-Ingest (mcp|crawler|preloaded) → raw-defects
-  → distill (0 LLM)
-  → screen R0–R3 (0 LLM)
-  → cluster L1/L2 (0 LLM) → L3 intent (heuristic or injected AI)
-  → R5/R6 → validate → defect-batch.json
+ingest (preloaded | mcp* | crawler*) → raw-defects
+  → distill → screen R0–R3 → cluster L1/L2 + L3 intent → R5/R6
+  → validateDefectBatch → defect-batch.json
 ```
 
-代码入口：
+\* mcp/crawler adapters are stubs until tool maps exist; use **preloaded**.
 
-- `ingestRawDefects()` — `src/ingest`
-- `prepareDefectBatch()` — `src/defect-batch`
+### Code entrypoints
 
-## 业务 Skill 可叠加（profiles: defect-batch）
+```ts
+import { runDefectBatchPrepare, prepareDefectBatch, validateDefectBatch } from "bugfix-agent";
 
-允许注入：模块别名、标题括注习惯、意图类目释义。  
-**禁止**：用业务 skill 推翻 R2 / 绕过 `raw-defects` 边界。
+const batch = await runDefectBatchPrepare({
+  mode: "preloaded",
+  productLine: "hc",
+  posture: "alpha", // or "beta" (Open/New only)
+  source: "./raw-defects.json",
+});
+```
 
-## L3 意图
+## Excel → raw-defects
 
-默认启发式分类器；可注入 `IntentClassifier` 做批处理 LLM。封闭枚举见 `INTENT_ENUM`（可后续冻结）。
+```bash
+python3 skills/defect-batch-prepare/scripts/xlsx_to_raw_defects.py \
+  --xlsx path/to/export.xlsx \
+  --product-line hc \
+  --out raw-defects.json
+```
 
-## 产出契约
+Requires `openpyxl`. Column aliases: `缺陷ID`/`标题|缺陷标题`/`缺陷描述`/`缺陷状态`/`测试模块`/…
 
-`defect-batch`：`schemaVersion`、`productLine`、`funnel`、`clusters[]`、`tickets[]`。  
-输出后必须 `validateDefectBatch`；失败不得交给 Agent-2/3。
+## Output contract
+
+`defect-batch`: `schemaVersion`, `productLine`, `posture`, `funnel`, `clusters[]`, `tickets[]`.  
+Fail closed: invalid batch must not go to Agent-2/3.
+
+## References
+
+- Rules: [reference.md](reference.md)
+- Examples: [examples.md](examples.md)
+- Stage1: `docs/defect-input-analysis/_stage1-rules.md`
+- Funnel: `docs/superpowers/specs/2026-10-30-defect-screen-cluster-design.md`
