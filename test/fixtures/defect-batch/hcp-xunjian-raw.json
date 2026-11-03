@@ -1,0 +1,274 @@
+{
+  "schemaVersion": "0.1.0",
+  "productLine": "hcp",
+  "defects": [
+    {
+      "defectId": "BGA260061551",
+      "title": "[智能巡检_APP] [Android] 自主按模板巡检提交后，点击Create Issue，抓图失败",
+      "description": "用例名称：对资产自主巡检前置条件：已进入自主巡检页面，选择区域下的资产，按模板远程巡检提交完成操作步骤：1.点检，提交问题单实际结果：抓图失败问题：[Android] 自主按模板巡检提交后，点击Create Issue，抓图失败见附件视频",
+      "status": "Open",
+      "testModule": "智能巡检_APP",
+      "fieldType": "缺陷",
+      "severity": "中"
+    },
+    {
+      "defectId": "BGA260060855",
+      "title": "[智能巡检_通用] 工作台任务待办提交，返回的界面非对应待办，而是之前在的巡检界面",
+      "description": "用例名称：【远程巡检任务】跳转显示正确前置条件：1.已添加包含巡检待办的工作台，且有全部权限操作步骤：1.工作台智能巡检-巡检待办卡片选中巡检任务，点击任一巡检任务的名称2.执行完成巡检任务预期结果：1.跳转到巡检待办对应的巡检任务的执行界面2.巡检任务处理成功，返回到巡检待办-巡检任务实际结果：2.返回的界面在之前的巡检界面，不是巡检待办-巡检任务，见附件视频问题：[智能巡检_通用] 工作台任务待办提交，返回的界面非对应待办，而是之前在的巡检界面",
+      "status": "Open",
+      "testModule": "智能巡检_通用",
+      "fieldType": "缺陷",
+      "severity": "低"
+    },
+    {
+      "defectId": "BGA260060587",
+      "title": "[智能巡检_报表] 单门店报表巡检任务报表重置后，导出失败",
+      "description": "用例名称：不同区域数据导出成功前置条件：1.进入巡检检任务报表-单门店报表\n2.选择门店操作步骤：1.底部巡检任务展开筛选项，点击重置\n2.点击导出实际结果：导出失败问题：单门店报表巡检任务报表重置后，导出失败\n初步定位：重置后时间范围（Scheduled Start Time控件）被清空导致，重新配置时间可导出成功",
+      "status": "Open",
+      "testModule": "智能巡检_报表",
+      "fieldType": "缺陷",
+      "severity": "中"
+    },
+    {
+      "defectId": "BGA260059805",
+      "title": "[智能巡检_视频配置] 巡检未解决的多语言UI问题",
+      "description": "问题：巡检未解决的多语言问题1.巡检库名称重复，报错仅中文翻译，英文等多语言翻译未修改\n\n2.[挪威语]资产配置或查看红外时，右上角Reselect被遮挡或与规则名称重叠",
+      "status": "Open",
+      "testModule": "智能巡检_视频配置",
+      "fieldType": "缺陷",
+      "severity": "低"
+    },
+    {
+      "defectId": "BGA260059782",
+      "title": "[智能巡检_任务] 远程或现场任务下重置，未区分任务模式",
+      "description": "问题：远程或现场任务下重置，未区分任务模式1.任务待办选择远程任务tab，点击重置，可包含现场任务2.任务待办选择现场任务tab，点击重置，可包含远程任务（见下图）",
+      "status": "Open",
+      "testModule": "智能巡检_任务",
+      "fieldType": "缺陷",
+      "severity": "低"
+    },
+    {
+      "defectId": "BGA260058640",
+      "title": "[软件成分分析]【HikCentral Professional Addon_Inspection_V2.2.0.202601260215_Win_x64.exe】zlib_1.3CVE漏洞(高危:2个,中危:0个,低危:0个)",
+      "description": "漏洞名称：【HikCentral Professional Addon_Inspection_V2.2.0.202601260215_Win_x64.exe】zlib_1.3CVE漏洞(高危:2个,中危:0个,低危:0个)\n漏洞描述：zlib_1.3 所属组件：[] 影响路径：['HCP/opencv_imgcodecs490.dll', 'HCP/opencv_core490.dll']\n检出工具：软件成分分析\n漏洞细节：\n\t高危--zlib_1.3_CVE漏洞(CVE-2023-45853)\n\t高危--zlib_1.3_CVE漏洞(CVE-2026-22184)\n漏洞共计：2\n报告地址：http://hikshield.example.com/task/detail?task_group_id=STG-MASKED\n详情请查看原始报告",
+      "status": "Delay/A bug（自动）",
+      "testModule": "安全",
+      "fieldType": "缺陷",
+      "severity": "高"
+    },
+    {
+      "defectId": "BGA260058639",
+      "title": "[软件成分分析]【HikCentral Professional Addon_Inspection_V2.2.0.202601260215_Win_x64.exe】zlib_1.2.11CVE漏洞(高危:4个,中危:0个,低危:0个)",
+      "description": "漏洞名称：【HikCentral Professional Addon_Inspection_V2.2.0.202601260215_Win_x64.exe】zlib_1.2.11CVE漏洞(高危:4个,中危:0个,低危:0个)\n漏洞描述：zlib_1.2.11 所属组件：[] 影响路径：['HCP/zlib1.dll', 'HCP/HPSocket.dll']\n检出工具：软件成分分析\n漏洞细节：\n\t高危--zlib_1.2.11_CVE漏洞(CVE-2022-37434)\n\t高危--zlib_1.2.11_CVE漏洞(CVE-2023-45853)\n\t高危--zlib_1.2.11_CVE漏洞(CVE-2018-25032)\n\t高危--zlib_1.2.11_CVE漏洞(CVE-2026-22184)\n漏洞共计：4\n报告地址：http://hikshield.example.com/task/detail?task_group_id=STG-MASKED\n详情请查看原始报告",
+      "status": "Delay/A bug（自动）",
+      "testModule": "安全",
+      "fieldType": "缺陷",
+      "severity": "高"
+    },
+    {
+      "defectId": "BGA260058638",
+      "title": "[软件成分分析]【HikCentral Professional Addon_Inspection_V2.2.0.202601260215_Win_x64.exe】libpng_1.6.37CVE漏洞(高危:3个,中危:3个,低危:0个)",
+      "description": "漏洞名称：【HikCentral Professional Addon_Inspection_V2.2.0.202601260215_Win_x64.exe】libpng_1.6.37CVE漏洞(高危:3个,中危:3个,低危:0个)\n漏洞描述：libpng_1.6.37 所属组件：[] 影响路径：['HCP/opencv_imgcodecs490.dll']\n检出工具：软件成分分析\n漏洞细节：\n\t中危--libpng_1.6.37_CVE漏洞(CVE-2025-64505)\n\t中危--libpng_1.6.37_CVE漏洞(CVE-2025-64506)\n\t高危--libpng_1.6.37_CVE漏洞(CVE-2025-65018)\n\t高危--libpng_1.6.37_CVE漏洞(CVE-2025-64720)\n\t高危--libpng_1.6.37_CVE漏洞(CVE-2025-66293)\n\t中危--libpng_1.6.37_CVE漏洞(CVE-2026-22801)\n漏洞共计：6\n报告地址：http://hikshield.example.com/task/detail?task_group_id=STG-MASKED\n详情请查看原始报告",
+      "status": "Delay/A bug（自动）",
+      "testModule": "安全",
+      "fieldType": "缺陷",
+      "severity": "高"
+    },
+    {
+      "defectId": "BGA260058637",
+      "title": "[智能巡检_资产配置] 其他界面返回资产，资产展开偶现无属性无资产",
+      "description": "前置条件：1.资产已展开操作步骤：1.切换其他菜单，返回资产，再次展开前置条件的资产实际结果：1.资产展开偶现无属性无资产问题：其他界面返回资产，资产展开偶现无属性无资产问题现象：\n正常情况：",
+      "status": "Open",
+      "testModule": "智能巡检_资产配置",
+      "fieldType": "缺陷",
+      "severity": "低"
+    },
+    {
+      "defectId": "BGA250770661",
+      "title": "[安全] Appscan扫描巡检相关有低级漏洞",
+      "description": "问题：Appscan扫描巡检相关有低级漏洞1.SSL请求中的查询参数2个\n2.发现可高速缓存的SSL页面2个",
+      "status": "Closed",
+      "testModule": "安全",
+      "fieldType": "缺陷",
+      "severity": "低"
+    },
+    {
+      "defectId": "BGA250770449",
+      "title": "[智能巡检_APP] iOS任务图片放到附件后，二次编辑卡死",
+      "description": "问题：iOS任务图片放到附件后，二次编辑loading结束后卡死\n&nbsp;\n见附件视频，图片无法收起\n&nbsp;",
+      "status": "Closed",
+      "testModule": "智能巡检_APP",
+      "fieldType": "缺陷",
+      "severity": "中"
+    },
+    {
+      "defectId": "BGA250770159",
+      "title": "[安全] WebScan扫描有3个中危漏洞[WebScan]Vulnerable JavaScript libraries",
+      "description": "漏洞名称：Vulnerable JavaScript libraries\n漏洞描述：You are using one or more vulnerable JavaScript libraries. One or more vulnerabilities were reported for this version of the library. Consult Attack details and Web References for more information about the affected library and the vulnerabilities that were reported.\n检出工具：WebScan\n漏洞细节：\n漏洞共计：1\n报告地址：http://hikshield.example.com/task/detail?task_group_id=STG-MASKED\n详情请查看原始报告",
+      "status": "Delay/A bug（自动）",
+      "testModule": "安全",
+      "fieldType": "缺陷",
+      "severity": "中"
+    },
+    {
+      "defectId": "BGA250770158",
+      "title": "[安全] WebScan扫描有3个中危漏洞[WebScan]Vulnerable JavaScript libraries",
+      "description": "漏洞名称：Vulnerable JavaScript libraries\n漏洞描述：You are using one or more vulnerable JavaScript libraries. One or more vulnerabilities were reported for this version of the library. Consult Attack details and Web References for more information about the affected library and the vulnerabilities that were reported.\n检出工具：WebScan\n漏洞细节：\n漏洞共计：1\n报告地址：http://hikshield.example.com/task/detail?task_group_id=STG-MASKED\n详情请查看原始报告",
+      "status": "Delay/A bug（自动）",
+      "testModule": "安全",
+      "fieldType": "缺陷",
+      "severity": "中"
+    },
+    {
+      "defectId": "BGA250770157",
+      "title": "[安全] WebScan扫描有3个中危漏洞[WebScan]Vulnerable JavaScript libraries",
+      "description": "漏洞名称：Vulnerable JavaScript libraries\n漏洞描述：You are using one or more vulnerable JavaScript libraries. One or more vulnerabilities were reported for this version of the library. Consult Attack details and Web References for more information about the affected library and the vulnerabilities that were reported.\n检出工具：WebScan\n漏洞细节：\n漏洞共计：1\n报告地址：http://hikshield.example.com/task/detail?task_group_id=STG-MASKED\n详情请查看原始报告",
+      "status": "Delay/A bug（自动）",
+      "testModule": "安全",
+      "fieldType": "缺陷",
+      "severity": "中"
+    },
+    {
+      "defectId": "BGA250769894",
+      "title": "[智能巡检_问题] 按任务分类查看问题清单，无巡检任务未按照区域过滤",
+      "description": "操作步骤：1.问题清单切换按分类显示测试数据：树选择节点实际结果：1.表头显示数量与实际展开的数量不一致，列表未进行区域过滤问题：按任务分类查看问题清单，无巡检任务未按照区域过滤补充：自主巡检和事件复核均存在该问题\n&nbsp;",
+      "status": "Closed",
+      "testModule": "智能巡检_问题",
+      "fieldType": "缺陷",
+      "severity": "中"
+    },
+    {
+      "defectId": "BGA250769741",
+      "title": "[智能巡检_问题] 已完成及作废的问题单修改处理人的提示语图标错误",
+      "description": "问题：已完成及作废的问题单修改处理人的提示语图标错误",
+      "status": "Closed",
+      "testModule": "智能巡检_问题",
+      "fieldType": "缺陷",
+      "severity": "低"
+    },
+    {
+      "defectId": "BGA250769726",
+      "title": "[智能巡检_事件] 事件复核点击查看记录按钮无效果",
+      "description": "问题：事件复核点击查看记录按钮无效果",
+      "status": "Closed",
+      "testModule": "智能巡检_事件",
+      "fieldType": "缺陷",
+      "severity": "中"
+    },
+    {
+      "defectId": "BGA250768474",
+      "title": "[智能巡检_问题] 从问题单切换问题清单，自定义列的资产、创建人是否勾选无效",
+      "description": "用例名称：编辑表头显示正确前置条件：1.问题单界面切换问题清单操作步骤：1.问题清单编辑列表表头预期结果：1.列表显示正确实际结果：自定义列的资产、创建人是否勾选无效问题：从问题单切换问题清单，自定义列的资产、创建人是否勾选无效补充：附件视频是零售操作，下图是工业",
+      "status": "Delay/A bug",
+      "testModule": "智能巡检_问题",
+      "fieldType": "缺陷",
+      "severity": "低"
+    },
+    {
+      "defectId": "BGH250075481",
+      "title": "[智能巡检_报表] 多门店报表导出文件名无实际意义",
+      "description": "问题：多门店报表导出文件名无实际意义",
+      "status": "Delay",
+      "testModule": "智能巡检_报表",
+      "fieldType": "建议"
+    },
+    {
+      "defectId": "BGA250768415",
+      "title": "[智能巡检_Mac] 事件及问题导出附件无视频，但实际导出包含视频文件",
+      "description": "操作步骤：1.问题单、问题清单导出查看mac显示预期结果：1.不支持视频，导出无视频实际结果：问题单及问题清单附件实际导出包含视频文件问题：复核清单、问题单、问题清单导出附件无视频，但实际导出包含视频文件补充：附件不勾选图片，仍带视频导出",
+      "status": "Closed",
+      "testModule": "智能巡检_任务",
+      "fieldType": "缺陷",
+      "severity": "中"
+    },
+    {
+      "defectId": "BGH250075418",
+      "title": "[智能巡检_任务] 巡检各界面检索条件，文本输入框未自动删除字符前和后的空格",
+      "description": "用例名称：巡检任务文本框字符串含有空格/回车操作步骤：1.测试文本框对文本字符的限制（最大限制输入n个字符）测试数据：字符串含有空格/回车预期结果：1-1.字符串前含有空格自动删除；1-2.字符串后含有空格自动删除；1-3.字符串中间含有一个或者多个空格时，空格自动删除/当做单个空格处理/当做多个空格处理（根据项目实际需求）问题：巡检各界面检索条件，文本输入框未自动删除字符前和后的空格建议：文本输入框对字符串自动过滤前后的空格\n补充：位置涉及多个界面，下图为任务待办界面",
+      "status": "Delay",
+      "testModule": "智能巡检_任务",
+      "fieldType": "建议"
+    },
+    {
+      "defectId": "BGA250767656",
+      "title": "[智能巡检_任务] 未完成任务附件上传中点击提交，出现右侧问题单弹窗不出现情况",
+      "description": "前置条件：1.任务仅剩1项未完成，已输入描述，还需要上传附件\n&nbsp;\n操作步骤：1.上传附件，未显示上传的附件前点击提交，提示未完成，关闭提示后清除上传的附件\n2.再次上传附件，已全部完成，点击提交实际结果：未出现右侧问题单弹窗，直接提交任务，实际有3个问题单问题：未完成任务附件上传中点击提交，出现右侧问题单弹窗不出现情况\n见录屏视频",
+      "status": "Delay/A bug",
+      "testModule": "智能巡检_任务",
+      "fieldType": "缺陷",
+      "severity": "低"
+    },
+    {
+      "defectId": "BGA250766950",
+      "title": "[智能巡检_任务] 模板及任务的报告分值出现未定义、选项前有历史配置分值",
+      "description": "问题：模板及任务的报告分值出现未定义、选项前有历史配置分值\n1.模板报告样式出现分值未定义\n2.模板及任务报告出现中间配置过的分值",
+      "status": "Closed",
+      "testModule": "智能巡检_任务",
+      "fieldType": "缺陷",
+      "severity": "低"
+    },
+    {
+      "defectId": "BGA250766745",
+      "title": "[智能巡检_通用] 工作台待办处理结束后，返回的界面非对应待办，而是之前在的巡检界面",
+      "description": "前置条件：1.工作台智能巡检-巡检待办卡片选中巡检任务，点击任一巡检任务的名称\n操作步骤：1.执行完成巡检任务\n预期结果：1.巡检任务处理成功，返回到巡检待办-巡检任务实际结果：工作台待办处理结束后，返回的界面非对应待办，而是之前在的巡检界面，比如模板问题：工作台待办处理结束后，返回的界面非对应待办，而是之前在的巡检界面补充：问题单、任务、事件复核均存在该情况",
+      "status": "Closed",
+      "testModule": "智能巡检_通用",
+      "fieldType": "缺陷",
+      "severity": "低"
+    },
+    {
+      "defectId": "BGA250766624",
+      "title": "[智能巡检_资产配置] 添加红外，风险项与底部红色高亮不匹配",
+      "description": "问题：添加红外，风险项与底部红色高亮不匹配\n触发场景存在两种：\n1.取消中风险，勾选中风险（图1）\n2.取消中风险，再取消高风险，勾选高风险（图2）",
+      "status": "Closed",
+      "testModule": "智能巡检_资产配置",
+      "fieldType": "缺陷",
+      "severity": "低"
+    },
+    {
+      "defectId": "BGA250766561",
+      "title": "[智能巡检_事件] 事件复核地图视频未关闭的提示图标错误",
+      "description": "问题：事件复核地图视频未关闭的提示图标错误",
+      "status": "Closed",
+      "testModule": "智能巡检_事件",
+      "fieldType": "缺陷",
+      "severity": "低"
+    },
+    {
+      "defectId": "BGA250766540",
+      "title": "[智能巡检_事件] 事件复核详情打开的问题单，左侧有空白但显示滚动条",
+      "description": "前置条件：1.进入巡检记录-事件复核-事件复核详情页操作步骤：1.查看操作记录，点击创建问题单的问题单预期结果：1.跳转到对应问题记录详情界面实际结果：左侧有空白但显示滚动条问题：事件复核详情打开的问题单，左侧有空白但显示滚动条\n补充：问题清单打开的问题单无该问题",
+      "status": "Closed",
+      "testModule": "智能巡检_事件",
+      "fieldType": "缺陷",
+      "severity": "低"
+    },
+    {
+      "defectId": "BGA250766442",
+      "title": "[智能巡检_任务] 仅勾选key时，右侧显示两次巡检项名称",
+      "description": "操作步骤：1.巡检模板界面配置巡检报告仅勾选key实际结果：仅勾选key时，右侧显示两次巡检项名称（报告样式及任务查看报告）问题：仅勾选key时，右侧显示两次巡检项名称\n补充：导出报告无该问题",
+      "status": "Closed",
+      "testModule": "智能巡检_任务",
+      "fieldType": "缺陷",
+      "severity": "低"
+    },
+    {
+      "defectId": "BGA250766319",
+      "title": "[智能巡检_任务] 任务未完成提交问题单，窗口两个按钮的效果不对",
+      "description": "操作步骤：1.任务未完成，点击提交\n2.遍历两个按钮，查看效果\n实际结果：\n1.点击取消和去完成按钮，均有定位效果（发生页面跳转及滚动条有变化，但选中的巡检项实际已完成）\n见附件视频问题：任务未完成提交问题单，窗口两个按钮的效果不对1.按钮取消，提示语应该直接关闭且没有定位效果2.按钮点击去完成，应该选定第一个未完成的巡检项，效果错误\n 补充：自主模板巡检有相同问题",
+      "status": "Closed",
+      "testModule": "智能巡检_任务",
+      "fieldType": "缺陷",
+      "severity": "中"
+    },
+    {
+      "defectId": "BGA250766197",
+      "title": "[智能巡检_自主] 自主巡检点检及事件复核无审核员报错后，影响其他报错弹窗显示",
+      "description": "前置步骤：1.选择监控点，并完成问题点检提交问题单，无审核员报错\n \n操作步骤：\n1.模板创建任务选择的区域无巡检员实际结果：\n1.创建失败，但无任何报错问题：自主巡检点检无审核员报错后，影响其他报错弹窗显示【事件复核无审核员有相同问题】见附件视频",
+      "status": "Closed",
+      "testModule": "智能巡检_自主",
+      "fieldType": "缺陷",
+      "severity": "中"
+    }
+  ]
+}

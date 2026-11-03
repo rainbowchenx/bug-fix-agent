@@ -20,3 +20,11 @@ logs/
 
 # LangGraph API
 .langgraph_api
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*.egg-info/
+dist-py/

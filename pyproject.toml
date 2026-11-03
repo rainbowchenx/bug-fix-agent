@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bugfix-agent"
+version = "0.2.0"
+description = "Three-agent defect workflow (Python): batch prepare → cartographer → analyst"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = [
+  "pydantic>=2.7",
+  "openpyxl>=3.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+
+[project.scripts]
+bugfix-agent = "bugfix_agent.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["bugfix_agent"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
