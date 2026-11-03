@@ -44,16 +44,23 @@ batch = run_defect_batch_prepare(
 )
 ```
 
-## Excel → raw-defects
+## Excel / CSV → raw-defects
 
 ```bash
+# Chinese Excel export
 python3 bugfix_agent/scripts/xlsx_to_raw_defects.py \
   --xlsx path/to/export.xlsx \
   --product-line hc \
   --out raw-defects.json
+
+# English camelCase CSV（缺陷拉取/脱敏/*.csv；平台拼写 describle）
+python3 bugfix_agent/scripts/csv_to_raw_defects.py \
+  --csv 缺陷拉取/脱敏/PJ14PD20260423284-assignee-87.csv \
+  --product-line ax-hybrid \
+  --out 缺陷拉取/脱敏/PJ14PD20260423284-assignee-87.raw-defects.json
 ```
 
-Requires `openpyxl`.
+Excel 需要 `openpyxl`。字段映射见 `缺陷拉取/脱敏/README.md`。
 
 ## Output contract
 
