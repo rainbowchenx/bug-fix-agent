@@ -2,7 +2,7 @@
 
 > 日期：2026-10-30  
 > **最近修订：2026-11-02 08:57（Asia/Shanghai）**  
-> 状态：**主路径探讨已收口**（非正式规格）——**仍不启动实现**。  
+> 状态：**主路径探讨已收口**；实现见 [正式架构脚手架](2026-11-03-three-agent-architecture.md)。  
 > 详文已拆开；本文 = 总览 + 跨段约定 + **收口摘要**。
 
 相关基线（Agent-3 尤须对照，完整表见 [Agent-3 §1.1–§1.2](2026-10-30-agent3-defect-analyst-discussion.md)）：
@@ -60,7 +60,7 @@
 | Agent-2 C2/C3/C4、B1–B7 | batch 形状/簇 ID/字段齐套；SDD 名单；三形态指纹等 |
 | Agent-3 E 组 | 多子仓 worktree 细节；多样本选优；Reviewer |
 | E6 aiservice | 私有仓深潜（本环境暂无读权限；GitHub 授权已拒） |
-| Q-F | 正式规格文 vs 直接实现——产品另拍 |
+| Q-F | **已拍（2026-11-03）**：直接进入正式架构脚手架 + 分阶段实现（见 [2026-11-03](2026-11-03-three-agent-architecture.md)） |
 
 ---
 
@@ -142,3 +142,4 @@ workflow┤  validate_in ──► Agent-2 ──► validate_out ─┤
 | 2026-11-01 | 拆三专文；松耦合；业务 Skill；Agent-1/2 推进 |
 | 2026-11-01～02 | Agent-2 A/C；Agent-3 D 组；SOTA 对照表 |
 | 2026-11-02 08:57 Asia/Shanghai | **三 Agent 主路径探讨收口总览**；更新跨段共识与延后清单 |
+| 2026-11-03 Asia/Shanghai | Q-F 拍板：进入 [正式架构脚手架](2026-11-03-three-agent-architecture.md)；探讨文不再挡实现 |

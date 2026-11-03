@@ -6,7 +6,7 @@
 |---|---|
 | C* screen rules / expectQuality / field bans | `docs/defect-input-analysis/_stage1-rules.md` |
 | R0–R6 pool semantics / L1→L2→L3 keys | `docs/superpowers/specs/2026-10-30-defect-screen-cluster-design.md` |
-| Implementation | `src/defect-batch/*`, `src/ingest/*` |
+| Implementation | `bugfix_agent/defect_batch/*`, `bugfix_agent/ingest/*`（Python） |
 
 ## Pool mapping (screen)
 

@@ -1,0 +1,39 @@
+# analysis-report v0.1
+
+**Producer:** Agent-3 (analyst) · **Consumer:** 人 / 下游
+
+| Field | Type | Notes |
+|---|---|---|
+| `schemaVersion` | string | `"0.1.0"` |
+| `productLine` / `workDir` | string | |
+| `generatedAt` | ISO string | |
+| `openMr` | boolean | 默认 false |
+| `mrUrl` | string \| null | |
+| `integrateMode` | `none` \| `single_mr` | openMr 时为 single_mr |
+| `summary` | `{ total, byOutcome }` | 浏览用；真源是 tickets[] |
+| `tickets[]` | **每票完整报告** | D2 |
+
+### tickets[] 互斥规则
+
+| `outcome` | 必填 | 禁止糊写 |
+|---|---|---|
+| `patch_ready` / `plan_only` | `proposedFix.summary` | 不可只写 blockers |
+| 其它阻断类 | `blockers` | 不可只写「不可修」 |
+
+### outcome 枚举
+
+`patch_ready` · `plan_only` · `needs_test_env` · `needs_ticket_info` · `needs_design_input` · `not_code` · `config_or_dependency` · `unlocalized` · `other_blocked`
+
+### tickets[] 字段
+
+| Field | Notes |
+|---|---|
+| `ticket` | 单信息切片（title/module/tag/intent/obs/exp/steps…） |
+| `localization` | candidates + notes；可 `degradedSearch` |
+| `rootCause` | summary / ruledOut / openQuestions |
+| `proposedFix?` | summary / steps / targetFiles |
+| `patch?` | path / summary |
+| `blockers?` | kind / detail / missingInfo? / envNeeds? |
+| `suggestedVerify` | steps + executed（默认 false） |
+| `confidence` | high/medium/low |
+| `verifyStatus` | passed/failed/**skipped**（默认 skipped；非 GREEN 门禁） |

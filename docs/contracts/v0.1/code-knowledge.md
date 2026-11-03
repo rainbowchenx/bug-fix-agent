@@ -1,0 +1,33 @@
+# code-knowledge v0.1
+
+**Producer:** Agent-2 (cartographer) · **Consumer:** Agent-3 only
+
+| Field | Type | Notes |
+|---|---|---|
+| `schemaVersion` | string | `"0.1.0"` |
+| `productLine` / `workDir` | string | |
+| `partial` | boolean | 探测/匹配不完整仍可校验通过 |
+| `generatedAt` | ISO string | |
+| `repoRoots[]` | `{ path, gitHead?, fingerprint? }` | 多子仓；`path` 相对 workDir |
+| `cartographyProfile` | enum | `electron_node` \| `micro_frontend` \| `device_web` \| `unknown` |
+| `secondaryHints[]` | string | |
+| `techStack` | `{ languages[], frameworks[], notes }` | |
+| `architecture` | `{ summary, entryPoints[], modules[] }` | modules: `{ id, path?, role? }` |
+| `conventions` | `{ fromClaudeMd[], fromRules[] }` | |
+| `boundSkills[]` | string | |
+| `specAtlas` | framework + entries + drDs | `frameworkId` 封闭集或 `unknown` |
+| `capabilities` | `{ codeGraph, runtimeVerify }` | |
+| `defectCodeMatches[]` | per-ticket soft start | **核心交付** |
+
+### defectCodeMatches[]
+
+| Field | Type | Notes |
+|---|---|---|
+| `defectId` | string | |
+| `clusterId` / `title` | ? | |
+| `candidates[]` | `{ repoPath, path, symbol?, why, source }` | 可空 |
+| `confidence` | high/medium/low | |
+
+`source`: `codegraph` \| `grep` \| `heuristic` \| `claude_md`
+
+默认只为 pool ∈ {strict, locatable_only, needs_info} 写匹配。

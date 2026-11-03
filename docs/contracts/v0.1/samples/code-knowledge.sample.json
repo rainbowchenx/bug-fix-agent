@@ -1,0 +1,156 @@
+{
+  "schemaVersion": "0.1.0",
+  "productLine": "hc",
+  "workDir": "/workspace/test/fixtures/mini-workdir-samples",
+  "partial": false,
+  "generatedAt": "2026-11-03T04:30:09.110911Z",
+  "repoRoots": [
+    {
+      "path": ".",
+      "gitHead": null,
+      "fingerprint": "mini-hc@0.0.1"
+    }
+  ],
+  "cartographyProfile": "electron_node",
+  "secondaryHints": [
+    ".:electron"
+  ],
+  "techStack": {
+    "languages": [
+      "javascript",
+      "typescript"
+    ],
+    "frameworks": [
+      "electron",
+      "vue"
+    ],
+    "notes": ""
+  },
+  "architecture": {
+    "summary": "Detected electron_node across 1 repo root(s)",
+    "entryPoints": [],
+    "modules": [
+      {
+        "id": ".",
+        "path": ".",
+        "role": "repo_root",
+        "shared": null,
+        "notes": null
+      }
+    ]
+  },
+  "conventions": {
+    "fromClaudeMd": [
+      "Sample",
+      "CodeGraph enabled."
+    ],
+    "fromRules": []
+  },
+  "boundSkills": [],
+  "specAtlas": {
+    "frameworkId": "unknown",
+    "entries": [
+      {
+        "path": "CLAUDE.md",
+        "kind": "guide",
+        "source": "repo_root"
+      }
+    ],
+    "drDs": [],
+    "bindings": []
+  },
+  "capabilities": {
+    "codeGraph": true,
+    "runtimeVerify": false
+  },
+  "defectCodeMatches": [
+    {
+      "defectId": "BGCM2026091608723",
+      "clusterId": "hc::T云视频-回放::T云视频-回放::compat::MAC电脑Safari小",
+      "title": "[T云视频-回放] MAC电脑Safari小窗口播放中，录像必须失败",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/playback_回放.ts",
+          "symbol": null,
+          "why": "path contains token \"回放\" from titleTag/testModule/intent",
+          "source": "heuristic"
+        }
+      ],
+      "confidence": "low"
+    },
+    {
+      "defectId": "BGCM2026092108592",
+      "clusterId": "hc::T云视频-事件文本摘要::T云视频-事件文本摘要::unclear::当AI套餐中的密码错误时",
+      "title": "[T云视频-事件文本摘要] 当AI套餐中的密码错误时，报警界面同一个通道的图片解密需要一个个事件解密才能查看",
+      "candidates": [],
+      "confidence": "low"
+    },
+    {
+      "defectId": "BGCM2026091705641",
+      "clusterId": null,
+      "title": "[T-云视频-轨迹播放] 轨迹播放追加目标后，新增了相应的监控点，但是删除该追加目标后，右上角的监控点列表和右侧事件列表，包括底部地图，该新增目标对应的监控点没有相应删掉",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/轨迹播放.ts",
+          "symbol": null,
+          "why": "path contains token \"轨迹播放\" from titleTag/testModule/intent",
+          "source": "heuristic"
+        }
+      ],
+      "confidence": "low"
+    },
+    {
+      "defectId": "BGCM2026092105488",
+      "clusterId": null,
+      "title": "[T-云视频-轨迹播放] 追加目标成功后，再删除目标，对应的监控点个数没有相应改变",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/轨迹播放.ts",
+          "symbol": null,
+          "why": "path contains token \"轨迹播放\" from titleTag/testModule/intent",
+          "source": "heuristic"
+        }
+      ],
+      "confidence": "low"
+    },
+    {
+      "defectId": "BGCM2026092105872",
+      "clusterId": null,
+      "title": "[T-云视频-轨迹播放] 追加目标成功后，只筛选追加目标的那个监控点，此时删除追加目标，原目标没有重新搜索，显示无数据",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/轨迹播放.ts",
+          "symbol": null,
+          "why": "path contains token \"轨迹播放\" from titleTag/testModule/intent",
+          "source": "heuristic"
+        }
+      ],
+      "confidence": "low"
+    },
+    {
+      "defectId": "BGCM2026091608797",
+      "clusterId": null,
+      "title": "[T云视频-VQA问答] PortalVQA云存储始终提示无录像",
+      "candidates": [],
+      "confidence": "low"
+    },
+    {
+      "defectId": "BGCM2026091709009",
+      "clusterId": null,
+      "title": "[T云视频Portal-综合检索接入AI Agent-人员] 智能检索，没有开AI套餐的时候，是否不展示AI搜索按钮",
+      "candidates": [],
+      "confidence": "low"
+    },
+    {
+      "defectId": "BGCM2026091608739",
+      "clusterId": null,
+      "title": "[T云视频-人车名单管理] Safari添加人车的弹窗，下侧兼容有点问题",
+      "candidates": [],
+      "confidence": "low"
+    }
+  ]
+}
