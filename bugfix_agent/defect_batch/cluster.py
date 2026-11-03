@@ -15,9 +15,13 @@ def _cluster_id(line: str, module: str, tag: str, intent: Intent, token: Optiona
 
 
 def _title_token(title: str) -> str:
-    # strip tags then take first meaningful chunk
+    # strip tags / code-review prefix then take a meaningful chunk
     t = re.sub(r"【[^】]+】|\[[^\]]+\]", "", title).strip()
-    m = re.search(r"[\u4e00-\u9fffA-Za-z0-9]{2,12}", t)
+    t = re.sub(r"^问题描述\s*[:：]\s*", "", t)
+    m = re.search(r"[A-Za-z_][A-Za-z0-9_.-]{2,24}", t)
+    if m:
+        return m.group(0)[:24]
+    m = re.search(r"[\u4e00-\u9fff]{2,12}", t)
     return m.group(0) if m else "_misc"
 
 
@@ -92,7 +96,12 @@ def cluster_screened(
     strict_count = max(len(strict), 1)
     final_buckets: dict[str, list[ScreenedTicket]] = {}
     for cid, lst in cluster_buckets.items():
-        fat = len(lst) / strict_count > fat_ratio or len(lst) > fat_absolute
+        code_review_heavy = sum(1 for t in lst if t.digest.titleTag == "_code_review") >= max(3, len(lst) // 2)
+        fat = (
+            len(lst) / strict_count > fat_ratio
+            or len(lst) > fat_absolute
+            or (code_review_heavy and len(lst) > 5)
+        )
         if not fat:
             final_buckets[cid] = lst
             continue

@@ -46,7 +46,10 @@ def screen_digest(
     if is_excluded_status(d.status):
         return ScreenedTicket(d, "excluded", "EXCLUDED", expect_quality, rule_ids, "R1", "Cancel / Not a bug / void")
 
-    if is_security_title(d.title) or SCANNER_RE.search(d.fullText):
+    # Code-review tickets often mention scanners/controls in diff text — do not bypass.
+    if d.titleTag != "_code_review" and (
+        is_security_title(d.title) or SCANNER_RE.search(d.fullText)
+    ):
         return ScreenedTicket(d, "security", "SECURITY", expect_quality, rule_ids, "R1", "security / SCA bypass")
 
     if posture == "beta" and d.status and not is_open_like(d.status):
