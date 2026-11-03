@@ -24,25 +24,6 @@ export { snipVerifyLog } from "./pipeline/log-snip.js";
 export { resolveStaticCheckPlan, runStaticCheck } from "./pipeline/static-check.js";
 export { reviewCluster, parseReviewResult } from "./pipeline/review.js";
 
-/** Agent-1 */
-export * from "./defect-batch/index.js";
-export {
-  ingestRawDefects,
-  getIngestAdapter,
-  preloadedIngestAdapter,
-  mcpIngestAdapter,
-  crawlerIngestAdapter,
-} from "./ingest/index.js";
-export type { IngestAdapter, IngestMode, IngestRequest, IngestResult } from "./ingest/index.js";
-
-/** Cross-agent contracts (preferred import surface for I/O) */
-export * from "./contracts/index.js";
-
-/** Agent-2 / Agent-3 packages */
-export * from "./agents/index.js";
-
-/** Parent workflow */
-export * from "./workflow/index.js";
 
 export interface StartServerOptions {
   port?: number;

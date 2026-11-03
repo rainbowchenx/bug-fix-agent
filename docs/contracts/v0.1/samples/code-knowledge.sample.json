@@ -3,7 +3,7 @@
   "productLine": "hc",
   "workDir": "/workspace/test/fixtures/mini-workdir-samples",
   "partial": false,
-  "generatedAt": "2026-11-03T01:00:22.192Z",
+  "generatedAt": "2026-11-03T04:30:09.110911Z",
   "repoRoots": [
     {
       "path": ".",
@@ -17,8 +17,8 @@
   ],
   "techStack": {
     "languages": [
-      "typescript",
-      "javascript"
+      "javascript",
+      "typescript"
     ],
     "frameworks": [
       "electron",
@@ -33,7 +33,9 @@
       {
         "id": ".",
         "path": ".",
-        "role": "repo_root"
+        "role": "repo_root",
+        "shared": null,
+        "notes": null
       }
     ]
   },
@@ -63,78 +65,90 @@
   },
   "defectCodeMatches": [
     {
-      "defectId": "BGCM2026091803464",
-      "title": "[T云视频Portal-智能检索] 智能检索事件导出，导出提示成功，但是实际没有视频导出出来",
+      "defectId": "BGCM2026091608723",
+      "clusterId": "hc::T云视频-回放::T云视频-回放::compat::MAC电脑Safari小",
+      "title": "[T云视频-回放] MAC电脑Safari小窗口播放中，录像必须失败",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/playback_回放.ts",
+          "symbol": null,
+          "why": "path contains token \"回放\" from titleTag/testModule/intent",
+          "source": "heuristic"
+        }
+      ],
+      "confidence": "low"
+    },
+    {
+      "defectId": "BGCM2026092108592",
+      "clusterId": "hc::T云视频-事件文本摘要::T云视频-事件文本摘要::unclear::当AI套餐中的密码错误时",
+      "title": "[T云视频-事件文本摘要] 当AI套餐中的密码错误时，报警界面同一个通道的图片解密需要一个个事件解密才能查看",
       "candidates": [],
       "confidence": "low"
     },
     {
-      "defectId": "BGCM2026091708573",
-      "title": "[T云视频Portal-综合检索-车] 搜车文件导出中，存在阿拉伯语未翻译",
+      "defectId": "BGCM2026091705641",
+      "clusterId": null,
+      "title": "[T-云视频-轨迹播放] 轨迹播放追加目标后，新增了相应的监控点，但是删除该追加目标后，右上角的监控点列表和右侧事件列表，包括底部地图，该新增目标对应的监控点没有相应删掉",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/轨迹播放.ts",
+          "symbol": null,
+          "why": "path contains token \"轨迹播放\" from titleTag/testModule/intent",
+          "source": "heuristic"
+        }
+      ],
+      "confidence": "low"
+    },
+    {
+      "defectId": "BGCM2026092105488",
+      "clusterId": null,
+      "title": "[T-云视频-轨迹播放] 追加目标成功后，再删除目标，对应的监控点个数没有相应改变",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/轨迹播放.ts",
+          "symbol": null,
+          "why": "path contains token \"轨迹播放\" from titleTag/testModule/intent",
+          "source": "heuristic"
+        }
+      ],
+      "confidence": "low"
+    },
+    {
+      "defectId": "BGCM2026092105872",
+      "clusterId": null,
+      "title": "[T-云视频-轨迹播放] 追加目标成功后，只筛选追加目标的那个监控点，此时删除追加目标，原目标没有重新搜索，显示无数据",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/轨迹播放.ts",
+          "symbol": null,
+          "why": "path contains token \"轨迹播放\" from titleTag/testModule/intent",
+          "source": "heuristic"
+        }
+      ],
+      "confidence": "low"
+    },
+    {
+      "defectId": "BGCM2026091608797",
+      "clusterId": null,
+      "title": "[T云视频-VQA问答] PortalVQA云存储始终提示无录像",
       "candidates": [],
-      "confidence": "low"
-    },
-    {
-      "defectId": "BGCM2026091706145",
-      "title": "[T云门禁-通行记录] 小语种登录平台，通行记录界面，筛选条件中时间选择最近7天和最近30天未翻译成小语种",
-      "candidates": [
-        {
-          "repoPath": ".",
-          "path": "src/通行记录.ts",
-          "why": "path contains token \"通行记录\" from titleTag/testModule/intent",
-          "source": "heuristic"
-        }
-      ],
-      "confidence": "low"
-    },
-    {
-      "defectId": "BGCM2026091705724",
-      "title": "[变更-T系统-服务] 小语种下，hct portal绑定监控点输入密码、AI服务协议弹框内容存在多语言未翻译",
-      "candidates": [
-        {
-          "repoPath": ".",
-          "path": "src/portal/服务.ts",
-          "why": "path contains token \"服务\" from titleTag/testModule/intent",
-          "source": "heuristic"
-        }
-      ],
-      "confidence": "low"
-    },
-    {
-      "defectId": "BGCM2026091704696",
-      "title": "[T系统-服务] 小语种下，hct portal服务市场视频AI或枪支检测营销页详情未显示多语言（hct app有显示）",
-      "candidates": [
-        {
-          "repoPath": ".",
-          "path": "src/portal/服务.ts",
-          "why": "path contains token \"服务\" from titleTag/testModule/intent",
-          "source": "heuristic"
-        }
-      ],
-      "confidence": "low"
-    },
-    {
-      "defectId": "BGCM2026091704657",
-      "title": "[T系统-服务] 小语种下，hct portal服务市场视频AI或枪支检测试用中按钮文案显示为key值",
-      "candidates": [
-        {
-          "repoPath": ".",
-          "path": "src/portal/服务.ts",
-          "why": "path contains token \"服务\" from titleTag/testModule/intent",
-          "source": "heuristic"
-        }
-      ],
       "confidence": "low"
     },
     {
       "defectId": "BGCM2026091709009",
+      "clusterId": null,
       "title": "[T云视频Portal-综合检索接入AI Agent-人员] 智能检索，没有开AI套餐的时候，是否不展示AI搜索按钮",
       "candidates": [],
       "confidence": "low"
     },
     {
-      "defectId": "BGCM2026092106976",
-      "title": "[T云门禁APP-授权Flutter] 临时授权动态二维码点击复制链接进入的页面Portal报错404（APP打开的界面也不对）",
+      "defectId": "BGCM2026091608739",
+      "clusterId": null,
+      "title": "[T云视频-人车名单管理] Safari添加人车的弹窗，下侧兼容有点问题",
       "candidates": [],
       "confidence": "low"
     }

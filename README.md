@@ -1,8 +1,20 @@
 # bugfix-agent
 
-本地双结局 BugFix Agent（npm 包）：Dify / `curl` 一次提交缺陷整表 + `workDir`，全自动跑完后产出汇总报告——**可修开 GitLab MR**，**不可修写全原因**；无中间等人断点。
+**三 Agent 主路径现为 Python**（`bugfix_agent/`）：缺陷批次准备 → 代码通读 → 按条分析报告。契约见 `docs/contracts/v0.1/`。
 
-## 安装
+```bash
+pip install -e ".[dev]"
+bugfix-agent run --work-dir ./repos --product-line hc --source raw-defects.json --posture alpha --out-dir /tmp/out
+pytest -q
+```
+
+---
+
+## Legacy（npm / 旧簇级 BugFix）
+
+本地双结局 BugFix Agent（npm 包，历史路径）：Dify / `curl` 一次提交缺陷整表 + `workDir`，全自动跑完后产出汇总报告——**可修开 GitLab MR**，**不可修写全原因**；无中间等人断点。
+
+### 安装（legacy）
 
 ```bash
 npm i -g bugfix-agent
@@ -12,7 +24,7 @@ npx bugfix-agent serve --port 8787
 
 **重要：** 依赖 `@anthropic-ai/claude-agent-sdk` 的 **optional 平台二进制**，安装时**不要**使用 `npm i --omit=optional`。
 
-Node.js ≥ 20。
+Node.js ≥ 20（仅 legacy 路径）。
 
 ## 环境变量
 

@@ -2,7 +2,7 @@
   "schemaVersion": "0.1.0",
   "productLine": "hc",
   "workDir": "/workspace/test/fixtures/mini-workdir-samples",
-  "generatedAt": "2026-11-03T01:00:22.195Z",
+  "generatedAt": "2026-11-03T04:30:09.111120Z",
   "openMr": false,
   "mrUrl": null,
   "integrateMode": "none",
@@ -16,30 +16,36 @@
   },
   "tickets": [
     {
-      "defectId": "BGCM2026091706145",
+      "defectId": "BGCM2026091608723",
       "ticket": {
-        "title": "[T云门禁-通行记录] 小语种登录平台，通行记录界面，筛选条件中时间选择最近7天和最近30天未翻译成小语种",
-        "testModule": "T云门禁-通行记录",
-        "titleTag": "T云门禁-通行记录",
-        "pool": "locatable_only",
-        "status": "Open",
-        "severity": "低",
-        "reasonCode": "R3b",
-        "reasonDetail": "FIXABLE but expect not unique"
+        "title": "[T云视频-回放] MAC电脑Safari小窗口播放中，录像必须失败",
+        "testModule": "T云视频-回放",
+        "titleTag": "T云视频-回放",
+        "intent": "compat",
+        "pool": "strict",
+        "observed": null,
+        "expected": null,
+        "steps": null,
+        "status": "Closed",
+        "severity": "中",
+        "reasonCode": null,
+        "reasonDetail": null
       },
       "localization": {
         "candidates": [
           {
             "repoPath": ".",
-            "path": "src/通行记录.ts",
-            "why": "path contains token \"通行记录\" from titleTag/testModule/intent",
+            "path": "src/playback_回放.ts",
+            "symbol": null,
+            "why": "path contains token \"回放\" from titleTag/testModule/intent",
             "source": "heuristic"
           }
         ],
-        "notes": "consumed Agent-2 defectCodeMatches as soft start (D4)"
+        "notes": "consumed Agent-2 defectCodeMatches as soft start (D4)",
+        "degradedSearch": null
       },
       "rootCause": {
-        "summary": "Localization soft-start available; root cause pending Agent-3 SDK analyze session",
+        "summary": "Localization soft-start available; root cause pending analyze session",
         "ruledOut": [],
         "openQuestions": [
           "根因待 analyze 会话确认"
@@ -47,14 +53,14 @@
       },
       "outcome": "plan_only",
       "proposedFix": {
-        "summary": "Inspect and fix around soft-matched paths for: [T云门禁-通行记录] 小语种登录平台，通行记录界面，筛选条件中时间选择最近7天和最近30天未翻译成小语种",
+        "summary": "Inspect and fix around soft-matched paths for: [T云视频-回放] MAC电脑Safari小窗口播放中，录像必须失败",
         "steps": [
           "Review soft-start candidates from code-knowledge",
-          "Confirm root cause with Read/Grep (SDK session)",
+          "Confirm root cause",
           "Apply minimal-diff patch under scope lock"
         ],
         "targetFiles": [
-          "src/通行记录.ts"
+          "src/playback_回放.ts"
         ]
       },
       "patch": null,
@@ -70,14 +76,18 @@
       "verifyStatus": "skipped"
     },
     {
-      "defectId": "BGCM2026091705724",
+      "defectId": "BGCM2026091705641",
       "ticket": {
-        "title": "[变更-T系统-服务] 小语种下，hct portal绑定监控点输入密码、AI服务协议弹框内容存在多语言未翻译",
-        "testModule": "变更-T系统-服务",
-        "titleTag": "变更-T系统-服务",
+        "title": "[T-云视频-轨迹播放] 轨迹播放追加目标后，新增了相应的监控点，但是删除该追加目标后，右上角的监控点列表和右侧事件列表，包括底部地图，该新增目标对应的监控点没有相应删掉",
+        "testModule": "T-云视频-轨迹播放",
+        "titleTag": "T-云视频-轨迹播放",
+        "intent": null,
         "pool": "locatable_only",
-        "status": "Open",
-        "severity": "低",
+        "observed": null,
+        "expected": null,
+        "steps": null,
+        "status": "Closed",
+        "severity": "中",
         "reasonCode": "R3b",
         "reasonDetail": "FIXABLE but expect not unique"
       },
@@ -85,15 +95,17 @@
         "candidates": [
           {
             "repoPath": ".",
-            "path": "src/portal/服务.ts",
-            "why": "path contains token \"服务\" from titleTag/testModule/intent",
+            "path": "src/轨迹播放.ts",
+            "symbol": null,
+            "why": "path contains token \"轨迹播放\" from titleTag/testModule/intent",
             "source": "heuristic"
           }
         ],
-        "notes": "consumed Agent-2 defectCodeMatches as soft start (D4)"
+        "notes": "consumed Agent-2 defectCodeMatches as soft start (D4)",
+        "degradedSearch": null
       },
       "rootCause": {
-        "summary": "Localization soft-start available; root cause pending Agent-3 SDK analyze session",
+        "summary": "Localization soft-start available; root cause pending analyze session",
         "ruledOut": [],
         "openQuestions": [
           "根因待 analyze 会话确认"
@@ -101,14 +113,14 @@
       },
       "outcome": "plan_only",
       "proposedFix": {
-        "summary": "Inspect and fix around soft-matched paths for: [变更-T系统-服务] 小语种下，hct portal绑定监控点输入密码、AI服务协议弹框内容存在多语言未翻译",
+        "summary": "Inspect and fix around soft-matched paths for: [T-云视频-轨迹播放] 轨迹播放追加目标后，新增了相应的监控点，但是删除该追加目标后，右上角的监控点列表和右侧事件列表，包括底部地图，该新增目标对应的监控点没",
         "steps": [
           "Review soft-start candidates from code-knowledge",
-          "Confirm root cause with Read/Grep (SDK session)",
+          "Confirm root cause",
           "Apply minimal-diff patch under scope lock"
         ],
         "targetFiles": [
-          "src/portal/服务.ts"
+          "src/轨迹播放.ts"
         ]
       },
       "patch": null,
@@ -124,14 +136,18 @@
       "verifyStatus": "skipped"
     },
     {
-      "defectId": "BGCM2026091704696",
+      "defectId": "BGCM2026092105488",
       "ticket": {
-        "title": "[T系统-服务] 小语种下，hct portal服务市场视频AI或枪支检测营销页详情未显示多语言（hct app有显示）",
-        "testModule": "T系统-服务",
-        "titleTag": "T系统-服务",
+        "title": "[T-云视频-轨迹播放] 追加目标成功后，再删除目标，对应的监控点个数没有相应改变",
+        "testModule": "T-云视频-轨迹播放",
+        "titleTag": "T-云视频-轨迹播放",
+        "intent": null,
         "pool": "locatable_only",
-        "status": "Open",
-        "severity": "低",
+        "observed": null,
+        "expected": null,
+        "steps": null,
+        "status": "Solved",
+        "severity": "中",
         "reasonCode": "R3b",
         "reasonDetail": "FIXABLE but expect not unique"
       },
@@ -139,15 +155,17 @@
         "candidates": [
           {
             "repoPath": ".",
-            "path": "src/portal/服务.ts",
-            "why": "path contains token \"服务\" from titleTag/testModule/intent",
+            "path": "src/轨迹播放.ts",
+            "symbol": null,
+            "why": "path contains token \"轨迹播放\" from titleTag/testModule/intent",
             "source": "heuristic"
           }
         ],
-        "notes": "consumed Agent-2 defectCodeMatches as soft start (D4)"
+        "notes": "consumed Agent-2 defectCodeMatches as soft start (D4)",
+        "degradedSearch": null
       },
       "rootCause": {
-        "summary": "Localization soft-start available; root cause pending Agent-3 SDK analyze session",
+        "summary": "Localization soft-start available; root cause pending analyze session",
         "ruledOut": [],
         "openQuestions": [
           "根因待 analyze 会话确认"
@@ -155,14 +173,14 @@
       },
       "outcome": "plan_only",
       "proposedFix": {
-        "summary": "Inspect and fix around soft-matched paths for: [T系统-服务] 小语种下，hct portal服务市场视频AI或枪支检测营销页详情未显示多语言（hct app有显示）",
+        "summary": "Inspect and fix around soft-matched paths for: [T-云视频-轨迹播放] 追加目标成功后，再删除目标，对应的监控点个数没有相应改变",
         "steps": [
           "Review soft-start candidates from code-knowledge",
-          "Confirm root cause with Read/Grep (SDK session)",
+          "Confirm root cause",
           "Apply minimal-diff patch under scope lock"
         ],
         "targetFiles": [
-          "src/portal/服务.ts"
+          "src/轨迹播放.ts"
         ]
       },
       "patch": null,
@@ -178,14 +196,18 @@
       "verifyStatus": "skipped"
     },
     {
-      "defectId": "BGCM2026091704657",
+      "defectId": "BGCM2026092105872",
       "ticket": {
-        "title": "[T系统-服务] 小语种下，hct portal服务市场视频AI或枪支检测试用中按钮文案显示为key值",
-        "testModule": "T系统-服务",
-        "titleTag": "T系统-服务",
+        "title": "[T-云视频-轨迹播放] 追加目标成功后，只筛选追加目标的那个监控点，此时删除追加目标，原目标没有重新搜索，显示无数据",
+        "testModule": "T-云视频-轨迹播放",
+        "titleTag": "T-云视频-轨迹播放",
+        "intent": null,
         "pool": "locatable_only",
-        "status": "Open",
-        "severity": "低",
+        "observed": null,
+        "expected": null,
+        "steps": null,
+        "status": "Solved",
+        "severity": "中",
         "reasonCode": "R3b",
         "reasonDetail": "FIXABLE but expect not unique"
       },
@@ -193,15 +215,17 @@
         "candidates": [
           {
             "repoPath": ".",
-            "path": "src/portal/服务.ts",
-            "why": "path contains token \"服务\" from titleTag/testModule/intent",
+            "path": "src/轨迹播放.ts",
+            "symbol": null,
+            "why": "path contains token \"轨迹播放\" from titleTag/testModule/intent",
             "source": "heuristic"
           }
         ],
-        "notes": "consumed Agent-2 defectCodeMatches as soft start (D4)"
+        "notes": "consumed Agent-2 defectCodeMatches as soft start (D4)",
+        "degradedSearch": null
       },
       "rootCause": {
-        "summary": "Localization soft-start available; root cause pending Agent-3 SDK analyze session",
+        "summary": "Localization soft-start available; root cause pending analyze session",
         "ruledOut": [],
         "openQuestions": [
           "根因待 analyze 会话确认"
@@ -209,14 +233,14 @@
       },
       "outcome": "plan_only",
       "proposedFix": {
-        "summary": "Inspect and fix around soft-matched paths for: [T系统-服务] 小语种下，hct portal服务市场视频AI或枪支检测试用中按钮文案显示为key值",
+        "summary": "Inspect and fix around soft-matched paths for: [T-云视频-轨迹播放] 追加目标成功后，只筛选追加目标的那个监控点，此时删除追加目标，原目标没有重新搜索，显示无数据",
         "steps": [
           "Review soft-start candidates from code-knowledge",
-          "Confirm root cause with Read/Grep (SDK session)",
+          "Confirm root cause",
           "Apply minimal-diff patch under scope lock"
         ],
         "targetFiles": [
-          "src/portal/服务.ts"
+          "src/轨迹播放.ts"
         ]
       },
       "patch": null,
@@ -237,8 +261,11 @@
         "title": "[T云视频Portal-综合检索接入AI Agent-人员] 智能检索，没有开AI套餐的时候，是否不展示AI搜索按钮",
         "testModule": "T云视频Portal-综合检索接入AI Agent-人员",
         "titleTag": "T云视频Portal-综合检索接入AI Agent-人员",
+        "intent": null,
         "pool": "needs_info",
         "observed": "智能检索，没有开AI套餐的时候，是否不展示AI搜索按钮问题：1.cuuwiv@youxiang.dev Hcc125689这个账号没激活AI套餐，是不是不要展示AI按钮2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
+        "expected": null,
+        "steps": null,
         "status": "Closed",
         "severity": "低",
         "reasonCode": "C2",
@@ -246,7 +273,8 @@
       },
       "localization": {
         "candidates": [],
-        "notes": "soft-start matches retained; analysis blocked on ticket info"
+        "notes": "soft-start matches retained; analysis blocked on ticket info",
+        "degradedSearch": null
       },
       "rootCause": {
         "summary": "Insufficient ticket information to localize or propose a reliable fix",
@@ -269,7 +297,8 @@
           "期望结果",
           "可判定的期望描述",
           "筛因补充: expectation undefined / needs design input"
-        ]
+        ],
+        "envNeeds": null
       },
       "suggestedVerify": {
         "steps": [
@@ -281,20 +310,25 @@
       "verifyStatus": "skipped"
     },
     {
-      "defectId": "BGCM2026092106976",
+      "defectId": "BGCM2026091608739",
       "ticket": {
-        "title": "[T云门禁APP-授权Flutter] 临时授权动态二维码点击复制链接进入的页面Portal报错404（APP打开的界面也不对）",
-        "testModule": "T云门禁APP-授权Flutter",
-        "titleTag": "T云门禁APP-授权Flutter",
+        "title": "[T云视频-人车名单管理] Safari添加人车的弹窗，下侧兼容有点问题",
+        "testModule": "T云视频-人车名单管理",
+        "titleTag": "T云视频-人车名单管理",
+        "intent": null,
         "pool": "needs_info",
-        "status": "Solved",
-        "severity": "中",
-        "reasonCode": "C1e",
-        "reasonDetail": "error mentioned without detail"
+        "observed": null,
+        "expected": null,
+        "steps": null,
+        "status": "Closed",
+        "severity": "低",
+        "reasonCode": "C1c",
+        "reasonDetail": "vague adjective without quantification"
       },
       "localization": {
         "candidates": [],
-        "notes": "soft-start matches retained; analysis blocked on ticket info"
+        "notes": "soft-start matches retained; analysis blocked on ticket info",
+        "degradedSearch": null
       },
       "rootCause": {
         "summary": "Insufficient ticket information to localize or propose a reliable fix",
@@ -304,7 +338,7 @@
           "期望结果",
           "实际结果",
           "可判定的期望描述",
-          "筛因补充: error mentioned without detail"
+          "筛因补充: vague adjective without quantification"
         ]
       },
       "outcome": "needs_ticket_info",
@@ -312,14 +346,15 @@
       "patch": null,
       "blockers": {
         "kind": "needs_ticket_info",
-        "detail": "error mentioned without detail",
+        "detail": "vague adjective without quantification",
         "missingInfo": [
           "复现步骤",
           "期望结果",
           "实际结果",
           "可判定的期望描述",
-          "筛因补充: error mentioned without detail"
-        ]
+          "筛因补充: vague adjective without quantification"
+        ],
+        "envNeeds": null
       },
       "suggestedVerify": {
         "steps": [
@@ -331,14 +366,62 @@
       "verifyStatus": "skipped"
     },
     {
-      "defectId": "BGCM2026091803464",
+      "defectId": "BGCM2026092108592",
       "ticket": {
-        "title": "[T云视频Portal-智能检索] 智能检索事件导出，导出提示成功，但是实际没有视频导出出来",
-        "testModule": "T云视频Portal-智能检索",
-        "titleTag": "T云视频Portal-智能检索",
+        "title": "[T云视频-事件文本摘要] 当AI套餐中的密码错误时，报警界面同一个通道的图片解密需要一个个事件解密才能查看",
+        "testModule": "T云视频-事件文本摘要",
+        "titleTag": "T云视频-事件文本摘要",
+        "intent": "unclear",
+        "pool": "strict",
+        "observed": null,
+        "expected": null,
+        "steps": null,
+        "status": "Solved",
+        "severity": "低",
+        "reasonCode": null,
+        "reasonDetail": null
+      },
+      "localization": {
+        "candidates": [],
+        "notes": "empty defectCodeMatches.candidates",
+        "degradedSearch": false
+      },
+      "rootCause": {
+        "summary": "Unable to localize to code with current code-knowledge matches",
+        "ruledOut": [],
+        "openQuestions": [
+          "需要 CodeGraph/二次检索",
+          "确认测试模块与代码目录映射"
+        ]
+      },
+      "outcome": "unlocalized",
+      "proposedFix": null,
+      "patch": null,
+      "blockers": {
+        "kind": "unlocalized",
+        "detail": "no code candidates from Agent-2 soft-start",
+        "missingInfo": null,
+        "envNeeds": null
+      },
+      "suggestedVerify": {
+        "steps": [],
+        "executed": false
+      },
+      "confidence": "low",
+      "verifyStatus": "skipped"
+    },
+    {
+      "defectId": "BGCM2026091608797",
+      "ticket": {
+        "title": "[T云视频-VQA问答] PortalVQA云存储始终提示无录像",
+        "testModule": "T云视频-VQA问答",
+        "titleTag": "T云视频-VQA问答",
+        "intent": null,
         "pool": "locatable_only",
-        "observed": "智能检索事件导出，导出提示成功，但是实际没有视频导出出来问题：1.  hc700@yopmail.net Hcc125689 导出cloud-xxx设备的录像导出这个提示成功了，但是实际没导出视频2.初步定位：无。建议：1.2.如其他项目或产品中存同样缺陷，请说明",
-        "status": "Open",
+        "observed": null,
+        "expected": null,
+        "steps": null,
+        "status": "Closed",
         "severity": "中",
         "reasonCode": "R3b",
         "reasonDetail": "FIXABLE but expect not unique"
@@ -352,7 +435,7 @@
         "summary": "Unable to localize to code with current code-knowledge matches",
         "ruledOut": [],
         "openQuestions": [
-          "需要 CodeGraph/SDK 二次检索",
+          "需要 CodeGraph/二次检索",
           "确认测试模块与代码目录映射"
         ]
       },
@@ -361,46 +444,9 @@
       "patch": null,
       "blockers": {
         "kind": "unlocalized",
-        "detail": "no code candidates from Agent-2 soft-start; SDK re-search not yet enabled"
-      },
-      "suggestedVerify": {
-        "steps": [],
-        "executed": false
-      },
-      "confidence": "low",
-      "verifyStatus": "skipped"
-    },
-    {
-      "defectId": "BGCM2026091708573",
-      "ticket": {
-        "title": "[T云视频Portal-综合检索-车] 搜车文件导出中，存在阿拉伯语未翻译",
-        "testModule": "T云视频Portal-综合检索-车",
-        "titleTag": "T云视频Portal-综合检索-车",
-        "pool": "locatable_only",
-        "status": "Open",
-        "severity": "低",
-        "reasonCode": "R3b",
-        "reasonDetail": "FIXABLE but expect not unique"
-      },
-      "localization": {
-        "candidates": [],
-        "notes": "empty defectCodeMatches.candidates",
-        "degradedSearch": false
-      },
-      "rootCause": {
-        "summary": "Unable to localize to code with current code-knowledge matches",
-        "ruledOut": [],
-        "openQuestions": [
-          "需要 CodeGraph/SDK 二次检索",
-          "确认测试模块与代码目录映射"
-        ]
-      },
-      "outcome": "unlocalized",
-      "proposedFix": null,
-      "patch": null,
-      "blockers": {
-        "kind": "unlocalized",
-        "detail": "no code candidates from Agent-2 soft-start; SDK re-search not yet enabled"
+        "detail": "no code candidates from Agent-2 soft-start",
+        "missingInfo": null,
+        "envNeeds": null
       },
       "suggestedVerify": {
         "steps": [],
