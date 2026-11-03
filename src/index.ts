@@ -34,6 +34,10 @@ export {
 } from "./ingest/index.js";
 export type { IngestAdapter, IngestMode, IngestRequest, IngestResult } from "./ingest/index.js";
 
+export * from "./code-knowledge/index.js";
+export * from "./defect-analyst/index.js";
+export * from "./workflow/index.js";
+
 export interface StartServerOptions {
   port?: number;
   hostname?: string;
