@@ -44,16 +44,27 @@ batch = run_defect_batch_prepare(
 )
 ```
 
-## Excel → raw-defects
+## Platform CSV / Excel → raw-defects
+
+平台导出 CSV（`缺陷拉取/脱敏/*.csv`，列名 `defectTitle` / `describle` / …）可直接作为 `--source`：
 
 ```bash
-python3 bugfix_agent/scripts/xlsx_to_raw_defects.py \
-  --xlsx path/to/export.xlsx \
+bugfix-agent prepare-batch \
   --product-line hc \
-  --out raw-defects.json
+  --source 缺陷拉取/脱敏/PJ14PD20260423284-assignee-87.csv \
+  --posture beta \
+  --out defect-batch.json
 ```
 
-Requires `openpyxl`.
+```bash
+python3 bugfix_agent/scripts/csv_to_raw_defects.py \
+  --csv path/to/export.csv --product-line hc --out raw-defects.json
+
+python3 bugfix_agent/scripts/xlsx_to_raw_defects.py \
+  --xlsx path/to/export.xlsx --product-line hc --out raw-defects.json
+```
+
+字段映射 SSOT：`bugfix_agent/ingest/field_map.py`（含平台拼写 `describle`）。xlsx 需 `openpyxl`。
 
 ## Output contract
 

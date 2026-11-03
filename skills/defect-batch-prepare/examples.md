@@ -25,6 +25,16 @@ bugfix-agent run \
   --out-dir /tmp/artifacts
 ```
 
+## Platform CSV（缺陷拉取）
+
+```bash
+bugfix-agent prepare-batch \
+  --product-line sample \
+  --source 缺陷拉取/脱敏/PJ14PD20260423284-assignee-87.csv \
+  --posture beta \
+  --out /tmp/defect-batch.json
+```
+
 ## Excel export
 
 ```bash
