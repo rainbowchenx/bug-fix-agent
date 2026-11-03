@@ -24,6 +24,16 @@ export { snipVerifyLog } from "./pipeline/log-snip.js";
 export { resolveStaticCheckPlan, runStaticCheck } from "./pipeline/static-check.js";
 export { reviewCluster, parseReviewResult } from "./pipeline/review.js";
 
+export * from "./defect-batch/index.js";
+export {
+  ingestRawDefects,
+  getIngestAdapter,
+  preloadedIngestAdapter,
+  mcpIngestAdapter,
+  crawlerIngestAdapter,
+} from "./ingest/index.js";
+export type { IngestAdapter, IngestMode, IngestRequest, IngestResult } from "./ingest/index.js";
+
 export interface StartServerOptions {
   port?: number;
   hostname?: string;
