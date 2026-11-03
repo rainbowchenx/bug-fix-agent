@@ -22,15 +22,17 @@ def _require_openpyxl():
 
 
 ALIASES = {
-    "defectId": ["缺陷ID", "ID", "id"],
-    "title": ["缺陷标题", "标题", "title"],
-    "description": ["缺陷描述", "描述", "description"],
-    "status": ["缺陷状态", "状态", "status"],
-    "flowStatus": ["流程状态"],
-    "testModule": ["测试模块"],
-    "fieldType": ["类型", "缺陷类型", "type"],
-    "severity": ["严重级别", "severity"],
-    "createdAt": ["创建时间", "createdAt"],
+    # Prefer Chinese Excel headers; also accept English CSV export aliases
+    # (see csv_to_raw_defects.py — platform typo "describle" is intentional).
+    "defectId": ["缺陷ID", "defectId", "ID", "id"],
+    "title": ["缺陷标题", "defectTitle", "标题", "title"],
+    "description": ["缺陷描述", "describle", "描述", "description"],
+    "status": ["缺陷状态", "defectStatus", "状态", "status"],
+    "flowStatus": ["流程状态", "flowStatusName", "flowStatus"],
+    "testModule": ["测试模块", "testModule"],
+    "fieldType": ["类型", "缺陷类型", "fieldType", "type"],
+    "severity": ["严重级别", "severityName", "severity"],
+    "createdAt": ["创建时间", "createDate", "createdAt"],
     "duplicateOf": ["关联重复缺陷编号", "关联缺陷ID", "duplicateOf"],
 }
 
