@@ -25,15 +25,17 @@ validate → Agent-1 → validate → Agent-2 → validate → Agent-3 → valid
 
 | 路径 | 段 | 职责 |
 |---|---|---|
+| `src/contracts/` | **跨段 SSOT** | zod 契约；唯一允许的耦合面（见 `docs/contracts/v0.1/`） |
 | `src/ingest/` | Agent-1 内 | 拉取 → `raw-defects` |
 | `src/defect-batch/` | Agent-1 | 蒸馏/筛选/分簇 → `defect-batch` |
-| `src/code-knowledge/` | Agent-2 | 通读/匹配 → `code-knowledge`（骨架） |
-| `src/defect-analyst/` | Agent-3 | 按条分析+patch → `analysis-report`（骨架） |
+| `src/agents/cartographer/` | Agent-2 | 通读/匹配 → `code-knowledge`（独立包） |
+| `src/agents/analyst/` | Agent-3 | 按条路由/报告 → `analysis-report`（独立包） |
 | `src/workflow/` | 父编排 | 串段 + 进出校验；**不**含业务规则 |
 | `skills/defect-batch-prepare/` | Agent-1 SOP | 已有 |
 | `skills/*`（后续） | Agent-2/3 | `profiles: cartography` / `analyze`/`fix` |
 
-禁止：`workflow` 直接 import 各段内部 helper（只走公开 `run*` / `validate*`）。
+禁止：`workflow` 直接 import 各段内部 helper（只走公开 `run*` / `validate*`）。  
+禁止：Agent-2 / Agent-3 **互相** import；只读已校验 artifact。
 
 ---
 
@@ -80,13 +82,15 @@ runThreeAgentWorkflow({
 
 ## 5. 实现顺序（本 PR → 后续）
 
-| 步 | 内容 | 本 PR |
+| 步 | 内容 | 状态 |
 |---|---|---|
-| S0 | 目录 + zod 契约 + `runThreeAgentWorkflow` 门禁 | ✅ |
-| S1 | Agent-1 已接入父工作流 | ✅ |
-| S2 | Agent-2：bootstrap / map / match 子图 | 后续 |
-| S3 | Agent-3：ticket_subgraph + openMr integrate | 后续 |
-| S4 | HTTP/CLI 暴露三 Agent Run；旧 pipeline 并存 | 后续 |
+| S0 | `src/contracts` + `docs/contracts/v0.1` + workflow 门禁 | ✅ |
+| S1 | Agent-1 接入父工作流 | ✅ |
+| S2a | Agent-2 独立包：detect/match 确定性实现 | ✅（SDK 子图后续） |
+| S3a | Agent-3 独立包：outcome 路由 + 完整单票报告 | ✅（SDK ticket_subgraph 后续） |
+| S2b | Agent-2 LangGraph + SDK map/match | 后续 |
+| S3b | Agent-3 SDK analyze/patch + openMr integrate | 后续 |
+| S4 | HTTP/CLI 暴露三 Agent Run | 后续 |
 
 ---
 

@@ -1,37 +1,39 @@
 import { describe, expect, it } from "vitest";
-import {
-  ANALYSIS_REPORT_SCHEMA_VERSION,
-  safeValidateAnalysisReport,
-  validateAnalysisReport,
-} from "../../src/defect-analyst/index.js";
+import { routeTicket } from "../../src/agents/analyst/index.js";
+import type { BatchTicket } from "../../src/contracts/index.js";
 
-describe("analysis-report validate", () => {
-  it("requires tickets array with outcome", () => {
-    const data = validateAnalysisReport({
-      schemaVersion: ANALYSIS_REPORT_SCHEMA_VERSION,
-      productLine: "hc",
-      workDir: "/tmp/w",
-      generatedAt: new Date().toISOString(),
-      tickets: [
-        {
-          defectId: "1",
-          outcome: "needs_ticket_info",
-          blockers: { kind: "needs_ticket_info", missingInfo: ["期望结果"], detail: "" },
-        },
-      ],
-    });
-    expect(data.tickets).toHaveLength(1);
-    expect(data.openMr).toBe(false);
+const base = (over: Partial<BatchTicket>): BatchTicket =>
+  ({
+    defectId: "1",
+    title: "t",
+    pool: "strict",
+    expectQuality: "explicit",
+    ...over,
+  }) as BatchTicket;
+
+describe("analyst router", () => {
+  it("maps needs_info pool to needs_ticket_info", () => {
+    const r = routeTicket(base({ pool: "needs_info", expected: "" }), undefined);
+    expect(r.outcome).toBe("needs_ticket_info");
+    expect(r.blockers?.missingInfo?.length).toBeGreaterThan(0);
   });
 
-  it("rejects unknown outcome", () => {
-    const r = safeValidateAnalysisReport({
-      schemaVersion: ANALYSIS_REPORT_SCHEMA_VERSION,
-      productLine: "hc",
-      workDir: "/tmp/w",
-      generatedAt: new Date().toISOString(),
-      tickets: [{ defectId: "1", outcome: "not_a_real_outcome" }],
+  it("maps empty candidates to unlocalized", () => {
+    const r = routeTicket(base({ pool: "strict" }), {
+      defectId: "1",
+      candidates: [],
+      confidence: "low",
     });
-    expect(r.ok).toBe(false);
+    expect(r.outcome).toBe("unlocalized");
+  });
+
+  it("maps candidates to plan_only", () => {
+    const r = routeTicket(base({ pool: "locatable_only" }), {
+      defectId: "1",
+      candidates: [{ repoPath: ".", path: "src/a.ts", why: "hit", source: "heuristic" }],
+      confidence: "medium",
+    });
+    expect(r.outcome).toBe("plan_only");
+    expect(r.proposedFix?.targetFiles?.[0]).toBe("src/a.ts");
   });
 });

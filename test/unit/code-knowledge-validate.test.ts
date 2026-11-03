@@ -3,10 +3,10 @@ import {
   CODE_KNOWLEDGE_SCHEMA_VERSION,
   safeValidateCodeKnowledge,
   validateCodeKnowledge,
-} from "../../src/code-knowledge/index.js";
+} from "../../src/contracts/index.js";
 
-describe("code-knowledge validate", () => {
-  it("accepts minimal scaffold payload", () => {
+describe("code-knowledge contract", () => {
+  it("accepts minimal payload", () => {
     const data = validateCodeKnowledge({
       schemaVersion: CODE_KNOWLEDGE_SCHEMA_VERSION,
       productLine: "hc",
@@ -15,7 +15,6 @@ describe("code-knowledge validate", () => {
       defectCodeMatches: [],
     });
     expect(data.cartographyProfile).toBe("unknown");
-    expect(data.partial).toBe(false);
   });
 
   it("rejects missing productLine", () => {

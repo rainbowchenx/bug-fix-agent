@@ -1,15 +1,11 @@
 import {
   safeValidateDefectBatch,
-  type DefectBatch,
-} from "../defect-batch/index.js";
-import {
   safeValidateCodeKnowledge,
-  type CodeKnowledge,
-} from "../code-knowledge/index.js";
-import {
   safeValidateAnalysisReport,
+  type DefectBatch,
+  type CodeKnowledge,
   type AnalysisReport,
-} from "../defect-analyst/index.js";
+} from "../contracts/index.js";
 
 export class ArtifactValidationError extends Error {
   constructor(

@@ -1,6 +1,6 @@
 import { runDefectBatchPrepare } from "../defect-batch/index.js";
-import { runCodeCartographer } from "../code-knowledge/index.js";
-import { runDefectAnalyst } from "../defect-analyst/index.js";
+import { runCartographer } from "../agents/cartographer/index.js";
+import { runAnalyst } from "../agents/analyst/index.js";
 import {
   ArtifactValidationError,
   requireAnalysisReport,
@@ -13,8 +13,8 @@ import type {
 } from "./types.js";
 
 /**
- * Parent workflow: validate → Agent-N → validate.
- * Loose coupling: only artifact I/O; handlers injectable for tests / future graphs.
+ * Parent workflow only: validate → agent → validate.
+ * No cross-agent internal imports — handlers injectable.
  */
 export async function runThreeAgentWorkflow(
   input: ThreeAgentWorkflowInput,
@@ -22,7 +22,6 @@ export async function runThreeAgentWorkflow(
   const artifacts: ThreeAgentWorkflowResult["artifacts"] = {};
 
   try {
-    // ── Agent-1 ──────────────────────────────────────────────
     let batch = input.defectBatch;
     if (!batch) {
       if (!input.ingest) {
@@ -45,9 +44,8 @@ export async function runThreeAgentWorkflow(
       return { ok: true, stage: "done", artifacts };
     }
 
-    // ── Agent-2 ──────────────────────────────────────────────
     if (!input.skipAgent2) {
-      const agent2 = input.handlers?.agent2 ?? runCodeCartographer;
+      const agent2 = input.handlers?.agent2 ?? runCartographer;
       const knowledge = await agent2({
         workDir: input.workDir,
         defectBatch: artifacts.defectBatch,
@@ -63,13 +61,12 @@ export async function runThreeAgentWorkflow(
       return {
         ok: false,
         stage: "agent3",
-        error: "code-knowledge required for Agent-3 (disable skipAgent2 or supply handler)",
+        error: "code-knowledge required for Agent-3",
         artifacts,
       };
     }
 
-    // ── Agent-3 ──────────────────────────────────────────────
-    const agent3 = input.handlers?.agent3 ?? runDefectAnalyst;
+    const agent3 = input.handlers?.agent3 ?? runAnalyst;
     const report = await agent3({
       workDir: input.workDir,
       defectBatch: artifacts.defectBatch,

@@ -1,0 +1,142 @@
+{
+  "schemaVersion": "0.1.0",
+  "productLine": "hc",
+  "workDir": "/workspace/test/fixtures/mini-workdir-samples",
+  "partial": false,
+  "generatedAt": "2026-11-03T01:00:22.192Z",
+  "repoRoots": [
+    {
+      "path": ".",
+      "gitHead": null,
+      "fingerprint": "mini-hc@0.0.1"
+    }
+  ],
+  "cartographyProfile": "electron_node",
+  "secondaryHints": [
+    ".:electron"
+  ],
+  "techStack": {
+    "languages": [
+      "typescript",
+      "javascript"
+    ],
+    "frameworks": [
+      "electron",
+      "vue"
+    ],
+    "notes": ""
+  },
+  "architecture": {
+    "summary": "Detected electron_node across 1 repo root(s)",
+    "entryPoints": [],
+    "modules": [
+      {
+        "id": ".",
+        "path": ".",
+        "role": "repo_root"
+      }
+    ]
+  },
+  "conventions": {
+    "fromClaudeMd": [
+      "Sample",
+      "CodeGraph enabled."
+    ],
+    "fromRules": []
+  },
+  "boundSkills": [],
+  "specAtlas": {
+    "frameworkId": "unknown",
+    "entries": [
+      {
+        "path": "CLAUDE.md",
+        "kind": "guide",
+        "source": "repo_root"
+      }
+    ],
+    "drDs": [],
+    "bindings": []
+  },
+  "capabilities": {
+    "codeGraph": true,
+    "runtimeVerify": false
+  },
+  "defectCodeMatches": [
+    {
+      "defectId": "BGCM2026091803464",
+      "title": "[T云视频Portal-智能检索] 智能检索事件导出，导出提示成功，但是实际没有视频导出出来",
+      "candidates": [],
+      "confidence": "low"
+    },
+    {
+      "defectId": "BGCM2026091708573",
+      "title": "[T云视频Portal-综合检索-车] 搜车文件导出中，存在阿拉伯语未翻译",
+      "candidates": [],
+      "confidence": "low"
+    },
+    {
+      "defectId": "BGCM2026091706145",
+      "title": "[T云门禁-通行记录] 小语种登录平台，通行记录界面，筛选条件中时间选择最近7天和最近30天未翻译成小语种",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/通行记录.ts",
+          "why": "path contains token \"通行记录\" from titleTag/testModule/intent",
+          "source": "heuristic"
+        }
+      ],
+      "confidence": "low"
+    },
+    {
+      "defectId": "BGCM2026091705724",
+      "title": "[变更-T系统-服务] 小语种下，hct portal绑定监控点输入密码、AI服务协议弹框内容存在多语言未翻译",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/portal/服务.ts",
+          "why": "path contains token \"服务\" from titleTag/testModule/intent",
+          "source": "heuristic"
+        }
+      ],
+      "confidence": "low"
+    },
+    {
+      "defectId": "BGCM2026091704696",
+      "title": "[T系统-服务] 小语种下，hct portal服务市场视频AI或枪支检测营销页详情未显示多语言（hct app有显示）",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/portal/服务.ts",
+          "why": "path contains token \"服务\" from titleTag/testModule/intent",
+          "source": "heuristic"
+        }
+      ],
+      "confidence": "low"
+    },
+    {
+      "defectId": "BGCM2026091704657",
+      "title": "[T系统-服务] 小语种下，hct portal服务市场视频AI或枪支检测试用中按钮文案显示为key值",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/portal/服务.ts",
+          "why": "path contains token \"服务\" from titleTag/testModule/intent",
+          "source": "heuristic"
+        }
+      ],
+      "confidence": "low"
+    },
+    {
+      "defectId": "BGCM2026091709009",
+      "title": "[T云视频Portal-综合检索接入AI Agent-人员] 智能检索，没有开AI套餐的时候，是否不展示AI搜索按钮",
+      "candidates": [],
+      "confidence": "low"
+    },
+    {
+      "defectId": "BGCM2026092106976",
+      "title": "[T云门禁APP-授权Flutter] 临时授权动态二维码点击复制链接进入的页面Portal报错404（APP打开的界面也不对）",
+      "candidates": [],
+      "confidence": "low"
+    }
+  ]
+}

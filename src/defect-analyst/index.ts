@@ -1,13 +1,19 @@
+/** @deprecated import from `src/contracts` + `src/agents/analyst` instead. */
 export {
   ANALYSIS_REPORT_SCHEMA_VERSION,
   AnalysisReportSchema,
   TicketReportSchema,
   TicketOutcomeSchema,
+  validateAnalysisReport,
+  safeValidateAnalysisReport,
   type AnalysisReport,
   type TicketReport,
   type TicketOutcome,
   type TicketBlockers,
-} from "./types.js";
-export { validateAnalysisReport, safeValidateAnalysisReport } from "./validate.js";
-export { runDefectAnalyst } from "./run.js";
-export type { RunDefectAnalystInput, DefectAnalystFn } from "./run.js";
+} from "../contracts/index.js";
+
+export {
+  runAnalyst as runDefectAnalyst,
+  type RunAnalystInput as RunDefectAnalystInput,
+  type AnalystFn as DefectAnalystFn,
+} from "../agents/analyst/index.js";
