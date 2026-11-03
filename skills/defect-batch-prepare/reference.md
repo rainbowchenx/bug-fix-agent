@@ -31,3 +31,10 @@ L3 default = heuristic `IntentClassifier`; inject LLM later via `cluster.intentC
 
 - `alpha` — keep all statuses in functional funnel (rule-shape analysis)
 - `beta` — only `Open`/`New` (daily-batch simulation)
+
+## Platform CSV notes（脱敏样本实测）
+
+- 描述常为**单行粘连**模板；distill 按标签切 `预期结果`/`实际结果`/`操作步骤`（不必有换行）。
+- 空模板 /「包括复现方法和现象描述等」→ **`needs_info` / C1a**（默认开启）。
+- 标题以 `问题描述:` 开头 → `titleTag=_code_review`；肥簇按符号 token 再切；并跳过 C3/security 误杀。
+

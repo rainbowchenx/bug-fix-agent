@@ -13,6 +13,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
+# Allow running as a script from repo root / scripts dir.
+_ROOT = Path(__file__).resolve().parents[2]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from bugfix_agent.ingest.field_map import FIELD_ALIASES, row_to_raw_dict  # noqa: E402
+
 
 def _require_openpyxl():
     try:
@@ -21,67 +28,37 @@ def _require_openpyxl():
         raise SystemExit("openpyxl is required: pip install openpyxl") from e
 
 
-ALIASES = {
-    "defectId": ["缺陷ID", "ID", "id"],
-    "title": ["缺陷标题", "标题", "title"],
-    "description": ["缺陷描述", "描述", "description"],
-    "status": ["缺陷状态", "状态", "status"],
-    "flowStatus": ["流程状态"],
-    "testModule": ["测试模块"],
-    "fieldType": ["类型", "缺陷类型", "type"],
-    "severity": ["严重级别", "severity"],
-    "createdAt": ["创建时间", "createdAt"],
-    "duplicateOf": ["关联重复缺陷编号", "关联缺陷ID", "duplicateOf"],
-}
-
-
-def pick(header_index: dict[str, int], names: list[str]) -> int | None:
-    for n in names:
-        if n in header_index:
-            return header_index[n]
-    return None
-
-
-def cell_str(v: Any) -> str:
-    if v is None:
-        return ""
-    return str(v).strip()
-
-
 def convert(xlsx: Path, product_line: str, sheet: str | None, limit: int | None) -> dict:
     _require_openpyxl()
     import openpyxl
 
     wb = openpyxl.load_workbook(xlsx, data_only=True)
     ws = wb[sheet] if sheet else wb[wb.sheetnames[0]]
-    headers = [cell_str(ws.cell(1, c).value) for c in range(1, ws.max_column + 1)]
-    header_index = {h: i for i, h in enumerate(headers) if h}
-    cols = {k: pick(header_index, v) for k, v in ALIASES.items()}
-    if cols["defectId"] is None or cols["title"] is None:
-        raise SystemExit(f"missing required columns defectId/title in {xlsx}; headers={headers[:20]}")
-
+    headers = [
+        ("" if ws.cell(1, c).value is None else str(ws.cell(1, c).value).strip())
+        for c in range(1, ws.max_column + 1)
+    ]
     defects: list[dict[str, Any]] = []
     for r in range(2, ws.max_row + 1):
-        defect_id = cell_str(ws.cell(r, cols["defectId"] + 1).value)
-        title = cell_str(ws.cell(r, cols["title"] + 1).value)
-        if not defect_id or not title:
-            continue
-        row: dict[str, Any] = {
-            "defectId": defect_id,
-            "title": title,
-            "description": cell_str(ws.cell(r, cols["description"] + 1).value) if cols["description"] is not None else "",
-        }
-        for key in ("status", "flowStatus", "testModule", "fieldType", "severity", "createdAt", "duplicateOf"):
-            idx = cols[key]
-            if idx is None:
+        row_map: dict[str, Any] = {}
+        for i, h in enumerate(headers):
+            if not h:
                 continue
-            val = cell_str(ws.cell(r, idx + 1).value)
-            if val:
-                row[key] = val
-        defects.append(row)
+            val = ws.cell(r, i + 1).value
+            row_map[h] = "" if val is None else str(val).strip()
+        mapped = row_to_raw_dict(row_map)
+        if not mapped:
+            continue
+        defects.append(mapped)
         if limit is not None and len(defects) >= limit:
             break
     wb.close()
+    if not defects:
+        # help diagnose alias misses
+        raise SystemExit(
+            f"no defects mapped from {xlsx}; headers={headers[:20]}; "
+            f"need aliases covering {list(FIELD_ALIASES['defectId'])} / {list(FIELD_ALIASES['title'])}"
+        )
     return {
         "schemaVersion": "0.1.0",
         "productLine": product_line,

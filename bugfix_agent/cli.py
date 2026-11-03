@@ -15,7 +15,17 @@ def main(argv: list[str] | None = None) -> int:
     run_p = sub.add_parser("run", help="Run Agent-1→2→3 workflow")
     run_p.add_argument("--work-dir", required=True)
     run_p.add_argument("--product-line", required=True)
-    run_p.add_argument("--source", required=True, help="raw-defects JSON path")
+    run_p.add_argument(
+        "--source",
+        required=True,
+        help="raw-defects JSON, or platform 缺陷拉取 CSV (defectTitle/describle/…)",
+    )
+
+    prep = sub.add_parser("prepare-batch", help="Agent-1 only: ingest → defect-batch.json")
+    prep.add_argument("--product-line", required=True)
+    prep.add_argument("--source", required=True, help="JSON or platform CSV")
+    prep.add_argument("--posture", choices=["alpha", "beta"], default="beta")
+    prep.add_argument("--out", required=True, help="Write defect-batch JSON")
     run_p.add_argument("--posture", choices=["alpha", "beta"], default="beta")
     run_p.add_argument("--open-mr", action="store_true")
     run_p.add_argument("--skip-agent2", action="store_true")
@@ -30,6 +40,25 @@ def main(argv: list[str] | None = None) -> int:
         from bugfix_agent import __version__
 
         print(__version__)
+        return 0
+
+    if args.cmd == "prepare-batch":
+        from bugfix_agent.defect_batch import run_defect_batch_prepare
+
+        batch = run_defect_batch_prepare(
+            product_line=args.product_line,
+            source=args.source,
+            posture=args.posture,
+        )
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(batch.model_dump_json(indent=2), encoding="utf-8")
+        print(
+            json.dumps(
+                {"ok": True, "tickets": len(batch.tickets), "funnel": batch.funnel, "out": str(out)},
+                ensure_ascii=False,
+            )
+        )
         return 0
 
     result = run_three_agent_workflow(

@@ -14,6 +14,7 @@ Agent-1 ──defect-batch──► Agent-2 ──code-knowledge──► Agent-
 
 | Artifact | 生产者 | 消费者 | Schema |
 |---|---|---|---|
+| `raw-defects`（入口） | 平台 CSV / Excel / JSON | Agent-1 | [raw-defects-entry.md](raw-defects-entry.md) |
 | `defect-batch` | Agent-1 | Agent-2、Agent-3 | [defect-batch.md](defect-batch.md) |
 | `code-knowledge` | Agent-2 | Agent-3 | [code-knowledge.md](code-knowledge.md) |
 | `analysis-report` | Agent-3 | 人 / 下游 | [analysis-report.md](analysis-report.md) |

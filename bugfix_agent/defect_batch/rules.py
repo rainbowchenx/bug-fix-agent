@@ -6,16 +6,22 @@ from typing import Optional
 
 from bugfix_agent.defect_batch.distill import DefectDigest
 
-SCANNER_RE = re.compile(r"检出工具|软件成分分析|静态检测|hikshield|漏洞名称|SCA|依赖扫描", re.I)
+SCANNER_RE = re.compile(
+    r"检出工具|软件成分分析|静态检测|hikshield|漏洞名称|(?<![A-Za-z])SCA(?![A-Za-z])|依赖扫描",
+    re.I,
+)
 CVE_RE = re.compile(r"CVE-\d+|CVE漏洞", re.I)
 CANCEL_RE = re.compile(r"^(?:Cancel|Not\s*a\s*bug|不是缺陷|误报)$", re.I)
 
 NOTCODE_BUILTIN = {
     "dirty-env": re.compile(r"脏数据|环境问题|环境异常|环境是否"),
-    "plugin": re.compile(r"启用控件|无插件.+(?:无法播放|黑屏|不能播放|点击无效)"),
+    # Avoid code-review identifiers like NopluginPlayer / NoPlugin
+    "plugin": re.compile(
+        r"启用控件|(?<![A-Za-z])无插件(?![A-Za-z]).{0,20}(?:无法播放|黑屏|不能播放|点击无效)"
+    ),
     "browser": re.compile(r"(?:火狐|safari|chrome).+(?:黑屏|录像失败|无法播放|播放失败)", re.I),
     "product-decided": re.compile(r"产品已有结论|需要后续优化|后续优化"),
-    "service-down": re.compile(r"服务.+异常|hccvis.+异常", re.I),
+    "service-down": re.compile(r"服务端?异常|服务.+宕机|hccvis.+异常|服务不可用", re.I),
     "resource-swap": re.compile(r"还是旧的|改回旧图|要不要替换图片|旧图"),
     "impl-suggestion": re.compile(r"不要写死|写死"),
 }
@@ -40,7 +46,8 @@ SLOW_RE = re.compile(r"较慢|太慢|卡顿|超时|延迟|\d+\s*秒后")
 
 @dataclass
 class ScreenProfile:
-    reject_empty_template: bool = False
+    # None = default on (reject empty templates). Explicit False opts out.
+    reject_empty_template: Optional[bool] = None
     device_patterns: list[re.Pattern[str]] = field(default_factory=list)
     notcode_extra: list[re.Pattern[str]] = field(default_factory=list)
     disabled_notcode: list[str] = field(default_factory=list)
@@ -84,6 +91,9 @@ def match_sca_cve(d: DefectDigest, profile: Optional[ScreenProfile] = None) -> O
 
 def match_not_code(d: DefectDigest, profile: Optional[ScreenProfile] = None) -> Optional[RuleHit]:
     profile = profile or ScreenProfile()
+    # Code-review style tickets discuss product code; C3 environment heuristics misfire.
+    if getattr(d, "titleTag", "") == "_code_review" or d.title.strip().startswith("问题描述"):
+        return None
     disabled = set(profile.disabled_notcode)
     for rid, cre in NOTCODE_BUILTIN.items():
         if rid in disabled:
@@ -124,10 +134,16 @@ def match_runtime_attach(d: DefectDigest) -> Optional[RuleHit]:
 
 def match_vague(d: DefectDigest, profile: Optional[ScreenProfile] = None) -> Optional[RuleHit]:
     profile = profile or ScreenProfile()
-    placeholder = "包括复现方法和现象描述等"
+    # Empty / placeholder templates are garbage for Agent-1 — always needs_info.
+    reject_empty = True if profile.reject_empty_template is None else profile.reject_empty_template
+    if reject_empty and getattr(d, "emptyTemplate", False):
+        return RuleHit("C1a", "empty / placeholder template")
+    if reject_empty and "包括复现方法和现象描述等" in d.description:
+        return RuleHit("C1a", "empty / placeholder template")
     observed_short = 0 < len(d.observed.strip()) < 4
-    if placeholder in d.description or observed_short:
-        if profile.reject_empty_template:
+    if reject_empty and observed_short and not d.expected.strip() and not d.steps.strip():
+        # title-only signal still allowed through other rules; short obs alone is weak
+        if not re.search(r"应(?:该)?|需要|必须|与.+一致|未翻译|报错|失败", d.title):
             return RuleHit("C1a", "empty / placeholder template")
 
     if CRASH_RE.search(d.title) and not CRASH_RE.search(d.description) and len(d.description.strip()) < 60:
