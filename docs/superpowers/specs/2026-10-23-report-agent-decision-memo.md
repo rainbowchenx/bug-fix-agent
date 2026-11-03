@@ -4,6 +4,8 @@
 > 前置依据：[报告型分析 Agent 设计](2026-10-23-report-agent-design.md)（`BOUND-*` / `CONF-*` / `DEC-24..28`）、[缺陷输入形态与来源契约](2026-10-22-defect-input-shape-and-source-contract.md)、[目标流水线设计](2026-10-22-target-pipeline-design.md)、[环境适配层与能力降级](2026-10-22-environment-adapter-and-capability-degradation.md)。
 > 定位：本文是**阅读四份设计文档后、动手改代码前**的整理稿。回答四件事：① 我对新方向的理解判断；② 哪些点必须由产品负责人拍板（`Q-*`）；③ 哪些点我不确定、需要补信息（`U-*`）；④ 我的建议与落地顺序。**不含实现**。
 > 编号约定：`Q-*` 需决策、`U-*` 不确定、`J-*` 理解判断、`R-*` 建议。后续实现任务引用这些编号。
+>
+> **⚠️ 跟进（2026-10-29）**：`Q-7` / `Q-8` / `U-4` / `U-5` 已有方向性答复（LangGraph **Python** 全量 + Claude Code；SWE 全删；缺陷走业务 MCP、过渡期 xlsx；版本 tag 可选）。详见 [决策跟进分析](2026-10-23-report-agent-decision-followup.md)。本文保留原文，以跟进文的 `ANS-*` / `IMP-*` / `NQ-*` 为准。
 
 ---
 
@@ -319,8 +321,8 @@ CVE / `.dll` / `.exe` / `软件成分分析` / 端侧设备特征 / `偶现` 这
 | `Q-4` | 报告物理布局 | ✅ | B brief 内联 + detail 分文件 | 业务侧要独立精简文件 → C |
 | `Q-5` | `attachments` 进 v1 | | A 进 | — |
 | `Q-6` | `LOC-R` 执行机制 | | B hook 硬拦截 + C 兜底 | — |
-| `Q-7` | 双引擎去留 | ✅ | B 退役 langgraph | `U-3` 确认有部署承诺 → A |
-| `Q-8` | SWE-bench 与修复侧 skills | ✅ | B 适配器改评测 + skills 退役 5 个 | 不想维护评测 → A 全退役 |
+| `Q-7` | 双引擎去留 | ✅ | ~~B 退役 langgraph~~ → **已改判：全量 LangGraph Python + Claude Code**（见跟进文） | — |
+| `Q-8` | SWE-bench 与修复侧 skills | ✅ | ~~B 改评测~~ → **已改判：SWE 全删**（见跟进文） | — |
 | `Q-9` | `repoSet` 进 v1 | | A 进（只读根目录语义） | — |
 | `Q-10` | 包名与 README | | A 不改名、重写 README | — |
 
