@@ -11,6 +11,16 @@ describe("skills manifest", () => {
     const skills = await listBuiltinSkills(skillsDir);
     expect(skills.length).toBeGreaterThanOrEqual(10);
     expect(skills.some((s) => s.id === "verify-green-gate")).toBe(true);
+    expect(skills.some((s) => s.id === "defect-batch-prepare")).toBe(true);
+  });
+
+  it("exposes defect-batch profile on defect-batch-prepare", async () => {
+    const skills = await listBuiltinSkills(skillsDir);
+    const skill = skills.find((s) => s.id === "defect-batch-prepare");
+    expect(skill?.profiles).toContain("defect-batch");
+    expect(filterSkillsForProfile(skills, "defect-batch").some((s) => s.id === "defect-batch-prepare")).toBe(
+      true,
+    );
   });
 
   it("respects disabled filter", async () => {
