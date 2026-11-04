@@ -9,7 +9,7 @@
 ```text
 Agent-1 ──defect-batch──► Agent-2 ──code-knowledge──► Agent-3 ──analysis-report──► 人/下游
                 ▲                      ▲
-                └──── 仅 artifact + zod 校验；禁止跨包调内部函数 / 共享 transcript
+                └──── 仅 artifact + Pydantic 校验；禁止跨包调内部函数 / 共享 transcript
 ```
 
 | Artifact | 生产者 | 消费者 | Schema |
