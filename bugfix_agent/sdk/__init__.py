@@ -1,4 +1,4 @@
-"""Claude Agent SDK adapters (analyze / future cartography)."""
+"""Claude Agent SDK adapters (analyze / cartography)."""
 
 from bugfix_agent.sdk.analyze import (
     AnalyzeRequest,
@@ -9,6 +9,14 @@ from bugfix_agent.sdk.analyze import (
     parse_analyze_payload,
     run_claude_analyze,
 )
+from bugfix_agent.sdk.cartography import (
+    CartographyRequest,
+    CartographyResult,
+    cartography_mode_from_env,
+    create_cartography_runner,
+    heuristic_cartography,
+    run_claude_cartography,
+)
 
 __all__ = [
     "AnalyzeRequest",
@@ -18,4 +26,10 @@ __all__ = [
     "heuristic_analyze",
     "parse_analyze_payload",
     "run_claude_analyze",
+    "CartographyRequest",
+    "CartographyResult",
+    "cartography_mode_from_env",
+    "create_cartography_runner",
+    "heuristic_cartography",
+    "run_claude_cartography",
 ]

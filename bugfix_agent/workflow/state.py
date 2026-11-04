@@ -17,6 +17,7 @@ class ThreeAgentState(TypedDict):
     skip_agent2: bool
     skip_agent3: bool
     analyze_mode: NotRequired[Literal["heuristic", "sdk"]]
+    cartography_mode: NotRequired[Literal["heuristic", "sdk"]]
 
     source: NotRequired[Any]
     """raw-defects path / JSON payload for Agent-1 when `defect_batch` is absent."""

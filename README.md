@@ -23,8 +23,8 @@ source (CSV/JSON/xlsx)
 |------|------|------|--------|
 | 契约 SSOT | `bugfix_agent/contracts/` | Pydantic 校验三段 artifact | ✅ |
 | Agent-1 | `ingest/` + `defect_batch/` | 入口映射 → 蒸馏 / 筛选 / 分簇 → `defect-batch` | ✅ 规则管线 |
-| Agent-2 | `agents/cartographer/` | 仓型探测 + 路径软匹配 → `code-knowledge` | 🟡 启发式（无 LLM 通读） |
-| Agent-3 | `agents/analyst/` + `sdk/` | 路由 + 可选 Claude 只读 analyze → `analysis-report` | 🟡 路由+SDK 骨架 |
+| Agent-2 | `agents/cartographer/` + `sdk/cartography.py` | 仓型探测 + 路径软匹配，可选 SDK 通读加厚 → `code-knowledge` | 🟡 启发式 + SDK 骨架 |
+| Agent-3 | `agents/analyst/` + `sdk/analyze.py` | 路由 + 可选 Claude 只读 analyze → `analysis-report` | 🟡 路由+SDK 骨架 |
 | 父编排 | `workflow/` | LangGraph `StateGraph`：`agent1→agent2→agent3` + 门禁 | ✅ |
 | CLI | `cli.py` | `bugfix-agent run` / `prepare-batch` | ✅ |
 
@@ -55,8 +55,9 @@ cp .env.example .env
 |------|------|
 | `ANTHROPIC_API_KEY` | 有则 Agent-3 默认走 SDK analyze |
 | `ANTHROPIC_BASE_URL` / `ANTHROPIC_MODEL` | 可选网关 / 模型覆盖 |
-| `BUGFIX_ANALYZE_MODE` | `heuristic` \| `sdk`（显式覆盖默认） |
+| `BUGFIX_ANALYZE_MODE` | Agent-3：`heuristic` \| `sdk`（显式覆盖默认） |
 | `BUGFIX_ANALYZE_LIMIT` | 单次 run 最多 enrich 几张软定位票（空=不限） |
+| `BUGFIX_CARTOGRAPHY_MODE` | Agent-2：`heuristic` \| `sdk`（有 key 时默认 sdk） |
 
 > 本机若仍有历史 `dist/`、`node_modules/`，可直接删掉（已 gitignore，不是源码）。
 
@@ -90,6 +91,7 @@ bugfix-agent run \
   --product-line hc \
   --source ./raw-defects.json \
   --posture alpha \
+  --cartography-mode heuristic \
   --analyze-mode heuristic \
   --out-dir /tmp/bugfix-out
 ```
@@ -107,6 +109,7 @@ stdout 会打印摘要：`ok` / `stage` / `funnel` / `profile` / `summary`。
 | 参数 | 含义 |
 |------|------|
 | `--posture alpha\|beta` | beta 时非 Open/New 更易进 `excluded` |
+| `--cartography-mode heuristic\|sdk` | Agent-2 enrich 模式 |
 | `--analyze-mode heuristic\|sdk` | Agent-3 enrich 模式 |
 | `--skip-agent2` / `--skip-agent3` | 调试时跳过后续段 |
 | `--open-mr` | 仅改报告 `integrateMode` 标志；**当前不会真正开 MR** |
@@ -210,7 +213,7 @@ raw-defects  ──Agent-1──►  defect-batch  ──Agent-2──►  code-
 
 | 项 | 状态 |
 |----|------|
-| Agent-2 LLM 通读加厚（S2b） | 后续 |
+| Agent-2 SDK 通读质量打磨（更多形态清单 / CodeGraph） | 后续 |
 | Agent-3 出 patch / worktree 迭代 / 真 MR | 后续 |
 | HTTP / LangGraph Server（S4） | 后续 |
 | 生产 MCP 拉缺陷 | stub（现用 CSV/JSON/xlsx） |

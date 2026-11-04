@@ -41,6 +41,7 @@ def run_three_agent_workflow(
     skip_agent2: bool = False,
     skip_agent3: bool = False,
     analyze_mode: Optional[Literal["heuristic", "sdk"]] = None,
+    cartography_mode: Optional[Literal["heuristic", "sdk"]] = None,
     agent2: Optional[CartographerFn] = None,
     agent3: Optional[AnalystFn] = None,
 ) -> ThreeAgentWorkflowResult:
@@ -65,6 +66,8 @@ def run_three_agent_workflow(
     }
     if analyze_mode is not None:
         initial["analyze_mode"] = analyze_mode
+    if cartography_mode is not None:
+        initial["cartography_mode"] = cartography_mode
     if source is not None:
         initial["source"] = str(source) if isinstance(source, Path) else source
     if defect_batch is not None:

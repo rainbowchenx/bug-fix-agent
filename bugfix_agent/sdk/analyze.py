@@ -2,18 +2,16 @@ from __future__ import annotations
 
 import json
 import os
-import re
 from dataclasses import dataclass
 from typing import Any, Callable, Literal, Optional
 
 from bugfix_agent.contracts.defect_batch import BatchTicket
+from bugfix_agent.sdk.parse import parse_json_payload
 
 AnalyzeMode = Literal["heuristic", "sdk"]
 
 ANALYZE_TOOLS = ["Read", "Glob", "Grep"]
 DISALLOWED_TOOLS = ["Edit", "Write", "Bash", "NotebookEdit", "MultiEdit"]
-
-_JSON_FENCE = re.compile(r"```(?:json)?\s*([\s\S]*?)```", re.I)
 
 
 @dataclass
@@ -129,29 +127,10 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
 
 
 def parse_analyze_payload(raw: Any) -> Optional[dict[str, Any]]:
-    if isinstance(raw, dict):
-        return _normalize_payload(raw)
-    if not isinstance(raw, str) or not raw.strip():
+    parsed = parse_json_payload(raw)
+    if parsed is None:
         return None
-    text = raw.strip()
-    try:
-        return _normalize_payload(json.loads(text))
-    except json.JSONDecodeError:
-        pass
-    m = _JSON_FENCE.search(text)
-    if m:
-        try:
-            return _normalize_payload(json.loads(m.group(1).strip()))
-        except json.JSONDecodeError:
-            return None
-    # last resort: first {...} block
-    start, end = text.find("{"), text.rfind("}")
-    if start >= 0 and end > start:
-        try:
-            return _normalize_payload(json.loads(text[start : end + 1]))
-        except json.JSONDecodeError:
-            return None
-    return None
+    return _normalize_payload(parsed)
 
 
 def _normalize_payload(data: dict[str, Any]) -> dict[str, Any]:
