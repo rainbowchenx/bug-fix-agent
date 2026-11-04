@@ -92,12 +92,19 @@ def create_three_agent_graph(
                 }
             batch = require_defect_batch(state["defect_batch"])
             knowledge = require_code_knowledge(knowledge_raw)
-            report = analyst(
-                work_dir=state["work_dir"],
-                defect_batch=batch,
-                code_knowledge=knowledge,
-                open_mr=bool(state.get("open_mr")),
-            )
+            call_kwargs: dict[str, Any] = {
+                "work_dir": state["work_dir"],
+                "defect_batch": batch,
+                "code_knowledge": knowledge,
+                "open_mr": bool(state.get("open_mr")),
+            }
+            if state.get("analyze_mode"):
+                call_kwargs["analyze_mode"] = state["analyze_mode"]
+            try:
+                report = analyst(**call_kwargs)
+            except TypeError:
+                call_kwargs.pop("analyze_mode", None)
+                report = analyst(**call_kwargs)
             validated = require_analysis_report(
                 report.model_dump() if hasattr(report, "model_dump") else report
             )

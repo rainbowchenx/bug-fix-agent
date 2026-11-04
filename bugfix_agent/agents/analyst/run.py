@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Optional
 
 from bugfix_agent.agents.analyst.route import route_ticket, slice_ticket
 from bugfix_agent.contracts import (
@@ -12,6 +13,12 @@ from bugfix_agent.contracts import (
     is_match_pool,
     validate_analysis_report,
 )
+from bugfix_agent.sdk.analyze import (
+    AnalyzeRequest,
+    AnalyzeRunner,
+    analyze_mode_from_env,
+    create_analyze_runner,
+)
 
 
 def run_analyst(
@@ -20,22 +27,44 @@ def run_analyst(
     defect_batch: DefectBatch,
     code_knowledge: CodeKnowledge,
     open_mr: bool = False,
+    analyze_mode: Optional[str] = None,
+    analyze_fn: Optional[AnalyzeRunner] = None,
+    analyze_limit: Optional[int] = None,
 ) -> AnalysisReport:
+    """Agent-3: route each match-pool ticket, then optionally run analyze session.
+
+    - `needs_ticket_info` / `unlocalized` stop at the deterministic router.
+    - Soft-localized tickets (`plan_only` hint) go through analyze (heuristic or SDK).
+    """
     work_dir = str(work_dir)
     match_by_id = {m.defectId: m for m in code_knowledge.defectCodeMatches}
+    runner = analyze_fn or create_analyze_runner(analyze_mode_from_env(analyze_mode))
+    remaining = analyze_limit if analyze_limit is not None else _limit_from_env()
 
-    tickets = []
+    tickets: list[dict[str, Any]] = []
     for t in defect_batch.tickets:
         if not is_match_pool(t.pool):
             continue
         routed = route_ticket(t, match_by_id.get(t.defectId))
-        tickets.append(
-            {
-                "defectId": t.defectId,
-                "ticket": slice_ticket(t),
-                **routed,
-            }
-        )
+        entry: dict[str, Any] = {
+            "defectId": t.defectId,
+            "ticket": slice_ticket(t),
+            **routed,
+        }
+
+        if routed["outcome"] == "plan_only" and (remaining is None or remaining > 0):
+            result = runner(AnalyzeRequest(work_dir=work_dir, ticket=t, routed=routed))
+            entry.update(result.payload)
+            loc = dict(entry.get("localization") or {})
+            note_bits = [x for x in [loc.get("notes"), f"analyze={result.source}"] if x]
+            if result.detail:
+                note_bits.append(result.detail)
+            loc["notes"] = "; ".join(note_bits)
+            entry["localization"] = loc
+            if remaining is not None:
+                remaining -= 1
+
+        tickets.append(entry)
 
     by_outcome: dict[str, int] = {}
     for tr in tickets:
@@ -53,3 +82,15 @@ def run_analyst(
         "tickets": tickets,
     }
     return validate_analysis_report(report)
+
+
+def _limit_from_env() -> Optional[int]:
+    import os
+
+    raw = os.environ.get("BUGFIX_ANALYZE_LIMIT")
+    if raw is None or raw.strip() == "":
+        return None
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return None

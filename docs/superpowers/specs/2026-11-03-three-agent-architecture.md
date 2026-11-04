@@ -29,7 +29,8 @@ validate → Agent-1 → validate → Agent-2 → validate → Agent-3 → valid
 | `bugfix_agent/ingest/` | Agent-1 内 | 拉取 → raw-defects |
 | `bugfix_agent/defect_batch/` | Agent-1 | 蒸馏/筛选/分簇 |
 | `bugfix_agent/agents/cartographer/` | Agent-2 | 通读/匹配 |
-| `bugfix_agent/agents/analyst/` | Agent-3 | 按条路由/报告 |
+| `bugfix_agent/agents/analyst/` | Agent-3 | 按条路由 + analyze 会话 / 报告 |
+| `bugfix_agent/sdk/` | Agent-3（可复用） | Claude Agent SDK 适配（analyze 只读） |
 | `bugfix_agent/workflow/` | 父编排 | LangGraph `StateGraph` + 进出校验门禁 |
 | `bugfix_agent/cli.py` | CLI | `bugfix-agent run` |
 
@@ -61,7 +62,8 @@ pytest -q
 | S1 | Agent-1 规则管线 | ✅ |
 | S2a | Agent-2 detect/match | ✅ |
 | S3a | Agent-3 outcome 路由 | ✅ |
-| S2b/S3b | LLM/SDK 会话 | 后续 |
+| S3b | Agent-3 analyze 会话（Claude Agent SDK，只读） | ✅ 骨架：`bugfix_agent/sdk/analyze.py`；无 key 时 heuristic 回退 |
+| S2b | Agent-2 LLM 通读加厚 | 后续 |
 | S4 | HTTP / LangGraph Server（可选） | 后续 |
 | S5 | 退役 TS `src/graph` / npm `@langchain/langgraph` | 后续 |
 
@@ -74,3 +76,4 @@ pytest -q
 | 2026-11-03 | 脚手架（曾用 TS） |
 | 2026-11-03 | **切换为 Python 实现**；移除 JS 三 Agent 代码 |
 | 2026-11-04 | 父编排改为 LangGraph Python `StateGraph`；CLI/`run_three_agent_workflow` 走图 |
+| 2026-11-04 | Agent-3 analyze：Claude Agent SDK 只读会话 + heuristic 回退；`--analyze-mode` / `BUGFIX_ANALYZE_MODE` |

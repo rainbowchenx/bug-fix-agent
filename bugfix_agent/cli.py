@@ -30,6 +30,12 @@ def main(argv: list[str] | None = None) -> int:
     run_p.add_argument("--open-mr", action="store_true")
     run_p.add_argument("--skip-agent2", action="store_true")
     run_p.add_argument("--skip-agent3", action="store_true")
+    run_p.add_argument(
+        "--analyze-mode",
+        choices=["heuristic", "sdk"],
+        default=None,
+        help="Agent-3 analyze: heuristic (default without API key) or Claude Agent SDK",
+    )
     run_p.add_argument("--out-dir", default=None, help="Write artifacts JSON here")
 
     ver = sub.add_parser("version")
@@ -69,6 +75,7 @@ def main(argv: list[str] | None = None) -> int:
         open_mr=args.open_mr,
         skip_agent2=args.skip_agent2,
         skip_agent3=args.skip_agent3,
+        analyze_mode=args.analyze_mode,
     )
     payload = {
         "ok": result.ok,

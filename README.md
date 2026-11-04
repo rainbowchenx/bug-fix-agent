@@ -4,7 +4,10 @@
 
 ```bash
 pip install -e ".[dev]"
+# optional: Claude Agent SDK for Agent-3 analyze
+pip install -e ".[sdk]"
 bugfix-agent run --work-dir ./repos --product-line hc --source raw-defects.json --posture alpha --out-dir /tmp/out
+# Agent-3: --analyze-mode heuristic|sdk（无 ANTHROPIC_API_KEY 时默认 heuristic）
 pytest -q
 ```
 
