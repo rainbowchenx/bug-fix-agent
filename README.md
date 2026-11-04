@@ -1,51 +1,223 @@
 # bugfix-agent
 
-三 Agent 缺陷分析工作流（**Python**）：缺陷批次准备 → 代码通读 → 按条分析报告。  
-父编排为 **LangGraph Python**（`bugfix_agent/workflow/graph.py`）。契约见 `docs/contracts/v0.1/`。
+本地 **三 Agent 缺陷分析** 工作流（Python ≥ 3.11）。一次输入缺陷表 + 目标仓目录，自动跑完并落盘三段 JSON 契约；默认**只分析、不出 MR**。
 
-```bash
-pip install -e ".[dev]"
-pip install -e ".[sdk]"   # optional: Agent-3 Claude Agent SDK analyze
-bugfix-agent run \
-  --work-dir ./repos \
-  --product-line hc \
-  --source raw-defects.json \
-  --posture alpha \
-  --out-dir /tmp/out
-# Agent-3: --analyze-mode heuristic|sdk（无 ANTHROPIC_API_KEY 时默认 heuristic）
-pytest -q
+```text
+source (CSV/JSON/xlsx)
+        │
+        ▼
+┌─ LangGraph 父编排（bugfix_agent/workflow）─────────────────────┐
+│  validate → Agent-1 → validate → Agent-2 → validate → Agent-3 │
+│               │                    │                    │     │
+│         defect-batch         code-knowledge      analysis-report │
+└───────────────────────────────────────────────────────────────┘
 ```
 
-## 环境变量
+旧 TypeScript / npm / JS LangGraph 运行时已退役；本仓可执行代码只在 `bugfix_agent/`。
 
-见 `.env.example`：
+---
+
+## 架构
+
+| 组件 | 路径 | 职责 | 成熟度 |
+|------|------|------|--------|
+| 契约 SSOT | `bugfix_agent/contracts/` | Pydantic 校验三段 artifact | ✅ |
+| Agent-1 | `ingest/` + `defect_batch/` | 入口映射 → 蒸馏 / 筛选 / 分簇 → `defect-batch` | ✅ 规则管线 |
+| Agent-2 | `agents/cartographer/` | 仓型探测 + 路径软匹配 → `code-knowledge` | 🟡 启发式（无 LLM 通读） |
+| Agent-3 | `agents/analyst/` + `sdk/` | 路由 + 可选 Claude 只读 analyze → `analysis-report` | 🟡 路由+SDK 骨架 |
+| 父编排 | `workflow/` | LangGraph `StateGraph`：`agent1→agent2→agent3` + 门禁 | ✅ |
+| CLI | `cli.py` | `bugfix-agent run` / `prepare-batch` | ✅ |
+
+**松耦合约定：** Agent 之间只交换落盘 JSON；禁止跨 Agent import 内部实现或共享 transcript。父图只调用各包公开的 `run_*` + `validate_*`。
+
+正式规格：[docs/superpowers/specs/2026-11-03-three-agent-architecture.md](docs/superpowers/specs/2026-11-03-three-agent-architecture.md)
+
+---
+
+## 安装
+
+```bash
+# 建议使用 venv
+python3 -m venv .venv && source .venv/bin/activate
+
+pip install -e ".[dev]"     # 核心：pydantic / openpyxl / langgraph + pytest
+pip install -e ".[sdk]"     # 可选：Agent-3 Claude Agent SDK（需本机 Claude Code CLI）
+```
+
+复制环境变量模板：
+
+```bash
+cp .env.example .env
+# 常用：ANTHROPIC_API_KEY、BUGFIX_ANALYZE_MODE、BUGFIX_ANALYZE_LIMIT
+```
 
 | 变量 | 说明 |
 |------|------|
-| `ANTHROPIC_API_KEY` | Agent-3 SDK analyze |
-| `ANTHROPIC_BASE_URL` / `ANTHROPIC_MODEL` | 可选 |
-| `BUGFIX_ANALYZE_MODE` | `heuristic` \| `sdk` |
-| `BUGFIX_ANALYZE_LIMIT` | 每跑 analyze 次数上限（空=不限） |
+| `ANTHROPIC_API_KEY` | 有则 Agent-3 默认走 SDK analyze |
+| `ANTHROPIC_BASE_URL` / `ANTHROPIC_MODEL` | 可选网关 / 模型覆盖 |
+| `BUGFIX_ANALYZE_MODE` | `heuristic` \| `sdk`（显式覆盖默认） |
+| `BUGFIX_ANALYZE_LIMIT` | 单次 run 最多 enrich 几张软定位票（空=不限） |
 
-## 库 API
+> 本机若仍有历史 `dist/`、`node_modules/`，可直接删掉（已 gitignore，不是源码）。
+
+---
+
+## 使用
+
+### 1）只跑 Agent-1（产出 defect-batch）
+
+```bash
+bugfix-agent prepare-batch \
+  --product-line hc \
+  --source ./raw-defects.json \
+  --posture alpha \
+  --out /tmp/defect-batch.json
+```
+
+`--source` 支持：
+
+- **平台 CSV**（如 `defectTitle` / `describle` / `flowStatusName`）
+- **raw-defects JSON**（见契约）
+- Excel 可先用 `bugfix_agent/scripts/xlsx_to_raw_defects.py` 转 JSON
+
+脱敏样本目录：`缺陷拉取/脱敏/`（若已入库）。夹具：`test/fixtures/defect-batch/`。
+
+### 2）跑完整三 Agent
+
+```bash
+bugfix-agent run \
+  --work-dir ./path/to/target-repos \
+  --product-line hc \
+  --source ./raw-defects.json \
+  --posture alpha \
+  --analyze-mode heuristic \
+  --out-dir /tmp/bugfix-out
+```
+
+成功时 `--out-dir` 写入：
+
+- `defect-batch.json`
+- `code-knowledge.json`
+- `analysis-report.json`
+
+stdout 会打印摘要：`ok` / `stage` / `funnel` / `profile` / `summary`。
+
+常用开关：
+
+| 参数 | 含义 |
+|------|------|
+| `--posture alpha\|beta` | beta 时非 Open/New 更易进 `excluded` |
+| `--analyze-mode heuristic\|sdk` | Agent-3 enrich 模式 |
+| `--skip-agent2` / `--skip-agent3` | 调试时跳过后续段 |
+| `--open-mr` | 仅改报告 `integrateMode` 标志；**当前不会真正开 MR** |
+
+### 3）库调用
 
 ```python
 from bugfix_agent import create_three_agent_graph, run_three_agent_workflow
 
 result = run_three_agent_workflow(
-    work_dir="...",
+    work_dir="./repos",
     product_line="hc",
-    source="raw.json",
+    source="./raw-defects.json",
     posture="alpha",
+    analyze_mode="heuristic",
 )
+assert result.ok and result.stage == "done"
+batch = result.artifacts.defect_batch
+knowledge = result.artifacts.code_knowledge
+report = result.artifacts.analysis_report
+
+# 或直接 invoke LangGraph
 graph = create_three_agent_graph()
+final = graph.invoke({
+    "work_dir": "./repos",
+    "product_line": "hc",
+    "posture": "alpha",
+    "source": "./raw-defects.json",
+    "open_mr": False,
+    "skip_agent2": False,
+    "skip_agent3": False,
+})
 ```
 
-## 文档
+---
 
-- 正式架构：[three-agent-architecture](docs/superpowers/specs/2026-11-03-three-agent-architecture.md)
-- 决策跟进（Python LangGraph、去 SWE、退役 TS）：[decision-followup](docs/superpowers/specs/2026-10-23-report-agent-decision-followup.md)
-- 报告型边界：[report-agent-design](docs/superpowers/specs/2026-10-23-report-agent-design.md)
+## 调试
+
+```bash
+# 单测（不需要 API key）
+pytest -q
+pytest -q tests/test_workflow.py tests/test_langgraph_workflow.py tests/test_analyze_sdk.py
+
+# 只验证 Agent-1 漏斗 / 分簇
+bugfix-agent prepare-batch --product-line sample --source ./your.csv --posture alpha --out /tmp/db.json
+python -c "import json;print(json.load(open('/tmp/db.json'))['funnel'])"
+
+# 强制不走 LLM，便于本地联调
+bugfix-agent run ... --analyze-mode heuristic --out-dir /tmp/out
+
+# 段失败时看 stdout 的 stage / error（agent1|agent2|agent3）
+# 注入假 Agent 做单测：run_three_agent_workflow(..., agent2=..., agent3=...)
+```
+
+SDK analyze 排障：
+
+1. `pip install -e ".[sdk]"` 且本机可跑 Claude Code CLI  
+2. `.env` 中配置 `ANTHROPIC_API_KEY`  
+3. 失败会 **fallback 到 heuristic**，并在票的 `localization.notes` 里标注 `analyze=sdk_fallback`
+
+---
+
+## 关键数据契约（v0.1）
+
+详文与样例：[`docs/contracts/v0.1/`](docs/contracts/v0.1/) · 代码 SSOT：`bugfix_agent/contracts/`
+
+```text
+raw-defects  ──Agent-1──►  defect-batch  ──Agent-2──►  code-knowledge  ──Agent-3──►  analysis-report
+```
+
+| Artifact | 生产者 | 消费者 | 文档 |
+|----------|--------|--------|------|
+| `raw-defects` | CSV / Excel / JSON 入口 | Agent-1 | [raw-defects-entry.md](docs/contracts/v0.1/raw-defects-entry.md) |
+| `defect-batch` | Agent-1 | Agent-2、3 | [defect-batch.md](docs/contracts/v0.1/defect-batch.md) |
+| `code-knowledge` | Agent-2 | Agent-3 | [code-knowledge.md](docs/contracts/v0.1/code-knowledge.md) |
+| `analysis-report` | Agent-3 | 人 / 下游 | [analysis-report.md](docs/contracts/v0.1/analysis-report.md) |
+
+### defect-batch（Agent-1 出口）
+
+- `funnel`：`total` / `strict` / `locatable_only` / `needs_info` / `hard_reject` / `security` / `excluded` / `duplicate`
+- `clusters[]`：**仅** `pool=strict` 的簇（`clusterId = productLine::module::tag::intent`）
+- `tickets[]`：全量票；含蒸馏字段 `observed` / `expected` / `steps`、`expectQuality`、`reasonCode`
+
+### code-knowledge（Agent-2 出口）
+
+- `cartographyProfile`、`repoRoots`、`techStack`、`architecture`、`specAtlas`
+- `defectCodeMatches[]`：给 Agent-3 的**软定位**起点（可空 / 低置信）
+
+### analysis-report（Agent-3 出口）
+
+- 每票完整报告：`localization` / `rootCause` / `proposedFix` / `blockers` / `confidence` / `verifyStatus`
+- `outcome`：`plan_only` · `unlocalized` · `needs_ticket_info` · …（见契约枚举）
+- 当前默认 `verifyStatus=skipped`；`openMr` 不会真正推 MR
+
+**匹配池（默认进入 Agent-2/3）：** `strict` | `locatable_only` | `needs_info`  
+（`hard_reject` / `security` / `excluded` 默认不分析）
+
+---
+
+## 当前不做 / 后续
+
+| 项 | 状态 |
+|----|------|
+| Agent-2 LLM 通读加厚（S2b） | 后续 |
+| Agent-3 出 patch / worktree 迭代 / 真 MR | 后续 |
+| HTTP / LangGraph Server（S4） | 后续 |
+| 生产 MCP 拉缺陷 | stub（现用 CSV/JSON/xlsx） |
+
+决策背景：[decision-followup](docs/superpowers/specs/2026-10-23-report-agent-decision-followup.md)
+
+---
 
 ## License
 
