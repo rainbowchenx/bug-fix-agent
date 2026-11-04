@@ -36,6 +36,12 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Agent-3 analyze: heuristic (default without API key) or Claude Agent SDK",
     )
+    run_p.add_argument(
+        "--cartography-mode",
+        choices=["heuristic", "sdk"],
+        default=None,
+        help="Agent-2 cartography enrich: heuristic or Claude Agent SDK",
+    )
     run_p.add_argument("--out-dir", default=None, help="Write artifacts JSON here")
 
     ver = sub.add_parser("version")
@@ -76,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
         skip_agent2=args.skip_agent2,
         skip_agent3=args.skip_agent3,
         analyze_mode=args.analyze_mode,
+        cartography_mode=args.cartography_mode,
     )
     payload = {
         "ok": result.ok,

@@ -67,7 +67,17 @@ def create_three_agent_graph(
     def agent2_node(state: ThreeAgentState) -> dict[str, Any]:
         try:
             batch = require_defect_batch(state["defect_batch"])
-            knowledge = cartographer(work_dir=state["work_dir"], defect_batch=batch)
+            call_kwargs: dict[str, Any] = {
+                "work_dir": state["work_dir"],
+                "defect_batch": batch,
+            }
+            if state.get("cartography_mode"):
+                call_kwargs["cartography_mode"] = state["cartography_mode"]
+            try:
+                knowledge = cartographer(**call_kwargs)
+            except TypeError:
+                call_kwargs.pop("cartography_mode", None)
+                knowledge = cartographer(**call_kwargs)
             validated = require_code_knowledge(
                 knowledge.model_dump() if hasattr(knowledge, "model_dump") else knowledge
             )
