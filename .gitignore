@@ -7,13 +7,8 @@ dist/
 coverage/
 .bugfix-runs/
 *.log
-.turbo/
-.vitest/
 
 logs/
-
-# LangGraph API
-.langgraph_api
 
 # Python
 __pycache__/

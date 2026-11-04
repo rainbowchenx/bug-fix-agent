@@ -65,7 +65,7 @@ pytest -q
 | S3b | Agent-3 analyze 会话（Claude Agent SDK，只读） | ✅ 骨架：`bugfix_agent/sdk/analyze.py`；无 key 时 heuristic 回退 |
 | S2b | Agent-2 LLM 通读加厚 | 后续 |
 | S4 | HTTP / LangGraph Server（可选） | 后续 |
-| S5 | 退役 TS `src/graph` / npm `@langchain/langgraph` | 后续 |
+| S5 | 退役 TS 运行时（`src/`、npm LangGraph、修复侧 skills） | ✅ |
 
 ---
 
@@ -77,3 +77,4 @@ pytest -q
 | 2026-11-03 | **切换为 Python 实现**；移除 JS 三 Agent 代码 |
 | 2026-11-04 | 父编排改为 LangGraph Python `StateGraph`；CLI/`run_three_agent_workflow` 走图 |
 | 2026-11-04 | Agent-3 analyze：Claude Agent SDK 只读会话 + heuristic 回退；`--analyze-mode` / `BUGFIX_ANALYZE_MODE` |
+| 2026-11-04 | **S5**：删除已由 Python 三 Agent 覆盖的 TS `src/`、Vitest、npm 包与修复侧 skills |
