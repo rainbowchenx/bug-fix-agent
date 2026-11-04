@@ -1,6 +1,6 @@
 # bugfix-agent
 
-**三 Agent 主路径现为 Python**（`bugfix_agent/`）：缺陷批次准备 → 代码通读 → 按条分析报告。契约见 `docs/contracts/v0.1/`。
+**三 Agent 主路径现为 Python**（`bugfix_agent/`）：缺陷批次准备 → 代码通读 → 按条分析报告。父编排为 **LangGraph Python**（`bugfix_agent/workflow/graph.py`）。契约见 `docs/contracts/v0.1/`。
 
 ```bash
 pip install -e ".[dev]"
