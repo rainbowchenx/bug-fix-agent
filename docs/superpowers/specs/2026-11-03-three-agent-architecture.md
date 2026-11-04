@@ -8,13 +8,14 @@
 
 ## 1. 目标
 
-松耦合工作流；**实现语言为 Python**（`bugfix_agent/`），不再维护 JS 三 Agent 路径。
+松耦合工作流；**实现语言为 Python**（`bugfix_agent/`），编排引擎为 **LangGraph（Python）**；不再演进 JS 三 Agent / TS LangGraph 路径。
 
 ```text
 validate → Agent-1 → validate → Agent-2 → validate → Agent-3 → validate
             defect-batch         code-knowledge        analysis-report
 ```
 
+- 父图：`bugfix_agent/workflow/graph.py`（`StateGraph`：`agent1` → `agent2` → `agent3`）
 - 仅落盘 artifact + Pydantic 校验跨段  
 - 契约审阅稿：`docs/contracts/v0.1/`
 
@@ -29,7 +30,7 @@ validate → Agent-1 → validate → Agent-2 → validate → Agent-3 → valid
 | `bugfix_agent/defect_batch/` | Agent-1 | 蒸馏/筛选/分簇 |
 | `bugfix_agent/agents/cartographer/` | Agent-2 | 通读/匹配 |
 | `bugfix_agent/agents/analyst/` | Agent-3 | 按条路由/报告 |
-| `bugfix_agent/workflow/` | 父编排 | 串段 + 进出校验 |
+| `bugfix_agent/workflow/` | 父编排 | LangGraph `StateGraph` + 进出校验门禁 |
 | `bugfix_agent/cli.py` | CLI | `bugfix-agent run` |
 
 禁止 Agent-2/3 互相 import。
@@ -56,11 +57,13 @@ pytest -q
 | 步 | 内容 | 状态 |
 |---|---|---|
 | S0 | contracts + workflow 门禁 | ✅ Python |
+| S0b | 父编排迁到 LangGraph Python | ✅ `workflow/graph.py` |
 | S1 | Agent-1 规则管线 | ✅ |
 | S2a | Agent-2 detect/match | ✅ |
 | S3a | Agent-3 outcome 路由 | ✅ |
 | S2b/S3b | LLM/SDK 会话 | 后续 |
-| S4 | HTTP 服务（可选 FastAPI） | 后续 |
+| S4 | HTTP / LangGraph Server（可选） | 后续 |
+| S5 | 退役 TS `src/graph` / npm `@langchain/langgraph` | 后续 |
 
 ---
 
@@ -70,3 +73,4 @@ pytest -q
 |---|---|
 | 2026-11-03 | 脚手架（曾用 TS） |
 | 2026-11-03 | **切换为 Python 实现**；移除 JS 三 Agent 代码 |
+| 2026-11-04 | 父编排改为 LangGraph Python `StateGraph`；CLI/`run_three_agent_workflow` 走图 |

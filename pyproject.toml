@@ -12,6 +12,7 @@ license = "MIT"
 dependencies = [
   "pydantic>=2.7",
   "openpyxl>=3.1",
+  "langgraph>=1.0",
 ]
 
 [project.optional-dependencies]
