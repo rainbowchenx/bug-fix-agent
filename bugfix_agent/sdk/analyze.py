@@ -7,6 +7,7 @@ from typing import Any, Callable, Literal, Optional
 
 from bugfix_agent.contracts.defect_batch import BatchTicket
 from bugfix_agent.sdk.parse import parse_json_payload
+from bugfix_agent.sdk.skills import skills_system_addon
 
 AnalyzeMode = Literal["heuristic", "sdk"]
 
@@ -83,9 +84,20 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
 
     prompt = _build_prompt(req)
     model = req.model or os.environ.get("ANTHROPIC_MODEL") or None
+    system_prompt = _SYSTEM_PROMPT + skills_system_addon(
+        (
+            "hierarchical-localization",
+            "systematic-debugging",
+            "test-triage",
+            "typescript-null-safety",
+            "vue-debug",
+            "electron-process-boundary",
+            "monorepo-workspace",
+        )
+    )
     options = ClaudeAgentOptions(
         cwd=req.work_dir,
-        system_prompt=_SYSTEM_PROMPT,
+        system_prompt=system_prompt,
         allowed_tools=list(ANALYZE_TOOLS),
         disallowed_tools=list(DISALLOWED_TOOLS),
         permission_mode="dontAsk",

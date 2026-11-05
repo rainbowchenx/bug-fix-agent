@@ -1,0 +1,7 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "three_agent": "./bugfix_agent/workflow/langgraph_app.py:graph"
+  },
+  "env": ".env"
+}

@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END
 
 from bugfix_agent.workflow import create_three_agent_graph, run_three_agent_workflow
@@ -28,6 +29,9 @@ def test_default_graph_compiles():
     assert "agent1" in nodes
     assert "agent2" in nodes
     assert "agent3" in nodes
+    assert "validate_batch" in nodes
+    assert "validate_knowledge" in nodes
+    assert "validate_report" in nodes
 
 
 def test_langgraph_e2e_invoke(tmp_path: Path):
@@ -88,5 +92,52 @@ def test_langgraph_hard_stop_invalid_agent2():
 
 
 def test_routing_helpers_end_constant():
-    # Guard: conditional edges use the same END sentinel LangGraph expects.
+    # Guard: conditional / Command edges use the same END sentinel LangGraph expects.
     assert END == "__end__"
+
+
+def test_langgraph_checkpointer_thread_and_updates(tmp_path: Path):
+    work = _mini_work(tmp_path)
+    stages: list[str] = []
+
+    def on_update(state: dict) -> None:
+        stage = state.get("stage")
+        if stage and (not stages or stages[-1] != stage):
+            stages.append(stage)
+
+    result = run_three_agent_workflow(
+        work_dir=work,
+        product_line="hc",
+        posture="alpha",
+        source=HC1,
+        analyze_mode="heuristic",
+        cartography_mode="heuristic",
+        thread_id="test-thread-1",
+        checkpointer=InMemorySaver(),
+        on_update=on_update,
+    )
+    assert result.ok is True
+    assert result.stage == "done"
+    assert "agent1" in stages
+    assert "agent2" in stages
+    assert "done" in stages
+
+
+def test_langgraph_progressive_artifact_dir(tmp_path: Path):
+    work = _mini_work(tmp_path)
+    out = tmp_path / "artifacts"
+    result = run_three_agent_workflow(
+        work_dir=work,
+        product_line="hc",
+        posture="alpha",
+        source=HC1,
+        analyze_mode="heuristic",
+        cartography_mode="heuristic",
+        artifact_dir=out,
+    )
+    assert result.ok is True
+    assert (out / "defect-batch.json").is_file()
+    assert (out / "code-knowledge.json").is_file()
+    assert (out / "analysis-report.json").is_file()
+    batch = json.loads((out / "defect-batch.json").read_text(encoding="utf-8"))
+    assert batch["funnel"]["total"] == 50

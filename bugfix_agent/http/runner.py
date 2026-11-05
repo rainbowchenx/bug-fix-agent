@@ -50,19 +50,55 @@ def enqueue_run(
     def _execute() -> None:
         update_meta(work_dir, run_id, status="running")
         fn = workflow_fn or run_three_agent_workflow
+        art_dir = root / "artifacts"
+        art_dir.mkdir(parents=True, exist_ok=True)
+        last_stage = "agent1"
+
+        def _on_update(state: dict[str, Any]) -> None:
+            nonlocal last_stage
+            stage = state.get("stage") or last_stage
+            if stage != last_stage:
+                last_stage = stage
+                update_meta(
+                    work_dir,
+                    run_id,
+                    status="running",
+                    stage=stage,
+                    error=state.get("error"),
+                )
+
         try:
-            result = fn(
-                work_dir=work_dir,
-                product_line=request.productLine,
-                source=request.source,
-                posture=request.posture,
-                open_mr=opts.openMr,
-                skip_agent2=opts.skipAgent2,
-                skip_agent3=opts.skipAgent3,
-                analyze_mode=opts.analyzeMode,
-                cartography_mode=opts.cartographyMode,
-            )
-            art_dir = root / "artifacts"
+            call_kwargs: dict[str, Any] = {
+                "work_dir": work_dir,
+                "product_line": request.productLine,
+                "source": request.source,
+                "posture": request.posture,
+                "open_mr": opts.openMr,
+                "skip_agent2": opts.skipAgent2,
+                "skip_agent3": opts.skipAgent3,
+                "analyze_mode": opts.analyzeMode,
+                "cartography_mode": opts.cartographyMode,
+            }
+            # Progressive artifact writes + stage streaming when using the
+            # built-in LangGraph runner. Injected workflow_fn (tests) may not
+            # accept these kwargs.
+            if workflow_fn is None:
+                call_kwargs.update(
+                    {
+                        "artifact_dir": str(art_dir),
+                        "thread_id": run_id,
+                        "on_update": _on_update,
+                    }
+                )
+            try:
+                result = fn(**call_kwargs)
+            except TypeError:
+                call_kwargs.pop("artifact_dir", None)
+                call_kwargs.pop("thread_id", None)
+                call_kwargs.pop("on_update", None)
+                result = fn(**call_kwargs)
+            # Ensure artifacts exist even if progressive persist was skipped
+            # (injected workflow_fn or older call path).
             if result.artifacts.defect_batch:
                 (art_dir / "defect-batch.json").write_text(
                     result.artifacts.defect_batch.model_dump_json(indent=2), encoding="utf-8"
@@ -105,7 +141,7 @@ def enqueue_run(
                 work_dir,
                 run_id,
                 status="failed",
-                stage="agent1",
+                stage=last_stage,
                 error=str(err),
             )
 

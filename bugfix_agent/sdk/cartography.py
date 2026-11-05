@@ -7,6 +7,7 @@ from typing import Any, Callable, Literal, Optional
 
 from bugfix_agent.contracts import CodeKnowledge, DefectBatch, validate_code_knowledge
 from bugfix_agent.sdk.parse import parse_json_payload
+from bugfix_agent.sdk.skills import skills_system_addon
 
 CartographyMode = Literal["heuristic", "sdk"]
 
@@ -86,9 +87,16 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
 
     prompt = _build_prompt(req)
     model = req.model or os.environ.get("ANTHROPIC_MODEL") or None
+    system_prompt = _SYSTEM_PROMPT + skills_system_addon(
+        (
+            "monorepo-workspace",
+            "electron-process-boundary",
+            "hierarchical-localization",
+        )
+    )
     options = ClaudeAgentOptions(
         cwd=req.work_dir,
-        system_prompt=_SYSTEM_PROMPT,
+        system_prompt=system_prompt,
         allowed_tools=list(CARTOGRAPHY_TOOLS),
         disallowed_tools=list(DISALLOWED_TOOLS),
         permission_mode="dontAsk",
