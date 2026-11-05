@@ -26,6 +26,9 @@ class ThreeAgentState(TypedDict):
     code_knowledge: NotRequired[dict[str, Any]]
     analysis_report: NotRequired[dict[str, Any]]
 
+    artifact_dir: NotRequired[str]
+    """If set, validate gates write JSON artifacts progressively after each success."""
+
     ok: NotRequired[bool]
     stage: NotRequired[Literal["agent1", "agent2", "agent3", "done"]]
     error: NotRequired[str | None]

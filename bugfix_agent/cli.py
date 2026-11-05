@@ -93,6 +93,7 @@ def main(argv: list[str] | None = None) -> int:
         skip_agent3=args.skip_agent3,
         analyze_mode=args.analyze_mode,
         cartography_mode=args.cartography_mode,
+        artifact_dir=args.out_dir,
     )
     payload = {
         "ok": result.ok,
