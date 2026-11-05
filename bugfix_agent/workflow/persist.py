@@ -1,3 +1,13 @@
+"""Progressive artifact persistence for validate_* gates.
+
+When ``ThreeAgentState.artifact_dir`` is set, each successful gate writes its
+JSON immediately (defect-batch → code-knowledge → analysis-report). HTTP uses
+this so ``GET /v1/runs/:id`` can show partial outputs while later agents run.
+
+IO failures are swallowed: orchestration must not die because a disk write
+failed; the final HTTP/CLI path still rewrites artifacts from the result object.
+"""
+
 from __future__ import annotations
 
 import json

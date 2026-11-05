@@ -33,12 +33,22 @@ def run_cartographer(
     cartography_mode: Optional[str] = None,
     cartography_fn: Optional[CartographyRunner] = None,
 ) -> CodeKnowledge:
-    """Agent-2: heuristic detect/match, then optional SDK enrich (S2b)."""
+    """Agent-2 public entry: produce ``code-knowledge`` for Agent-3.
+
+    Pipeline (no cross-agent imports)::
+
+        discover roots → detect profile/stack → heuristic path match
+            → (optional) Claude SDK enrich → validate_code_knowledge
+
+    Soft matches are a *starting hint* only; Agent-3 may revise localization.
+    """
     work_dir = str(work_dir)
+    # 1) Structural scan of the target workDir (multi-root monorepos OK).
     repo_roots = discover_repo_roots(work_dir)
     profile, hints, tech = detect_cartography_profile(work_dir, repo_roots)
     conventions = read_conventions(work_dir, repo_roots)
 
+    # 2) Soft-locate match-pool tickets (strict / locatable_only / needs_info).
     match_list = [t for t in defect_batch.tickets if is_match_pool(t.pool)]
     defect_code_matches = filter_existing_candidates(
         work_dir, match_tickets(work_dir, repo_roots, match_list)
@@ -86,6 +96,7 @@ def run_cartographer(
         }
     )
 
+    # 3) Optional LLM thicken (heuristic fallback when no key / SDK errors).
     runner = cartography_fn or create_cartography_runner(
         cartography_mode_from_env(cartography_mode)
     )

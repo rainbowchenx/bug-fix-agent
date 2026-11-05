@@ -1,3 +1,10 @@
+"""S4 FastAPI shell compatible with Dify-style ``POST/GET /v1/runs``.
+
+This is intentionally thin: auth-less loopback by default, state on disk under
+``{workDir}/.bugfix-runs/``. LangGraph Server remains an optional alternate
+deploy path (see ``langgraph.json``); this app keeps the existing HTTP contract.
+"""
+
 from __future__ import annotations
 
 from typing import Any, Optional

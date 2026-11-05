@@ -1,3 +1,10 @@
+"""Helpers for pointing Claude Agent SDK sessions at package ``skills/``.
+
+These SOPs (hierarchical-localization, systematic-debugging, …) travel with the
+wheel. Agent-2/3 append a short system-prompt addon naming the relevant skills;
+Claude Code may also load ``SKILL.md`` when the skill directory is discoverable.
+"""
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -7,6 +14,7 @@ from typing import Optional
 
 def package_skills_root() -> Path:
     """Repo/package `skills/` directory shipped with bugfix-agent."""
+    # bugfix_agent/sdk/skills.py → parents[2] == repository / package root.
     return Path(__file__).resolve().parents[2] / "skills"
 
 

@@ -1,3 +1,10 @@
+"""Agent-1 public entry: raw defects → ``defect-batch``.
+
+``preloaded`` mode loads CSV/JSON/xlsx-derived payloads, then runs the
+deterministic distill / screen / cluster pipeline (no LLM). ``mcp`` / ``crawler``
+ingest modes are stubs until production defect MCP is wired.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,6 +25,7 @@ def run_defect_batch_prepare(
     posture: Literal["alpha", "beta"] = "beta",
     profile: Optional[ScreenProfile] = None,
 ) -> DefectBatch:
+    """Load (optional) + prepare; used by CLI ``prepare-batch`` and graph agent1."""
     if mode != "preloaded":
         raise NotImplementedError(f"ingest mode {mode!r} is stubbed; use preloaded")
     if defects is None:

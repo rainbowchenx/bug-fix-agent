@@ -1,3 +1,22 @@
+"""Async run executor for ``POST /v1/runs``.
+
+Lifecycle
+---------
+1. Allocate ``{workDir}/.bugfix-runs/{runId}/`` and write ``meta.json`` (queued).
+2. Start a daemon thread (or run sync in tests with ``background=False``).
+3. While LangGraph streams state values, polish ``meta.stage`` for polling clients.
+4. On finish, rewrite artifacts + final meta (succeeded/failed).
+
+Layout::
+
+    {workDir}/.bugfix-runs/{runId}/
+        meta.json
+        artifacts/
+            defect-batch.json
+            code-knowledge.json
+            analysis-report.json
+"""
+
 from __future__ import annotations
 
 import logging
@@ -55,6 +74,7 @@ def enqueue_run(
         last_stage = "agent1"
 
         def _on_update(state: dict[str, Any]) -> None:
+            """Mirror LangGraph ``stage`` into meta.json for GET pollers."""
             nonlocal last_stage
             stage = state.get("stage") or last_stage
             if stage != last_stage:
@@ -148,6 +168,7 @@ def enqueue_run(
     if background:
         import threading
 
+        # Fire-and-forget: POST returns 202; client polls GET /v1/runs/:id.
         threading.Thread(target=_execute, name=f"bugfix-run-{run_id}", daemon=True).start()
     else:
         _execute()

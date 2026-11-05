@@ -32,11 +32,17 @@ def run_analyst(
     analyze_fn: Optional[AnalyzeRunner] = None,
     analyze_limit: Optional[int] = None,
 ) -> AnalysisReport:
-    """Agent-3: route each match-pool ticket, then optionally run analyze session.
+    """Agent-3 public entry: produce ``analysis-report`` (report-only by default).
 
-    - `needs_ticket_info` / `unlocalized` stop at the deterministic router.
-    - Soft-localized tickets (`plan_only` hint) go through analyze (heuristic or SDK).
-    - Per-ticket validation failures degrade to `other_blocked` (do not abort the report).
+    Per match-pool ticket::
+
+        route_ticket (deterministic) ──► maybe analyze session (heuristic|sdk)
+                                      └──► coerce / degrade invalid ticket rows
+
+    - ``needs_ticket_info`` / ``unlocalized`` stop at the router (no LLM).
+    - Soft-localized tickets (``plan_only`` hint) may call analyze.
+    - One bad ticket becomes ``other_blocked``; the whole report still completes.
+    - ``open_mr`` only flips report flags today — no real GitLab push.
     """
     work_dir = str(work_dir)
     match_by_id = {m.defectId: m for m in code_knowledge.defectCodeMatches}
@@ -47,6 +53,7 @@ def run_analyst(
     for t in defect_batch.tickets:
         if not is_match_pool(t.pool):
             continue
+        # Deterministic outcome first; analyze only when the router says plan_only.
         routed = route_ticket(t, match_by_id.get(t.defectId))
         entry: dict[str, Any] = {
             "defectId": t.defectId,

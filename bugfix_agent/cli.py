@@ -1,3 +1,14 @@
+"""CLI entry (`bugfix-agent` console script).
+
+Subcommands
+-----------
+- ``prepare-batch``: Agent-1 only → defect-batch JSON (no LangGraph parent).
+- ``run``: full Agent-1→2→3 via ``run_three_agent_workflow`` (optional ``--out-dir``
+  enables progressive artifact writes).
+- ``serve``: FastAPI S4 shell on loopback.
+- ``version``: print package version.
+"""
+
 from __future__ import annotations
 
 import argparse

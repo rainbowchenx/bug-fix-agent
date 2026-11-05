@@ -1,3 +1,31 @@
+"""LangGraph parent graph: three agents + explicit validate gates.
+
+Topology (static edges + Command routing from validate_* nodes)::
+
+    START
+      │
+      ▼
+    agent1  ──►  validate_batch  ──Command──►  agent2 | END
+                                                  │
+                                                  ▼
+                                            validate_knowledge ──► agent3 | END
+                                                                      │
+                                                                      ▼
+                                                                validate_report ──► END
+
+Responsibilities
+----------------
+- ``agent1`` / ``agent2`` / ``agent3``: call the segment ``run_*`` API, write
+  artifact dicts into state.
+- ``validate_*``: Pydantic hard gate, optional disk persist, decide next hop
+  via ``Command(goto=...)`` (no separate conditional_edges map).
+- ``RetryPolicy`` on agent nodes: transient I/O / SDK failures only; schema and
+  ``ValueError`` / ``TypeError`` are not retried.
+
+Injectable ``agent2`` / ``agent3`` are closed over at compile time so callables
+never enter checkpointed state (keeps threads JSON-serializable).
+"""
+
 from __future__ import annotations
 
 from typing import Any, Callable, Literal, Optional, Sequence
@@ -38,24 +66,29 @@ def create_three_agent_graph(
     checkpointer: Any = None,
     retry_policy: Optional[RetryPolicy | Sequence[RetryPolicy]] = _AGENT_RETRY,
 ):
-    """Build the parent LangGraph matching the architecture gates:
+    """Compile the parent StateGraph.
 
-    ``agent1 → validate_batch → agent2 → validate_knowledge → agent3 → validate_report``
-
-    Agent callables are closed over so tests can inject stubs without putting
-    non-serializable callables into checkpoint state. Pass ``checkpointer``
-    (e.g. ``InMemorySaver()``) for durable / thread-scoped runs; omit it for
-    LangGraph Server which supplies its own.
+    Parameters
+    ----------
+    agent2 / agent3:
+        Optional stubs for unit tests. Default = real cartographer / analyst.
+    checkpointer:
+        e.g. ``InMemorySaver()`` for durable thread runs. Omit for LangGraph
+        Server (platform supplies persistence — see ``langgraph_app.py``).
+    retry_policy:
+        Attached to agent1/2/3 nodes; validate_* gates are not retried.
     """
     cartographer = agent2 or run_cartographer
     analyst = agent3 or run_analyst
 
+    # ----- Agent-1: ingest / distill / screen / cluster → defect-batch -----
     def agent1_node(state: ThreeAgentState) -> dict[str, Any]:
         # Deterministic rules pipeline: surface data errors as ok=False rather
         # than burning RetryPolicy attempts.
         try:
             existing = state.get("defect_batch")
             if existing is not None:
+                # Preloaded batch (HTTP/CLI may pass a finished Agent-1 artifact).
                 return {
                     "defect_batch": existing,
                     "ok": True,
@@ -84,10 +117,12 @@ def create_three_agent_graph(
         except Exception as err:  # noqa: BLE001
             return {"ok": False, "stage": "agent1", "error": _err_message(err)}
 
+    # ----- Gate: defect-batch schema + route to Agent-2 or END -----
     def validate_batch(
         state: ThreeAgentState,
     ) -> Command[Literal["agent2", "__end__"]]:
         if not state.get("ok", True):
+            # Agent-1 already recorded stage/error; just stop.
             return Command(goto=END)
         try:
             batch = require_defect_batch(state.get("defect_batch"))
@@ -102,6 +137,7 @@ def create_three_agent_graph(
 
         both_skip = bool(state.get("skip_agent2")) and bool(state.get("skip_agent3"))
         if both_skip:
+            # Debug path: Agent-1 only.
             return Command(
                 update={
                     "defect_batch": dumped,
@@ -135,6 +171,7 @@ def create_three_agent_graph(
             goto="agent2",
         )
 
+    # ----- Agent-2: repo cartography + soft path match → code-knowledge -----
     def agent2_node(state: ThreeAgentState) -> dict[str, Any]:
         try:
             batch = require_defect_batch(state["defect_batch"])
@@ -149,9 +186,11 @@ def create_three_agent_graph(
         try:
             knowledge = cartographer(**call_kwargs)
         except TypeError:
+            # Injected stubs in tests may not accept cartography_mode.
             call_kwargs.pop("cartography_mode", None)
             knowledge = cartographer(**call_kwargs)
         # Let unexpected cartographer failures raise → RetryPolicy may retry.
+        # Output schema is checked in validate_knowledge (not here).
         raw = knowledge.model_dump() if hasattr(knowledge, "model_dump") else knowledge
         return {
             "code_knowledge": raw,
@@ -160,6 +199,7 @@ def create_three_agent_graph(
             "error": None,
         }
 
+    # ----- Gate: code-knowledge schema + route to Agent-3 or END -----
     def validate_knowledge(
         state: ThreeAgentState,
     ) -> Command[Literal["agent3", "__end__"]]:
@@ -196,6 +236,7 @@ def create_three_agent_graph(
             goto="agent3",
         )
 
+    # ----- Agent-3: per-ticket route + optional analyze → analysis-report -----
     def agent3_node(state: ThreeAgentState) -> dict[str, Any]:
         knowledge_raw = state.get("code_knowledge")
         if knowledge_raw is None:
@@ -231,6 +272,7 @@ def create_three_agent_graph(
             "error": None,
         }
 
+    # ----- Gate: analysis-report schema + mark stage=done -----
     def validate_report(
         state: ThreeAgentState,
     ) -> Command[Literal["__end__"]]:
@@ -263,6 +305,7 @@ def create_three_agent_graph(
     builder.add_node("agent3", agent3_node, retry_policy=retry_policy)
     builder.add_node("validate_report", validate_report)
 
+    # Linear agent → gate edges; validate_* choose the next hop via Command.
     builder.add_edge(START, "agent1")
     builder.add_edge("agent1", "validate_batch")
     # validate_* nodes route via Command(goto=...); no static edges needed.
@@ -278,4 +321,6 @@ def _err_message(err: BaseException) -> str:
 
 
 # Default compiled graph (no injectable overrides / no checkpointer).
+# Prefer this for one-shot CLI/library invokes; rebuild when checkpointer or
+# agent stubs are required.
 default_three_agent_graph = create_three_agent_graph()

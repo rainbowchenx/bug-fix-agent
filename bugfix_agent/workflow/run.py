@@ -1,3 +1,17 @@
+"""Invoke the parent LangGraph and map final state → ``ThreeAgentWorkflowResult``.
+
+Call paths
+----------
+1. **Fast path** (default): ``default_three_agent_graph.invoke(initial)`` — no
+   checkpointer, no streaming.
+2. **Observable / durable path**: when ``on_update``, ``thread_id``, or an
+   explicit ``checkpointer`` is passed, stream ``stream_mode="values"`` so
+   callers (HTTP) can polish ``stage`` and recover partial artifacts on crash.
+
+Pre-flight checks (source required, skip_agent2 alone forbidden) run *before*
+the graph so invalid requests never create a checkpoint thread.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -20,6 +34,8 @@ WorkflowUpdateFn = Callable[[dict[str, Any]], None]
 
 @dataclass
 class WorkflowArtifacts:
+    """Typed copies of the three cross-agent JSON artifacts (may be partial)."""
+
     defect_batch: Optional[DefectBatch] = None
     code_knowledge: Optional[CodeKnowledge] = None
     analysis_report: Optional[AnalysisReport] = None
@@ -27,6 +43,12 @@ class WorkflowArtifacts:
 
 @dataclass
 class ThreeAgentWorkflowResult:
+    """Library/CLI/HTTP facing result.
+
+    ``ok`` is True only when ``stage == "done"`` *and* state ``ok`` is True —
+    a successful Agent-1-only skip also sets ``stage=done``.
+    """
+
     ok: bool
     stage: Literal["agent1", "agent2", "agent3", "done"]
     artifacts: WorkflowArtifacts = field(default_factory=WorkflowArtifacts)
@@ -59,6 +81,7 @@ def run_three_agent_workflow(
       ``InMemorySaver`` when only ``thread_id`` is set).
     - ``on_update``: called with each streamed state value (for HTTP stage polish).
     """
+    # --- pre-flight (fail closed without touching the graph) ---
     if source is None and defect_batch is None:
         return ThreeAgentWorkflowResult(
             ok=False,
@@ -72,6 +95,7 @@ def run_three_agent_workflow(
             error="skip_agent2 without skip_agent3 is unsupported (Agent-3 needs code-knowledge)",
         )
 
+    # --- build initial LangGraph state (JSON-friendly) ---
     initial: ThreeAgentState = {
         "work_dir": str(work_dir),
         "product_line": product_line,
@@ -94,6 +118,7 @@ def run_three_agent_workflow(
     if artifact_dir is not None:
         initial["artifact_dir"] = str(artifact_dir)
 
+    # Custom compile when stubs, checkpointer, or thread_id are involved.
     needs_custom = (
         agent2 is not None
         or agent3 is not None
@@ -119,13 +144,13 @@ def run_three_agent_workflow(
 
     config: Optional[dict[str, Any]] = None
     if resolved_checkpointer is not None:
+        # LangGraph scopes checkpoints by thread_id under configurable.
         config = {"configurable": {"thread_id": thread_id or "bugfix-default"}}
 
     last_state: Optional[ThreeAgentState] = None
     try:
         if on_update is not None or resolved_checkpointer is not None:
-            # Stream values so callers can observe stage transitions; final
-            # snapshot is the last values chunk.
+            # Stream cumulative state after each node so HTTP can update meta.stage.
             stream_kwargs: dict[str, Any] = {"stream_mode": "values"}
             if config is not None:
                 for chunk in graph.stream(initial, config, **stream_kwargs):
@@ -141,6 +166,7 @@ def run_three_agent_workflow(
         else:
             final = graph.invoke(initial, config) if config else graph.invoke(initial)
     except Exception as err:  # noqa: BLE001 — surface as workflow failure
+        # Prefer last streamed snapshot so stage/artifacts reflect progress.
         stage = _stage_from_partial(last_state) if last_state else "agent1"
         artifacts = _artifacts_from_state(last_state) if last_state else WorkflowArtifacts()
         return ThreeAgentWorkflowResult(
@@ -163,6 +189,7 @@ def _stage_from_partial(
 
 
 def _artifacts_from_state(state: ThreeAgentState) -> WorkflowArtifacts:
+    """Best-effort re-hydrate Pydantic models from state dicts (partial OK)."""
     artifacts = WorkflowArtifacts()
     if state.get("defect_batch") is not None:
         try:
