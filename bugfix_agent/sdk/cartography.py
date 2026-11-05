@@ -186,6 +186,22 @@ def _merge_enrichment(baseline: CodeKnowledge, parsed: dict[str, Any]) -> dict[s
                 continue
             by_id[str(item["defectId"])] = item
         data["defectCodeMatches"] = list(by_id.values())
+    # Drop hallucinated paths (SDK or merge).
+    from bugfix_agent.agents.cartographer.match import filter_existing_candidates
+    from bugfix_agent.contracts.code_knowledge import DefectCodeMatch
+
+    parsed_matches = []
+    for item in data.get("defectCodeMatches") or []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            parsed_matches.append(DefectCodeMatch.model_validate(item))
+        except Exception:  # noqa: BLE001
+            continue
+    data["defectCodeMatches"] = [
+        m.model_dump()
+        for m in filter_existing_candidates(baseline.workDir, parsed_matches)
+    ]
     if isinstance(parsed.get("partial"), bool):
         data["partial"] = parsed["partial"]
     else:

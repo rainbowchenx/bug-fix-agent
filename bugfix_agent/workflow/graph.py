@@ -132,8 +132,9 @@ def create_three_agent_graph(
             return END
         if state.get("skip_agent2") and state.get("skip_agent3"):
             return END
+        # skip_agent2 alone is rejected in run_three_agent_workflow; keep END as safety net.
         if state.get("skip_agent2"):
-            return "agent3"
+            return END
         return "agent2"
 
     def after_agent2(state: ThreeAgentState) -> Literal["agent3", "__end__"]:
@@ -151,7 +152,7 @@ def create_three_agent_graph(
     builder.add_conditional_edges(
         "agent1",
         after_agent1,
-        {"agent2": "agent2", "agent3": "agent3", END: END},
+        {"agent2": "agent2", END: END},
     )
     builder.add_conditional_edges(
         "agent2",

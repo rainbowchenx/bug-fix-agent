@@ -13,6 +13,7 @@ from bugfix_agent.contracts import (
     is_match_pool,
     validate_analysis_report,
 )
+from bugfix_agent.contracts.analysis_report import TicketReport
 from bugfix_agent.sdk.analyze import (
     AnalyzeRequest,
     AnalyzeRunner,
@@ -35,6 +36,7 @@ def run_analyst(
 
     - `needs_ticket_info` / `unlocalized` stop at the deterministic router.
     - Soft-localized tickets (`plan_only` hint) go through analyze (heuristic or SDK).
+    - Per-ticket validation failures degrade to `other_blocked` (do not abort the report).
     """
     work_dir = str(work_dir)
     match_by_id = {m.defectId: m for m in code_knowledge.defectCodeMatches}
@@ -64,7 +66,7 @@ def run_analyst(
             if remaining is not None:
                 remaining -= 1
 
-        tickets.append(entry)
+        tickets.append(_coerce_ticket_entry(entry))
 
     by_outcome: dict[str, int] = {}
     for tr in tickets:
@@ -82,6 +84,33 @@ def run_analyst(
         "tickets": tickets,
     }
     return validate_analysis_report(report)
+
+
+def _coerce_ticket_entry(entry: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return TicketReport.model_validate(entry).model_dump()
+    except Exception as err:  # noqa: BLE001
+        return {
+            "defectId": entry.get("defectId") or "unknown",
+            "ticket": entry.get("ticket") or {},
+            "localization": entry.get("localization")
+            or {"candidates": [], "notes": "ticket validation failed"},
+            "rootCause": {
+                "summary": "Agent-3 ticket payload failed schema validation",
+                "ruledOut": [],
+                "openQuestions": [str(err)],
+            },
+            "outcome": "other_blocked",
+            "proposedFix": None,
+            "patch": None,
+            "blockers": {
+                "kind": "other_blocked",
+                "detail": f"invalid ticket report: {err}",
+            },
+            "suggestedVerify": {"steps": [], "executed": False},
+            "confidence": "low",
+            "verifyStatus": "skipped",
+        }
 
 
 def _limit_from_env() -> Optional[int]:

@@ -52,6 +52,12 @@ def run_three_agent_workflow(
             stage="agent1",
             error="source or defect_batch is required",
         )
+    if skip_agent2 and not skip_agent3:
+        return ThreeAgentWorkflowResult(
+            ok=False,
+            stage="agent2",
+            error="skip_agent2 without skip_agent3 is unsupported (Agent-3 needs code-knowledge)",
+        )
 
     initial: ThreeAgentState = {
         "work_dir": str(work_dir),

@@ -10,7 +10,7 @@ from bugfix_agent.http.models import (
     RunStatusResponse,
 )
 from bugfix_agent.http.runner import WorkflowFn, enqueue_run
-from bugfix_agent.http.store import meta_to_status, read_meta
+from bugfix_agent.http.store import UnsafeRunPathError, meta_to_status, read_meta
 
 
 def create_app(*, workflow_fn: Optional[WorkflowFn] = None, background: bool = True):
@@ -50,6 +50,8 @@ def create_app(*, workflow_fn: Optional[WorkflowFn] = None, background: bool = T
     ) -> RunStatusResponse:
         try:
             meta = read_meta(workDir, run_id)
+        except UnsafeRunPathError as err:
+            raise HTTPException(status_code=400, detail=str(err)) from err
         except FileNotFoundError as err:
             raise HTTPException(status_code=404, detail=str(err)) from err
         return meta_to_status(meta)
@@ -69,6 +71,16 @@ def run_server(
         raise ImportError(
             'HTTP extra required: pip install -e ".[http]" (fastapi + uvicorn)'
         ) from err
+
+    loopback = {"127.0.0.1", "localhost", "::1", "0:0:0:0:0:0:0:1"}
+    if host not in loopback:
+        import warnings
+
+        warnings.warn(
+            f"bugfix-agent serve binding to non-loopback host {host!r}: "
+            "no auth; arbitrary workDir paths are writable. Prefer 127.0.0.1.",
+            stacklevel=2,
+        )
 
     app = create_app(workflow_fn=workflow_fn, background=True)
     uvicorn.run(app, host=host, port=port, log_level="info")

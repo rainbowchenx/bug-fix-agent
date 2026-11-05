@@ -81,3 +81,4 @@ pytest -q
 | 2026-11-04 | **S5**：删除已由 Python 三 Agent 覆盖的 TS `src/`、Vitest、npm 包与修复侧 skills |
 | 2026-11-04 | **S2b**：Agent-2 cartography SDK enrich + heuristic 回退；`--cartography-mode` / `BUGFIX_CARTOGRAPHY_MODE` |
 | 2026-11-05 | **S4**：FastAPI `POST/GET /v1/runs` 异步壳 + `bugfix-agent serve`；状态落 `{workDir}/.bugfix-runs/{runId}/` |
+| 2026-11-05 | 评审加固：`flowStatus` 进排除；`duplicate` pool；禁单独 `skip_agent2`；HTTP `runId` 防路径逃逸 + meta 原子写；Agent-2 丢弃不存在路径；Agent-3 单票校验失败 → `other_blocked`；`oversized` 仅绝对阈值；CLI 失败也写 `--out-dir` |

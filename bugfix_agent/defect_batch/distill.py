@@ -56,6 +56,7 @@ class DefectDigest:
     title: str
     description: str
     status: Optional[str]
+    flowStatus: Optional[str]
     testModuleRaw: Optional[str]
     fieldType: Optional[str]
     severity: Optional[str]
@@ -186,6 +187,7 @@ def distill_defect(raw: RawDefect) -> DefectDigest:
         title=title,
         description=description,
         status=raw.status,
+        flowStatus=raw.flowStatus,
         testModuleRaw=raw.testModule,
         fieldType=raw.fieldType,
         severity=raw.severity,

@@ -43,7 +43,18 @@ def screen_digest(
     expect_quality = classify_expect_quality(d)
     rule_ids: list[str] = []
 
-    if is_excluded_status(d.status):
+    if d.duplicate:
+        return ScreenedTicket(
+            d,
+            "duplicate",
+            "EXCLUDED",
+            expect_quality,
+            rule_ids,
+            "R1:dup",
+            f"duplicate of {d.duplicateOf}" if d.duplicateOf else "duplicate ticket",
+        )
+
+    if is_excluded_status(d.status, d.flowStatus):
         return ScreenedTicket(d, "excluded", "EXCLUDED", expect_quality, rule_ids, "R1", "Cancel / Not a bug / void")
 
     # Code-review tickets often mention scanners/controls in diff text — do not bypass.
@@ -111,6 +122,4 @@ def funnel_counts(tickets: list[ScreenedTicket]) -> dict[str, int]:
     }
     for t in tickets:
         out[t.pool] = out.get(t.pool, 0) + 1
-        if t.digest.duplicate:
-            out["duplicate"] += 1
     return out

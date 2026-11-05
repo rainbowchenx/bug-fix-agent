@@ -98,7 +98,7 @@ bugfix-agent run \
   --out-dir /tmp/bugfix-out
 ```
 
-成功时 `--out-dir` 写入：
+`--out-dir` 在成功或失败时都会尽量写入已产出的 artifact：
 
 - `defect-batch.json`
 - `code-knowledge.json`
@@ -113,7 +113,7 @@ stdout 会打印摘要：`ok` / `stage` / `funnel` / `profile` / `summary`。
 | `--posture alpha\|beta` | beta 时非 Open/New 更易进 `excluded` |
 | `--cartography-mode heuristic\|sdk` | Agent-2 enrich 模式 |
 | `--analyze-mode heuristic\|sdk` | Agent-3 enrich 模式 |
-| `--skip-agent2` / `--skip-agent3` | 调试时跳过后续段 |
+| `--skip-agent2` / `--skip-agent3` | 调试跳过；`skip-agent2` 必须与 `skip-agent3` 同开（Agent-3 依赖 code-knowledge） |
 | `--open-mr` | 仅改报告 `integrateMode` 标志；**当前不会真正开 MR** |
 
 ### 3）HTTP 服务（S4）
@@ -142,7 +142,9 @@ curl -sS 'http://127.0.0.1:8787/v1/runs/<runId>?workDir=/abs/path/to/repos'
 curl -sS http://127.0.0.1:8787/health
 ```
 
-状态与产物落在 `{workDir}/.bugfix-runs/{runId}/`（`meta.json` + `artifacts/*.json`）。  
+状态与产物落在 `{workDir}/.bugfix-runs/{runId}/`（`meta.json` 原子写入 + `artifacts/*.json`）。  
+`runId` 仅允许 `[A-Za-z0-9._-]`，拒绝 `..` / 路径分隔，防止逃逸出 `.bugfix-runs/`。  
+默认绑定 `127.0.0.1`；非 loopback host 会告警。  
 响应 `schemaVersion` 为 `3-agent-0.1`（与旧 TS `fixed[]/unfixed[]` 报告不兼容）。
 
 ### 4）库调用
