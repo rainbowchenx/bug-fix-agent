@@ -33,22 +33,22 @@ def run_cartographer(
     cartography_mode: Optional[str] = None,
     cartography_fn: Optional[CartographyRunner] = None,
 ) -> CodeKnowledge:
-    """Agent-2 public entry: produce ``code-knowledge`` for Agent-3.
+    """Agent-2 公开入口：产出供 Agent-3 消费的 ``code-knowledge``。
 
-    Pipeline (no cross-agent imports)::
+    管线（禁止跨 Agent import）::
 
-        discover roots → detect profile/stack → heuristic path match
-            → (optional) Claude SDK enrich → validate_code_knowledge
+        发现仓根 → 探测 profile/技术栈 → 启发式路径匹配
+            →（可选）Claude SDK 加厚 → validate_code_knowledge
 
-    Soft matches are a *starting hint* only; Agent-3 may revise localization.
+    软匹配只是起点提示；Agent-3 可改写定位结论。
     """
     work_dir = str(work_dir)
-    # 1) Structural scan of the target workDir (multi-root monorepos OK).
+    # 1) 扫描目标 workDir 结构（支持多根 monorepo）。
     repo_roots = discover_repo_roots(work_dir)
     profile, hints, tech = detect_cartography_profile(work_dir, repo_roots)
     conventions = read_conventions(work_dir, repo_roots)
 
-    # 2) Soft-locate match-pool tickets (strict / locatable_only / needs_info).
+    # 2) 对匹配池票做软定位（strict / locatable_only / needs_info）。
     match_list = [t for t in defect_batch.tickets if is_match_pool(t.pool)]
     defect_code_matches = filter_existing_candidates(
         work_dir, match_tickets(work_dir, repo_roots, match_list)
@@ -96,7 +96,7 @@ def run_cartographer(
         }
     )
 
-    # 3) Optional LLM thicken (heuristic fallback when no key / SDK errors).
+    # 3) 可选 LLM 加厚（无 key / SDK 失败时回退 heuristic）。
     runner = cartography_fn or create_cartography_runner(
         cartography_mode_from_env(cartography_mode)
     )

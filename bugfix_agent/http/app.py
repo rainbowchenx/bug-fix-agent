@@ -1,8 +1,8 @@
-"""S4 FastAPI shell compatible with Dify-style ``POST/GET /v1/runs``.
+"""S4 FastAPI 兼容壳：对齐 Dify 风格的 ``POST/GET /v1/runs``。
 
-This is intentionally thin: auth-less loopback by default, state on disk under
-``{workDir}/.bugfix-runs/``. LangGraph Server remains an optional alternate
-deploy path (see ``langgraph.json``); this app keeps the existing HTTP contract.
+刻意做薄：默认无鉴权、绑回环；状态落在 ``{workDir}/.bugfix-runs/``。
+LangGraph Server 仍是可选部署路径（见 ``langgraph.json``）；本应用保持既有
+HTTP 契约。
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from bugfix_agent.http.store import UnsafeRunPathError, meta_to_status, read_met
 
 
 def create_app(*, workflow_fn: Optional[WorkflowFn] = None, background: bool = True):
-    """Build FastAPI app. `workflow_fn` / `background=False` are for tests."""
+    """构建 FastAPI 应用。``workflow_fn`` / ``background=False`` 供测试注入。"""
     try:
         from fastapi import FastAPI, HTTPException, Query
     except ImportError as err:  # pragma: no cover

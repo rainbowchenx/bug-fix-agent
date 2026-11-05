@@ -1,9 +1,9 @@
-"""Parent LangGraph orchestration for the three-agent defect pipeline.
+"""三 Agent 缺陷流水线的父级 LangGraph 编排。
 
-Public entry: ``run_three_agent_workflow`` (CLI / HTTP / library).
-Graph factory: ``create_three_agent_graph`` (tests, LangGraph Server).
+对外入口：``run_three_agent_workflow``（CLI / HTTP / 库调用）。
+构图工厂：``create_three_agent_graph``（单测、LangGraph Server）。
 
-Flow (loose coupling — agents only exchange validated JSON artifacts)::
+流程（松耦合——Agent 之间只交换校验后的 JSON 产物）::
 
     source / defect_batch
             │
@@ -13,8 +13,8 @@ Flow (loose coupling — agents only exchange validated JSON artifacts)::
                                                     ▼
                                               agent3 ──► validate_report ──► done
 
-Hard stop: any ``ok=False`` or Pydantic gate failure ends the graph at that stage
-(no MR / no partial delivery past a red gate).
+硬门禁：任一 ``ok=False`` 或 Pydantic 校验失败，图在该 stage 结束
+（不越过红灯继续交付）。
 """
 
 from bugfix_agent.workflow.gates import ArtifactValidationError

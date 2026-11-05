@@ -1,8 +1,7 @@
-"""Agent-1 public entry: raw defects → ``defect-batch``.
+"""Agent-1 公开入口：原始缺陷 → ``defect-batch``。
 
-``preloaded`` mode loads CSV/JSON/xlsx-derived payloads, then runs the
-deterministic distill / screen / cluster pipeline (no LLM). ``mcp`` / ``crawler``
-ingest modes are stubs until production defect MCP is wired.
+``preloaded`` 模式加载 CSV/JSON/xlsx 派生载荷，再跑确定性的蒸馏 / 筛选 / 分簇
+（不调 LLM）。``mcp`` / ``crawler`` 拉取模式仍为 stub，待生产缺陷 MCP 就绪。
 """
 
 from __future__ import annotations
@@ -25,7 +24,7 @@ def run_defect_batch_prepare(
     posture: Literal["alpha", "beta"] = "beta",
     profile: Optional[ScreenProfile] = None,
 ) -> DefectBatch:
-    """Load (optional) + prepare; used by CLI ``prepare-batch`` and graph agent1."""
+    """加载（可选）+ 制备；供 CLI ``prepare-batch`` 与图节点 agent1 调用。"""
     if mode != "preloaded":
         raise NotImplementedError(f"ingest mode {mode!r} is stubbed; use preloaded")
     if defects is None:

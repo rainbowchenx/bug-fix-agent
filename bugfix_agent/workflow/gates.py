@@ -1,11 +1,11 @@
-"""Pydantic hard gates between agents.
+"""Agent 之间的 Pydantic 硬门禁。
 
-Each ``require_*`` wraps the contract ``safe_validate_*`` helpers and raises
-``ArtifactValidationError`` on schema failure. Parent graph validate_* nodes
-catch that error, set ``ok=False`` / ``stage`` / ``error``, and ``Command(goto=END)``.
+各 ``require_*`` 包装契约层的 ``safe_validate_*``；校验失败抛出
+``ArtifactValidationError``。父图的 ``validate_*`` 节点捕获后写入
+``ok=False`` / ``stage`` / ``error``，并以 ``Command(goto=END)`` 结束。
 
-Agents must not import each other's internals — only these artifact types cross
-the boundary (defect-batch → code-knowledge → analysis-report).
+禁止 Agent 互相 import 内部实现——跨段只允许这些产物类型
+（defect-batch → code-knowledge → analysis-report）。
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from bugfix_agent.contracts import (
 
 
 class ArtifactValidationError(Exception):
-    """Raised when a cross-agent artifact fails schema validation."""
+    """跨 Agent 产物未通过 schema 校验时抛出。"""
 
     def __init__(self, artifact: str, detail: str):
         self.artifact = artifact
@@ -32,7 +32,7 @@ class ArtifactValidationError(Exception):
 
 
 def require_defect_batch(data: Any) -> DefectBatch:
-    """Gate after Agent-1: raw dict → ``DefectBatch`` or raise."""
+    """Agent-1 出口门禁：原始 dict → ``DefectBatch``，失败则抛错。"""
     ok, result = safe_validate_defect_batch(data)
     if not ok:
         raise ArtifactValidationError("defect-batch", str(result))
@@ -41,7 +41,7 @@ def require_defect_batch(data: Any) -> DefectBatch:
 
 
 def require_code_knowledge(data: Any) -> CodeKnowledge:
-    """Gate after Agent-2: raw dict → ``CodeKnowledge`` or raise."""
+    """Agent-2 出口门禁：原始 dict → ``CodeKnowledge``，失败则抛错。"""
     ok, result = safe_validate_code_knowledge(data)
     if not ok:
         raise ArtifactValidationError("code-knowledge", str(result))
@@ -50,7 +50,7 @@ def require_code_knowledge(data: Any) -> CodeKnowledge:
 
 
 def require_analysis_report(data: Any) -> AnalysisReport:
-    """Gate after Agent-3: raw dict → ``AnalysisReport`` or raise."""
+    """Agent-3 出口门禁：原始 dict → ``AnalysisReport``，失败则抛错。"""
     ok, result = safe_validate_analysis_report(data)
     if not ok:
         raise ArtifactValidationError("analysis-report", str(result))

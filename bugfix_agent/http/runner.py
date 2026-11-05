@@ -1,13 +1,13 @@
-"""Async run executor for ``POST /v1/runs``.
+"""``POST /v1/runs`` 的异步执行器。
 
-Lifecycle
----------
-1. Allocate ``{workDir}/.bugfix-runs/{runId}/`` and write ``meta.json`` (queued).
-2. Start a daemon thread (or run sync in tests with ``background=False``).
-3. While LangGraph streams state values, polish ``meta.stage`` for polling clients.
-4. On finish, rewrite artifacts + final meta (succeeded/failed).
+生命周期
+--------
+1. 分配 ``{workDir}/.bugfix-runs/{runId}/`` 并写 ``meta.json``（queued）。
+2. 起守护线程（测试可 ``background=False`` 同步跑）。
+3. LangGraph 流式输出 state 时，同步刷新 ``meta.stage`` 供轮询。
+4. 结束后重写产物 + 最终 meta（succeeded/failed）。
 
-Layout::
+目录布局::
 
     {workDir}/.bugfix-runs/{runId}/
         meta.json
@@ -38,9 +38,9 @@ def enqueue_run(
     workflow_fn: Optional[WorkflowFn] = None,
     background: bool = True,
 ) -> tuple[str, str]:
-    """Persist run meta and start the three-agent workflow (thread or sync).
+    """落盘 run meta，并启动三 Agent 工作流（线程或同步）。
 
-    Returns `(runId, resolvedWorkDir)`.
+    返回 ``(runId, resolvedWorkDir)``。
     """
     work_dir = str(Path(request.workDir).resolve())
     Path(work_dir).mkdir(parents=True, exist_ok=True)
@@ -74,7 +74,7 @@ def enqueue_run(
         last_stage = "agent1"
 
         def _on_update(state: dict[str, Any]) -> None:
-            """Mirror LangGraph ``stage`` into meta.json for GET pollers."""
+            """把 LangGraph 的 ``stage`` 镜像进 meta.json，供 GET 轮询。"""
             nonlocal last_stage
             stage = state.get("stage") or last_stage
             if stage != last_stage:
@@ -99,9 +99,8 @@ def enqueue_run(
                 "analyze_mode": opts.analyzeMode,
                 "cartography_mode": opts.cartographyMode,
             }
-            # Progressive artifact writes + stage streaming when using the
-            # built-in LangGraph runner. Injected workflow_fn (tests) may not
-            # accept these kwargs.
+            # 内置 LangGraph runner：渐进落盘 + 阶段流式。
+            # 测试注入的 workflow_fn 可能不接受这些 kwargs。
             if workflow_fn is None:
                 call_kwargs.update(
                     {
@@ -117,8 +116,7 @@ def enqueue_run(
                 call_kwargs.pop("thread_id", None)
                 call_kwargs.pop("on_update", None)
                 result = fn(**call_kwargs)
-            # Ensure artifacts exist even if progressive persist was skipped
-            # (injected workflow_fn or older call path).
+            # 即便跳过了渐进落盘（注入桩 / 旧路径），收尾也要保证产物在盘上。
             if result.artifacts.defect_batch:
                 (art_dir / "defect-batch.json").write_text(
                     result.artifacts.defect_batch.model_dump_json(indent=2), encoding="utf-8"
@@ -168,7 +166,7 @@ def enqueue_run(
     if background:
         import threading
 
-        # Fire-and-forget: POST returns 202; client polls GET /v1/runs/:id.
+        # 即发即忘：POST 返回 202；客户端轮询 GET /v1/runs/:id。
         threading.Thread(target=_execute, name=f"bugfix-run-{run_id}", daemon=True).start()
     else:
         _execute()

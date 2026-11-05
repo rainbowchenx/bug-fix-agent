@@ -1,8 +1,8 @@
-"""Helpers for pointing Claude Agent SDK sessions at package ``skills/``.
+"""把包内 ``skills/`` 指给 Claude Agent SDK 会话。
 
-These SOPs (hierarchical-localization, systematic-debugging, …) travel with the
-wheel. Agent-2/3 append a short system-prompt addon naming the relevant skills;
-Claude Code may also load ``SKILL.md`` when the skill directory is discoverable.
+这些 SOP（hierarchical-localization、systematic-debugging 等）随包发布。
+Agent-2/3 会在 system prompt 末尾追加相关 skill 名；若 skill 目录可被
+Claude Code 发现，也会加载对应 ``SKILL.md``。
 """
 
 from __future__ import annotations
@@ -13,8 +13,8 @@ from typing import Optional
 
 
 def package_skills_root() -> Path:
-    """Repo/package `skills/` directory shipped with bugfix-agent."""
-    # bugfix_agent/sdk/skills.py → parents[2] == repository / package root.
+    """随包发布的仓库根 ``skills/`` 目录。"""
+    # bugfix_agent/sdk/skills.py → parents[2] == 仓库 / 包根。
     return Path(__file__).resolve().parents[2] / "skills"
 
 
@@ -31,11 +31,10 @@ def list_package_skill_names() -> tuple[str, ...]:
 
 
 def skills_system_addon(relevant: Optional[tuple[str, ...]] = None) -> str:
-    """Short system-prompt addon pointing the SDK session at package skills.
+    """生成简短 system-prompt 附录，点名可用的包内 skills。
 
-    Claude Code discovers ``SKILL.md`` when the skill dir is on the agent
-    search path; we also name them explicitly so heuristic/SDK sessions share
-    the same SOP vocabulary.
+    Claude Code 在 skill 目录位于搜索路径时可自动发现 ``SKILL.md``；
+    这里再显式点名，让 heuristic / SDK 会话共用同一套 SOP 词汇。
     """
     names = list(relevant) if relevant is not None else list(list_package_skill_names())
     if not names:
