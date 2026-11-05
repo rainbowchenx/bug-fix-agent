@@ -44,6 +44,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     run_p.add_argument("--out-dir", default=None, help="Write artifacts JSON here")
 
+    serve_p = sub.add_parser("serve", help="HTTP API (S4 FastAPI): POST/GET /v1/runs")
+    serve_p.add_argument("--host", default="127.0.0.1")
+    serve_p.add_argument("--port", type=int, default=8787)
+
     ver = sub.add_parser("version")
     ver.set_defaults(cmd="version")
 
@@ -52,6 +56,12 @@ def main(argv: list[str] | None = None) -> int:
         from bugfix_agent import __version__
 
         print(__version__)
+        return 0
+
+    if args.cmd == "serve":
+        from bugfix_agent.http.app import run_server
+
+        run_server(host=args.host, port=args.port)
         return 0
 
     if args.cmd == "prepare-batch":

@@ -26,7 +26,8 @@ source (CSV/JSON/xlsx)
 | Agent-2 | `agents/cartographer/` + `sdk/cartography.py` | 仓型探测 + 路径软匹配，可选 SDK 通读加厚 → `code-knowledge` | 🟡 启发式 + SDK 骨架 |
 | Agent-3 | `agents/analyst/` + `sdk/analyze.py` | 路由 + 可选 Claude 只读 analyze → `analysis-report` | 🟡 路由+SDK 骨架 |
 | 父编排 | `workflow/` | LangGraph `StateGraph`：`agent1→agent2→agent3` + 门禁 | ✅ |
-| CLI | `cli.py` | `bugfix-agent run` / `prepare-batch` | ✅ |
+| HTTP（S4） | `http/` | FastAPI：`POST/GET /v1/runs`、`GET /health` | ✅ 兼容壳 |
+| CLI | `cli.py` | `bugfix-agent run` / `prepare-batch` / `serve` | ✅ |
 
 **松耦合约定：** Agent 之间只交换落盘 JSON；禁止跨 Agent import 内部实现或共享 transcript。父图只调用各包公开的 `run_*` + `validate_*`。
 
@@ -41,7 +42,8 @@ source (CSV/JSON/xlsx)
 python3 -m venv .venv && source .venv/bin/activate
 
 pip install -e ".[dev]"     # 核心：pydantic / openpyxl / langgraph + pytest
-pip install -e ".[sdk]"     # 可选：Agent-3 Claude Agent SDK（需本机 Claude Code CLI）
+pip install -e ".[sdk]"     # 可选：Agent-2/3 Claude Agent SDK（需本机 Claude Code CLI）
+pip install -e ".[http]"    # 可选：FastAPI + uvicorn（S4）
 ```
 
 复制环境变量模板：
@@ -114,10 +116,39 @@ stdout 会打印摘要：`ok` / `stage` / `funnel` / `profile` / `summary`。
 | `--skip-agent2` / `--skip-agent3` | 调试时跳过后续段 |
 | `--open-mr` | 仅改报告 `integrateMode` 标志；**当前不会真正开 MR** |
 
-### 3）库调用
+### 3）HTTP 服务（S4）
+
+```bash
+bugfix-agent serve --host 127.0.0.1 --port 8787
+```
+
+```bash
+# 创建 run（202）
+curl -sS -X POST http://127.0.0.1:8787/v1/runs \
+  -H 'content-type: application/json' \
+  -d '{
+    "workDir": "/abs/path/to/repos",
+    "productLine": "hc",
+    "source": "/abs/path/to/raw-defects.json",
+    "posture": "alpha",
+    "options": {
+      "analyzeMode": "heuristic",
+      "cartographyMode": "heuristic"
+    }
+  }'
+
+# 轮询（需带同一 workDir）
+curl -sS 'http://127.0.0.1:8787/v1/runs/<runId>?workDir=/abs/path/to/repos'
+curl -sS http://127.0.0.1:8787/health
+```
+
+状态与产物落在 `{workDir}/.bugfix-runs/{runId}/`（`meta.json` + `artifacts/*.json`）。  
+响应 `schemaVersion` 为 `3-agent-0.1`（与旧 TS `fixed[]/unfixed[]` 报告不兼容）。
+
+### 4）库调用
 
 ```python
-from bugfix_agent import create_three_agent_graph, run_three_agent_workflow
+from bugfix_agent import create_app, create_three_agent_graph, run_three_agent_workflow
 
 result = run_three_agent_workflow(
     work_dir="./repos",
@@ -215,7 +246,7 @@ raw-defects  ──Agent-1──►  defect-batch  ──Agent-2──►  code-
 |----|------|
 | Agent-2 SDK 通读质量打磨（更多形态清单 / CodeGraph） | 后续 |
 | Agent-3 出 patch / worktree 迭代 / 真 MR | 后续 |
-| HTTP / LangGraph Server（S4） | 后续 |
+| LangGraph Server 原生部署（S4 增强） | 后续（现有 FastAPI 兼容壳） |
 | 生产 MCP 拉缺陷 | stub（现用 CSV/JSON/xlsx） |
 
 决策背景：[decision-followup](docs/superpowers/specs/2026-10-23-report-agent-decision-followup.md)
