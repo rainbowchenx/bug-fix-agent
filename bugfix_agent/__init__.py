@@ -17,6 +17,11 @@ from bugfix_agent.agents.cartographer import run_cartographer
 from bugfix_agent.agents.analyst import run_analyst
 from bugfix_agent.workflow import create_three_agent_graph, run_three_agent_workflow
 
+try:
+    from bugfix_agent.http import create_app
+except ImportError:  # pragma: no cover — fastapi optional until [http] installed
+    create_app = None  # type: ignore[assignment]
+
 __all__ = [
     "CONTRACT_SCHEMA_VERSION",
     "DEFECT_BATCH_SCHEMA_VERSION",
@@ -34,6 +39,7 @@ __all__ = [
     "run_analyst",
     "run_three_agent_workflow",
     "create_three_agent_graph",
+    "create_app",
 ]
 
 __version__ = "0.2.0"

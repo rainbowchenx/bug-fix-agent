@@ -32,7 +32,8 @@ validate → Agent-1 → validate → Agent-2 → validate → Agent-3 → valid
 | `bugfix_agent/agents/analyst/` | Agent-3 | 按条路由 + analyze 会话 / 报告 |
 | `bugfix_agent/sdk/` | Agent-3（可复用） | Claude Agent SDK 适配（analyze 只读） |
 | `bugfix_agent/workflow/` | 父编排 | LangGraph `StateGraph` + 进出校验门禁 |
-| `bugfix_agent/cli.py` | CLI | `bugfix-agent run` |
+| `bugfix_agent/http/` | S4 HTTP | FastAPI：`POST/GET /v1/runs`、落盘 `.bugfix-runs/` |
+| `bugfix_agent/cli.py` | CLI | `bugfix-agent run` / `serve` |
 
 禁止 Agent-2/3 互相 import。
 
@@ -64,7 +65,7 @@ pytest -q
 | S3a | Agent-3 outcome 路由 | ✅ |
 | S3b | Agent-3 analyze 会话（Claude Agent SDK，只读） | ✅ 骨架：`bugfix_agent/sdk/analyze.py`；无 key 时 heuristic 回退 |
 | S2b | Agent-2 LLM 通读加厚 | ✅ 骨架：`bugfix_agent/sdk/cartography.py`；启发式 detect/match + 可选 SDK enrich |
-| S4 | HTTP / LangGraph Server（可选） | 后续 |
+| S4 | HTTP / LangGraph Server（可选） | ✅ FastAPI 兼容壳：`POST/GET /v1/runs`、`GET /health`（`bugfix_agent/http/`）；LangGraph Server 部署仍可选后续 |
 | S5 | 退役 TS 运行时（`src/`、npm LangGraph、修复侧 skills） | ✅ |
 
 ---
@@ -79,3 +80,4 @@ pytest -q
 | 2026-11-04 | Agent-3 analyze：Claude Agent SDK 只读会话 + heuristic 回退；`--analyze-mode` / `BUGFIX_ANALYZE_MODE` |
 | 2026-11-04 | **S5**：删除已由 Python 三 Agent 覆盖的 TS `src/`、Vitest、npm 包与修复侧 skills |
 | 2026-11-04 | **S2b**：Agent-2 cartography SDK enrich + heuristic 回退；`--cartography-mode` / `BUGFIX_CARTOGRAPHY_MODE` |
+| 2026-11-05 | **S4**：FastAPI `POST/GET /v1/runs` 异步壳 + `bugfix-agent serve`；状态落 `{workDir}/.bugfix-runs/{runId}/` |
