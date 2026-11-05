@@ -134,7 +134,8 @@ def cluster_screened(
                 intent=intent,  # type: ignore[arg-type]
                 size=len(lst),
                 openCount=open_count,
-                oversized=len(lst) / strict_count > fat_ratio or len(lst) > fat_absolute,
+                # Post-split: only absolute size marks oversized (ratio is for split decision).
+                oversized=len(lst) > fat_absolute,
                 defectIds=[t.digest.defectId for t in lst],
             )
         )

@@ -9,7 +9,7 @@ from bugfix_agent.agents.cartographer.detect import (
     discover_repo_roots,
     read_conventions,
 )
-from bugfix_agent.agents.cartographer.match import match_tickets
+from bugfix_agent.agents.cartographer.match import filter_existing_candidates, match_tickets
 from bugfix_agent.contracts import (
     CODE_KNOWLEDGE_SCHEMA_VERSION,
     CodeKnowledge,
@@ -40,7 +40,9 @@ def run_cartographer(
     conventions = read_conventions(work_dir, repo_roots)
 
     match_list = [t for t in defect_batch.tickets if is_match_pool(t.pool)]
-    defect_code_matches = match_tickets(work_dir, repo_roots, match_list)
+    defect_code_matches = filter_existing_candidates(
+        work_dir, match_tickets(work_dir, repo_roots, match_list)
+    )
 
     partial = profile == "unknown" or all(len(m.candidates) == 0 for m in defect_code_matches)
 

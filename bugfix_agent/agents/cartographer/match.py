@@ -94,3 +94,29 @@ def match_tickets(
             )
         )
     return results
+
+
+def filter_existing_candidates(
+    work_dir: str | Path,
+    matches: list[DefectCodeMatch],
+) -> list[DefectCodeMatch]:
+    """Drop candidates whose files do not exist under work_dir."""
+    root = Path(work_dir)
+    out: list[DefectCodeMatch] = []
+    for m in matches:
+        kept: list[MatchCandidate] = []
+        for c in m.candidates:
+            rel = Path(c.path)
+            abs_path = root / c.repoPath / rel if c.repoPath not in (".", "") else root / rel
+            try:
+                if abs_path.resolve().is_file():
+                    kept.append(c)
+            except OSError:
+                continue
+        conf = m.confidence
+        if not kept:
+            conf = "low"
+        elif len(kept) >= 3 and conf == "low":
+            conf = "medium"
+        out.append(m.model_copy(update={"candidates": kept, "confidence": conf}))
+    return out

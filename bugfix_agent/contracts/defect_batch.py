@@ -15,6 +15,7 @@ Pool = Literal[
     "hard_reject",
     "security",
     "excluded",
+    "duplicate",
 ]
 ExpectQuality = Literal["explicit", "inferred", "ambiguous", "absent"]
 Intent = Literal[

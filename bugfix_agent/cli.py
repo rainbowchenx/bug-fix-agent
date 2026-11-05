@@ -112,7 +112,7 @@ def main(argv: list[str] | None = None) -> int:
     }
     print(json.dumps(payload, ensure_ascii=False, indent=2))
 
-    if args.out_dir and result.ok:
+    if args.out_dir:
         out = Path(args.out_dir)
         out.mkdir(parents=True, exist_ok=True)
         if result.artifacts.defect_batch:

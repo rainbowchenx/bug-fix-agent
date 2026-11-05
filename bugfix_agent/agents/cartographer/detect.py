@@ -51,7 +51,7 @@ def detect_cartography_profile(
     repo_roots: list[RepoRoot],
 ) -> tuple[CartographyProfile, list[str], dict]:
     frameworks: set[str] = set()
-    languages = {"typescript", "javascript"}
+    languages: set[str] = set()
     hints: list[str] = []
     profile: CartographyProfile = "unknown"
     root = Path(work_dir)
@@ -65,6 +65,8 @@ def detect_cartography_profile(
         if isinstance(pkg.get("devDependencies"), dict):
             deps.update(pkg["devDependencies"])
 
+        if pkg:
+            languages.update({"typescript", "javascript"})
         if "electron" in deps or "electron-builder" in deps or "electron-vite" in deps:
             profile = "electron_node"
             frameworks.add("electron")
@@ -89,6 +91,9 @@ def detect_cartography_profile(
             if profile == "unknown":
                 profile = "device_web"
             hints.append(f"{rr.path}:device-bridge-path")
+
+    if not languages:
+        languages.add("unknown")
 
     return (
         profile,
