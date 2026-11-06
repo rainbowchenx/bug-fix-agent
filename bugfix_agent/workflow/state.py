@@ -4,12 +4,22 @@ from typing import Any, Literal, NotRequired, TypedDict
 
 
 class ThreeAgentState(TypedDict):
-    """LangGraph state for Agent-1 → Agent-2 → Agent-3.
+    """LangGraph 共享状态：Agent-1 → Agent-2 → Agent-3。
 
-    Artifacts are stored as plain dicts so checkpoints stay JSON-serializable.
-    Agents remain loosely coupled: nodes only call `run_*` + Pydantic gates.
+    设计要点
+    --------
+    - 产物以普通 ``dict`` 存放，便于 checkpoint / Studio 做 JSON 序列化。
+    - 节点只返回部分更新；由 LangGraph 合并进本状态。
+    - Agent 松耦合：只调用 ``run_*`` + Pydantic 门禁，禁止 import 另一 Agent 私有模块。
+
+    控制字段
+    --------
+    - ``ok``：软失败标志；校验节点见 False 即结束。
+    - ``stage``：当前阶段（``agent1|agent2|agent3|done``）；HTTP 轮询读此字段。
+    - ``error``：``ok`` 为 False 时的可读原因。
     """
 
+    # --- 运行入参（invoke 时一次性写入） ---
     work_dir: str
     product_line: str
     posture: Literal["alpha", "beta"]
@@ -20,15 +30,17 @@ class ThreeAgentState(TypedDict):
     cartography_mode: NotRequired[Literal["heuristic", "sdk"]]
 
     source: NotRequired[Any]
-    """raw-defects path / JSON payload for Agent-1 when `defect_batch` is absent."""
+    """无 ``defect_batch`` 时，Agent-1 使用的 raw-defects 路径或 JSON 载荷。"""
 
+    # --- 渐进产物（Pydantic 模型的 dict 形态） ---
     defect_batch: NotRequired[dict[str, Any]]
     code_knowledge: NotRequired[dict[str, Any]]
     analysis_report: NotRequired[dict[str, Any]]
 
     artifact_dir: NotRequired[str]
-    """If set, validate gates write JSON artifacts progressively after each success."""
+    """若设置，各 validate 门禁在校验成功后渐进写入 JSON 产物。"""
 
+    # --- 控制 / 可观测性 ---
     ok: NotRequired[bool]
     stage: NotRequired[Literal["agent1", "agent2", "agent3", "done"]]
     error: NotRequired[str | None]

@@ -1,3 +1,14 @@
+"""CLI 入口（``bugfix-agent`` console script）。
+
+子命令
+------
+- ``prepare-batch``：只跑 Agent-1 → defect-batch JSON（不走父图）。
+- ``run``：完整 Agent-1→2→3（``run_three_agent_workflow``）；``--out-dir``
+  开启渐进产物落盘。
+- ``serve``：回环上的 FastAPI S4 壳。
+- ``version``：打印包版本。
+"""
+
 from __future__ import annotations
 
 import argparse

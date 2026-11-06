@@ -32,11 +32,17 @@ def run_analyst(
     analyze_fn: Optional[AnalyzeRunner] = None,
     analyze_limit: Optional[int] = None,
 ) -> AnalysisReport:
-    """Agent-3: route each match-pool ticket, then optionally run analyze session.
+    """Agent-3 公开入口：产出 ``analysis-report``（默认只出报告、不开 MR）。
 
-    - `needs_ticket_info` / `unlocalized` stop at the deterministic router.
-    - Soft-localized tickets (`plan_only` hint) go through analyze (heuristic or SDK).
-    - Per-ticket validation failures degrade to `other_blocked` (do not abort the report).
+    对匹配池中的每张票::
+
+        route_ticket（确定性）──► 可选 analyze 会话（heuristic|sdk）
+                              └──► 非法票行降级为 other_blocked
+
+    - ``needs_ticket_info`` / ``unlocalized`` 停在路由器（不调 LLM）。
+    - 软定位票（``plan_only`` 提示）可进入 analyze。
+    - 单票校验失败 → ``other_blocked``，整份报告仍继续。
+    - 当前 ``open_mr`` 只改报告标志，不会真推 GitLab。
     """
     work_dir = str(work_dir)
     match_by_id = {m.defectId: m for m in code_knowledge.defectCodeMatches}
@@ -47,6 +53,7 @@ def run_analyst(
     for t in defect_batch.tickets:
         if not is_match_pool(t.pool):
             continue
+        # 先确定性路由；仅当路由器给出 plan_only 时才进 analyze。
         routed = route_ticket(t, match_by_id.get(t.defectId))
         entry: dict[str, Any] = {
             "defectId": t.defectId,
