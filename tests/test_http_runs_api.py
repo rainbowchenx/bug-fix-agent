@@ -8,9 +8,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from bugfix_agent.http import create_app
 from bugfix_agent.workflow import ThreeAgentWorkflowResult, WorkflowArtifacts
-
-ROOT = Path(__file__).resolve().parents[1]
-HC1 = ROOT / "test" / "fixtures" / "defect-batch" / "hc1-raw.json"
+from tests.helpers import defect_batch_from_hc1, minimal_defect_batch
 
 
 def test_health():
@@ -32,6 +30,9 @@ def test_create_and_get_run_sync(tmp_path: Path):
     (work / "src").mkdir()
     (work / "src" / "回放.ts").write_text("export {}\n", encoding="utf-8")
 
+    batch_path = tmp_path / "defect-batch.json"
+    batch_path.write_text(defect_batch_from_hc1().model_dump_json(), encoding="utf-8")
+
     app = create_app(background=False)
     client = TestClient(app)
     created = client.post(
@@ -39,7 +40,7 @@ def test_create_and_get_run_sync(tmp_path: Path):
         json={
             "workDir": str(work),
             "productLine": "hc",
-            "source": str(HC1),
+            "defectBatch": str(batch_path),
             "posture": "alpha",
             "options": {
                 "analyzeMode": "heuristic",
@@ -84,7 +85,7 @@ def test_create_run_with_injected_workflow(tmp_path: Path):
         json={
             "workDir": str(work),
             "productLine": "hc",
-            "source": {"tickets": []},
+            "defectBatch": minimal_defect_batch().model_dump(),
             "posture": "alpha",
             "options": {"skipAgent2": True, "skipAgent3": True},
         },

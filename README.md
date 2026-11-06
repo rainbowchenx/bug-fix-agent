@@ -1,16 +1,19 @@
 # bugfix-agent
 
-本地 **三 Agent 缺陷分析** 工作流（Python ≥ 3.11）。一次输入缺陷表 + 目标仓目录，自动跑完并落盘三段 JSON 契约；默认**只分析、不出 MR**。
+本地 **三 Agent 缺陷分析** 工作流（Python ≥ 3.11）。Agent-1 在图外（skill + Claude Code / `prepare-batch`）；LangGraph 只编排 Agent-2→3。默认**只分析、不出 MR**。
 
 ```text
 source (CSV/JSON/xlsx)
         │
+        ▼  Agent-1（图外：skill / prepare-batch）
+   defect-batch.json
+        │
         ▼
-┌─ LangGraph 父编排（bugfix_agent/workflow）─────────────────────┐
-│  validate → Agent-1 → validate → Agent-2 → validate → Agent-3 │
-│               │                    │                    │     │
-│         defect-batch         code-knowledge      analysis-report │
-└───────────────────────────────────────────────────────────────┘
+┌─ LangGraph 父编排（bugfix_agent/workflow）──────────────┐
+│  validate_batch → Agent-2 → validate → Agent-3 → validate │
+│                      │                    │               │
+│                code-knowledge      analysis-report         │
+└───────────────────────────────────────────────────────────┘
 ```
 
 旧 TypeScript / npm / JS LangGraph 运行时已退役；本仓可执行代码只在 `bugfix_agent/`。
@@ -22,12 +25,12 @@ source (CSV/JSON/xlsx)
 | 组件 | 路径 | 职责 | 成熟度 |
 |------|------|------|--------|
 | 契约 SSOT | `bugfix_agent/contracts/` | Pydantic 校验三段 artifact | ✅ |
-| Agent-1 | `ingest/` + `defect_batch/` | 入口映射 → 蒸馏 / 筛选 / 分簇 → `defect-batch` | ✅ 规则管线 |
+| Agent-1 | `ingest/` + `defect_batch/` + `skills/defect-batch-prepare/` | 图外：入口映射 → 蒸馏 / 筛选 / 分簇 → `defect-batch` | ✅ 规则管线 + skill |
 | Agent-2 | `agents/cartographer/` + `sdk/cartography.py` | 仓型探测 + 路径软匹配，可选 SDK 通读加厚 → `code-knowledge` | 🟡 启发式 + SDK 骨架 |
 | Agent-3 | `agents/analyst/` + `sdk/analyze.py` | 路由 + 可选 Claude 只读 analyze → `analysis-report` | 🟡 路由+SDK 骨架 |
-| 父编排 | `workflow/` | LangGraph `StateGraph`：`agent1→agent2→agent3` + 门禁 | ✅ |
-| HTTP（S4） | `http/` | FastAPI：`POST/GET /v1/runs`、`GET /health` | ✅ 兼容壳 |
-| CLI | `cli.py` | `bugfix-agent run` / `prepare-batch` / `serve` | ✅ |
+| 父编排 | `workflow/` | LangGraph：`validate_batch→agent2→agent3` + 门禁（不含 Agent-1） | ✅ |
+| HTTP（S4） | `http/` | FastAPI：`POST/GET /v1/runs`（入参 `defectBatch`）、`GET /health` | ✅ 兼容壳 |
+| CLI | `cli.py` | `prepare-batch`（Agent-1）/ `run`（2→3）/ `serve` | ✅ |
 
 **松耦合约定：** Agent 之间只交换落盘 JSON；禁止跨 Agent import 内部实现或共享 transcript。父图只调用各包公开的 `run_*` + `validate_*`。
 
@@ -67,7 +70,9 @@ cp .env.example .env
 
 ## 使用
 
-### 1）只跑 Agent-1（产出 defect-batch）
+### 1）Agent-1（图外：skill / prepare-batch）
+
+在 Claude Code 中按 `skills/defect-batch-prepare/` 调用规则管线，或：
 
 ```bash
 bugfix-agent prepare-batch \
@@ -85,13 +90,13 @@ bugfix-agent prepare-batch \
 
 脱敏样本目录：`缺陷拉取/脱敏/`（若已入库）。夹具：`test/fixtures/defect-batch/`。
 
-### 2）跑完整三 Agent
+### 2）LangGraph 跑 Agent-2→3（需要已有 defect-batch）
 
 ```bash
 bugfix-agent run \
   --work-dir ./path/to/target-repos \
   --product-line hc \
-  --source ./raw-defects.json \
+  --defect-batch /tmp/defect-batch.json \
   --posture alpha \
   --cartography-mode heuristic \
   --analyze-mode heuristic \
@@ -129,7 +134,7 @@ curl -sS -X POST http://127.0.0.1:8787/v1/runs \
   -d '{
     "workDir": "/abs/path/to/repos",
     "productLine": "hc",
-    "source": "/abs/path/to/raw-defects.json",
+    "defectBatch": "/abs/path/to/defect-batch.json",
     "posture": "alpha",
     "options": {
       "analyzeMode": "heuristic",
@@ -150,27 +155,31 @@ curl -sS http://127.0.0.1:8787/health
 ### 4）库调用
 
 ```python
-from bugfix_agent import create_app, create_three_agent_graph, run_three_agent_workflow
+from bugfix_agent import create_three_agent_graph, run_defect_batch_prepare, run_three_agent_workflow
 
+batch = run_defect_batch_prepare(
+    product_line="hc",
+    source="./raw-defects.json",
+    posture="alpha",
+)
 result = run_three_agent_workflow(
     work_dir="./repos",
     product_line="hc",
-    source="./raw-defects.json",
+    defect_batch=batch,
     posture="alpha",
     analyze_mode="heuristic",
 )
 assert result.ok and result.stage == "done"
-batch = result.artifacts.defect_batch
 knowledge = result.artifacts.code_knowledge
 report = result.artifacts.analysis_report
 
-# 或直接 invoke LangGraph
+# 或直接 invoke LangGraph（须自带 defect_batch）
 graph = create_three_agent_graph()
 final = graph.invoke({
     "work_dir": "./repos",
     "product_line": "hc",
     "posture": "alpha",
-    "source": "./raw-defects.json",
+    "defect_batch": batch.model_dump(),
     "open_mr": False,
     "skip_agent2": False,
     "skip_agent3": False,
@@ -193,7 +202,7 @@ python -c "import json;print(json.load(open('/tmp/db.json'))['funnel'])"
 # 强制不走 LLM，便于本地联调
 bugfix-agent run ... --analyze-mode heuristic --out-dir /tmp/out
 
-# 段失败时看 stdout 的 stage / error（agent1|agent2|agent3）
+# 段失败时看 stdout 的 stage / error（agent2|agent3）
 # 注入假 Agent 做单测：run_three_agent_workflow(..., agent2=..., agent3=...)
 ```
 

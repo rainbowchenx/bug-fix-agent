@@ -6,9 +6,9 @@ from langgraph.graph import END
 
 from bugfix_agent.workflow import create_three_agent_graph, run_three_agent_workflow
 from bugfix_agent.workflow.graph import default_three_agent_graph
+from tests.helpers import defect_batch_from_hc1
 
 ROOT = Path(__file__).resolve().parents[1]
-HC1 = ROOT / "test" / "fixtures" / "defect-batch" / "hc1-raw.json"
 
 
 def _mini_work(tmp_path: Path) -> Path:
@@ -26,7 +26,7 @@ def _mini_work(tmp_path: Path) -> Path:
 def test_default_graph_compiles():
     g = default_three_agent_graph
     nodes = set(g.get_graph().nodes)
-    assert "agent1" in nodes
+    assert "agent1" not in nodes
     assert "agent2" in nodes
     assert "agent3" in nodes
     assert "validate_batch" in nodes
@@ -36,18 +36,19 @@ def test_default_graph_compiles():
 
 def test_langgraph_e2e_invoke(tmp_path: Path):
     work = _mini_work(tmp_path)
+    batch = defect_batch_from_hc1()
     graph = create_three_agent_graph()
     final = graph.invoke(
         {
             "work_dir": str(work),
             "product_line": "hc",
             "posture": "alpha",
-            "source": str(HC1),
+            "defect_batch": batch.model_dump(),
             "open_mr": False,
             "skip_agent2": False,
             "skip_agent3": False,
             "ok": True,
-            "stage": "agent1",
+            "stage": "agent2",
             "error": None,
         }
     )
@@ -64,7 +65,7 @@ def test_langgraph_skip_agent2_and_3(tmp_path: Path):
         work_dir=work,
         product_line="hc",
         posture="alpha",
-        source=HC1,
+        defect_batch=defect_batch_from_hc1(),
         skip_agent2=True,
         skip_agent3=True,
     )
@@ -83,7 +84,7 @@ def test_langgraph_hard_stop_invalid_agent2():
         work_dir="/tmp/x",
         product_line="hc",
         posture="alpha",
-        source=HC1,
+        defect_batch=defect_batch_from_hc1(),
         agent2=bad_agent2,
     )
     assert result.ok is False
@@ -109,7 +110,7 @@ def test_langgraph_checkpointer_thread_and_updates(tmp_path: Path):
         work_dir=work,
         product_line="hc",
         posture="alpha",
-        source=HC1,
+        defect_batch=defect_batch_from_hc1(),
         analyze_mode="heuristic",
         cartography_mode="heuristic",
         thread_id="test-thread-1",
@@ -118,7 +119,7 @@ def test_langgraph_checkpointer_thread_and_updates(tmp_path: Path):
     )
     assert result.ok is True
     assert result.stage == "done"
-    assert "agent1" in stages
+    assert "agent1" not in stages
     assert "agent2" in stages
     assert "done" in stages
 
@@ -130,7 +131,7 @@ def test_langgraph_progressive_artifact_dir(tmp_path: Path):
         work_dir=work,
         product_line="hc",
         posture="alpha",
-        source=HC1,
+        defect_batch=defect_batch_from_hc1(),
         analyze_mode="heuristic",
         cartography_mode="heuristic",
         artifact_dir=out,

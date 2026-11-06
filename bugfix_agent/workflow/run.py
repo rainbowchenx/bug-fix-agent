@@ -8,17 +8,23 @@
    ``checkpointer`` 时，用 ``stream_mode="values"`` 流式输出，供 HTTP
    刷新 ``stage``，崩溃时也能带回部分产物。
 
-预检（必须有 source、禁止单独 skip_agent2）在进图前完成，非法请求不会
-创建 checkpoint 线程。
+预检（必须有 defect-batch、禁止单独 skip_agent2）在进图前完成，非法请求不会
+创建 checkpoint 线程。Agent-1 不在本图内。
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional, Union
 
-from bugfix_agent.contracts import AnalysisReport, CodeKnowledge, DefectBatch
+from bugfix_agent.contracts import (
+    AnalysisReport,
+    CodeKnowledge,
+    DefectBatch,
+    validate_defect_batch,
+)
 from bugfix_agent.workflow.gates import ArtifactValidationError
 from bugfix_agent.workflow.graph import (
     AnalystFn,
@@ -31,10 +37,12 @@ from bugfix_agent.workflow.state import ThreeAgentState
 WorkflowUpdateFn = Callable[[dict[str, Any]], None]
 """每帧流式 state 快照的回调（stream_mode=values）。"""
 
+DefectBatchInput = Union[str, Path, dict[str, Any], DefectBatch]
+
 
 @dataclass
 class WorkflowArtifacts:
-    """三段跨 Agent JSON 产物的类型化副本（允许部分缺失）。"""
+    """跨 Agent JSON 产物的类型化副本（允许部分缺失）。"""
 
     defect_batch: Optional[DefectBatch] = None
     code_knowledge: Optional[CodeKnowledge] = None
@@ -46,22 +54,32 @@ class ThreeAgentWorkflowResult:
     """面向库 / CLI / HTTP 的运行结果。
 
     仅当 ``stage == "done"`` 且 state ``ok`` 为 True 时 ``ok`` 才为 True——
-    成功的「只跑 Agent-1」跳过路径同样会把 ``stage`` 设为 ``done``。
+    成功的「只校验 defect-batch」双 skip 路径同样会把 ``stage`` 设为 ``done``。
     """
 
     ok: bool
-    stage: Literal["agent1", "agent2", "agent3", "done"]
+    stage: Literal["agent2", "agent3", "done"]
     artifacts: WorkflowArtifacts = field(default_factory=WorkflowArtifacts)
     error: Optional[str] = None
+
+
+def load_defect_batch(value: DefectBatchInput) -> DefectBatch:
+    """加载并校验 Agent-1 产出的 defect-batch（路径 / dict / 模型）。"""
+    if isinstance(value, DefectBatch):
+        return value
+    if isinstance(value, dict):
+        return validate_defect_batch(value)
+    path = Path(value)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return validate_defect_batch(data)
 
 
 def run_three_agent_workflow(
     *,
     work_dir: str | Path,
     product_line: str,
+    defect_batch: DefectBatchInput,
     posture: Literal["alpha", "beta"] = "beta",
-    source: Optional[Union[str, Path, dict[str, Any], list[Any]]] = None,
-    defect_batch: Optional[DefectBatch] = None,
     open_mr: bool = False,
     skip_agent2: bool = False,
     skip_agent3: bool = False,
@@ -74,24 +92,29 @@ def run_three_agent_workflow(
     checkpointer: Any = None,
     on_update: Optional[WorkflowUpdateFn] = None,
 ) -> ThreeAgentWorkflowResult:
-    """父编排入口：agent → 校验门禁 → 下一 agent。
+    """父编排入口：校验 defect-batch → Agent-2 → Agent-3。
 
+    - ``defect_batch``：图外 Agent-1 产物（路径 / dict / ``DefectBatch``）。
     - ``artifact_dir``：每个门禁成功后渐进写 JSON。
     - ``thread_id`` / ``checkpointer``：持久化执行（仅给 ``thread_id`` 时
       默认挂 ``InMemorySaver``）。
     - ``on_update``：每帧流式 state（供 HTTP 刷新 stage）。
     """
     # --- 预检（不过图，直接失败关闭） ---
-    if source is None and defect_batch is None:
+    try:
+        batch = load_defect_batch(defect_batch)
+    except Exception as err:  # noqa: BLE001
         return ThreeAgentWorkflowResult(
             ok=False,
-            stage="agent1",
-            error="source or defect_batch is required",
+            stage="agent2",
+            error=f"invalid defect-batch: {err}",
         )
+
     if skip_agent2 and not skip_agent3:
         return ThreeAgentWorkflowResult(
             ok=False,
             stage="agent2",
+            artifacts=WorkflowArtifacts(defect_batch=batch),
             error="skip_agent2 without skip_agent3 is unsupported (Agent-3 needs code-knowledge)",
         )
 
@@ -103,18 +126,15 @@ def run_three_agent_workflow(
         "open_mr": open_mr,
         "skip_agent2": skip_agent2,
         "skip_agent3": skip_agent3,
+        "defect_batch": batch.model_dump(),
         "ok": True,
-        "stage": "agent1",
+        "stage": "agent2",
         "error": None,
     }
     if analyze_mode is not None:
         initial["analyze_mode"] = analyze_mode
     if cartography_mode is not None:
         initial["cartography_mode"] = cartography_mode
-    if source is not None:
-        initial["source"] = str(source) if isinstance(source, Path) else source
-    if defect_batch is not None:
-        initial["defect_batch"] = defect_batch.model_dump()
     if artifact_dir is not None:
         initial["artifact_dir"] = str(artifact_dir)
 
@@ -167,8 +187,12 @@ def run_three_agent_workflow(
             final = graph.invoke(initial, config) if config else graph.invoke(initial)
     except Exception as err:  # noqa: BLE001 — 统一收敛为工作流失败结果
         # 优先用最后一帧流式快照，让 stage/产物反映真实进度。
-        stage = _stage_from_partial(last_state) if last_state else "agent1"
-        artifacts = _artifacts_from_state(last_state) if last_state else WorkflowArtifacts()
+        stage = _stage_from_partial(last_state) if last_state else "agent2"
+        artifacts = _artifacts_from_state(last_state) if last_state else WorkflowArtifacts(
+            defect_batch=batch
+        )
+        if artifacts.defect_batch is None:
+            artifacts.defect_batch = batch
         return ThreeAgentWorkflowResult(
             ok=False,
             stage=stage,
@@ -181,11 +205,11 @@ def run_three_agent_workflow(
 
 def _stage_from_partial(
     state: ThreeAgentState,
-) -> Literal["agent1", "agent2", "agent3", "done"]:
-    stage = state.get("stage") or "agent1"
-    if stage in ("agent1", "agent2", "agent3", "done"):
+) -> Literal["agent2", "agent3", "done"]:
+    stage = state.get("stage") or "agent2"
+    if stage in ("agent2", "agent3", "done"):
         return stage  # type: ignore[return-value]
-    return "agent1"
+    return "agent2"
 
 
 def _artifacts_from_state(state: ThreeAgentState) -> WorkflowArtifacts:
@@ -226,6 +250,7 @@ __all__ = [
     "ThreeAgentWorkflowResult",
     "WorkflowUpdateFn",
     "run_three_agent_workflow",
+    "load_defect_batch",
     "CartographerFn",
     "AnalystFn",
     "ArtifactValidationError",

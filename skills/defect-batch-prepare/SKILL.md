@@ -1,25 +1,28 @@
 ---
 name: defect-batch-prepare
-description: Prepares defect-batch JSON from raw defects via ingest, rule distill/screen, and L1→L2→L3 clustering (Python). Use when running Agent-1, converting Excel/MCP defect exports, screening/clustering tickets, or validating defect-batch output—never freestyle R0–R3 or L1/L2 in the model.
+description: Prepares defect-batch JSON from raw defects via ingest, rule distill/screen, and L1→L2→L3 clustering (Python). Use when running Agent-1 outside LangGraph, converting Excel/MCP defect exports, screening/clustering tickets, or validating defect-batch output—never freestyle R0–R3 or L1/L2 in the model. After success, hand off defect-batch.json to bugfix-agent run (Agent-2→3).
 profiles: defect-batch
 ---
 
-# Defect Batch Prepare（Agent-1 · Python）
+# Defect Batch Prepare（Agent-1 · 图外）
 
-SOP only. **R0–R3 and L1/L2 run in code** (`prepare_defect_batch` / `run_defect_batch_prepare`). Do not re-implement screen rules in chat.
+SOP only. **Agent-1 不在 LangGraph 父图内**：由本 skill + Claude Code（或 `prepare-batch` CLI）产出 `defect-batch.json`，再交给 Agent-2→3。
+
+**R0–R3 and L1/L2 run in code** (`prepare_defect_batch` / `run_defect_batch_prepare`). Do not re-implement screen rules in chat.
 
 ## When to use
 
 - Building or refreshing a `defect-batch` for Agent-2/3
 - Ingesting preloaded JSON / Excel exports (see `bugfix_agent/scripts/xlsx_to_raw_defects.py`)
-- Checking funnel pools: `strict` / `locatable_only` / `needs_info` / `hard_reject` / `security` / `excluded`
+- Checking funnel pools: `strict` / `locatable_only` / `needs_info` / `hard_reject` / `security` / `excluded` / `duplicate`
 
 ## Do / Don't
 
 | Do | Don't |
 |---|---|
 | Ingest → `raw-defects` → distill → screen → cluster → validate | Read `所属模块` or other closed-loop fields |
-| Call Python entrypoints below | Hand-run R2/R3 regexes in the model |
+| Call Python entrypoints / `prepare-batch` below | Hand-run R2/R3 regexes in the model |
+| Hand off `defect-batch.json` to `bugfix-agent run --defect-batch` | Expect LangGraph to ingest raw CSV/JSON for Agent-1 |
 | Inject business skills for aliases / intent gloss only | Override hard rejects via skill text |
 
 ## Pipeline
@@ -28,6 +31,7 @@ SOP only. **R0–R3 and L1/L2 run in code** (`prepare_defect_batch` / `run_defec
 ingest (preloaded | mcp* | crawler*) → raw-defects
   → distill → screen R0–R3 → cluster L1/L2 + L3 intent → R5/R6
   → validate_defect_batch → defect-batch.json
+  → (handoff) bugfix-agent run --defect-batch …   # LangGraph Agent-2→3
 ```
 
 \* mcp/crawler adapters are stubs; use **preloaded**.
@@ -42,6 +46,14 @@ batch = run_defect_batch_prepare(
     posture="alpha",
     source="./raw-defects.json",
 )
+
+# LangGraph 只吃 defect-batch，不再吃 raw source
+result = run_three_agent_workflow(
+    work_dir="./repos",
+    product_line="hc",
+    defect_batch=batch,
+    posture="alpha",
+)
 ```
 
 ## Platform CSV / Excel → raw-defects
@@ -54,6 +66,13 @@ bugfix-agent prepare-batch \
   --source 缺陷拉取/脱敏/PJ14PD20260423284-assignee-87.csv \
   --posture beta \
   --out defect-batch.json
+
+bugfix-agent run \
+  --work-dir ./repos \
+  --product-line hc \
+  --defect-batch defect-batch.json \
+  --analyze-mode heuristic \
+  --out-dir /tmp/out
 ```
 
 ```bash

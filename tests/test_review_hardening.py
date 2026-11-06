@@ -60,11 +60,13 @@ def test_duplicate_pool_and_funnel_no_double_count():
 
 
 def test_skip_agent2_alone_rejected(tmp_path: Path):
+    from tests.helpers import minimal_defect_batch
+
     result = run_three_agent_workflow(
         work_dir=tmp_path,
         product_line="hc",
         posture="alpha",
-        source={"tickets": []},
+        defect_batch=minimal_defect_batch(),
         skip_agent2=True,
         skip_agent3=False,
     )
@@ -190,31 +192,15 @@ def test_analyst_invalid_ticket_becomes_other_blocked(tmp_path: Path):
 
 def test_cli_writes_out_dir_on_failure(tmp_path: Path, monkeypatch):
     from bugfix_agent import cli as cli_mod
+    from tests.helpers import minimal_defect_batch
 
     out = tmp_path / "out"
     work = tmp_path / "work"
     work.mkdir()
-    # Minimal batch that Agent-1 can produce; force skip_agent2 alone via argv path
-    # Use workflow that fails after Agent-1 by injecting bad agent2 through env is hard;
-    # instead call cli main with source that works then skip flags that fail early.
-    raw = tmp_path / "raw.json"
-    raw.write_text(
-        json.dumps(
-            {
-                "tickets": [
-                    {
-                        "defectId": "1",
-                        "title": "t",
-                        "description": "预期结果：ok\n实际结果：bad",
-                        "status": "Open",
-                    }
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
+    batch_path = tmp_path / "defect-batch.json"
+    batch_path.write_text(minimal_defect_batch().model_dump_json(), encoding="utf-8")
 
-    # Failure before any artifacts: skip_agent2 alone
+    # Failure: skip_agent2 alone (Agent-3 needs code-knowledge)
     code = cli_mod.main(
         [
             "run",
@@ -222,8 +208,8 @@ def test_cli_writes_out_dir_on_failure(tmp_path: Path, monkeypatch):
             str(work),
             "--product-line",
             "hc",
-            "--source",
-            str(raw),
+            "--defect-batch",
+            str(batch_path),
             "--posture",
             "alpha",
             "--skip-agent2",
@@ -232,8 +218,8 @@ def test_cli_writes_out_dir_on_failure(tmp_path: Path, monkeypatch):
         ]
     )
     assert code == 1
-    # Early reject has no batch yet — out dir may be empty; ensure no crash and dir created
     assert out.is_dir()
+    assert (out / "defect-batch.json").is_file()
 
 
 def test_http_get_rejects_unsafe_run_id(tmp_path: Path):

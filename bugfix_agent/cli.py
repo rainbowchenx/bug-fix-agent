@@ -2,9 +2,9 @@
 
 子命令
 ------
-- ``prepare-batch``：只跑 Agent-1 → defect-batch JSON（不走父图）。
-- ``run``：完整 Agent-1→2→3（``run_three_agent_workflow``）；``--out-dir``
-  开启渐进产物落盘。
+- ``prepare-batch``：Agent-1（图外）→ defect-batch JSON；供 skill / Claude Code 使用。
+- ``run``：LangGraph Agent-2→3（``run_three_agent_workflow``）；需要已有
+  ``--defect-batch``；``--out-dir`` 开启渐进产物落盘。
 - ``serve``：回环上的 FastAPI S4 壳。
 - ``version``：打印包版本。
 """
@@ -20,23 +20,32 @@ from bugfix_agent.workflow import run_three_agent_workflow
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="bugfix-agent", description="Three-agent defect workflow (Python)")
+    parser = argparse.ArgumentParser(
+        prog="bugfix-agent",
+        description="Defect workflow: Agent-1 outside LangGraph; Agent-2→3 via LangGraph",
+    )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    run_p = sub.add_parser("run", help="Run Agent-1→2→3 workflow")
-    run_p.add_argument("--work-dir", required=True)
-    run_p.add_argument("--product-line", required=True)
-    run_p.add_argument(
-        "--source",
-        required=True,
-        help="raw-defects JSON, or platform 缺陷拉取 CSV (defectTitle/describle/…)",
+    prep = sub.add_parser(
+        "prepare-batch",
+        help="Agent-1 only (outside LangGraph): ingest → defect-batch.json",
     )
-
-    prep = sub.add_parser("prepare-batch", help="Agent-1 only: ingest → defect-batch.json")
     prep.add_argument("--product-line", required=True)
     prep.add_argument("--source", required=True, help="JSON or platform CSV")
     prep.add_argument("--posture", choices=["alpha", "beta"], default="beta")
     prep.add_argument("--out", required=True, help="Write defect-batch JSON")
+
+    run_p = sub.add_parser(
+        "run",
+        help="LangGraph Agent-2→3 (requires defect-batch from prepare-batch / skill)",
+    )
+    run_p.add_argument("--work-dir", required=True)
+    run_p.add_argument("--product-line", required=True)
+    run_p.add_argument(
+        "--defect-batch",
+        required=True,
+        help="Path to defect-batch.json from prepare-batch / defect-batch-prepare skill",
+    )
     run_p.add_argument("--posture", choices=["alpha", "beta"], default="beta")
     run_p.add_argument("--open-mr", action="store_true")
     run_p.add_argument("--skip-agent2", action="store_true")
@@ -97,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
     result = run_three_agent_workflow(
         work_dir=args.work_dir,
         product_line=args.product_line,
-        source=args.source,
+        defect_batch=args.defect_batch,
         posture=args.posture,
         open_mr=args.open_mr,
         skip_agent2=args.skip_agent2,

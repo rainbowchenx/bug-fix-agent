@@ -9,9 +9,7 @@ from bugfix_agent.contracts import (
     DefectCodeMatch,
 )
 from bugfix_agent.workflow import run_three_agent_workflow
-
-ROOT = Path(__file__).resolve().parents[1]
-HC1 = ROOT / "test" / "fixtures" / "defect-batch" / "hc1-raw.json"
+from tests.helpers import defect_batch_from_hc1
 
 
 def test_workflow_e2e(tmp_path: Path):
@@ -30,7 +28,7 @@ def test_workflow_e2e(tmp_path: Path):
         work_dir=work,
         product_line="hc",
         posture="alpha",
-        source=HC1,
+        defect_batch=defect_batch_from_hc1(),
         open_mr=False,
     )
     assert result.ok is True
@@ -54,7 +52,7 @@ def test_workflow_hard_stop_invalid_agent2():
         work_dir="/tmp/x",
         product_line="hc",
         posture="alpha",
-        source=HC1,
+        defect_batch=defect_batch_from_hc1(),
         agent2=bad_agent2,
     )
     assert result.ok is False
