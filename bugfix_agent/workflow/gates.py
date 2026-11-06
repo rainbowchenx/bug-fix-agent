@@ -32,7 +32,7 @@ class ArtifactValidationError(Exception):
 
 
 def require_defect_batch(data: Any) -> DefectBatch:
-    """Agent-1 出口门禁：原始 dict → ``DefectBatch``，失败则抛错。"""
+    """defect-batch 入口门禁（图外 Agent-1 产物）：原始 dict → ``DefectBatch``，失败则抛错。"""
     ok, result = safe_validate_defect_batch(data)
     if not ok:
         raise ArtifactValidationError("defect-batch", str(result))

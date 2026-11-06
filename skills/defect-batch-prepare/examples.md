@@ -13,19 +13,7 @@ batch = run_defect_batch_prepare(
 print(batch.funnel, len(batch.clusters))
 ```
 
-## Full three-agent run
-
-```bash
-pip install -e ".[dev]"
-bugfix-agent run \
-  --work-dir /path/to/repos \
-  --product-line hc \
-  --source raw-defects.json \
-  --posture alpha \
-  --out-dir /tmp/artifacts
-```
-
-## Platform CSV（缺陷拉取）
+## Platform CSV（缺陷拉取）→ defect-batch → Agent-2/3
 
 ```bash
 bugfix-agent prepare-batch \
@@ -33,6 +21,13 @@ bugfix-agent prepare-batch \
   --source 缺陷拉取/脱敏/PJ14PD20260423284-assignee-87.csv \
   --posture beta \
   --out /tmp/defect-batch.json
+
+bugfix-agent run \
+  --work-dir /path/to/repos \
+  --product-line sample \
+  --defect-batch /tmp/defect-batch.json \
+  --posture beta \
+  --out-dir /tmp/artifacts
 ```
 
 ## Excel export

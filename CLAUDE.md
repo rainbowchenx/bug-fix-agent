@@ -7,11 +7,15 @@ Guidance for working in this repository.
 `bugfix-agent`：三 Agent 缺陷分析工作流（**Python**）。
 
 ```text
-validate → Agent-1 → validate → Agent-2 → validate → Agent-3 → validate
-            defect-batch         code-knowledge        analysis-report
+Agent-1（图外：skill / prepare-batch）→ defect-batch
+        │
+        ▼
+validate_batch → Agent-2 → validate → Agent-3 → validate
+                   code-knowledge        analysis-report
 ```
 
-- 编排：LangGraph Python（`bugfix_agent/workflow/graph.py`）
+- Agent-1 不在 LangGraph 内；用 `skills/defect-batch-prepare/` + Claude Code 或 `prepare-batch`
+- 编排：LangGraph Python 只跑 Agent-2→3（`bugfix_agent/workflow/graph.py`）
 - 跨段只传落盘 JSON + Pydantic 校验；Agent 之间不互相 import
 - Agent-3 analyze 默认只读（Claude Agent SDK：`Read`/`Glob`/`Grep`）；无 key 时 heuristic 回退
 - 旧 TypeScript 簇级 BugFix / npm LangGraph 路径已退役
@@ -28,7 +32,7 @@ pip install -e ".[dev]"
 pip install -e ".[sdk]"          # 可选：Agent-3 Claude Agent SDK
 pytest -q
 bugfix-agent prepare-batch --product-line hc --source raw.json --out /tmp/defect-batch.json
-bugfix-agent run --work-dir ./repos --product-line hc --source raw.json --posture alpha --out-dir /tmp/out
+bugfix-agent run --work-dir ./repos --product-line hc --defect-batch /tmp/defect-batch.json --posture alpha --out-dir /tmp/out
 ```
 
 - Python ≥ 3.11；依赖见 `pyproject.toml`（`pydantic` / `openpyxl` / `langgraph`；SDK 为 optional extra）
