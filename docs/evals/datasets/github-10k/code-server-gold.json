@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "0.1.0",
+  "name": "code-server-10k-smoke",
+  "expectedProfile": ["unknown", "node-web", "node-lib"],
+  "expectedLanguagesAnyOf": ["typescript", "javascript"],
+  "tickets": [
+    {"defectId": "CS-1", "goldPaths": ["src/node/routes/login.ts"], "matchMode": "any"},
+    {"defectId": "CS-2", "goldPaths": ["src/node/settings.ts"], "matchMode": "any"},
+    {"defectId": "CS-3", "goldPaths": ["src/node/routes/health.ts"], "matchMode": "any"},
+    {"defectId": "CS-4", "goldPaths": ["src/node/proxy.ts", "src/node/routes/pathProxy.ts"], "matchMode": "any"},
+    {"defectId": "CS-5", "goldPaths": [], "expectEmpty": true}
+  ],
+  "gates": {
+    "requireSchemaValid": true,
+    "requirePathsExist": true,
+    "maxCandidates": 3,
+    "minHitAt1": 0.5,
+    "minHitAt3": 0.7,
+    "minNegativeAccuracy": 1.0,
+    "requireProfileHit": false
+  }
+}

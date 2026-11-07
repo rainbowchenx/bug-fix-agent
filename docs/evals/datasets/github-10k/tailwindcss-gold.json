@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "0.1.0",
+  "name": "tailwindcss-10k-smoke",
+  "expectedProfile": ["unknown", "node-lib", "node-web"],
+  "expectedLanguagesAnyOf": ["typescript", "javascript"],
+  "tickets": [
+    {"defectId": "TW-1", "goldPaths": ["packages/@tailwindcss-node/src/optimize.ts"], "matchMode": "any"},
+    {"defectId": "TW-2", "goldPaths": ["packages/@tailwindcss-node/src/compile.ts", "packages/tailwindcss/src/compile.ts"], "matchMode": "any"},
+    {"defectId": "TW-3", "goldPaths": ["packages/@tailwindcss-webpack/src/index.ts"], "matchMode": "any"},
+    {"defectId": "TW-4", "goldPaths": ["packages/@tailwindcss-vite/src/index.ts"], "matchMode": "any"},
+    {"defectId": "TW-5", "goldPaths": [], "expectEmpty": true}
+  ],
+  "gates": {
+    "requireSchemaValid": true,
+    "requirePathsExist": true,
+    "maxCandidates": 3,
+    "minHitAt1": 0.5,
+    "minHitAt3": 0.7,
+    "minNegativeAccuracy": 1.0,
+    "requireProfileHit": false
+  }
+}

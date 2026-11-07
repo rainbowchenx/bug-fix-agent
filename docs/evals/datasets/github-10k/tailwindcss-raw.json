@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "0.1.0",
+  "productLine": "sample",
+  "defects": [
+    {
+      "defectId": "TW-1",
+      "title": "【节点】optimize 开启后输出体积异常偏大",
+      "description": "预期结果：optimize 显著减小体积\n实际结果：几乎无压缩\n操作步骤：开启 optimize 再构建",
+      "status": "Open",
+      "testModule": "optimize",
+      "severity": "major"
+    },
+    {
+      "defectId": "TW-2",
+      "title": "【编译】compile 管道在嵌套 @apply 时丢规则",
+      "description": "预期结果：compile 输出完整 CSS\n实际结果：嵌套规则丢失\n操作步骤：写嵌套 @apply 后编译",
+      "status": "Open",
+      "testModule": "compile",
+      "severity": "major"
+    },
+    {
+      "defectId": "TW-3",
+      "title": "【webpack】@tailwindcss-webpack loader 热更新失效",
+      "description": "预期结果：改 class 后 HMR\n实际结果：需整页刷新\n操作步骤：webpack 项目改 utility",
+      "status": "Open",
+      "testModule": "webpack",
+      "severity": "normal"
+    },
+    {
+      "defectId": "TW-4",
+      "title": "【vite】@tailwindcss-vite plugin 未监听文件变更",
+      "description": "预期结果：改 class 后重建\n实际结果：需手动重启 vite\n操作步骤：改 utility class",
+      "status": "Open",
+      "testModule": "vite",
+      "severity": "normal"
+    },
+    {
+      "defectId": "TW-5",
+      "title": "【无关】无人机云台预览花屏",
+      "description": "预期结果：正常画面\n实际结果：花屏\n操作步骤：开预览",
+      "status": "Open",
+      "testModule": "云台",
+      "severity": "trivial"
+    }
+  ]
+}

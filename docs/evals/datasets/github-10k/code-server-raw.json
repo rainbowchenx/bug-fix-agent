@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "0.1.0",
+  "productLine": "sample",
+  "defects": [
+    {
+      "defectId": "CS-1",
+      "title": "【登录】login 路由密码正确仍 401",
+      "description": "预期结果：登录成功跳转\n实际结果：401\n操作步骤：提交正确密码",
+      "status": "Open",
+      "testModule": "login",
+      "severity": "critical"
+    },
+    {
+      "defectId": "CS-2",
+      "title": "【设置】settings 写入后重启丢失",
+      "description": "预期结果：settings 持久化\n实际结果：重启恢复默认\n操作步骤：改设置重启",
+      "status": "Open",
+      "testModule": "settings",
+      "severity": "major"
+    },
+    {
+      "defectId": "CS-3",
+      "title": "【健康】health 探针在繁忙时误报 down",
+      "description": "预期结果：busy 仍 healthy\n实际结果：返回 unhealthy\n操作步骤：高负载打 /healthz",
+      "status": "Open",
+      "testModule": "health",
+      "severity": "normal"
+    },
+    {
+      "defectId": "CS-4",
+      "title": "【代理】proxy 路径改写丢 query string",
+      "description": "预期结果：query 透传\n实际结果：query 被剥掉\n操作步骤：经 proxy 访问带参 URL",
+      "status": "Open",
+      "testModule": "proxy",
+      "severity": "major"
+    },
+    {
+      "defectId": "CS-5",
+      "title": "【无关】咖啡机水位传感器失灵",
+      "description": "预期结果：正常加水提示\n实际结果：无提示\n操作步骤：排空水箱",
+      "status": "Open",
+      "testModule": "咖啡机",
+      "severity": "trivial"
+    }
+  ]
+}

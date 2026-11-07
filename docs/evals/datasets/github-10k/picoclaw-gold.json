@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "0.1.0",
+  "name": "picoclaw-10k-smoke",
+  "expectedProfile": ["unknown"],
+  "expectedLanguagesAnyOf": ["go", "typescript", "javascript"],
+  "tickets": [
+    {"defectId": "PC-1", "goldPaths": ["pkg/config/security.go"], "matchMode": "any"},
+    {"defectId": "PC-2", "goldPaths": ["pkg/session/session_store.go"], "matchMode": "any"},
+    {"defectId": "PC-3", "goldPaths": ["cmd/picoclaw/internal/auth/login.go"], "matchMode": "any"},
+    {"defectId": "PC-4", "goldPaths": ["pkg/config/gateway.go"], "matchMode": "any"},
+    {"defectId": "PC-5", "goldPaths": [], "expectEmpty": true}
+  ],
+  "gates": {
+    "requireSchemaValid": true,
+    "requirePathsExist": true,
+    "maxCandidates": 3,
+    "minHitAt1": 0.5,
+    "minHitAt3": 0.7,
+    "minNegativeAccuracy": 1.0,
+    "requireProfileHit": false
+  }
+}

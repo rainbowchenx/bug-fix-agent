@@ -146,6 +146,7 @@ SDK 模式可用同一套金标；门槛可在 `gold.gates` 覆盖，但**同一
 |---|---|---|
 | CI 夹具 | `test/fixtures/agent2-eval/` | 人造小仓 + gold，pytest 守门 |
 | 外部样本 | 评测时临时 clone；gold 放 `docs/evals/datasets/` 或本地 | 真实仓回归，不强制 CI 拉外网 |
+| 10k+ star 抽样 | `docs/evals/datasets/github-10k/` | 随机 ≥10k★ 代码仓（含 raw+gold）；需本地 shallow clone 后跑 `eval-agent2` |
 
 金标制作规则：
 
