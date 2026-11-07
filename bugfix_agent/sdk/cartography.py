@@ -89,6 +89,7 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
     model = req.model or os.environ.get("ANTHROPIC_MODEL") or None
     system_prompt = _SYSTEM_PROMPT + skills_system_addon(
         (
+            "code-cartography",
             "monorepo-workspace",
             "electron-process-boundary",
             "hierarchical-localization",
