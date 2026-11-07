@@ -65,6 +65,7 @@ pytest -q
 | S3a | Agent-3 outcome 路由 | ✅ |
 | S3b | Agent-3 analyze 会话（Claude Agent SDK，只读） | ✅ 骨架：`bugfix_agent/sdk/analyze.py`；无 key 时 heuristic 回退 |
 | S2b | Agent-2 LLM 通读加厚 | ✅ 骨架：`bugfix_agent/sdk/cartography.py`；启发式 detect/match + 可选 SDK enrich |
+| S2c | Agent-2 启发式加厚 | ✅ 形态化 architecture 图、A3/A4 置信度、`skills/code-cartography/` |
 | S4 | HTTP / LangGraph Server（可选） | ✅ FastAPI 兼容壳：`POST/GET /v1/runs`、`GET /health`（`bugfix_agent/http/`）；LangGraph Server 部署仍可选后续 |
 | S5 | 退役 TS 运行时（`src/`、npm LangGraph、修复侧 skills） | ✅ |
 
@@ -82,3 +83,4 @@ pytest -q
 | 2026-11-04 | **S2b**：Agent-2 cartography SDK enrich + heuristic 回退；`--cartography-mode` / `BUGFIX_CARTOGRAPHY_MODE` |
 | 2026-11-05 | **S4**：FastAPI `POST/GET /v1/runs` 异步壳 + `bugfix-agent serve`；状态落 `{workDir}/.bugfix-runs/{runId}/` |
 | 2026-11-05 | 评审加固：`flowStatus` 进排除；`duplicate` pool；禁单独 `skip_agent2`；HTTP `runId` 防路径逃逸 + meta 原子写；Agent-2 丢弃不存在路径；Agent-3 单票校验失败 → `other_blocked`；`oversized` 仅绝对阈值；CLI 失败也写 `--out-dir` |
+| 2026-11-07 | **S2c**：Agent-2 形态化架构探测、匹配 A3/A4 置信度、`skills/code-cartography/` |

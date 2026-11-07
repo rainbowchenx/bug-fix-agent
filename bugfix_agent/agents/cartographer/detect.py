@@ -11,7 +11,9 @@ def discover_repo_roots(work_dir: str | Path) -> list[RepoRoot]:
     root = Path(work_dir)
     roots: list[RepoRoot] = []
     if (root / "package.json").exists() or (root / ".git").exists() or (root / "pyproject.toml").exists():
-        roots.append(RepoRoot(path=".", gitHead=None, fingerprint=_fingerprint(root)))
+        roots.append(
+            RepoRoot(path=".", gitHead=_git_head(root), fingerprint=_fingerprint(root))
+        )
 
     try:
         entries = list(root.iterdir())
@@ -22,9 +24,33 @@ def discover_repo_roots(work_dir: str | Path) -> list[RepoRoot]:
         if not child.is_dir() or child.name.startswith(".") or child.name in {"node_modules", "dist", ".venv"}:
             continue
         if (child / "package.json").exists() or (child / ".git").exists() or (child / "pyproject.toml").exists():
-            roots.append(RepoRoot(path=child.name, gitHead=None, fingerprint=_fingerprint(child)))
+            roots.append(
+                RepoRoot(
+                    path=child.name,
+                    gitHead=_git_head(child),
+                    fingerprint=_fingerprint(child),
+                )
+            )
 
-    return roots or [RepoRoot(path=".", gitHead=None, fingerprint=_fingerprint(root))]
+    return roots or [
+        RepoRoot(path=".", gitHead=_git_head(root), fingerprint=_fingerprint(root))
+    ]
+
+
+def _git_head(dir_path: Path) -> str | None:
+    head = dir_path / ".git" / "HEAD"
+    try:
+        text = head.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    if text.startswith("ref:"):
+        ref = text.split(":", 1)[1].strip()
+        ref_path = dir_path / ".git" / ref
+        try:
+            return ref_path.read_text(encoding="utf-8").strip()[:40] or None
+        except OSError:
+            return ref
+    return text[:40] or None
 
 
 def _fingerprint(dir_path: Path) -> str:
