@@ -5,6 +5,7 @@
 - ``prepare-batch``：只跑 Agent-1 → defect-batch JSON（不走父图）。
 - ``run``：完整 Agent-1→2→3（``run_three_agent_workflow``）；``--out-dir``
   开启渐进产物落盘。
+- ``eval-agent2``：按金标评测 Agent-2 ``code-knowledge``（见 ``docs/evals/``）。
 - ``serve``：回环上的 FastAPI S4 壳。
 - ``version``：打印包版本。
 """
@@ -55,6 +56,32 @@ def main(argv: list[str] | None = None) -> int:
     )
     run_p.add_argument("--out-dir", default=None, help="Write artifacts JSON here")
 
+    eval2 = sub.add_parser(
+        "eval-agent2",
+        help="Evaluate Agent-2 code-knowledge against gold labels",
+    )
+    eval2.add_argument("--work-dir", required=True)
+    eval2.add_argument("--gold", required=True, help="gold.json (Agent-2 eval labels)")
+    eval2.add_argument(
+        "--defect-batch",
+        default=None,
+        help="If set with no --code-knowledge, run cartographer first",
+    )
+    eval2.add_argument(
+        "--source",
+        default=None,
+        help="Optional raw-defects/CSV; prepare-batch then cartographer",
+    )
+    eval2.add_argument("--product-line", default="sample")
+    eval2.add_argument("--posture", choices=["alpha", "beta"], default="alpha")
+    eval2.add_argument("--code-knowledge", default=None, help="Existing code-knowledge.json")
+    eval2.add_argument(
+        "--cartography-mode",
+        choices=["heuristic", "sdk"],
+        default="heuristic",
+    )
+    eval2.add_argument("--out", default=None, help="Write eval report JSON")
+
     serve_p = sub.add_parser("serve", help="HTTP API (S4 FastAPI): POST/GET /v1/runs")
     serve_p.add_argument("--host", default="127.0.0.1")
     serve_p.add_argument("--port", type=int, default=8787)
@@ -74,6 +101,57 @@ def main(argv: list[str] | None = None) -> int:
 
         run_server(host=args.host, port=args.port)
         return 0
+
+    if args.cmd == "eval-agent2":
+        from bugfix_agent.agents.cartographer import run_cartographer
+        from bugfix_agent.contracts import validate_code_knowledge
+        from bugfix_agent.defect_batch import run_defect_batch_prepare
+        from bugfix_agent.evals.agent2 import score_code_knowledge
+
+        knowledge = None
+        if args.code_knowledge:
+            knowledge = validate_code_knowledge(
+                json.loads(Path(args.code_knowledge).read_text(encoding="utf-8"))
+            )
+        else:
+            if args.defect_batch:
+                from bugfix_agent.contracts import validate_defect_batch
+
+                batch = validate_defect_batch(
+                    json.loads(Path(args.defect_batch).read_text(encoding="utf-8"))
+                )
+            elif args.source:
+                batch = run_defect_batch_prepare(
+                    product_line=args.product_line,
+                    source=args.source,
+                    posture=args.posture,
+                )
+            else:
+                print(
+                    "eval-agent2 requires --code-knowledge or --defect-batch or --source",
+                    file=sys.stderr,
+                )
+                return 2
+            knowledge = run_cartographer(
+                work_dir=args.work_dir,
+                defect_batch=batch,
+                cartography_mode=args.cartography_mode,
+            )
+
+        report = score_code_knowledge(
+            work_dir=args.work_dir,
+            knowledge=knowledge,
+            gold=args.gold,
+        )
+        payload = report.to_dict()
+        payload["mode"] = args.cartography_mode if not args.code_knowledge else "precomputed"
+        text = json.dumps(payload, ensure_ascii=False, indent=2)
+        print(text)
+        if args.out:
+            out = Path(args.out)
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(text, encoding="utf-8")
+        return 0 if report.passed else 1
 
     if args.cmd == "prepare-batch":
         from bugfix_agent.defect_batch import run_defect_batch_prepare

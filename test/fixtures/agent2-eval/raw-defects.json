@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "0.1.0",
+  "productLine": "sample",
+  "defects": [
+    {
+      "defectId": "E1",
+      "title": "【权限】PermissionModal 拒绝后仍可执行",
+      "description": "预期结果：拒绝后停止\n实际结果：继续执行\n操作步骤：点拒绝",
+      "status": "Open",
+      "testModule": "permission"
+    },
+    {
+      "defectId": "E2",
+      "title": "【会话】session store 切换未清空",
+      "description": "预期结果：清空\n实际结果：残留\n操作步骤：切换",
+      "status": "Open",
+      "testModule": "session"
+    },
+    {
+      "defectId": "E3",
+      "title": "【登录】auth login 校验绕过",
+      "description": "预期结果：拒绝非法 token\n实际结果：放行\n操作步骤：伪造 token",
+      "status": "Open",
+      "testModule": "auth"
+    },
+    {
+      "defectId": "E4",
+      "title": "【无关】云台码流花屏",
+      "description": "预期结果：正常\n实际结果：花屏\n操作步骤：预览",
+      "status": "Open",
+      "testModule": "云台"
+    }
+  ]
+}
