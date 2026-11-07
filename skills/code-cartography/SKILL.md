@@ -14,7 +14,7 @@ SOP for building `code-knowledge`. Prefer the Python entrypoint; use this skill 
 |---|---|
 | Read target `CLAUDE.md` / `.claude` first | Invent file paths that do not exist |
 | Call `run_cartographer` / heuristic detect+match | Dump full ticket observed/expected/steps into matching queries |
-| Cap candidates at **3** per defect; empty OK with `confidence=low` | Exceed candidate cap or force high confidence without CodeGraph |
+| Cap candidates at **3** per defect; empty OK with `confidence=low` | Exceed candidate cap or invent non-existent paths |
 | Follow profile biases (electron / micro_frontend / device_web) | Write `CODEBASE_MAP.md` or edit target repo by default |
 
 ## Pipeline
@@ -42,14 +42,14 @@ knowledge = run_cartographer(
 )
 ```
 
-## Confidence (A4)
+## Confidence
 
-| Situation | Cap |
+| Situation | Level |
 |---|---|
 | No candidates | `low` |
-| Path/grep heuristic only | ≤ `medium` |
-| CodeGraph hit + file exists | may be `high` |
-| `capabilities.codeGraph=false` | ≤ `medium` |
+| Single path/grep hit | `medium` |
+| ≥2 path hits, or CodeGraph hit | `high`（**不**因缺少 CodeGraph 能力而封顶） |
+| Missing titleTag/testModule/intent (A1) | ≤ `medium` |
 
 ## Profile biases
 

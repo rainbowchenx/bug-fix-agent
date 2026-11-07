@@ -119,7 +119,7 @@ def filter_existing_candidates(
     *,
     code_graph: bool = False,
 ) -> list[DefectCodeMatch]:
-    """Drop candidates whose files do not exist; re-apply A4 confidence caps."""
+    """Drop candidates whose files do not exist; re-score confidence."""
     root = Path(work_dir)
     out: list[DefectCodeMatch] = []
     for m in matches:
@@ -150,30 +150,21 @@ def _score_confidence(
     code_graph: bool,
     ticket: BatchTicket,
 ) -> Literal["high", "medium", "low"]:
-    """A4 + A1 field-quality caps.
+    """Confidence from match strength (no CodeGraph capability ceiling).
 
     - no candidates → low
-    - codegraph hit + path kept → may be high
-    - grep/heuristic only → at most medium
-    - codeGraph capability false → all capped at medium
+    - codegraph hit, or ≥2 path hits → high
+    - single path/grep hit → medium
     - missing suggested ticket fields (A1) → at most medium
     """
     if not candidates:
         return "low"
 
     sources = {c.source for c in candidates}
-    has_codegraph = "codegraph" in sources and code_graph
-    if has_codegraph:
+    has_codegraph = "codegraph" in sources
+    if has_codegraph or len(candidates) >= 2:
         conf: Literal["high", "medium", "low"] = "high"
-    elif len(candidates) >= 2:
-        conf = "medium"
     else:
-        conf = "low"
-
-    # Path/grep/heuristic alone never high (A4).
-    if not has_codegraph and conf == "high":
-        conf = "medium"
-    if not code_graph and conf == "high":
         conf = "medium"
 
     # A1: clusterId/testModule/titleTag/intent recommended; missing → ≤ medium.
@@ -181,4 +172,6 @@ def _score_confidence(
     if not rich and conf == "high":
         conf = "medium"
 
+    # code_graph flag reserved for future boosts; intentionally not a high-cap.
+    _ = code_graph
     return conf

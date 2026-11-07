@@ -109,15 +109,19 @@ def test_match_caps_candidates_and_confidence(tmp_path: Path):
     )
     matched = match_tickets(work, roots, [ticket], code_graph=False)
     assert len(matched[0].candidates) <= MAX_CANDIDATES
-    assert matched[0].confidence in {"low", "medium"}
-    assert matched[0].confidence != "high"  # no CodeGraph
+    assert matched[0].confidence in {"low", "medium", "high"}
+    # ≥2 path hits may be high even without CodeGraph capability.
+    if len(matched[0].candidates) >= 2:
+        assert matched[0].confidence == "high"
     assert all(c.source == "grep" for c in matched[0].candidates)
 
     filtered = filter_existing_candidates(work, matched, code_graph=False)
     assert len(filtered[0].candidates) <= MAX_CANDIDATES
 
 
-def test_confidence_codegraph_can_be_high_when_enabled():
+def test_confidence_high_without_codegraph_capability():
+    from bugfix_agent.agents.cartographer.match import _score_confidence
+
     ticket = BatchTicket(
         defectId="1",
         title="t",
@@ -128,21 +132,15 @@ def test_confidence_codegraph_can_be_high_when_enabled():
         intent="ui_layout",
         clusterId="c",
     )
-    matches = [
-        DefectCodeMatch(
-            defectId="1",
-            title="t",
-            candidates=[
-                MatchCandidate(path="src/a.ts", why="cg", source="codegraph"),
-            ],
-            confidence="low",
-        )
+    two_grep = [
+        MatchCandidate(path="src/a.ts", why="g", source="grep"),
+        MatchCandidate(path="src/b.ts", why="g", source="grep"),
     ]
-    # Without real files filter keeps empty → low; score path via match helper:
-    from bugfix_agent.agents.cartographer.match import _score_confidence
-
-    conf = _score_confidence(matches[0].candidates, code_graph=True, ticket=ticket)
+    conf = _score_confidence(two_grep, code_graph=False, ticket=ticket)
     assert conf == "high"
+
+    one_cg = [MatchCandidate(path="src/a.ts", why="cg", source="codegraph")]
+    assert _score_confidence(one_cg, code_graph=False, ticket=ticket) == "high"
 
 
 def test_code_cartography_skill_present():

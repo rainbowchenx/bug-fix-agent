@@ -23,7 +23,7 @@ source (CSV/JSON/xlsx)
 |------|------|------|--------|
 | 契约 SSOT | `bugfix_agent/contracts/` | Pydantic 校验三段 artifact | ✅ |
 | Agent-1 | `ingest/` + `defect_batch/` | 入口映射 → 蒸馏 / 筛选 / 分簇 → `defect-batch` | ✅ 规则管线 |
-| Agent-2 | `agents/cartographer/` + `sdk/cartography.py` + `skills/code-cartography/` | 仓型探测 + 形态化架构图 + 路径软匹配（A3/A4）+ 可选 SDK 通读 → `code-knowledge` | 🟡 启发式加厚 + SDK 骨架 |
+| Agent-2 | `agents/cartographer/` + `sdk/cartography.py` + `skills/code-cartography/` | 仓型探测 + 形态化架构图 + 路径软匹配（候选≤3；置信度不因无 CodeGraph 封顶）+ 可选 SDK 通读 → `code-knowledge` | 🟡 启发式加厚 + SDK 骨架 |
 | Agent-3 | `agents/analyst/` + `sdk/analyze.py` | 路由 + 可选 Claude 只读 analyze → `analysis-report` | 🟡 路由+SDK 骨架 |
 | 父编排 | `workflow/` | LangGraph `StateGraph`：`agent1→agent2→agent3` + 门禁 | ✅ |
 | HTTP（S4） | `http/` | FastAPI：`POST/GET /v1/runs`、`GET /health` | ✅ 兼容壳 |
