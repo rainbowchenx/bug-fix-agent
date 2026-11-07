@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "0.1.0",
+  "name": "agent2-mini-fixture",
+  "expectedProfile": ["unknown"],
+  "expectedLanguagesAnyOf": ["typescript", "javascript"],
+  "tickets": [
+    {
+      "defectId": "E1",
+      "goldPaths": ["src/ui/PermissionModal.ts"],
+      "matchMode": "any",
+      "expectEmpty": false
+    },
+    {
+      "defectId": "E2",
+      "goldPaths": ["src/session/store.ts"],
+      "matchMode": "any",
+      "expectEmpty": false
+    },
+    {
+      "defectId": "E3",
+      "goldPaths": ["src/auth/login.ts"],
+      "matchMode": "any",
+      "expectEmpty": false
+    },
+    {
+      "defectId": "E4",
+      "goldPaths": [],
+      "expectEmpty": true
+    }
+  ],
+  "gates": {
+    "requireSchemaValid": true,
+    "requirePathsExist": true,
+    "maxCandidates": 3,
+    "minHitAt1": 0.5,
+    "minHitAt3": 0.7,
+    "minNegativeAccuracy": 1.0,
+    "requireProfileHit": false
+  }
+}
