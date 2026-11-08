@@ -16,6 +16,7 @@ SOP for building `code-knowledge`. Prefer the Python entrypoint; use this skill 
 | Call `run_cartographer` / heuristic detect+match | Dump full ticket observed/expected/steps into matching queries |
 | Cap candidates at **3** per defect; empty OK with `confidence=low` | Exceed candidate cap or invent non-existent paths |
 | Follow profile biases (electron / micro_frontend / device_web) | Write `CODEBASE_MAP.md` or edit target repo by default |
+| SDK: read deeply (imports/call flow) so Agent-3 spends fewer tokens | Mutate the repo via Bash/Edit/Write |
 
 ## Pipeline
 
@@ -25,7 +26,7 @@ workDir + defect-batch
   → detect cartographyProfile + techStack
   → map architecture (entryPoints / modules by profile)
   → match tickets (title + titleTag/testModule/intent tokens → paths)
-  → optional SDK enrich (Read/Glob/Grep only)
+  → optional SDK enrich (Read/Glob/Grep + read-only Bash; no max_turns by default)
   → validate_code_knowledge → code-knowledge.json
 ```
 
