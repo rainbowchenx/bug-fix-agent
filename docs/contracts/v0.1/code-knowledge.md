@@ -14,7 +14,7 @@
 | `techStack` | `{ languages[], frameworks[], notes }` | |
 | `architecture` | `{ summary, entryPoints[], modules[] }` | modules: `{ id, path?, role? }` |
 | `conventions` | `{ fromClaudeMd[], fromRules[] }` | |
-| `boundSkills[]` | string | |
+| `boundSkills[]` | string | 本次实际绑定的 cartography skill 名（仓内 / `.bugfix` / `--skills-dir` overlay 在前，包内置在后） |
 | `specAtlas` | framework + entries + drDs | `frameworkId` 封闭集或 `unknown` |
 | `capabilities` | `{ codeGraph, runtimeVerify }` | |
 | `defectCodeMatches[]` | per-ticket soft start | **核心交付** |

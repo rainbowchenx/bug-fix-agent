@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 from bugfix_agent.agents.analyst.route import route_ticket, slice_ticket
 from bugfix_agent.contracts import (
@@ -20,6 +20,7 @@ from bugfix_agent.sdk.analyze import (
     analyze_mode_from_env,
     create_analyze_runner,
 )
+from bugfix_agent.sdk.skill_inject import discover_analyze_skills
 
 
 def run_analyst(
@@ -29,6 +30,7 @@ def run_analyst(
     code_knowledge: CodeKnowledge,
     open_mr: bool = False,
     analyze_mode: Optional[str] = None,
+    extra_skill_dirs: Optional[Sequence[str | Path]] = None,
     analyze_fn: Optional[AnalyzeRunner] = None,
     analyze_limit: Optional[int] = None,
 ) -> AnalysisReport:
@@ -43,9 +45,28 @@ def run_analyst(
     - 软定位票（``plan_only`` 提示）可进入 analyze。
     - 单票校验失败 → ``other_blocked``，整份报告仍继续。
     - 当前 ``open_mr`` 只改报告标志，不会真推 GitLab。
+
+    Args:
+        work_dir: 目标代码根。
+        defect_batch: 已校验的缺陷批次。
+        code_knowledge: Agent-2 产物。
+        open_mr: 只改报告 ``integrateMode`` 标志。
+        analyze_mode: ``heuristic`` / ``sdk``；``None`` 时看环境变量。
+        extra_skill_dirs: 与 Agent-2 相同的仓特异性 skill 根目录。
+        analyze_fn: 可注入的 ``AnalyzeRunner``（测试用）。
+        analyze_limit: 最多 enrich 几张软定位票。
+
+    Returns:
+        通过 ``validate_analysis_report`` 的 ``AnalysisReport``。
     """
     work_dir = str(work_dir)
     match_by_id = {m.defectId: m for m in code_knowledge.defectCodeMatches}
+    injected = discover_analyze_skills(
+        work_dir,
+        repo_roots=code_knowledge.repoRoots,
+        extra_dirs=extra_skill_dirs,
+    )
+    bound_skills = list(dict.fromkeys(s.name for s in injected))[:40]
     runner = analyze_fn or create_analyze_runner(analyze_mode_from_env(analyze_mode))
     remaining = analyze_limit if analyze_limit is not None else _limit_from_env()
 
@@ -62,7 +83,14 @@ def run_analyst(
         }
 
         if routed["outcome"] == "plan_only" and (remaining is None or remaining > 0):
-            result = runner(AnalyzeRequest(work_dir=work_dir, ticket=t, routed=routed))
+            result = runner(
+                AnalyzeRequest(
+                    work_dir=work_dir,
+                    ticket=t,
+                    routed=routed,
+                    injected_skills=tuple(injected),
+                )
+            )
             entry.update(result.payload)
             loc = dict(entry.get("localization") or {})
             note_bits = [x for x in [loc.get("notes"), f"analyze={result.source}"] if x]
@@ -88,6 +116,7 @@ def run_analyst(
         "mrUrl": None,
         "integrateMode": "single_mr" if open_mr else "none",
         "summary": {"total": len(tickets), "byOutcome": by_outcome},
+        "boundSkills": bound_skills,
         "tickets": tickets,
     }
     return validate_analysis_report(report)

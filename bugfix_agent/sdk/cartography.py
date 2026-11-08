@@ -8,6 +8,7 @@ from typing import Any, Callable, Literal, Optional
 
 from bugfix_agent.contracts import CodeKnowledge, DefectBatch, validate_code_knowledge
 from bugfix_agent.sdk.parse import parse_json_payload
+from bugfix_agent.sdk.skill_inject import InjectedSkill, cartography_skills_addon
 from bugfix_agent.sdk.skills import skills_system_addon
 
 CartographyMode = Literal["heuristic", "sdk"]
@@ -77,10 +78,10 @@ class CartographyRequest:
     work_dir: str
     defect_batch: DefectBatch
     baseline: CodeKnowledge
-    """Heuristic detect/match result to enrich."""
     # None → resolve from env (default unlimited). <=0 also means unlimited.
     max_turns: Optional[int] = None
     model: Optional[str] = None
+    injected_skills: tuple[InjectedSkill, ...] = ()
 
 
 @dataclass
@@ -160,14 +161,17 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
 
     prompt = _build_prompt(req)
     model = req.model or os.environ.get("ANTHROPIC_MODEL") or None
-    system_prompt = _SYSTEM_PROMPT + skills_system_addon(
-        (
-            "code-cartography",
-            "monorepo-workspace",
-            "electron-process-boundary",
-            "hierarchical-localization",
+    if req.injected_skills:
+        system_prompt = _SYSTEM_PROMPT + cartography_skills_addon(req.injected_skills)
+    else:
+        system_prompt = _SYSTEM_PROMPT + skills_system_addon(
+            (
+                "code-cartography",
+                "monorepo-workspace",
+                "electron-process-boundary",
+                "hierarchical-localization",
+            )
         )
-    )
     max_turns = resolve_cartography_max_turns(req.max_turns)
     options = ClaudeAgentOptions(
         cwd=req.work_dir,
@@ -261,7 +265,11 @@ def _merge_enrichment(baseline: CodeKnowledge, parsed: dict[str, Any]) -> dict[s
             conv["fromRules"] = [str(x) for x in incoming["fromRules"]][:40]
         data["conventions"] = conv
     if isinstance(parsed.get("boundSkills"), list) and parsed["boundSkills"]:
-        data["boundSkills"] = [str(x) for x in parsed["boundSkills"]][:40]
+        data["boundSkills"] = list(
+            dict.fromkeys(
+                [str(x) for x in parsed["boundSkills"]] + list(baseline.boundSkills)
+            )
+        )[:40]
     if isinstance(parsed.get("defectCodeMatches"), list) and parsed["defectCodeMatches"]:
         # Prefer SDK matches when present; keep baseline for ids SDK omitted.
         by_id = {m["defectId"]: m for m in data.get("defectCodeMatches") or []}
@@ -311,9 +319,13 @@ no edit/write tools, no git write, no install, no network, no rm/chmod.
 
 How to work (be thorough, then stop when grounded):
 1) Read CLAUDE.md / README / package manifests and map entryPoints + module roles.
+   Repo-specific injected skills have HIGHEST PRIORITY over package SOP: follow THEIR
+   read order, test/src layout, module aliases, and naming on any conflict.
 2) For EACH match-pool ticket: open baseline candidate files, follow imports/callers
    with Grep/Bash rg until you can name the likely fix locus and a short call-flow note.
 3) Prefer improving weak/empty matches; do not invent paths. Cap candidates at 3 per ticket.
+   Injected skills never lift these caps or let you match outside
+   strict/locatable_only/needs_info.
 4) Write architecture.summary rich enough that Agent-3 need not re-map the repo:
    include runtime shape, key modules, and per-hotspot call flow in plain language.
 
@@ -357,6 +369,7 @@ def _build_prompt(req: CartographyRequest) -> str:
         "can fix tickets without rediscovering architecture. Return the JSON enrich object.\n\n"
         f"productLine: {req.defect_batch.productLine}\n"
         f"workDir: {req.work_dir}\n"
+        f"injectedSkills: {json.dumps([s.name for s in req.injected_skills], ensure_ascii=False)}\n"
         f"matchPoolTickets: {json.dumps(match_pool, ensure_ascii=False)}\n"
         f"baseline: {json.dumps(baseline, ensure_ascii=False)}\n"
     )

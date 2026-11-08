@@ -66,6 +66,19 @@ knowledge = run_cartographer(
 
 See `docs/contracts/v0.1/code-knowledge.md` (Pydantic SSOT: `bugfix_agent/contracts/code_knowledge.py`). Input artifact: `docs/contracts/v0.1/defect-batch-guide.md`.
 
+## Injected repo skills
+
+Users may overlay **repo-specific** skills (read order, test vs src layout, module aliases, product-line naming). Same dirs feed Agent-2 and Agent-3. Merge order (later same-name wins); overlay always outranks package SOP in the session prompt:
+
+1. Package builtins
+2. Each repo root `.claude/skills`
+3. `workDir/.bugfix/skills`
+4. `--skills-dir` / `options.skillsDirs` / `BUGFIX_SKILLS_DIR`
+
+Load if frontmatter `profiles` contains `cartography` (this agent), `analyze` (Agent-3), or `bugfix` (both). Unlabelled skills under `.bugfix/skills` or `--skills-dir` also load for both. Overlay skills **guide** matching bias and directory habits; they do **not** change schema gates, match-pool, or the 3-candidate cap.
+
+Template: `docs/prompts/agent2/example-injected-skill.md`.
+
 ## Related package skills
 
 - `electron-process-boundary` — electron process roles

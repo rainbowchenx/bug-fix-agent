@@ -11,6 +11,7 @@
 | `mrUrl` | string \| null | |
 | `integrateMode` | `none` \| `single_mr` | openMr 时为 single_mr |
 | `summary` | `{ total, byOutcome }` | 浏览用；真源是 tickets[] |
+| `boundSkills[]` | string | 本次实际绑定的 analyze skill 名（overlay 在前，包内置在后） |
 | `tickets[]` | **每票完整报告** | D2 |
 
 ### tickets[] 互斥规则

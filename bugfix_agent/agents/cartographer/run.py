@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 from bugfix_agent.agents.cartographer.architecture import map_architecture
 from bugfix_agent.agents.cartographer.detect import (
@@ -18,13 +18,14 @@ from bugfix_agent.contracts import (
     is_match_pool,
     validate_code_knowledge,
 )
-from bugfix_agent.contracts.code_knowledge import SpecAtlas
+from bugfix_agent.contracts.code_knowledge import SpecAtlas, SpecEntry
 from bugfix_agent.sdk.cartography import (
     CartographyRequest,
     CartographyRunner,
     cartography_mode_from_env,
     create_cartography_runner,
 )
+from bugfix_agent.sdk.skill_inject import InjectedSkill, discover_cartography_skills
 
 
 def run_cartographer(
@@ -32,6 +33,7 @@ def run_cartographer(
     work_dir: str | Path,
     defect_batch: DefectBatch,
     cartography_mode: Optional[str] = None,
+    extra_skill_dirs: Optional[Sequence[str | Path]] = None,
     cartography_fn: Optional[CartographyRunner] = None,
 ) -> CodeKnowledge:
     """Agent-2 公开入口：产出供 Agent-3 消费的 ``code-knowledge``。
@@ -42,12 +44,29 @@ def run_cartographer(
             →（可选）Claude SDK 加厚 → validate_code_knowledge
 
     软匹配只是起点提示；Agent-3 可改写定位结论。
+
+    Args:
+        work_dir: 目标代码根（其下可有多个仓）。
+        defect_batch: 已通过 ``validate_defect_batch`` 的批次。
+        cartography_mode: ``heuristic`` / ``sdk``；``None`` 时看环境变量。
+        extra_skill_dirs: 用户注入的 cartography skill 根目录。与仓内
+            ``.claude/skills``、``workDir/.bugfix/skills``、
+            ``BUGFIX_SKILLS_DIR`` 合并；同名后者覆盖。只收
+            ``profiles`` 含 ``cartography`` 的 skill。
+        cartography_fn: 可注入的 ``CartographyRunner``（测试用）。
+
+    Returns:
+        通过 ``validate_code_knowledge`` 的 ``CodeKnowledge``。
     """
     work_dir = str(work_dir)
     # 1) 扫描目标 workDir 结构（支持多根 monorepo）。
     repo_roots = discover_repo_roots(work_dir)
     profile, hints, tech = detect_cartography_profile(work_dir, repo_roots)
     conventions = read_conventions(work_dir, repo_roots)
+    injected = discover_cartography_skills(work_dir, repo_roots, extra_skill_dirs)
+    bound_skills, atlas_entries = _bind_injected_skills(
+        work_dir, conventions, injected
+    )
     arch_summary, entry_points, modules = map_architecture(work_dir, repo_roots, profile)
 
     # 2) 对匹配池票做软定位（strict / locatable_only / needs_info）。
@@ -85,10 +104,10 @@ def run_cartographer(
                 "fromClaudeMd": conventions["fromClaudeMd"][:30],
                 "fromRules": conventions["fromRules"],
             },
-            "boundSkills": conventions["boundSkills"],
+            "boundSkills": bound_skills,
             "specAtlas": SpecAtlas(
                 frameworkId=conventions["frameworkId"],
-                entries=conventions["entries"],
+                entries=atlas_entries,
             ).model_dump(),
             "capabilities": {
                 "codeGraph": code_graph,
@@ -103,6 +122,39 @@ def run_cartographer(
         cartography_mode_from_env(cartography_mode)
     )
     result = runner(
-        CartographyRequest(work_dir=work_dir, defect_batch=defect_batch, baseline=baseline)
+        CartographyRequest(
+            work_dir=work_dir,
+            defect_batch=defect_batch,
+            baseline=baseline,
+            injected_skills=tuple(injected),
+        )
     )
     return result.knowledge
+
+
+def _bind_injected_skills(
+    work_dir: str,
+    conventions: dict,
+    injected: Sequence[InjectedSkill],
+) -> tuple[list[str], list[SpecEntry]]:
+    """把 cartography skill 写入 ``boundSkills`` / ``specAtlas``。
+
+    包内置 skill 只记名字；仓内 / ``.bugfix`` / 显式目录记路径，供 Agent-3 看见。
+    """
+    bound = list(dict.fromkeys(s.name for s in injected))[:40]
+    entries = list(conventions.get("entries") or [])
+    seen = {e.path for e in entries}
+    root = Path(work_dir)
+    for skill in injected:
+        if skill.source == "package":
+            continue
+        try:
+            rel = str(skill.skill_md.relative_to(root)).replace("\\", "/")
+        except ValueError:
+            rel = str(skill.skill_md)
+        if rel in seen:
+            continue
+        seen.add(rel)
+        source = "claude_dir" if skill.source == "claude_dir" else "explicit"
+        entries.append(SpecEntry(path=rel, kind="skill", source=source))
+    return bound, entries

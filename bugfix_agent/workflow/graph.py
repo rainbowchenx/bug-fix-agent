@@ -146,12 +146,18 @@ def create_three_agent_graph(
         }
         if state.get("cartography_mode"):
             call_kwargs["cartography_mode"] = state["cartography_mode"]
+        if state.get("extra_skill_dirs"):
+            call_kwargs["extra_skill_dirs"] = state["extra_skill_dirs"]
         try:
             knowledge = cartographer(**call_kwargs)
         except TypeError:
-            # 单测注入的桩可能不接受 cartography_mode。
+            # 单测注入的桩可能不接受 cartography_mode / extra_skill_dirs。
             call_kwargs.pop("cartography_mode", None)
-            knowledge = cartographer(**call_kwargs)
+            try:
+                knowledge = cartographer(**call_kwargs)
+            except TypeError:
+                call_kwargs.pop("extra_skill_dirs", None)
+                knowledge = cartographer(**call_kwargs)
         # 未预期异常向上抛，交给 RetryPolicy；出口 schema 由 validate_knowledge 把关。
         raw = knowledge.model_dump() if hasattr(knowledge, "model_dump") else knowledge
         return {
@@ -220,11 +226,18 @@ def create_three_agent_graph(
         }
         if state.get("analyze_mode"):
             call_kwargs["analyze_mode"] = state["analyze_mode"]
+        if state.get("extra_skill_dirs"):
+            call_kwargs["extra_skill_dirs"] = state["extra_skill_dirs"]
         try:
             report = analyst(**call_kwargs)
         except TypeError:
+            # 单测注入的桩可能不接受 analyze_mode / extra_skill_dirs。
             call_kwargs.pop("analyze_mode", None)
-            report = analyst(**call_kwargs)
+            try:
+                report = analyst(**call_kwargs)
+            except TypeError:
+                call_kwargs.pop("extra_skill_dirs", None)
+                report = analyst(**call_kwargs)
         # 未预期异常向上抛，交给 RetryPolicy。
         raw = report.model_dump() if hasattr(report, "model_dump") else report
         return {

@@ -7,6 +7,7 @@ from typing import Any, Callable, Literal, Optional
 
 from bugfix_agent.contracts.defect_batch import BatchTicket
 from bugfix_agent.sdk.parse import parse_json_payload
+from bugfix_agent.sdk.skill_inject import InjectedSkill, analyze_skills_addon
 from bugfix_agent.sdk.skills import skills_system_addon
 
 AnalyzeMode = Literal["heuristic", "sdk"]
@@ -20,9 +21,9 @@ class AnalyzeRequest:
     work_dir: str
     ticket: BatchTicket
     routed: dict[str, Any]
-    """Pre-router outcome payload (soft-start localization, etc.)."""
     max_turns: int = 12
     model: Optional[str] = None
+    injected_skills: tuple[InjectedSkill, ...] = ()
 
 
 @dataclass
@@ -84,17 +85,20 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
 
     prompt = _build_prompt(req)
     model = req.model or os.environ.get("ANTHROPIC_MODEL") or None
-    system_prompt = _SYSTEM_PROMPT + skills_system_addon(
-        (
-            "hierarchical-localization",
-            "systematic-debugging",
-            "test-triage",
-            "typescript-null-safety",
-            "vue-debug",
-            "electron-process-boundary",
-            "monorepo-workspace",
+    if req.injected_skills:
+        system_prompt = _SYSTEM_PROMPT + analyze_skills_addon(req.injected_skills)
+    else:
+        system_prompt = _SYSTEM_PROMPT + skills_system_addon(
+            (
+                "hierarchical-localization",
+                "systematic-debugging",
+                "test-triage",
+                "typescript-null-safety",
+                "vue-debug",
+                "electron-process-boundary",
+                "monorepo-workspace",
+            )
         )
-    )
     options = ClaudeAgentOptions(
         cwd=req.work_dir,
         system_prompt=system_prompt,
@@ -197,6 +201,9 @@ def _merge_with_routed(routed: dict[str, Any], parsed: dict[str, Any]) -> dict[s
 _SYSTEM_PROMPT = """You are Agent-3 defect analyst for a report-only workflow.
 Use only Read / Glob / Grep. Do NOT edit files or run shell.
 Ground claims in code you actually read. Prefer Agent-2 soft-start paths first.
+Repo-specific injected skills (if attached) have HIGHEST PRIORITY over package SOP:
+follow their read order, test/dev conventions, module aliases, and product-line naming.
+They do not let you invent paths or schema fields.
 End with a single JSON object (optionally in a ```json fence) with keys:
 outcome, rootCause{summary,ruledOut,openQuestions}, proposedFix{summary,steps,targetFiles},
 localization{candidates,notes}, blockers, confidence, suggestedVerify{steps,executed}.
@@ -223,6 +230,7 @@ def _build_prompt(req: AnalyzeRequest) -> str:
         f"expected: {t.expected}\n"
         f"steps: {t.steps}\n"
         f"expectQuality: {t.expectQuality}\n"
+        f"injectedSkills: {json.dumps([s.name for s in req.injected_skills], ensure_ascii=False)}\n"
         f"softStartLocalization: {json.dumps(soft, ensure_ascii=False)}\n"
         f"routerOutcomeHint: {req.routed.get('outcome')}\n"
     )

@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Literal, Optional, Union
+from typing import Any, Callable, Literal, Optional, Sequence, Union
 
 from bugfix_agent.contracts import (
     AnalysisReport,
@@ -85,6 +85,7 @@ def run_three_agent_workflow(
     skip_agent3: bool = False,
     analyze_mode: Optional[Literal["heuristic", "sdk"]] = None,
     cartography_mode: Optional[Literal["heuristic", "sdk"]] = None,
+    extra_skill_dirs: Optional[Sequence[str | Path]] = None,
     agent2: Optional[CartographerFn] = None,
     agent3: Optional[AnalystFn] = None,
     artifact_dir: Optional[str | Path] = None,
@@ -95,6 +96,7 @@ def run_three_agent_workflow(
     """父编排入口：校验 defect-batch → Agent-2 → Agent-3。
 
     - ``defect_batch``：图外 Agent-1 产物（路径 / dict / ``DefectBatch``）。
+    - ``extra_skill_dirs``：Agent-2/3 额外 overlay skill 根目录（两边共用，overlay 优先）。
     - ``artifact_dir``：每个门禁成功后渐进写 JSON。
     - ``thread_id`` / ``checkpointer``：持久化执行（仅给 ``thread_id`` 时
       默认挂 ``InMemorySaver``）。
@@ -135,6 +137,8 @@ def run_three_agent_workflow(
         initial["analyze_mode"] = analyze_mode
     if cartography_mode is not None:
         initial["cartography_mode"] = cartography_mode
+    if extra_skill_dirs:
+        initial["extra_skill_dirs"] = [str(p) for p in extra_skill_dirs]
     if artifact_dir is not None:
         initial["artifact_dir"] = str(artifact_dir)
 

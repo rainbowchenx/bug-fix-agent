@@ -99,6 +99,8 @@ def enqueue_run(
                 "analyze_mode": opts.analyzeMode,
                 "cartography_mode": opts.cartographyMode,
             }
+            if opts.skillsDirs:
+                call_kwargs["extra_skill_dirs"] = list(opts.skillsDirs)
             # 内置 LangGraph runner：渐进落盘 + 阶段流式。
             # 测试注入的 workflow_fn 可能不接受这些 kwargs。
             if workflow_fn is None:
@@ -115,6 +117,7 @@ def enqueue_run(
                 call_kwargs.pop("artifact_dir", None)
                 call_kwargs.pop("thread_id", None)
                 call_kwargs.pop("on_update", None)
+                call_kwargs.pop("extra_skill_dirs", None)
                 result = fn(**call_kwargs)
             # 即便跳过了渐进落盘（注入桩 / 旧路径），收尾也要保证产物在盘上。
             if result.artifacts.defect_batch:

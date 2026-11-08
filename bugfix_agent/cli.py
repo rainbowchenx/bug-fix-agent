@@ -71,6 +71,18 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Agent-2 cartography enrich: heuristic or Claude Agent SDK",
     )
+    run_p.add_argument(
+        "--skills-dir",
+        action="append",
+        default=None,
+        dest="skills_dirs",
+        metavar="DIR",
+        help=(
+            "Extra Agent-2/3 overlay skill root (repeatable). Merged after "
+            ".claude/skills and workDir/.bugfix/skills; overlay outranks "
+            "package SOP. Also reads BUGFIX_SKILLS_DIR."
+        ),
+    )
     run_p.add_argument("--out-dir", default=None, help="Write artifacts JSON here")
 
     serve_p = sub.add_parser("serve", help="HTTP API (S4 FastAPI): POST/GET /v1/runs")
@@ -147,6 +159,7 @@ def main(argv: list[str] | None = None) -> int:
         skip_agent3=args.skip_agent3,
         analyze_mode=args.analyze_mode,
         cartography_mode=args.cartography_mode,
+        extra_skill_dirs=args.skills_dirs,
         artifact_dir=args.out_dir,
     )
     payload = {

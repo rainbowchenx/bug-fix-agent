@@ -120,6 +120,7 @@ class AnalysisReport(BaseModel):
     mrUrl: Optional[str] = None
     integrateMode: Literal["none", "single_mr"] = "none"
     summary: Optional[ReportSummary] = None
+    boundSkills: list[str] = Field(default_factory=list)
     tickets: list[TicketReport]
 
 

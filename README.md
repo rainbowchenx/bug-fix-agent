@@ -63,6 +63,7 @@ cp .env.example .env
 | `BUGFIX_ANALYZE_MODE` | Agent-3：`heuristic` \| `sdk`（显式覆盖默认） |
 | `BUGFIX_ANALYZE_LIMIT` | 单次 run 最多 enrich 几张软定位票（空=不限） |
 | `BUGFIX_CARTOGRAPHY_MODE` | Agent-2：`heuristic` \| `sdk`（有 key 时默认 sdk） |
+| `BUGFIX_SKILLS_DIR` | Agent-2/3 额外 overlay skill 根目录（`os.pathsep` 分隔；与 `--skills-dir` 合并，overlay 优先） |
 
 > 本机若仍有历史 `dist/`、`node_modules/`，可直接删掉（已 gitignore，不是源码）。
 
@@ -99,6 +100,7 @@ bugfix-agent run \
   --defect-batch /tmp/defect-batch.json \
   --posture alpha \
   --cartography-mode heuristic \
+  --skills-dir ./line-skills \
   --analyze-mode heuristic \
   --out-dir /tmp/bugfix-out
 ```
@@ -117,6 +119,7 @@ stdout 会打印摘要：`ok` / `stage` / `funnel` / `profile` / `summary`。
 |------|------|
 | `--posture alpha\|beta` | beta 时非 Open/New 更易进 `excluded` |
 | `--cartography-mode heuristic\|sdk` | Agent-2 enrich 模式 |
+| `--skills-dir DIR` | Agent-2/3 注入仓特异性 skill（可重复；overlay 优先于包内置；见 `docs/prompts/agent2/`） |
 | `--analyze-mode heuristic\|sdk` | Agent-3 enrich 模式 |
 | `--skip-agent2` / `--skip-agent3` | 调试跳过；`skip-agent2` 必须与 `skip-agent3` 同开（Agent-3 依赖 code-knowledge） |
 | `--open-mr` | 仅改报告 `integrateMode` 标志；**当前不会真正开 MR** |

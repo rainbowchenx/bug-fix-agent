@@ -8,6 +8,10 @@ from pydantic import BaseModel, Field
 class CreateRunOptions(BaseModel):
     analyzeMode: Optional[Literal["heuristic", "sdk"]] = None
     cartographyMode: Optional[Literal["heuristic", "sdk"]] = None
+    skillsDirs: list[str] = Field(
+        default_factory=list,
+        description="Agent-2/3 overlay skill roots; overlay outranks package SOP",
+    )
     skipAgent2: bool = False
     skipAgent3: bool = False
     openMr: bool = False
