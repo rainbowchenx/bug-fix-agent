@@ -25,7 +25,9 @@
 {productLine}::{testModule}::{titleTag}::{intent}[::{tokenBucket}]
 ```
 
-L3 default = heuristic `IntentClassifier`; inject LLM later via `cluster.intentClassifier`.
+L3 first pass = heuristic `IntentClassifier`（关键词 / `fieldType`，0 LLM）。  
+Skill 在 `prepare-batch` 之后做意图复核：读原始描述，纠正 `intent`（及匹配池误分），经 `apply-review` 回写（`intentSource=ai`）。  
+不要把筛池硬规则交给模型重跑。
 
 ## Posture
 

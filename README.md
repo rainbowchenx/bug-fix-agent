@@ -225,7 +225,7 @@ raw-defects  ──Agent-1──►  defect-batch  ──Agent-2──►  code-
 | Artifact | 生产者 | 消费者 | 文档 |
 |----------|--------|--------|------|
 | `raw-defects` | CSV / Excel / JSON 入口 | Agent-1 | [raw-defects-entry.md](docs/contracts/v0.1/raw-defects-entry.md) |
-| `defect-batch` | Agent-1 | Agent-2、3 | [defect-batch.md](docs/contracts/v0.1/defect-batch.md) |
+| `defect-batch` | Agent-1 | Agent-2、3 | [defect-batch-guide.md](docs/contracts/v0.1/defect-batch-guide.md) |
 | `code-knowledge` | Agent-2 | Agent-3 | [code-knowledge.md](docs/contracts/v0.1/code-knowledge.md) |
 | `analysis-report` | Agent-3 | 人 / 下游 | [analysis-report.md](docs/contracts/v0.1/analysis-report.md) |
 

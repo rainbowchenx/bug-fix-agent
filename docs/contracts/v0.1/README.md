@@ -15,16 +15,18 @@ Agent-1 ──defect-batch──► Agent-2 ──code-knowledge──► Agent-
 | Artifact | 生产者 | 消费者 | Schema |
 |---|---|---|---|
 | `raw-defects`（入口） | 平台 CSV / Excel / JSON | Agent-1 | [raw-defects-entry.md](raw-defects-entry.md) |
-| `defect-batch` | Agent-1 | Agent-2、Agent-3 | [defect-batch.md](defect-batch.md) |
+| `defect-batch` | Agent-1 | Agent-2、Agent-3 | [defect-batch-guide.md](defect-batch-guide.md) |
 | `code-knowledge` | Agent-2 | Agent-3 | [code-knowledge.md](code-knowledge.md) |
 | `analysis-report` | Agent-3 | 人 / 下游 | [analysis-report.md](analysis-report.md) |
 
 代码 SSOT：`bugfix_agent/contracts/*`。样例：`samples/*.json`。
 
-## 匹配池（Agent-2 / 3 默认）
+## 匹配池（后续步骤默认）
 
 `strict` | `locatable_only` | `needs_info`  
 （`hard_reject` / `security` / `excluded` 默认不进入匹配与分析）
+
+消费 `defect-batch` 前先看 [defect-batch-guide.md](defect-batch-guide.md)。
 
 ## 包边界（Python）
 

@@ -30,6 +30,27 @@ bugfix-agent run \
   --out-dir /tmp/artifacts
 ```
 
+## 规则层之后做意图复核
+
+```bash
+bugfix-agent prepare-batch \
+  --product-line hc \
+  --source 缺陷拉取/脱敏/export.csv \
+  --posture beta \
+  --out defect-batch.json
+```
+
+对照原始 CSV 与 `defect-batch.json`，把需要改的票写成 `review.json`，再：
+
+```bash
+bugfix-agent apply-review \
+  --batch defect-batch.json \
+  --overrides review.json \
+  --out defect-batch.json
+```
+
+`review.json` 只列调整项；硬淘汰池不要写入。升入 `strict` 时带上 `expectQuality`。
+
 ## Excel export
 
 ```bash

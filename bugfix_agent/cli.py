@@ -3,6 +3,7 @@
 子命令
 ------
 - ``prepare-batch``：Agent-1（图外）→ defect-batch JSON；供 skill / Claude Code 使用。
+- ``apply-review``：把意图复核调整写回已有 defect-batch（重建簇后校验）。
 - ``run``：LangGraph Agent-2→3（``run_three_agent_workflow``）；需要已有
   ``--defect-batch``；``--out-dir`` 开启渐进产物落盘。
 - ``serve``：回环上的 FastAPI S4 壳。
@@ -34,6 +35,14 @@ def main(argv: list[str] | None = None) -> int:
     prep.add_argument("--source", required=True, help="JSON or platform CSV")
     prep.add_argument("--posture", choices=["alpha", "beta"], default="beta")
     prep.add_argument("--out", required=True, help="Write defect-batch JSON")
+
+    review = sub.add_parser(
+        "apply-review",
+        help="Apply intent-review overrides onto an existing defect-batch.json",
+    )
+    review.add_argument("--batch", required=True, help="Existing defect-batch JSON")
+    review.add_argument("--overrides", required=True, help="JSON {adjustments: [...]}")
+    review.add_argument("--out", required=True, help="Write updated defect-batch JSON")
 
     run_p = sub.add_parser(
         "run",
@@ -98,6 +107,31 @@ def main(argv: list[str] | None = None) -> int:
         print(
             json.dumps(
                 {"ok": True, "tickets": len(batch.tickets), "funnel": batch.funnel, "out": str(out)},
+                ensure_ascii=False,
+            )
+        )
+        return 0
+
+    if args.cmd == "apply-review":
+        from bugfix_agent.defect_batch.review import IntentReviewFile, apply_intent_review
+        from bugfix_agent.workflow.run import load_defect_batch
+
+        batch = load_defect_batch(args.batch)
+        payload = json.loads(Path(args.overrides).read_text(encoding="utf-8"))
+        review_file = IntentReviewFile.model_validate(payload)
+        updated = apply_intent_review(batch, review_file.adjustments)
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(updated.model_dump_json(indent=2), encoding="utf-8")
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "tickets": len(updated.tickets),
+                    "funnel": updated.funnel,
+                    "adjustments": len(review_file.adjustments),
+                    "out": str(out),
+                },
                 ensure_ascii=False,
             )
         )

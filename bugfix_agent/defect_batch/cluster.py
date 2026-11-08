@@ -169,3 +169,95 @@ def cluster_screened(
             bt.priority = float(i)
 
     return clusters, tickets
+
+
+def rebuild_clusters_from_tickets(
+    tickets: list[BatchTicket],
+    product_line: str,
+    *,
+    fat_ratio: float = 0.25,
+    fat_absolute: int = 40,
+) -> list[BatchCluster]:
+    """按票上现有的 L1/L2/intent 重建簇（R5 过肥再切 + R6 排序）。
+
+    会就地改写 ``clusterId`` / ``priority``。非 ``strict`` 的 ``clusterId``
+    置为 ``None``。
+
+    Args:
+        tickets: 全量票（含拟改写的 intent / pool）。
+        product_line: ``clusterId`` 前缀。
+        fat_ratio: 相对 ``strict`` 总数的过肥阈值。
+        fat_absolute: 绝对条数过肥阈值。
+
+    Returns:
+        仅含 strict 的簇列表。
+    """
+    strict = [t for t in tickets if t.pool == "strict"]
+    for t in tickets:
+        if t.pool != "strict":
+            t.clusterId = None
+            t.priority = None
+            continue
+        module = t.testModule or "_unmoduled"
+        tag = t.titleTag or "_untagged"
+        intent = t.intent or "unclear"
+        t.clusterId = _cluster_id(product_line, module, tag, intent)
+
+    cluster_buckets: dict[str, list[BatchTicket]] = {}
+    for t in strict:
+        if t.clusterId:
+            cluster_buckets.setdefault(t.clusterId, []).append(t)
+
+    strict_count = max(len(strict), 1)
+    final_buckets: dict[str, list[BatchTicket]] = {}
+    for cid, lst in cluster_buckets.items():
+        code_review_heavy = sum(1 for t in lst if t.titleTag == "_code_review") >= max(
+            3, len(lst) // 2
+        )
+        fat = (
+            len(lst) / strict_count > fat_ratio
+            or len(lst) > fat_absolute
+            or (code_review_heavy and len(lst) > 5)
+        )
+        if not fat:
+            final_buckets[cid] = lst
+            continue
+        by_token: dict[str, list[BatchTicket]] = {}
+        for t in lst:
+            token = _title_token(t.title) or "_misc"
+            key = f"{cid}::{token}"
+            by_token.setdefault(key, []).append(t)
+        for key, arr in by_token.items():
+            final_buckets[key] = arr
+            for bt in arr:
+                bt.clusterId = key
+
+    clusters: list[BatchCluster] = []
+    for cid, lst in final_buckets.items():
+        parts = cid.split("::")
+        test_module = parts[1] if len(parts) > 1 else "_unmoduled"
+        title_tag = parts[2] if len(parts) > 2 else "_untagged"
+        intent = parts[3] if len(parts) > 3 else "unclear"
+        open_count = sum(1 for t in lst if is_open_like(t.status))
+        clusters.append(
+            BatchCluster(
+                clusterId=cid,
+                testModule=test_module,
+                titleTag=title_tag,
+                intent=intent,  # type: ignore[arg-type]
+                size=len(lst),
+                openCount=open_count,
+                oversized=len(lst) > fat_absolute,
+                defectIds=[t.defectId for t in lst],
+            )
+        )
+
+    def ticket_key(bt: BatchTicket) -> tuple:
+        pool_rank = 0 if bt.pool == "strict" else 1 if bt.pool == "locatable_only" else 2
+        return (pool_rank, _expect_rank(bt.expectQuality), bt.defectId)
+
+    tickets.sort(key=ticket_key)
+    clusters.sort(key=lambda c: (-c.openCount, -c.size, c.clusterId))
+    for i, bt in enumerate(tickets):
+        bt.priority = float(i) if bt.pool == "strict" else None
+    return clusters

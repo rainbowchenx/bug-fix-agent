@@ -18,6 +18,10 @@ SOP for building `code-knowledge`. Prefer the Python entrypoint; use this skill 
 | Follow profile biases (electron / micro_frontend / device_web) | Write `CODEBASE_MAP.md` or edit target repo by default |
 | SDK: read deeply (imports/call flow) so Agent-3 spends fewer tokens | Mutate the repo via Bash/Edit/Write |
 
+## Input contract
+
+Read `docs/contracts/v0.1/defect-batch-guide.md` before matching. Default match pool: `strict` / `locatable_only` / `needs_info`. Do not treat other pools as fixable.
+
 ## Pipeline
 
 ```text
@@ -60,7 +64,7 @@ knowledge = run_cartographer(
 
 ## Output contract
 
-See `docs/contracts/v0.1/code-knowledge.md` (Pydantic SSOT: `bugfix_agent/contracts/code_knowledge.py`).
+See `docs/contracts/v0.1/code-knowledge.md` (Pydantic SSOT: `bugfix_agent/contracts/code_knowledge.py`). Input artifact: `docs/contracts/v0.1/defect-batch-guide.md`.
 
 ## Related package skills
 
