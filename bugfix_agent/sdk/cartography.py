@@ -15,13 +15,23 @@ CARTOGRAPHY_TOOLS = ["Read", "Glob", "Grep"]
 DISALLOWED_TOOLS = ["Edit", "Write", "Bash", "NotebookEdit", "MultiEdit"]
 
 
+def _cartography_max_turns(default: int = 48) -> int:
+    raw = (os.environ.get("BUGFIX_CARTOGRAPHY_MAX_TURNS") or "").strip()
+    if not raw:
+        return default
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return default
+
+
 @dataclass
 class CartographyRequest:
     work_dir: str
     defect_batch: DefectBatch
     baseline: CodeKnowledge
     """Heuristic detect/match result to enrich."""
-    max_turns: int = 16
+    max_turns: int = 48
     model: Optional[str] = None
 
 
@@ -101,7 +111,7 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
         allowed_tools=list(CARTOGRAPHY_TOOLS),
         disallowed_tools=list(DISALLOWED_TOOLS),
         permission_mode="dontAsk",
-        max_turns=req.max_turns,
+        max_turns=req.max_turns if req.max_turns > 0 else _cartography_max_turns(),
         model=model,
     )
 
