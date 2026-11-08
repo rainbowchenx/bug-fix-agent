@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from typing import Any, Callable, Literal, Optional
 
@@ -11,18 +12,64 @@ from bugfix_agent.sdk.skills import skills_system_addon
 
 CartographyMode = Literal["heuristic", "sdk"]
 
-CARTOGRAPHY_TOOLS = ["Read", "Glob", "Grep"]
-DISALLOWED_TOOLS = ["Edit", "Write", "Bash", "NotebookEdit", "MultiEdit"]
+# Thorough read session: Bash allowed for read-only exploration; no mutate tools.
+CARTOGRAPHY_TOOLS = ["Read", "Glob", "Grep", "Bash"]
+DISALLOWED_TOOLS = ["Edit", "Write", "NotebookEdit", "MultiEdit"]
+
+# Destructive / egress patterns for Bash (defense in depth; prompt also forbids mutation).
+_BASH_DENY_RE = re.compile(
+    r"""(?ix)
+    (?:^|[;&|`]\s*|\$\()
+    (?:
+        rm\b|sudo\b|chmod\b|chown\b|mkfs\b|dd\b|truncate\b|
+        git\s+(?:push|commit|rebase|reset|clean|tag|add|stash|checkout|switch|merge|cherry-pick|pull)|
+        (?:npm|pnpm|yarn|bun)\s+(?:publish|install|add|uninstall|update)|
+        pip(?:3)?\s+install|
+        (?:curl|wget|nc|ncat|ssh|scp|rsync|ftp)\b|
+        docker\b|kubectl\b|
+        python(?:3)?\s+-m\s+pip\s+install
+    )
+    """
+)
+
+
+def resolve_cartography_max_turns(explicit: Optional[int] = None) -> Optional[int]:
+    """Return SDK ``max_turns`` or ``None`` for unlimited.
+
+    - Request explicit ``>0`` → that value
+    - Request explicit ``<=0`` → unlimited
+    - Env empty / ``0`` / ``none`` / ``unlimited`` → unlimited (default)
+    - Env positive int → that value
+    """
+    if explicit is not None:
+        return None if explicit <= 0 else explicit
+    raw = (os.environ.get("BUGFIX_CARTOGRAPHY_MAX_TURNS") or "").strip().lower()
+    if raw in ("", "0", "none", "null", "unlimited", "inf", "infinite"):
+        return None
+    try:
+        n = int(raw)
+    except ValueError:
+        return None
+    return None if n <= 0 else n
+
+
+def bash_command_allowed(command: str) -> tuple[bool, str]:
+    """Whether a Bash tool command is allowed for Agent-2 cartography."""
+    text = (command or "").strip()
+    if not text:
+        return False, "empty bash command"
+    if _BASH_DENY_RE.search(text):
+        return (
+            False,
+            "bash blocked: mutating, network, package-install, or VCS-write commands are not allowed in Agent-2",
+        )
+    return True, ""
 
 
 def _cartography_max_turns(default: int = 48) -> int:
-    raw = (os.environ.get("BUGFIX_CARTOGRAPHY_MAX_TURNS") or "").strip()
-    if not raw:
-        return default
-    try:
-        return max(1, int(raw))
-    except ValueError:
-        return default
+    """Deprecated helper kept for callers; prefer ``resolve_cartography_max_turns``."""
+    resolved = resolve_cartography_max_turns()
+    return default if resolved is None else resolved
 
 
 @dataclass
@@ -31,7 +78,8 @@ class CartographyRequest:
     defect_batch: DefectBatch
     baseline: CodeKnowledge
     """Heuristic detect/match result to enrich."""
-    max_turns: int = 48
+    # None → resolve from env (default unlimited). <=0 also means unlimited.
+    max_turns: Optional[int] = None
     model: Optional[str] = None
 
 
@@ -78,8 +126,23 @@ def heuristic_cartography(req: CartographyRequest) -> CartographyResult:
     )
 
 
+async def _can_use_cartography_tool(
+    tool_name: str,
+    input_data: dict[str, Any],
+    _context: Any,
+) -> Any:
+    from claude_agent_sdk.types import PermissionResultAllow, PermissionResultDeny
+
+    if tool_name == "Bash":
+        cmd = str(input_data.get("command") or input_data.get("cmd") or "")
+        ok, reason = bash_command_allowed(cmd)
+        if not ok:
+            return PermissionResultDeny(message=reason)
+    return PermissionResultAllow()
+
+
 def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
-    """Read-only Claude Agent SDK session to thicken architecture + matches."""
+    """Claude Agent SDK session: thorough read of workDir to thicken code-knowledge."""
     if not os.environ.get("ANTHROPIC_API_KEY"):
         fallback = heuristic_cartography(req)
         fallback.source = "sdk_fallback"
@@ -105,14 +168,16 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
             "hierarchical-localization",
         )
     )
+    max_turns = resolve_cartography_max_turns(req.max_turns)
     options = ClaudeAgentOptions(
         cwd=req.work_dir,
         system_prompt=system_prompt,
         allowed_tools=list(CARTOGRAPHY_TOOLS),
         disallowed_tools=list(DISALLOWED_TOOLS),
         permission_mode="dontAsk",
-        max_turns=req.max_turns if req.max_turns > 0 else _cartography_max_turns(),
+        max_turns=max_turns,
         model=model,
+        can_use_tool=_can_use_cartography_tool,
     )
 
     result_text = ""
@@ -237,9 +302,21 @@ def _merge_enrichment(baseline: CodeKnowledge, parsed: dict[str, Any]) -> dict[s
     return data
 
 
-_SYSTEM_PROMPT = """You are Agent-2 Code Cartographer.
-Use only Read / Glob / Grep. Do NOT edit files or run shell.
-Read CLAUDE.md / package manifests / likely entry files. Improve the baseline JSON.
+_SYSTEM_PROMPT = """You are Agent-2 Code Cartographer for an automated bugfix pipeline.
+Your job is to thoroughly read the target workDir so Agent-3 can fix defects with LESS re-exploration token cost.
+
+Tools: Read, Glob, Grep, and Bash. Bash is for READ-ONLY exploration only
+(e.g. rg/find/git log|blame|grep|show, ls, cat/head/sed -n). NEVER mutate the repo:
+no edit/write tools, no git write, no install, no network, no rm/chmod.
+
+How to work (be thorough, then stop when grounded):
+1) Read CLAUDE.md / README / package manifests and map entryPoints + module roles.
+2) For EACH match-pool ticket: open baseline candidate files, follow imports/callers
+   with Grep/Bash rg until you can name the likely fix locus and a short call-flow note.
+3) Prefer improving weak/empty matches; do not invent paths. Cap candidates at 3 per ticket.
+4) Write architecture.summary rich enough that Agent-3 need not re-map the repo:
+   include runtime shape, key modules, and per-hotspot call flow in plain language.
+
 Return one JSON object (optionally in a ```json fence) with any of:
 cartographyProfile, secondaryHints, techStack{languages,frameworks,notes},
 architecture{summary,entryPoints,modules[{id,path,role,shared,notes}]},
@@ -248,7 +325,7 @@ defectCodeMatches[{defectId,candidates[{repoPath,path,symbol,why,source}],confid
 partial.
 cartographyProfile must be one of: electron_node, micro_frontend, device_web, unknown.
 candidate source must be one of: codegraph, grep, heuristic, claude_md.
-Ground claims in files you read. Prefer improving weak/empty matches over inventing paths.
+In each candidate.why, cite the symbol/call edge you actually observed.
 """
 
 
@@ -276,7 +353,8 @@ def _build_prompt(req: CartographyRequest) -> str:
         "partial": req.baseline.partial,
     }
     return (
-        "Enrich this code-knowledge baseline for the workDir. Return the JSON enrich object.\n\n"
+        "Thoroughly read this workDir and enrich the code-knowledge baseline so Agent-3 "
+        "can fix tickets without rediscovering architecture. Return the JSON enrich object.\n\n"
         f"productLine: {req.defect_batch.productLine}\n"
         f"workDir: {req.work_dir}\n"
         f"matchPoolTickets: {json.dumps(match_pool, ensure_ascii=False)}\n"
