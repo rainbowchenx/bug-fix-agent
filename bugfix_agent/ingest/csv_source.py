@@ -14,7 +14,22 @@ def load_platform_csv(
     limit: Optional[int] = None,
     encoding: str = "utf-8-sig",
 ) -> list[RawDefect]:
-    """Load a 缺陷拉取-style CSV into RawDefect list."""
+    """读取缺陷平台导出 CSV，映射为 ``RawDefect`` 列表。
+
+    列名经 ``row_to_raw_dict``（含平台拼写 ``describle``）。缺 ID 或标题的
+    行会被跳过。
+
+    Args:
+        path: CSV 路径。
+        limit: 最多保留多少条有效缺陷；默认不限制。
+        encoding: 文件编码，默认 ``utf-8-sig`` 以吃掉 BOM。
+
+    Returns:
+        映射成功的 ``RawDefect`` 列表。
+
+    Raises:
+        ValueError: CSV 没有表头。
+    """
     p = Path(path)
     defects: list[RawDefect] = []
     with p.open(encoding=encoding, newline="") as f:

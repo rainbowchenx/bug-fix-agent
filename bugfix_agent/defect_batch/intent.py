@@ -38,6 +38,14 @@ IntentClassifier = Callable[[list[DefectDigest]], dict[str, IntentResult]]
 
 
 def heuristic_classify_intent(d: DefectDigest) -> IntentResult:
+    """用关键词 / ``fieldType`` 给单条 digest 打 L3 意图（0 LLM）。
+
+    Args:
+        d: 蒸馏产物。
+
+    Returns:
+        封闭枚举意图及来源、置信度、理由。
+    """
     text = d.fullText
     if re.search(r"CVE-|软件成分分析|漏洞名称|\[安全\]", text):
         return IntentResult("security_scan", "heuristic", "high", "security/CVE signals")
@@ -66,4 +74,12 @@ def heuristic_classify_intent(d: DefectDigest) -> IntentResult:
 
 
 def default_intent_classifier(digests: list[DefectDigest]) -> dict[str, IntentResult]:
+    """默认 L3 分类器：对每条 digest 跑 ``heuristic_classify_intent``。
+
+    Args:
+        digests: 通常为 ``strict``（或含 ``locatable_only``）池的蒸馏结果。
+
+    Returns:
+        ``defectId → IntentResult``。
+    """
     return {d.defectId: heuristic_classify_intent(d) for d in digests}

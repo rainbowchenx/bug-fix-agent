@@ -115,6 +115,17 @@ class DefectBatch(BaseModel):
 
 
 def validate_defect_batch(data: Any) -> DefectBatch:
+    """按契约校验 ``defect-batch`` 载荷。
+
+    Args:
+        data: dict 或已接近契约形状的对象。
+
+    Returns:
+        校验通过的 ``DefectBatch``。
+
+    Raises:
+        ValidationError: 字段或类型不符合 v0.1 契约。
+    """
     return DefectBatch.model_validate(data)
 
 

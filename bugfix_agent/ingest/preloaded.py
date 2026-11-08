@@ -12,7 +12,22 @@ Source = Union[str, Path, dict[str, Any], list[Any]]
 
 
 def load_preloaded(source: Source) -> list[RawDefect]:
-    """Load raw defects from JSON list/object, raw-defects file, or platform CSV."""
+    """把预置载荷归一成 ``RawDefect`` 列表（Ingest 的 ``preloaded`` 实现）。
+
+    后续蒸馏 / 筛选 / 分簇只读本函数产物，不再回查平台。
+
+    Args:
+        source: 文件路径（``.csv`` / ``raw-defects`` JSON / 缺陷列表 JSON）、
+            内存 dict（含 ``defects`` 的文件对象，或单条平台/canonical 行）、
+            或缺陷 dict / ``RawDefect`` 列表。
+
+    Returns:
+        归一后的 ``RawDefect`` 列表。
+
+    Raises:
+        TypeError: 列表项不是 dict / ``RawDefect``。
+        ValidationError: 条目无法映射为 ``RawDefect``。
+    """
     if isinstance(source, list):
         return [_coerce_item(x) for x in source]
     if isinstance(source, dict):
@@ -36,7 +51,21 @@ def load_preloaded(source: Source) -> list[RawDefect]:
 
 
 def _coerce_item(item: Any) -> RawDefect:
-    """Accept either canonical RawDefect keys or platform row keys."""
+    """把单条记录收成 ``RawDefect``。
+
+    已是 ``RawDefect`` 或含 ``title`` + ``defectId`` 的 canonical dict 则直接
+    校验；否则走 ``row_to_raw_dict`` 做平台列名映射。
+
+    Args:
+        item: ``RawDefect``、canonical dict 或平台行 dict。
+
+    Returns:
+        校验通过的 ``RawDefect``。
+
+    Raises:
+        TypeError: ``item`` 不是 dict / ``RawDefect``。
+        ValidationError: 映射后仍不满足契约。
+    """
     if isinstance(item, RawDefect):
         return item
     if not isinstance(item, dict):

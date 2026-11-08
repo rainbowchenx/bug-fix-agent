@@ -68,7 +68,15 @@ def pick_field(row: Mapping[str, Any], aliases: list[str]) -> str:
 
 
 def row_to_raw_dict(row: Mapping[str, Any]) -> dict[str, Any] | None:
-    """Convert one platform/Excel row to a RawDefect-shaped dict, or None if unusable."""
+    """把一行平台 / Excel 记录映射为 ``RawDefect`` 形状的 dict。
+
+    Args:
+        row: 原始列名到单元格的映射（英文导出或中文表头均可）。
+
+    Returns:
+        可供 ``RawDefect.model_validate`` 的 dict；缺 ``defectId`` 或
+        ``title`` 时返回 ``None``（调用方应跳过该行）。
+    """
     defect_id = pick_field(row, FIELD_ALIASES["defectId"])
     title = pick_field(row, FIELD_ALIASES["title"])
     if not defect_id or not title:

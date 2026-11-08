@@ -38,6 +38,23 @@ def cluster_screened(
     fat_absolute: int = 40,
     intent_on_locatable: bool = False,
 ) -> tuple[list[BatchCluster], list[BatchTicket]]:
+    """把筛选结果编成簇与全量票（L1/L2 规则 + L3 意图 + R5/R6）。
+
+    仅 ``strict`` 进簇并默认跑 L3。过大簇（占比 / 绝对条数 / 代码评审堆）
+    按标题 token 再切（R5）；票按池与 expectQuality 排序（R6）。旁路池仍
+    出现在 ``tickets``，``clusterId`` 为 ``None``。
+
+    Args:
+        screened: 漏斗输出。
+        product_line: 写入 ``clusterId`` 前缀。
+        intent_classifier: L3 分类器；默认启发式，不调 LLM。
+        fat_ratio: 相对 ``strict`` 总数的过肥阈值（默认 0.25）。
+        fat_absolute: 绝对条数过肥阈值（默认 40）。
+        intent_on_locatable: 为 True 时也对 ``locatable_only`` 打意图。
+
+    Returns:
+        ``(clusters, tickets)``。``clusters`` 仅含 strict；``tickets`` 为全量。
+    """
     classify = intent_classifier or default_intent_classifier
     strict = [t for t in screened if t.pool == "strict"]
     for_intent = (

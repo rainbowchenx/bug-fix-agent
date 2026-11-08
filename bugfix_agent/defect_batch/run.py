@@ -24,7 +24,32 @@ def run_defect_batch_prepare(
     posture: Literal["alpha", "beta"] = "beta",
     profile: Optional[ScreenProfile] = None,
 ) -> DefectBatch:
-    """加载（可选）+ 制备；供 CLI ``prepare-batch`` 与图节点 agent1 调用。"""
+    """加载原始缺陷并制备 ``defect-batch``。
+
+    供 CLI ``prepare-batch`` 与 ``defect-batch-prepare`` skill 调用。
+
+    Args:
+        product_line: 产品线标识。写入 ``defect-batch.productLine``，并参与
+            ``clusterId``（``{line}::{module}::{tag}::{intent}``）。
+        mode: Ingest 方式。当前仅 ``preloaded`` 可用；``mcp`` / ``crawler``
+            仍为 stub。
+        source: ``preloaded`` 且未给 ``defects`` 时的原始载荷。可为文件路径
+            （平台 CSV / ``raw-defects`` JSON / 缺陷列表 JSON）、内存 dict
+            （含 ``defects`` 的文件对象，或单条平台行 / canonical 行）、或
+            缺陷 dict 列表。与 ``defects`` 二选一。
+        defects: 已归一的 ``RawDefect`` 列表。有则跳过 Ingest，直接进蒸馏。
+        posture: 筛选姿态。``beta`` 时非 Open/New 状态进 ``excluded``；
+            ``alpha`` 不过这条状态门。写入产物 ``defect-batch.posture``。
+        profile: 可选筛池规则覆盖（空模板、端侧/非代码正则等）。默认
+            ``ScreenProfile()``。
+
+    Returns:
+        校验通过的 ``DefectBatch``。
+
+    Raises:
+        NotImplementedError: ``mode`` 为 ``mcp`` 或 ``crawler``。
+        ValueError: ``preloaded`` 模式下 ``source`` 与 ``defects`` 都未提供。
+    """
     if mode != "preloaded":
         raise NotImplementedError(f"ingest mode {mode!r} is stubbed; use preloaded")
     if defects is None:

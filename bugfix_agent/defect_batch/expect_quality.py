@@ -25,6 +25,14 @@ def _effective_expected(expected: str, title: str) -> str:
 
 
 def classify_expect_quality(d: DefectDigest) -> ExpectQuality:
+    """判断预期是否足够明确，供 R3 分流 ``strict`` / ``locatable_only``。
+
+    Args:
+        d: 蒸馏产物（主要看 ``expected`` / ``observed`` / 标题）。
+
+    Returns:
+        ``explicit`` / ``inferred`` / ``ambiguous`` / ``absent``。
+    """
     expect = _effective_expected(d.expected, d.title)
     sig = f"{d.title}\n{d.observed}"
     all_text = f"{d.title}\n{d.observed}\n{d.expected}"

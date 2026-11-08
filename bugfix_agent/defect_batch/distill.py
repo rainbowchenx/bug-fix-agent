@@ -166,6 +166,17 @@ def _observed_from_code_review_title(title: str) -> str:
 
 
 def distill_defect(raw: RawDefect) -> DefectDigest:
+    """把一条 ``RawDefect`` 蒸馏成结构化 ``DefectDigest``（0 LLM）。
+
+    拆描述模板（observed / expected / steps）、取 L2 标题括注、归一 L1
+    测试模块，并标记空模板 / 重复单。
+
+    Args:
+        raw: Ingest 之后的原始缺陷。
+
+    Returns:
+        供筛选与分簇使用的 ``DefectDigest``。
+    """
     description = raw.description or ""
     observed, expected, steps = split_description(description)
     title = raw.title.strip()
@@ -206,4 +217,12 @@ def distill_defect(raw: RawDefect) -> DefectDigest:
 
 
 def distill_all(raws: list[RawDefect]) -> list[DefectDigest]:
+    """批量蒸馏 ``RawDefect`` → ``DefectDigest``。
+
+    Args:
+        raws: 原始缺陷列表。
+
+    Returns:
+        与输入等长的 ``DefectDigest`` 列表。
+    """
     return [distill_defect(r) for r in raws]

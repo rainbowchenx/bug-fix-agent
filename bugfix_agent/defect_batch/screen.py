@@ -39,6 +39,20 @@ def screen_digest(
     posture: Literal["alpha", "beta"] = "beta",
     profile: Optional[ScreenProfile] = None,
 ) -> ScreenedTicket:
+    """按 R0–R3 规则把一条 digest 分流到漏斗池（纯规则，无 LLM）。
+
+    顺序：重复 / 作废状态 / 安全扫描 → beta 状态门 → SCA/CVE 与非代码硬淘汰
+    → 设计未定 / 附件 / 过薄 → 按 expectQuality 进 ``strict`` 或
+    ``locatable_only``。
+
+    Args:
+        d: 蒸馏产物。
+        posture: ``beta`` 时非 Open/New 进 ``excluded``；``alpha`` 跳过该门。
+        profile: 可选规则覆盖；默认 ``ScreenProfile()``。
+
+    Returns:
+        带 ``pool`` / ``reasonCode`` / ``expectQuality`` 的 ``ScreenedTicket``。
+    """
     profile = profile or ScreenProfile()
     expect_quality = classify_expect_quality(d)
     rule_ids: list[str] = []
@@ -106,10 +120,28 @@ def screen_all(
     posture: Literal["alpha", "beta"] = "beta",
     profile: Optional[ScreenProfile] = None,
 ) -> list[ScreenedTicket]:
+    """批量跑 ``screen_digest``。
+
+    Args:
+        digests: 蒸馏结果。
+        posture: 筛选姿态，透传给 ``screen_digest``。
+        profile: 可选筛池规则覆盖。
+
+    Returns:
+        与输入等长的 ``ScreenedTicket`` 列表。
+    """
     return [screen_digest(d, posture=posture, profile=profile) for d in digests]
 
 
 def funnel_counts(tickets: list[ScreenedTicket]) -> dict[str, int]:
+    """统计各漏斗池票数，供 ``defect-batch.funnel`` 使用。
+
+    Args:
+        tickets: 筛选后的票。
+
+    Returns:
+        含 ``total`` 与各 ``pool`` 计数的 dict。
+    """
     out = {
         "total": len(tickets),
         "strict": 0,
