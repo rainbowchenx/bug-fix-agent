@@ -1,42 +1,34 @@
 ---
 name: defect-batch-prepare
-description: Prepares defect-batch JSON from raw defects via ingest, rule distill/screen, L1→L2 clustering, then an intent-review pass that reads original ticket text and corrects L3 intent (and match-pool mistakes). Use when converting Excel/CSV/JSON defect exports, screening/clustering tickets, or validating defect-batch output. Never freestyle R0–R3 or L1/L2 in chat. After success, hand off defect-batch.json to bugfix-agent run.
-profiles: defect-batch
+description: Prepares defect-batch.json from exported defect lists (CSV, Excel, or JSON) by running the rule funnel, then rereading original ticket text to correct intent and match-pool placement. Use this skill whenever the user asks to 筛选, 分簇, 分类, or 复核缺陷单; convert a 缺陷列表 or 平台导出; run prepare-batch; build or validate defect-batch; or check whether tickets landed in the right pool or intent—even if they do not name this skill.
+compatibility: Requires Python 3.11+, bugfix-agent CLI on PATH, and openpyxl when the source is .xlsx.
+metadata:
+  profiles: defect-batch
 ---
 
 # Defect Batch Prepare
 
-SOP. 本 skill + 规则管线产出 `defect-batch.json`。筛池 / L1 / L2 必须走代码；**描述五花八门的意图理解放在规则跑完之后的复核步**。
+Turn an exported defect list into a validated `defect-batch.json`.
 
-## When to use
+Screening and L1/L2 keys run in code so the same export yields the same funnel. Ticket descriptions are too irregular for those rules, so after the script finishes, reread the original text and correct intent (and match-pool mistakes).
 
-- 把导出的缺陷列表做成 `defect-batch`
-- 检查漏斗：`strict` / `locatable_only` / `needs_info` / `hard_reject` / `security` / `excluded` / `duplicate`
-- 规则分簇之后，按原文判断 `intent`（以及功能池是否放错）并回写
-
-## Do / Don't
-
-| Do | Don't |
-|---|---|
-| 先跑 `prepare-batch`，再读原文做意图复核 | 在对话里重写 R0–R3 正则或 L1/L2 取值 |
-| 复核时对照**原始描述**（产物里已丢掉长描述） | 只看蒸馏切片就下结论 |
-| 用 `apply-review` 回写，让脚本重建簇并校验 | 手改 `clusterId` / `clusters[]` / `funnel` |
-| 只在匹配池内调整；意图必须落在封闭枚举 | 推翻 `hard_reject` / `security` / `excluded` / `duplicate` |
-| 注入业务 skill 只解释模块别名、意图口径 | 读 `所属模块`；发明新的 intent 标签 |
-
-## Pipeline
+## Workflow
 
 ```text
-ingest (preloaded) → raw-defects
-  → distill → screen R0–R3 → cluster L1/L2 + heuristic L3 → R5/R6
-  → validate_defect_batch → defect-batch.json          # 规则层，0 LLM
-  → 读原文，按意图复核分类 → adjustments.json
-  → apply-review → 重建簇 + 再校验 → defect-batch.json  # 本 skill 的理解层
+export → prepare-batch → defect-batch.json
+       → reread originals → review.json → apply-review → defect-batch.json
 ```
 
-mcp/crawler 仍为 stub；用 **preloaded**（CSV / JSON / xlsx 派生）。
+CSV and JSON go straight to `prepare-batch`. For `.xlsx`, convert with the script bundled in this skill (needs `openpyxl`):
 
-### 1）规则层（必须用脚本）
+```bash
+python scripts/xlsx_to_raw_defects.py \
+  --xlsx path/to/export.xlsx --product-line hc --out raw-defects.json
+```
+
+mcp/crawler ingest is still stubbed; use a preloaded file.
+
+### 1. Rule funnel
 
 ```bash
 bugfix-agent prepare-batch \
@@ -46,51 +38,23 @@ bugfix-agent prepare-batch \
   --out defect-batch.json
 ```
 
-```python
-from bugfix_agent import run_defect_batch_prepare
+Do not re-implement R0–R3 or L1/L2 in chat. Those rules encode CVE/SCA, status posture, and module/tag parsing; a one-off rewrite will drift from the contract.
 
-batch = run_defect_batch_prepare(
-    product_line="hc",
-    posture="alpha",
-    source="./raw-defects.json",
-)
-```
+Pool meanings, posture, and CSV quirks: [references/reference.md](references/reference.md).
 
-**R0–R3 and L1/L2 run in code.** Do not re-implement screen rules in chat.
+### 2. Intent review
 
-### 2）意图复核（本 skill 要做的理解，不是脚本替代品）
+The batch drops the long `description`. Heuristic L3 only matches keywords, so `unclear`, low confidence, `locatable_only`, and `needs_info` often mean "the template did not parse", not "the reporter said nothing". Read the original export next to `title` / `observed` / `expected` / `steps`.
 
-规则只做硬分流和结构键。启发式 L3 只是关键词先验。描述不规范时，**必须读原始单**，判断分类对不对，再调整。
+For each change, write what the reporter meant, which closed intent it is, and whether it still belongs in the current match pool.
 
-对照材料：
+Closed intent set: `ui_layout` · `i18n` · `logic` · `data_wrong` · `perf` · `compat` · `config` · `security_scan` · `crash` · `unclear`
 
-- `defect-batch.json` 里的 `title` / `observed` / `expected` / `steps` / `pool` / `intent*`
-- 原始导出（CSV/JSON）里的完整描述——批次产物**不再带**长 `description`
+Safe to change: `intent` (then `intentSource` becomes `ai`), and `pool` among `strict` / `locatable_only` / `needs_info`. Promoting into `strict` needs `expectQuality` of `explicit` or `inferred`.
 
-优先看这些票（不必全量死抠旁路池）：
+Leave `hard_reject` / `security` / `excluded` / `duplicate` alone — those are safety and status gates, not language understanding. Leave `testModule` / `titleTag` to the rules so `所属模块` never becomes a path. Do not hand-edit `clusterId` / `clusters[]` / `funnel`; `apply-review` rebuilds them so the file still validates.
 
-1. `intent` 为 `unclear`，或 `intentConfidence=low` / `intentSource` ∈ `heuristic` / `field_fallback`
-2. `locatable_only`、`needs_info`（常常是蒸馏没抽出预期，原文其实能读懂）
-3. 标题/原文与当前 `intent` 明显打架（例如满篇「未翻译」却标成 `logic`）
-
-对每张要改的票，写清：**原文在说什么 → 应属哪类意图 → 是否还应留在当前功能池**。
-
-封闭意图枚举（不可自造）：
-
-`ui_layout` · `i18n` · `logic` · `data_wrong` · `perf` · `compat` · `config` · `security_scan` · `crash` · `unclear`
-
-可改：
-
-- `intent`（及 rationale / confidence）；回写后 `intentSource` 必为 `ai`
-- 匹配池之间的 `pool`：`strict` ↔ `locatable_only` ↔ `needs_info`
-- 升入 `strict` 时必须带 `expectQuality=explicit|inferred`
-
-不可改：
-
-- `hard_reject` / `security` / `excluded` / `duplicate`（进或出都不行）
-- `testModule` / `titleTag`（L1/L2 仍走规则）
-
-落盘 `review.json`：
+Write only the tickets you are changing:
 
 ```json
 {
@@ -107,8 +71,6 @@ batch = run_defect_batch_prepare(
 }
 ```
 
-回写（脚本重建 `clusterId` / `clusters[]` / `funnel` 并校验）：
-
 ```bash
 bugfix-agent apply-review \
   --batch defect-batch.json \
@@ -116,25 +78,6 @@ bugfix-agent apply-review \
   --out defect-batch.json
 ```
 
-没有需要改的票：不要空跑；直接把规则产物交给后续步骤。
+If nothing should change, skip `apply-review` and hand off the rule output.
 
-## Platform CSV / Excel
-
-平台导出 CSV 可直接作为 `--source`。xlsx：
-
-```bash
-python3 bugfix_agent/scripts/xlsx_to_raw_defects.py \
-  --xlsx path/to/export.xlsx --product-line hc --out raw-defects.json
-```
-
-字段映射 SSOT：`bugfix_agent/ingest/field_map.py`（含平台拼写 `describle`）。xlsx 需 `openpyxl`。
-
-## Output contract
-
-See `docs/contracts/v0.1/defect-batch-guide.md` (Pydantic SSOT: `bugfix_agent/contracts/`).
-
-## References
-
-- Rules: [reference.md](reference.md)
-- Examples: [examples.md](examples.md)
-- Stage1: `docs/defect-input-analysis/_stage1-rules.md`
+Command variants: [references/examples.md](references/examples.md). Output shape: `docs/contracts/v0.1/defect-batch-guide.md`.

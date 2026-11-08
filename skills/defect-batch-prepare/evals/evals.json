@@ -1,0 +1,41 @@
+{
+  "skill_name": "defect-batch-prepare",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "仓库在 d:\\codeOnly\\bugfixagent。请用缺陷批次准备流程处理 test/fixtures/defect-batch/hc1-raw.json：产品线 hc，姿态 alpha，产出 defect-batch.json。规则跑完后对照原始 JSON 复核意图，把需要改的票写成 review.json 再回写。不要在对话里重写筛选正则。",
+      "expected_output": "A validated defect-batch.json from prepare-batch, plus apply-review if any intent/pool adjustments were needed. Funnel and cluster ids come from the CLI, not hand-edited JSON.",
+      "files": [],
+      "expectations": [
+        "Invoked bugfix-agent prepare-batch (or run_defect_batch_prepare) instead of re-implementing R0-R3 in chat",
+        "Wrote a defect-batch.json that passes validate_defect_batch",
+        "Read original ticket text before changing intent or match-pool",
+        "If adjustments exist, they went through apply-review rather than hand-edited clusterId/funnel",
+        "Did not move tickets out of hard_reject, security, excluded, or duplicate"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "已经有一份规则跑完的 defect-batch.json（和对应的原始导出）。请只做意图复核：描述很乱，不要相信启发式 intent。对照原文判断分类对不对，有问题就回写，没问题就说明为什么不用改。",
+      "expected_output": "Either a review.json applied via apply-review, or an explicit no-change handoff with reasons. No second prepare-batch unless the batch is missing.",
+      "files": [],
+      "expectations": [
+        "Did not re-run the full screen/cluster pipeline unless the batch file was invalid",
+        "Compared original descriptions, not only observed/expected/steps",
+        "Intent values stayed in the closed enum",
+        "clusterId/clusters/funnel were rebuilt by apply-review when anything changed"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "老板丢过来一个 xlsx 缺陷列表，要筛选分类后给我 defect-batch。先转成 raw-defects 再走规则，然后再按原文看意图有没有分错。",
+      "expected_output": "xlsx converted with this skill's scripts/xlsx_to_raw_defects.py, then prepare-batch, then optional intent review via apply-review.",
+      "files": [],
+      "expectations": [
+        "Used scripts/xlsx_to_raw_defects.py (skill-bundled), not a one-off converter",
+        "Ran prepare-batch on the converted JSON",
+        "Did not skip intent review just because the spreadsheet converted cleanly"
+      ]
+    }
+  ]
+}
