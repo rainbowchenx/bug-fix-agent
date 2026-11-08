@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "0.1.0",
+  "productLine": "sample",
+  "defects": [
+    {
+      "defectId": "PC-1",
+      "title": "【策略】security 未拦截危险工具调用",
+      "description": "预期结果：危险工具被拒绝\n实际结果：仍执行\n操作步骤：触发危险工具",
+      "status": "Open",
+      "testModule": "security",
+      "severity": "major"
+    },
+    {
+      "defectId": "PC-2",
+      "title": "【会话】session store 切换后旧消息残留",
+      "description": "预期结果：切换清空\n实际结果：旧 session 内容可见\n操作步骤：切换 session",
+      "status": "Open",
+      "testModule": "session",
+      "severity": "major"
+    },
+    {
+      "defectId": "PC-3",
+      "title": "【登录】auth login 校验失败仍写入凭证",
+      "description": "预期结果：login 失败不落盘\n实际结果：写入半成品 token\n操作步骤：错误密码登录",
+      "status": "Open",
+      "testModule": "login",
+      "severity": "major"
+    },
+    {
+      "defectId": "PC-4",
+      "title": "【网关】gateway host 环境覆盖无效",
+      "description": "预期结果：env 覆盖 gateway host\n实际结果：仍用配置文件\n操作步骤：export 后启动",
+      "status": "Open",
+      "testModule": "gateway",
+      "severity": "normal"
+    },
+    {
+      "defectId": "PC-5",
+      "title": "【无关】打印机驱动蓝屏",
+      "description": "预期结果：正常打印\n实际结果：蓝屏\n操作步骤：安装驱动",
+      "status": "Open",
+      "testModule": "打印机",
+      "severity": "trivial"
+    }
+  ]
+}
