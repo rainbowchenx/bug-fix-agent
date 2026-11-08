@@ -132,11 +132,13 @@ def test_workflow_cartography_heuristic(tmp_path: Path, monkeypatch):
     (work / "src" / "preview-player.ts").write_text("export const preview = 1;\n", encoding="utf-8")
     (work / "src" / "回放.ts").write_text("export {}\n", encoding="utf-8")
 
+    from tests.helpers import defect_batch_from_hc1
+
     result = run_three_agent_workflow(
         work_dir=work,
         product_line="hc",
         posture="alpha",
-        source=HC1,
+        defect_batch=defect_batch_from_hc1(),
         cartography_mode="heuristic",
         analyze_mode="heuristic",
     )

@@ -14,12 +14,12 @@ class CreateRunOptions(BaseModel):
 
 
 class CreateRunRequest(BaseModel):
-    """Three-agent run request (Dify-oriented async shell)."""
+    """Agent-2→3 run request. Agent-1 defect-batch is prepared outside LangGraph."""
 
     workDir: str = Field(min_length=1)
     productLine: str = Field(min_length=1)
-    source: Union[str, dict[str, Any], list[Any]] = Field(
-        description="Path to CSV/JSON, or inline raw-defects payload"
+    defectBatch: Union[str, dict[str, Any]] = Field(
+        description="Path to defect-batch.json, or inline defect-batch object"
     )
     posture: Literal["alpha", "beta"] = "beta"
     options: CreateRunOptions = Field(default_factory=CreateRunOptions)

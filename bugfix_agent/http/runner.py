@@ -55,11 +55,11 @@ def enqueue_run(
             "productLine": request.productLine,
             "posture": request.posture,
             "status": "queued",
-            "stage": "agent1",
+            "stage": "agent2",
             "error": None,
             "schemaVersion": "3-agent-0.1",
             "request": {
-                "sourceType": type(request.source).__name__,
+                "defectBatchType": type(request.defectBatch).__name__,
                 "options": opts.model_dump(),
             },
             "artifacts": {},
@@ -71,7 +71,7 @@ def enqueue_run(
         fn = workflow_fn or run_three_agent_workflow
         art_dir = root / "artifacts"
         art_dir.mkdir(parents=True, exist_ok=True)
-        last_stage = "agent1"
+        last_stage = "agent2"
 
         def _on_update(state: dict[str, Any]) -> None:
             """把 LangGraph 的 ``stage`` 镜像进 meta.json，供 GET 轮询。"""
@@ -91,7 +91,7 @@ def enqueue_run(
             call_kwargs: dict[str, Any] = {
                 "work_dir": work_dir,
                 "product_line": request.productLine,
-                "source": request.source,
+                "defect_batch": request.defectBatch,
                 "posture": request.posture,
                 "open_mr": opts.openMr,
                 "skip_agent2": opts.skipAgent2,

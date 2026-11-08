@@ -11,11 +11,15 @@
 松耦合工作流；**实现语言为 Python**（`bugfix_agent/`），编排引擎为 **LangGraph（Python）**；不再演进 JS 三 Agent / TS LangGraph 路径。
 
 ```text
-validate → Agent-1 → validate → Agent-2 → validate → Agent-3 → validate
-            defect-batch         code-knowledge        analysis-report
+Agent-1（图外：skill / prepare-batch）→ defect-batch
+        │
+        ▼
+validate_batch → Agent-2 → validate → Agent-3 → validate
+                   code-knowledge        analysis-report
 ```
 
-- 父图：`bugfix_agent/workflow/graph.py`（`StateGraph`：`agent1` → `agent2` → `agent3`）
+- Agent-1 **不在** LangGraph 内：`skills/defect-batch-prepare/` + Claude Code / `bugfix-agent prepare-batch`
+- 父图：`bugfix_agent/workflow/graph.py`（`StateGraph`：`validate_batch` → `agent2` → `agent3`）
 - 仅落盘 artifact + Pydantic 校验跨段  
 - 契约审阅稿：`docs/contracts/v0.1/`
 
@@ -43,10 +47,13 @@ validate → Agent-1 → validate → Agent-2 → validate → Agent-3 → valid
 
 ```bash
 pip install -e ".[dev]"
+bugfix-agent prepare-batch \
+  --product-line hc --source ./raw-defects.json --posture alpha \
+  --out /tmp/defect-batch.json
 bugfix-agent run \
   --work-dir ./repos \
   --product-line hc \
-  --source ./raw-defects.json \
+  --defect-batch /tmp/defect-batch.json \
   --posture alpha \
   --out-dir /tmp/out
 pytest -q
@@ -83,4 +90,5 @@ pytest -q
 | 2026-11-04 | **S2b**：Agent-2 cartography SDK enrich + heuristic 回退；`--cartography-mode` / `BUGFIX_CARTOGRAPHY_MODE` |
 | 2026-11-05 | **S4**：FastAPI `POST/GET /v1/runs` 异步壳 + `bugfix-agent serve`；状态落 `{workDir}/.bugfix-runs/{runId}/` |
 | 2026-11-05 | 评审加固：`flowStatus` 进排除；`duplicate` pool；禁单独 `skip_agent2`；HTTP `runId` 防路径逃逸 + meta 原子写；Agent-2 丢弃不存在路径；Agent-3 单票校验失败 → `other_blocked`；`oversized` 仅绝对阈值；CLI 失败也写 `--out-dir` |
+| 2026-11-06 | **Agent-1 移出 LangGraph**：父图仅 `validate_batch→agent2→agent3`；入参改为 `defectBatch` / `--defect-batch`；Agent-1 走 skill + `prepare-batch` |
 | 2026-11-07 | **S2c**：Agent-2 形态化架构探测、匹配 A3/A4 置信度、`skills/code-cartography/` |
