@@ -26,7 +26,7 @@ source (CSV/JSON/xlsx)
 |------|------|------|--------|
 | 契约 SSOT | `bugfix_agent/contracts/` | Pydantic 校验三段 artifact | ✅ |
 | Agent-1 | `ingest/` + `defect_batch/` + `skills/defect-batch-prepare/` | 图外：入口映射 → 蒸馏 / 筛选 / 分簇 → `defect-batch` | ✅ 规则管线 + skill |
-| Agent-2 | `agents/cartographer/` + `sdk/cartography.py` | 仓型探测 + 路径软匹配，可选 SDK 通读加厚 → `code-knowledge` | 🟡 启发式 + SDK 骨架 |
+| Agent-2 | `agents/cartographer/` + `sdk/cartography.py` + `skills/code-cartography/` | 仓型探测 + 形态化架构图 + 路径软匹配（候选≤3；置信度不因无 CodeGraph 封顶）+ 可选 SDK 通读 → `code-knowledge` | 🟡 启发式加厚 + SDK 骨架 |
 | Agent-3 | `agents/analyst/` + `sdk/analyze.py` | 路由 + 可选 Claude 只读 analyze → `analysis-report` | 🟡 路由+SDK 骨架 |
 | 父编排 | `workflow/` | LangGraph：`validate_batch→agent2→agent3` + 门禁（不含 Agent-1） | ✅ |
 | HTTP（S4） | `http/` | FastAPI：`POST/GET /v1/runs`（入参 `defectBatch`）、`GET /health` | ✅ 兼容壳 |
@@ -255,7 +255,7 @@ raw-defects  ──Agent-1──►  defect-batch  ──Agent-2──►  code-
 
 | 项 | 状态 |
 |----|------|
-| Agent-2 SDK 通读质量打磨（更多形态清单 / CodeGraph） | 后续 |
+| Agent-2 CodeGraph 真工具环 / 业务形态指纹样本仓 | 后续（启发式架构图 + code-cartography skill 已落地） |
 | Agent-3 出 patch / worktree 迭代 / 真 MR | 后续 |
 | LangGraph Server 原生部署（S4 增强） | 后续（现有 FastAPI 兼容壳） |
 | 生产 MCP 拉缺陷 | stub（现用 CSV/JSON/xlsx） |

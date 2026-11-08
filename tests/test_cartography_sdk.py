@@ -4,10 +4,14 @@ from pathlib import Path
 from bugfix_agent.agents.cartographer import run_cartographer
 from bugfix_agent.contracts import DefectBatch
 from bugfix_agent.sdk.cartography import (
+    CARTOGRAPHY_TOOLS,
+    DISALLOWED_TOOLS,
     CartographyRequest,
     CartographyResult,
+    bash_command_allowed,
     cartography_mode_from_env,
     heuristic_cartography,
+    resolve_cartography_max_turns,
 )
 from bugfix_agent.workflow import run_three_agent_workflow
 
@@ -44,6 +48,7 @@ def _batch() -> DefectBatch:
 
 def test_heuristic_cartography_annotates(monkeypatch, tmp_path: Path):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("BUGFIX_CARTOGRAPHY_MODE", raising=False)
     assert cartography_mode_from_env() == "heuristic"
 
     work = tmp_path / "repo"
@@ -163,3 +168,33 @@ def test_heuristic_cartography_direct(tmp_path: Path):
     )
     assert out.source == "heuristic"
     assert "heuristic mode" in out.knowledge.architecture.summary
+
+
+def test_cartography_tools_allow_bash_forbid_writes():
+    assert "Bash" in CARTOGRAPHY_TOOLS
+    assert "Read" in CARTOGRAPHY_TOOLS
+    for blocked in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
+        assert blocked in DISALLOWED_TOOLS
+    assert "Bash" not in DISALLOWED_TOOLS
+
+
+def test_resolve_cartography_max_turns_unlimited_by_default(monkeypatch):
+    monkeypatch.delenv("BUGFIX_CARTOGRAPHY_MAX_TURNS", raising=False)
+    assert resolve_cartography_max_turns() is None
+    monkeypatch.setenv("BUGFIX_CARTOGRAPHY_MAX_TURNS", "unlimited")
+    assert resolve_cartography_max_turns() is None
+    monkeypatch.setenv("BUGFIX_CARTOGRAPHY_MAX_TURNS", "0")
+    assert resolve_cartography_max_turns() is None
+    monkeypatch.setenv("BUGFIX_CARTOGRAPHY_MAX_TURNS", "64")
+    assert resolve_cartography_max_turns() == 64
+    assert resolve_cartography_max_turns(12) == 12
+    assert resolve_cartography_max_turns(0) is None
+
+
+def test_bash_command_allowed_readonly_vs_mutating():
+    assert bash_command_allowed("rg -n login src")[0] is True
+    assert bash_command_allowed("git blame src/node/routes/login.ts")[0] is True
+    assert bash_command_allowed("git push origin HEAD")[0] is False
+    assert bash_command_allowed("rm -rf src")[0] is False
+    assert bash_command_allowed("curl https://example.com")[0] is False
+    assert bash_command_allowed("npm install lodash")[0] is False
