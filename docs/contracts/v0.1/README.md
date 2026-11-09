@@ -1,6 +1,6 @@
 # 跨 Agent 数据契约 v0.1（审阅稿）
 
-> 日期：2026-11-03 · **供评估**：字段可改，改完需同步 Pydantic（`bugfix_agent/contracts/`）  
+> 日期：2026-11-03 · **供评估**：字段可改，改完需同步 Pydantic（`contracts/bugfix_contracts/`）  
 > 实现语言：**Python**（不再使用 JS 三 Agent 路径）  
 > 依据：三 Agent 探讨收口 + [正式架构](../../superpowers/specs/2026-11-03-three-agent-architecture.md)
 
@@ -19,7 +19,7 @@ Agent-1 ──defect-batch──► Agent-2 ──code-knowledge──► Agent-
 | `code-knowledge` | Agent-2 | Agent-3 | [code-knowledge.md](code-knowledge.md) |
 | `analysis-report` | Agent-3 | 人 / 下游 | [analysis-report.md](analysis-report.md) |
 
-代码 SSOT：`bugfix_agent/contracts/*`。样例：`samples/*.json`。
+代码 SSOT：`contracts/bugfix_contracts/*`。样例：`samples/*.json`。
 
 ## 匹配池（后续步骤默认）
 
@@ -32,11 +32,11 @@ Agent-1 ──defect-batch──► Agent-2 ──code-knowledge──► Agent-
 
 | 包 | 路径 | 依赖 |
 |---|---|---|
-| contracts | `bugfix_agent/contracts` | pydantic |
-| defect_batch (Agent-1) | `bugfix_agent/defect_batch` | contracts + ingest |
-| cartographer (Agent-2) | `bugfix_agent/agents/cartographer` | contracts + fs + `sdk/skill_inject` |
-| analyst (Agent-3) | `bugfix_agent/agents/analyst` | contracts + `sdk/skill_inject` |
-| workflow | `bugfix_agent/workflow` | 只调各包公开 `run_*` + `validate_*` |
+| contracts | `contracts/bugfix_contracts` | pydantic |
+| Agent-1 | `agent1/bugfix_agent1` | contracts + ingest |
+| cartographer (Agent-2) | `platform/bugfix_platform/agents/cartographer` | contracts + fs + `sdk/skill_inject` |
+| analyst (Agent-3) | `platform/bugfix_platform/agents/analyst` | contracts + `sdk/skill_inject` |
+| workflow | `platform/bugfix_platform/workflow` | 只调各包公开 `run_*` + `validate_*` |
 
 ## 审阅时请关注
 

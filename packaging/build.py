@@ -12,15 +12,14 @@
         defect-batch-prepare/scripts/agent1.exe    零依赖单文件 CLI
     dist/agent1-standalone.zip        交付包不含任何源码
 
-    dist/bugfix-agent-platform.zip      平台包（根级 graph.py + 源码 + skills）
+    dist/bugfix-agent-platform.zip      平台包（根级 graph.py + 源码 + platform skills）
 
-代码边界（两侧只共享 5 个 contracts 文件，见 AGENT1_FILES / PLATFORM_FILES）：
+源码边界（打包拷整个目录，不再维护文件白名单）：
 
-    Agent-1     contracts + ingest + defect_batch + cli → 图外，独立 CLI
-    Platform    contracts + agents + workflow + sdk    → LangGraph 管控
+    Agent-1     contracts/bugfix_contracts + agent1/bugfix_agent1 + agent1/skills
+    Platform    contracts/bugfix_contracts + platform/bugfix_platform + platform/skills
 
-两侧都不导入对方的其余模块。打包时会各生成一份裁剪过的
-``bugfix_agent/__init__.py``——仓库里那份是给整仓开发用的，会 import 全部三方。
+两侧都不导入对方的其余模块。共享只走 ``bugfix_contracts`` 与落盘 JSON。
 """
 
 from __future__ import annotations
@@ -41,135 +40,8 @@ PKG = Path(__file__).resolve().parent
 DIST = ROOT / "dist"
 BUILD = ROOT / "build"
 
-# --------------------------------------------------------------------------- #
-# 代码边界。显式列出而不是动态推导：动态发现会把 ingest/ 悄悄带进平台包。
-# 新增文件必须手动加进来，否则打包测试会失败（见 verify_*）。
-# --------------------------------------------------------------------------- #
-
-_SHARED_CONTRACTS = [
-    "_version.py",
-    "contracts/__init__.py",
-    "contracts/common.py",
-    "contracts/defect_batch.py",
-    "contracts/analysis_report.py",
-    "contracts/code_knowledge.py",
-]
-
-AGENT1_FILES = _SHARED_CONTRACTS + [
-    "cli.py",
-    "agent1.py",
-    "ingest/__init__.py",
-    "ingest/preflight.py",
-    "ingest/field_map.py",
-    "ingest/csv_source.py",
-    "ingest/xlsx_source.py",
-    "ingest/preloaded.py",
-    "defect_batch/__init__.py",
-    "defect_batch/run.py",
-    "defect_batch/prepare.py",
-    "defect_batch/distill.py",
-    "defect_batch/screen.py",
-    "defect_batch/rules.py",
-    "defect_batch/expect_quality.py",
-    "defect_batch/intent.py",
-    "defect_batch/cluster.py",
-    "defect_batch/review.py",
-]
-
-PLATFORM_FILES = _SHARED_CONTRACTS + [
-    "agents/__init__.py",
-    "agents/analyst/__init__.py",
-    "agents/analyst/route.py",
-    "agents/analyst/run.py",
-    "agents/cartographer/__init__.py",
-    "agents/cartographer/architecture.py",
-    "agents/cartographer/detect.py",
-    "agents/cartographer/match.py",
-    "agents/cartographer/run.py",
-    "sdk/__init__.py",
-    "sdk/analyze.py",
-    "sdk/cartography.py",
-    "sdk/parse.py",
-    "sdk/skills.py",
-    "sdk/skill_inject.py",
-    "workflow/__init__.py",
-    "workflow/graph.py",
-    "workflow/gates.py",
-    "workflow/persist.py",
-    "workflow/run.py",
-    "workflow/state.py",
-    "workflow/langgraph_app.py",
-]
-
-# Agent-1 的 skill 不上平台；平台只需要 Agent-2/3 分析向 skill。
 AGENT1_SKILL = "defect-batch-prepare"
-PLATFORM_SKILLS = [
-    "code-cartography",
-    "electron-process-boundary",
-    "hierarchical-localization",
-    "monorepo-workspace",
-    "systematic-debugging",
-    "test-triage",
-    "typescript-null-safety",
-    "vue-debug",
-]
-
-AGENT1_INIT = '''"""Agent-1 standalone: defect-batch only. No agents / workflow / sdk / langgraph."""
-
-from bugfix_agent._version import __version__
-from bugfix_agent.contracts import (
-    CONTRACT_SCHEMA_VERSION,
-    DEFECT_BATCH_SCHEMA_VERSION,
-    DefectBatch,
-    validate_defect_batch,
-)
-from bugfix_agent.defect_batch import prepare_defect_batch, run_defect_batch_prepare
-
-__all__ = [
-    "CONTRACT_SCHEMA_VERSION",
-    "DEFECT_BATCH_SCHEMA_VERSION",
-    "DefectBatch",
-    "validate_defect_batch",
-    "prepare_defect_batch",
-    "run_defect_batch_prepare",
-]
-'''
-
-PLATFORM_INIT = '''"""Platform build: Agent-2/3 under LangGraph. Agent-1 lives outside this graph."""
-
-from bugfix_agent.contracts import (
-    ANALYSIS_REPORT_SCHEMA_VERSION,
-    CODE_KNOWLEDGE_SCHEMA_VERSION,
-    CONTRACT_SCHEMA_VERSION,
-    DEFECT_BATCH_SCHEMA_VERSION,
-    AnalysisReport,
-    CodeKnowledge,
-    DefectBatch,
-    validate_analysis_report,
-    validate_code_knowledge,
-    validate_defect_batch,
-)
-from bugfix_agent.agents.analyst import run_analyst
-from bugfix_agent.agents.cartographer import run_cartographer
-from bugfix_agent.workflow import create_three_agent_graph, run_three_agent_workflow
-
-__all__ = [
-    "CONTRACT_SCHEMA_VERSION",
-    "DEFECT_BATCH_SCHEMA_VERSION",
-    "CODE_KNOWLEDGE_SCHEMA_VERSION",
-    "ANALYSIS_REPORT_SCHEMA_VERSION",
-    "DefectBatch",
-    "CodeKnowledge",
-    "AnalysisReport",
-    "validate_defect_batch",
-    "validate_code_knowledge",
-    "validate_analysis_report",
-    "run_cartographer",
-    "run_analyst",
-    "run_three_agent_workflow",
-    "create_three_agent_graph",
-]
-'''
+_IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo")
 
 
 def log(msg: str) -> None:
@@ -188,18 +60,12 @@ def strip_pycache(root: Path) -> int:
     return n
 
 
-def copy_package(files: list[str], dest: Path, init_src: str) -> None:
-    """把指定文件拷成 dest/bugfix_agent/...，并把 __init__.py 换成裁剪版。"""
+def copy_python_tree(src: Path, dest: Path) -> None:
+    if not src.is_dir():
+        raise SystemExit(f"missing source tree: {src}")
     if dest.exists():
         shutil.rmtree(dest)
-    for rel in files:
-        src = ROOT / "bugfix_agent" / rel
-        if not src.is_file():
-            raise SystemExit(f"missing source file: {src}")
-        out = dest / rel
-        out.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, out)
-    (dest / "__init__.py").write_text(init_src, encoding="utf-8")
+    shutil.copytree(src, dest, ignore=_IGNORE)
 
 
 def write_manifest(vendor: Path, label: str) -> None:
@@ -217,7 +83,7 @@ def write_manifest(vendor: Path, label: str) -> None:
     (vendor / "VENDOR.json").write_text(
         json.dumps(
             {
-                "source": f"bugfix_agent ({label})",
+                "source": f"bugfix-agent ({label})",
                 "repo": "bugfix-agent",
                 "commit": commit,
                 "copiedAt": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -232,41 +98,36 @@ def write_manifest(vendor: Path, label: str) -> None:
     )
 
 
-# --------------------------------------------------------------------------- #
-# 产品 1：Agent-1 独立包
-# --------------------------------------------------------------------------- #
-
 def build_agent1(skip_exe: bool = False) -> Path:
     """产出**只有 exe** 的 skill；源码不进交付包（单一真源在仓库里）。"""
-    skill_src = ROOT / "skills" / AGENT1_SKILL
+    skill_src = ROOT / "agent1" / "skills" / AGENT1_SKILL
     stage = BUILD / "agent1-stage" / AGENT1_SKILL
     if stage.exists():
         shutil.rmtree(stage)
     stage.mkdir(parents=True)
 
-    # --- 构建树：编译 exe 需要完整源码，但这棵树不交付 ---
     log("agent1: staging build tree (not shipped)")
-    for name in ("SKILL.md",):
-        shutil.copy2(skill_src / name, stage / name)
+    shutil.copy2(skill_src / "SKILL.md", stage / "SKILL.md")
     for sub in ("references", "evals"):
         shutil.copytree(skill_src / sub, stage / sub)
-    # 入口放在包外：包内目录当 script 跑会让 bugfix_agent/http/ 遮蔽标准库 http。
     scripts = stage / "scripts"
     scripts.mkdir()
     (scripts / "entry.py").write_text(
-        chr(10).join([
+        "\n".join([
             "import sys",
-            "from bugfix_agent.agent1 import entry",
+            "from bugfix_agent1.agent1 import entry",
             "sys.exit(entry())",
             "",
         ]),
         encoding="utf-8",
     )
 
-    vendor = scripts / "_vendor" / "bugfix_agent"
-    copy_package(AGENT1_FILES, vendor, AGENT1_INIT)
-    write_manifest(vendor.parent, "Agent-1 subset: contracts + ingest + defect_batch")
-    log(f"agent1: vendored {len(AGENT1_FILES)} files for the build")
+    vendor = scripts / "_vendor"
+    copy_python_tree(ROOT / "contracts" / "bugfix_contracts", vendor / "bugfix_contracts")
+    copy_python_tree(ROOT / "agent1" / "bugfix_agent1", vendor / "bugfix_agent1")
+    write_manifest(vendor, "Agent-1: bugfix_contracts + bugfix_agent1")
+    n_py = len(list(vendor.rglob("*.py")))
+    log(f"agent1: vendored {n_py} python files for the build")
 
     exe_name = "agent1.exe" if os.name == "nt" else "agent1"
     if skip_exe:
@@ -275,24 +136,23 @@ def build_agent1(skip_exe: bool = False) -> Path:
     else:
         log("agent1: running PyInstaller (30-60s)")
         stamp = BUILD / "pyinstaller"
-        env = dict(os.environ, PYTHONPATH=str(scripts / "_vendor"))
-        # 排除清单实测省下约 5.2 MB（16.6 -> 11.4），且已验证 CLI 全子命令仍正常：
-        #   libcrypto/libssl 7.6 MB  <- hashlib->_hashlib->OpenSSL；排除后走内置 _sha256
-        #   setuptools 1.95 MB + packaging 0.38 MB <- pydantic hook 捎带
-        #   pydoc_data 0.61 MB / asyncio / unittest / tkinter 等
+        env = dict(os.environ, PYTHONPATH=str(vendor))
         excludes: list[str] = []
         for mod in (
             "setuptools", "pkg_resources", "packaging",
             "pydoc_data", "ssl", "_ssl", "_hashlib",
             "asyncio", "tkinter", "unittest", "lib2to3", "distutils", "xmlrpc",
+            "langgraph", "bugfix_platform",
         ):
             excludes += ["--exclude-module", mod]
         subprocess.run(
             [
                 sys.executable, "-m", "PyInstaller", "--onefile", "--name", "agent1",
                 "--noconfirm", "--clean",
-                "--add-data", f"{scripts / '_vendor' / 'VENDOR.json'}{os.pathsep}.",
+                "--add-data", f"{vendor / 'VENDOR.json'}{os.pathsep}.",
                 "--hidden-import", "openpyxl",
+                "--hidden-import", "bugfix_contracts",
+                "--hidden-import", "bugfix_agent1",
                 *excludes,
                 "--distpath", str(stamp / "dist"),
                 "--workpath", str(stamp / "work"),
@@ -308,7 +168,6 @@ def build_agent1(skip_exe: bool = False) -> Path:
 
     _verify_agent1(scripts)
 
-    # --- 交付包：只放 exe + 文档，源码不进 ---
     log("agent1: assembling exe-only package")
     out = BUILD / "agent1-standalone" / AGENT1_SKILL
     if out.exists():
@@ -331,16 +190,21 @@ def build_agent1(skip_exe: bool = False) -> Path:
 
 
 def _verify_agent1(scripts: Path) -> None:
-    """确认裁剪后的源码树能独立导入（不碰仓库里的 bugfix_agent）。"""
+    """确认裁剪后的源码树能独立导入（不碰平台包）。"""
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+    vendor = scripts / "_vendor"
+    if (vendor / "bugfix_platform").exists():
+        raise SystemExit("agent1: platform tree leaked into vendor")
+    if (vendor / "bugfix_agent1" / "workflow").exists():
+        raise SystemExit("agent1: workflow leaked into vendor")
     code = (
         "import sys; sys.path.insert(0, r'%s');"
-        "from bugfix_agent.defect_batch import run_defect_batch_prepare;"
-        "import bugfix_agent;"
-        "assert not hasattr(bugfix_agent, 'run_three_agent_workflow'), 'platform leaked into agent1 build';"
+        "from bugfix_agent1.defect_batch import run_defect_batch_prepare;"
+        "import bugfix_agent1;"
+        "assert not hasattr(bugfix_agent1, 'run_three_agent_workflow'), 'platform leaked into agent1 build';"
         "assert 'langgraph' not in sys.modules, 'agent1 build pulled langgraph';"
         "print('  ok: agent1 imports clean, no langgraph')"
-    ) % (scripts / "_vendor")
+    ) % vendor
     subprocess.run([sys.executable, "-B", "-c", code], check=True, cwd=ROOT, env=env)
     exe = scripts / ("agent1.exe" if os.name == "nt" else "agent1")
     if exe.exists():
@@ -379,11 +243,6 @@ def _verify_package(out: Path) -> None:
     log(f"  ok: {len(survivors)} files, exe made {len(data['tickets'])} tickets from a real fixture")
 
 
-
-# --------------------------------------------------------------------------- #
-# 产品 2：平台包
-# --------------------------------------------------------------------------- #
-
 def build_platform() -> Path:
     log("platform: staging")
     out = BUILD / "platform"
@@ -391,12 +250,23 @@ def build_platform() -> Path:
         shutil.rmtree(out)
     out.mkdir(parents=True)
 
-    copy_package(PLATFORM_FILES, out / "bugfix_agent", PLATFORM_INIT)
-    log(f"platform: {len(PLATFORM_FILES)} package files")
+    copy_python_tree(ROOT / "contracts" / "bugfix_contracts", out / "bugfix_contracts")
+    copy_python_tree(ROOT / "platform" / "bugfix_platform", out / "bugfix_platform")
+    # 平台 zip 走 LangGraph Server，不带 CLI / HTTP 壳。
+    (out / "bugfix_platform" / "cli.py").unlink(missing_ok=True)
+    http = out / "bugfix_platform" / "http"
+    if http.is_dir():
+        shutil.rmtree(http)
 
-    for name in PLATFORM_SKILLS:
-        shutil.copytree(ROOT / "skills" / name, out / "skills" / name)
-    log(f"platform: {len(PLATFORM_SKILLS)} skills")
+    skills_src = ROOT / "platform" / "skills"
+    shutil.copytree(skills_src, out / "skills", ignore=_IGNORE)
+    if (out / "skills" / AGENT1_SKILL).exists():
+        raise SystemExit("platform: Agent-1 skill leaked into platform skills")
+    if (out / "bugfix_agent1").exists():
+        raise SystemExit("platform: bugfix_agent1 leaked into platform zip")
+
+    n_skills = sum(1 for p in (out / "skills").iterdir() if p.is_dir() and (p / "SKILL.md").is_file())
+    log(f"platform: {n_skills} skills")
 
     for name in ("graph.py", "langgraph.json", "requirements.txt"):
         shutil.copy2(PKG / "platform" / name, out / name)
@@ -424,19 +294,18 @@ def _verify_platform(staging: Path) -> None:
         "nodes = set(graph.get_graph().nodes);"
         "assert {'agent2', 'agent3'} <= nodes, f'unexpected nodes: {sorted(nodes)}';"
         "assert 'agent1' not in nodes, 'agent1 must stay outside the graph';"
+        "import bugfix_platform;"
+        "assert 'bugfix_agent1' not in sys.modules, 'agent1 leaked into platform build';"
         "print('  ok: graph builds, nodes =', sorted(nodes))"
     ) % staging
     subprocess.run([sys.executable, "-B", "-c", code], check=True, cwd=ROOT, env=env)
 
 
-# --------------------------------------------------------------------------- #
-
 def sync_delivery(target_root: Path) -> None:
     """把仓库里构建好的 skill 同步到交付目录。
 
-    唯一真源始终是仓库：改代码、改文档都在 ``skills/defect-batch-prepare/`` 和
-    ``bugfix_agent/`` 里做，然后跑一次 build 同步出去。目标目录只被本函数写，
-    不要手改——手改出来的东西下一次同步会被覆盖，而漏同步会让两边悄悄分叉。
+    唯一真源始终是仓库：改代码、改文档都在 ``agent1/`` 里做，然后跑一次
+    build 同步出去。目标目录只被本函数写，不要手改。
     """
     out_root = BUILD / "agent1-standalone"
     if not (out_root / AGENT1_SKILL).is_dir():

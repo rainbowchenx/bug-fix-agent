@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from bugfix_agent.contracts import DefectBatch
-from bugfix_agent.defect_batch import run_defect_batch_prepare
+from bugfix_contracts import DefectBatch
+from bugfix_agent1.defect_batch import run_defect_batch_prepare
 
 ROOT = Path(__file__).resolve().parents[1]
 HC1 = ROOT / "test" / "fixtures" / "defect-batch" / "hc1-raw.json"

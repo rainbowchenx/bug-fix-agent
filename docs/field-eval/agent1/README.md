@@ -7,7 +7,7 @@
 3. **实际分类质量够不够交给后续步骤**（池、意图、蒸馏切片）
 
 契约阅读说明：`docs/contracts/v0.1/defect-batch-guide.md`。  
-skill 正文：`skills/defect-batch-prepare/SKILL.md`。
+skill 正文：`agent1/skills/defect-batch-prepare/SKILL.md`。
 
 ---
 
@@ -34,7 +34,7 @@ python --version          # ≥ 3.11
 bugfix-agent version
 ```
 
-xlsx 需要 `openpyxl`。skill 要让 Claude Code 能读到 `skills/defect-batch-prepare/`（仓内路径即可；若装到用户技能目录，把整个文件夹拷过去，不要只拷 `SKILL.md`）。
+xlsx 需要 `openpyxl`。skill 要让 Claude Code 能读到 `agent1/skills/defect-batch-prepare/`（仓内路径即可；若装到用户技能目录，把整个文件夹拷过去，不要只拷 `SKILL.md`）。
 
 今晚若有空，用仓库夹具热身（不必打分）：
 
@@ -86,7 +86,7 @@ xlsx 组额外看：是否用了 `agent1 xlsx-to-raw`，而不是现场另写转
 python -c "
 from pathlib import Path
 from collections import Counter
-from bugfix_agent.contracts import validate_defect_batch
+from bugfix_contracts import validate_defect_batch
 import json
 p = Path('field-runs/2026-11-09-hc-组1/03-after-review.json')
 b = validate_defect_batch(json.loads(p.read_text(encoding='utf-8')))

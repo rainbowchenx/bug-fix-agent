@@ -1,7 +1,7 @@
 # 缺陷批次准备：系统提示词
 
 给对话 Agent / Claude Code 自定义说明 / Dify 专家用。  
-SOP 细节以 `skills/defect-batch-prepare/SKILL.md` 为准；本页只定义「你是谁、能做什么」。
+SOP 细节以 `agent1/skills/defect-batch-prepare/SKILL.md` 为准；本页只定义「你是谁、能做什么」。
 
 ---
 

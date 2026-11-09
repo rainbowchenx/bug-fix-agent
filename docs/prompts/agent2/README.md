@@ -1,7 +1,7 @@
 # Agent-2：代码通读与仓特异性 skill
 
 给对话 Agent / Claude Code 自定义说明用。  
-SOP 以 `skills/code-cartography/SKILL.md` 为准；本页说明「怎么给某个业务仓注入读仓规则」。
+SOP 以 `platform/skills/code-cartography/SKILL.md` 为准；本页说明「怎么给某个业务仓注入读仓规则」。
 
 ---
 
@@ -28,10 +28,10 @@ SOP 以 `skills/code-cartography/SKILL.md` 为准；本页说明「怎么给某�
 
 | 来源 | 路径 | 适用 |
 |---|---|---|
-| 包内置 | 本包 `skills/` | 通用 SOP |
+| 包内置 | `platform/skills/` | 通用 SOP（不含 Agent-1） |
 | 仓内 | 各仓根 `.claude/skills/<name>/SKILL.md` | 跟仓走的约定 |
 | 工作根 | `{workDir}/.bugfix/skills/<name>/SKILL.md` | 线别 / 本次分析专用，不必改业务仓 |
-| Run | `bugfix-agent run --skills-dir DIR`（可重复） | CI / 本机覆盖 |
+| Run | `bugfix-platform run --skills-dir DIR`（可重复） | CI / 本机覆盖 |
 | 环境 | `BUGFIX_SKILLS_DIR`（`os.pathsep` 分隔） | 全局默认 |
 | HTTP | `options.skillsDirs` | `POST /v1/runs` |
 
@@ -78,7 +78,7 @@ SOP 以 `skills/code-cartography/SKILL.md` 为准；本页说明「怎么给某�
 ## 5. CLI 示例
 
 ```bash
-bugfix-agent run \
+bugfix-platform run \
   --work-dir ./path/to/target-repos \
   --product-line hc \
   --defect-batch /tmp/defect-batch.json \

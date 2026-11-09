@@ -5,27 +5,48 @@ build-backend = "hatchling.build"
 [project]
 name = "bugfix-agent"
 version = "0.2.0"
-description = "Three-agent defect workflow (Python): batch prepare → cartographer → analyst"
+description = "Two independent products: Agent-1 defect-batch CLI, and a LangGraph Agent-2/3 platform"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 dependencies = [
   "pydantic>=2.7",
-  "openpyxl>=3.1",
-  "langgraph>=1.0",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "httpx>=0.27"]
+agent1 = ["openpyxl>=3.1"]
+platform = ["langgraph>=1.0"]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+  "httpx>=0.27",
+  "openpyxl>=3.1",
+  "langgraph>=1.0",
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+]
 sdk = ["claude-agent-sdk>=0.1"]
 http = ["fastapi>=0.115", "uvicorn[standard]>=0.30"]
 
 [project.scripts]
-bugfix-agent = "bugfix_agent.cli:main"
+bugfix-agent = "bugfix_agent1.cli:main"
+bugfix-platform = "bugfix_platform.cli:main"
+
+[tool.hatch.build]
+dev-mode-dirs = ["contracts", "agent1", "platform"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["bugfix_agent"]
+only-include = [
+  "contracts/bugfix_contracts",
+  "agent1/bugfix_agent1",
+  "platform/bugfix_platform",
+]
+
+[tool.hatch.build.targets.wheel.sources]
+"contracts" = ""
+"agent1" = ""
+"platform" = ""
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = ["contracts", "agent1", "platform", "."]

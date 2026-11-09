@@ -10,9 +10,9 @@
 hcp 与 hct 是同一模板的两条产品线；camera 是同一产品线的 4.5 代（V4.5.0，2021）。
 三者共用同一套内部脚手架。
 
-- 契约枚举：`micro_frontend`（`contracts/code_knowledge.py:CartographyProfile`）
-- 现有判型：`agents/cartographer/detect.py` —— 只认 `single-spa` 依赖
-- 现有架构图：`agents/cartographer/architecture.py:_map_micro_frontend()` —— 实测无产出
+- 契约枚举：`micro_frontend`（`contracts/bugfix_contracts/code_knowledge.py:CartographyProfile`）
+- 现有判型：`platform/bugfix_platform/agents/cartographer/detect.py` —— 只认 `single-spa` 依赖
+- 现有架构图：`platform/bugfix_platform/agents/cartographer/architecture.py:_map_micro_frontend()` —— 实测无产出
 
 ---
 
@@ -321,8 +321,8 @@ head -12 src/root-application.js
 
 # 5：现有实现产出（在 bugfix-agent 仓根执行）
 python -c "
-from bugfix_agent.agents.cartographer.detect import discover_repo_roots
-from bugfix_agent.agents.cartographer.architecture import map_architecture
+from bugfix_platform.agents.cartographer.detect import discover_repo_roots
+from bugfix_platform.agents.cartographer.architecture import map_architecture
 wd = r'E:\working_code_webfront\bug-fix-demo-project\hcp\hcp'
 print(map_architecture(wd, discover_repo_roots(wd), 'micro_frontend'))"
 ```

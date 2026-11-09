@@ -3,9 +3,9 @@
 样本：`bug-fix-demo-project/led` —— 一个**多仓容器**，内含一个 Electron 产品 + 一个外挂 Node 服务。
 这是三类里唯一需要处理"一个工作目录里有多个仓、多种技术栈"的类型。
 
-- 契约枚举：`electron_node`（`contracts/code_knowledge.py:CartographyProfile`）
-- 现有判型：`agents/cartographer/detect.py` —— `deps` 含 `electron` / `electron-builder` / `electron-vite`
-- 现有架构图：`agents/cartographer/architecture.py:_map_electron()`
+- 契约枚举：`electron_node`（`contracts/bugfix_contracts/code_knowledge.py:CartographyProfile`）
+- 现有判型：`platform/bugfix_platform/agents/cartographer/detect.py` —— `deps` 含 `electron` / `electron-builder` / `electron-vite`
+- 现有架构图：`platform/bugfix_platform/agents/cartographer/architecture.py:_map_electron()`
 
 **与另两类最大的不同**：这一类的判型**现阶段基本可用**（实测 `calibrationtool` → `electron_node` ✓），
 问题集中在**架构图粒度**：进程边界抓错了文件、外挂服务完全不可见、跨进程调用链没建。
@@ -400,8 +400,8 @@ cat calibrationtool/web/src/request/index.ts
 # E5/E6：现有实现的三处错误（在 bugfix-agent 仓根执行）
 python -c "
 from collections import Counter
-from bugfix_agent.agents.cartographer.detect import discover_repo_roots
-from bugfix_agent.agents.cartographer.architecture import map_architecture
+from bugfix_platform.agents.cartographer.detect import discover_repo_roots
+from bugfix_platform.agents.cartographer.architecture import map_architecture
 wd=r'E:\working_code_webfront\bug-fix-demo-project\led\calibrationtool'
 s,ep,mods=map_architecture(wd,discover_repo_roots(wd),'electron_node')
 print(len(mods), Counter(m.role for m in mods))

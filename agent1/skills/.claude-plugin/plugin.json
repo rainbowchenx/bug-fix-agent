@@ -1,0 +1,5 @@
+{
+  "name": "defect-batch-prepare",
+  "version": "0.2.0",
+  "description": "Agent-1 skill: turn an exported defect list into defect-batch.json (outside LangGraph)"
+}

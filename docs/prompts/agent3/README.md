@@ -1,7 +1,7 @@
 # Agent-3：缺陷分析与仓特异性 skill
 
 给对话 Agent / Claude Code 自定义说明用。  
-SOP 以包内 `systematic-debugging` / `hierarchical-localization` 等为准；仓特异性规则与 Agent-2 **共用同一套注入位置**，且 overlay **高于**包内置 SOP。
+SOP 以 `platform/skills/` 里的 `systematic-debugging` / `hierarchical-localization` 等为准；仓特异性规则与 Agent-2 **共用同一套注入位置**，且 overlay **高于**包内置 SOP。
 
 ---
 

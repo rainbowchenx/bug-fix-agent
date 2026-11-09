@@ -1,7 +1,7 @@
 # defect-batch 阅读说明
 
 > 落盘文件名通常是 `defect-batch.json`。  
-> 代码 SSOT：`bugfix_agent/contracts/defect_batch.py`。样例：[`samples/defect-batch.sample.json`](samples/defect-batch.sample.json)。
+> 代码 SSOT：`contracts/bugfix_contracts/defect_batch.py`。样例：[`samples/defect-batch.sample.json`](samples/defect-batch.sample.json)。
 
 读这份产物时：**只信 JSON + 校验结果**，不要回查缺陷平台，也不要假设上游会话上下文。
 
@@ -153,7 +153,7 @@ raw-defects  ──►  defect-batch.json  ──► 后续步骤
 | 空候选可以 `confidence=low` 交出去 | 要求每张票都必须有代码命中 |
 | 信息不足时仍给出完整结论（分类阻断即可） | 因旁路池票缺失而失败整批 |
 
-过滤匹配池可用 `is_match_pool(pool)`（`bugfix_agent.contracts`）。
+过滤匹配池可用 `is_match_pool(pool)`（`bugfix_contracts`）。
 
 ---
 

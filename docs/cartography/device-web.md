@@ -3,9 +3,9 @@
 样本：`peitao`（5.x / Vue 2）、`transport`（5.x / Vue 3）。
 两个仓 **`package.json` 的 `name` 都是 `web5.0-framework`**，是同一框架的两条产品线。
 
-- 契约枚举：`device_web`（`contracts/code_knowledge.py:CartographyProfile`）
-- 现有判型：`agents/cartographer/detect.py` —— 根目录名正则，**对两个样本命中 0 次**
-- 现有架构图：`agents/cartographer/architecture.py:_map_device_web()` —— 实测无产出
+- 契约枚举：`device_web`（`contracts/bugfix_contracts/code_knowledge.py:CartographyProfile`）
+- 现有判型：`platform/bugfix_platform/agents/cartographer/detect.py` —— 根目录名正则，**对两个样本命中 0 次**
+- 现有架构图：`platform/bugfix_platform/agents/cartographer/architecture.py:_map_device_web()` —— 实测无产出
 
 ---
 

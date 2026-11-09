@@ -17,7 +17,7 @@ export.csv ──> defect-batch.json ──> validate_batch ──> agent2 ─�
 | 要求 | 本包 |
 |---|---|
 | zip 根目录有 `graph.py` | ✅ `graph.py` |
-| 暴露 `build_graph()` / `graph` / `main()` 之一 | ✅ 三个都暴露，转发到 `bugfix_agent/workflow/langgraph_app.py` |
+| 暴露 `build_graph()` / `graph` / `main()` 之一 | ✅ 三个都暴露，转发到 `bugfix_platform/workflow/langgraph_app.py` |
 | `requirements.txt` | ✅ |
 | `.env`（可选） | ✅ `.env` 留空 + `.env.example` 说明 |
 | 模型配置复用平台「模型管理」 | ✅ `BUGFIX_ANALYZE_MODE` / `BUGFIX_CARTOGRAPHY_MODE` 留空即自动跟随 |
@@ -57,29 +57,25 @@ bugfix-agent-platform.zip
 ├── requirements.txt            pydantic + langgraph
 ├── .env / .env.example         模式开关留空，跟平台模型管理走
 ├── README.md                   本文件
-├── bugfix_agent/               27 个 .py
-│   ├── contracts/              5   契约（与 Agent-1 共享）
-│   ├── agents/                 9   cartographer + analyst
-│   ├── workflow/               7   graph / gates / run / persist / state / langgraph_app
-│   └── sdk/                    6   analyze / cartography / parse / skills / skill_inject
-└── skills/                     8 个分析向 skill（Agent-2/3 运行时依赖）
+├── bugfix_contracts/           共享契约（与 Agent-1 同一份 schema）
+├── bugfix_platform/            agents / workflow / sdk（不含 Agent-1、不含 http/cli）
+└── skills/                     平台分析向 skill（Agent-2/3；不含 defect-batch-prepare）
 ```
 
 ## 显式不含的东西
 
 | 不含 | 原因 |
 |---|---|
-| `bugfix_agent/ingest/` | 那是 Agent-1 的 CSV/xlsx 读取 |
-| `bugfix_agent/defect_batch/` | 那是 Agent-1 的蒸馏/筛选/分簇 |
-| `bugfix_agent/http/` | 平台自带 Server，`serve` 子命令用不上 |
-| `bugfix_agent/cli.py` | 平台走图，不走 CLI |
-| `skills/defect-batch-prepare/` | Agent-1 的 skill，与图无关 |
+| `bugfix_agent1/` | Agent-1 的 ingest / defect_batch |
+| `bugfix_platform/http/` | 平台自带 Server，`serve` 子命令用不上 |
+| `bugfix_platform/cli.py` | 平台走图，不走 CLI |
+| `defect-batch-prepare` skill | Agent-1 的 skill，与图无关 |
 | `docs/` `tests/` `test/` | 不参与运行 |
 
 ## 注意
 
 - **不要**在 `graph.py` 或 `langgraph_app.py` 里挂 `InMemorySaver`——持久化由平台负责
-- 改了 `bugfix_agent/workflow/graph.py` 后必须重新打包，平台不会自动跟随
+- 改了 `platform/bugfix_platform/workflow/graph.py` 后必须重新打包，平台不会自动跟随
 
 ## 重新打包
 

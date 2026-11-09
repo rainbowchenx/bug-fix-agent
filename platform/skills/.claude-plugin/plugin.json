@@ -1,0 +1,5 @@
+{
+  "name": "bugfix-platform-skills",
+  "version": "0.2.0",
+  "description": "Builtin skills for Agent-2 cartography and Agent-3 analyze sessions"
+}

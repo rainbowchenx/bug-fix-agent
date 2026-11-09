@@ -58,8 +58,8 @@ agent1-standalone/
 
 | 你想做的事 | 在哪做 |
 |---|---|
-| 改规则 / 修 bug | 仓库 `bugfix_agent/defect_batch/*` |
-| 补列名别名 | 仓库 `bugfix_agent/ingest/field_map.py` |
+| 改规则 / 修 bug | 仓库 `agent1/bugfix_agent1/defect_batch/*` |
+| 补列名别名 | 仓库 `agent1/bugfix_agent1/ingest/field_map.py` |
 | 出新 exe | 仓库根 `python packaging/build.py agent1` |
 
 **不要试图改这个包里的逻辑**——exe 是编译产物，改不了也改不得。行为不对就回仓库修，然后
@@ -68,7 +68,7 @@ agent1-standalone/
 ## 更新流程（唯一真源在仓库）
 
 这个目录是仓库的**构建产物**，不手工维护。改完代码跑一条命令，仓库里的
-`skills/defect-batch-prepare/` + `bugfix_agent/` 会重新打成 exe 并同步过去：
+`agent1/skills/defect-batch-prepare/` + `agent1/bugfix_agent1/` 会重新打成 exe 并同步过去：
 
 ```bash
 python packaging/build.py agent1 --deliver-to <交付目录>
@@ -85,7 +85,7 @@ agent1.exe self-check
 
 ```text
 vendor files : 20
-source       : bugfix_agent (Agent-1 subset: contracts + ingest + defect_batch)
+source       : bugfix-agent (Agent-1: bugfix_contracts + bugfix_agent1)
 commit       : c92cc3a
 copiedAt     : 2026-11-09T06:48:07Z
 mode         : frozen single-file build (hashes not verifiable at runtime)

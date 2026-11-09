@@ -9,14 +9,14 @@ source (CSV/JSON/xlsx)
    defect-batch.json
         │
         ▼
-┌─ LangGraph 父编排（bugfix_agent/workflow）──────────────┐
+┌─ LangGraph 父编排（platform/bugfix_platform/workflow）──┐
 │  validate_batch → Agent-2 → validate → Agent-3 → validate │
 │                      │                    │               │
 │                code-knowledge      analysis-report         │
 └───────────────────────────────────────────────────────────┘
 ```
 
-旧 TypeScript / npm / JS LangGraph 运行时已退役；本仓可执行代码只在 `bugfix_agent/`。
+旧 TypeScript / npm / JS LangGraph 运行时已退役。源码按产品切开：`contracts/`（共享契约）、`agent1/`（图外 CLI + skill）、`platform/`（LangGraph Agent-2/3 + skill）。
 
 ---
 
@@ -24,15 +24,15 @@ source (CSV/JSON/xlsx)
 
 | 组件 | 路径 | 职责 | 成熟度 |
 |------|------|------|--------|
-| 契约 SSOT | `bugfix_agent/contracts/` | Pydantic 校验三段 artifact | ✅ |
-| Agent-1 | `ingest/` + `defect_batch/` + `skills/defect-batch-prepare/` | 图外：入口映射 → 蒸馏 / 筛选 / 分簇 → `defect-batch` | ✅ 规则管线 + skill |
-| Agent-2 | `agents/cartographer/` + `sdk/cartography.py` + `sdk/skill_inject.py` + `skills/code-cartography/` | 仓型探测 + 形态化架构图 + 路径软匹配（候选≤3）+ 仓特异性 overlay skill + 可选 SDK 通读 → `code-knowledge` | 🟡 启发式加厚 + SDK 骨架 |
-| Agent-3 | `agents/analyst/` + `sdk/analyze.py` + `sdk/skill_inject.py` | 路由 + 同一套 overlay skill + 可选 Claude 只读 analyze → `analysis-report` | 🟡 路由+SDK 骨架 |
-| 父编排 | `workflow/` | LangGraph：`validate_batch→agent2→agent3` + 门禁（不含 Agent-1） | ✅ |
-| HTTP（S4） | `http/` | FastAPI：`POST/GET /v1/runs`（入参 `defectBatch`）、`GET /health` | ✅ 兼容壳 |
-| CLI | `cli.py` + `agent1.py` | 8 个子命令全在一处；`main(standalone=True)` 让 exe 只列图外 5 个 | ✅ |
+| 契约 SSOT | `contracts/bugfix_contracts/` | Pydantic 校验三段 artifact；两边唯一共享代码 | ✅ |
+| Agent-1 | `agent1/bugfix_agent1/` + `agent1/skills/defect-batch-prepare/` | 图外：入口映射 → 蒸馏 / 筛选 / 分簇 → `defect-batch` | ✅ 规则管线 + skill |
+| Agent-2 | `platform/bugfix_platform/agents/cartographer/` + `sdk/` + `platform/skills/code-cartography/` | 仓型探测 + 形态化架构图 + 路径软匹配（候选≤3）+ 仓特异性 overlay skill + 可选 SDK 通读 → `code-knowledge` | 🟡 启发式加厚 + SDK 骨架 |
+| Agent-3 | `platform/bugfix_platform/agents/analyst/` + `sdk/` | 路由 + 同一套 overlay skill + 可选 Claude 只读 analyze → `analysis-report` | 🟡 路由+SDK 骨架 |
+| 父编排 | `platform/bugfix_platform/workflow/` | LangGraph：`validate_batch→agent2→agent3` + 门禁（不含 Agent-1） | ✅ |
+| HTTP（S4） | `platform/bugfix_platform/http/` | FastAPI：`POST/GET /v1/runs`（入参 `defectBatch`）、`GET /health` | ✅ 兼容壳 |
+| CLI | `bugfix-agent` / `bugfix-platform` | 两个入口：Agent-1 图外命令 vs 平台 `run` / `serve` | ✅ |
 
-**松耦合约定：** Agent 之间只交换落盘 JSON；禁止跨 Agent import 内部实现或共享 transcript。父图只调用各包公开的 `run_*` + `validate_*`。
+**松耦合约定：** Agent 之间只交换落盘 JSON；禁止跨产品 import。父图只调用各包公开的 `run_*` + `validate_*`。
 
 正式规格：[docs/superpowers/specs/2026-11-03-three-agent-architecture.md](docs/superpowers/specs/2026-11-03-three-agent-architecture.md)
 
@@ -44,7 +44,9 @@ source (CSV/JSON/xlsx)
 # 建议使用 venv
 python3 -m venv .venv && source .venv/bin/activate
 
-pip install -e ".[dev]"     # 核心：pydantic / openpyxl / langgraph + pytest
+pip install -e ".[dev]"     # 两边开发：pydantic / openpyxl / langgraph + pytest
+pip install -e ".[agent1]"  # 只装 Agent-1（openpyxl）
+pip install -e ".[platform]" # 只装平台（langgraph）
 pip install -e ".[sdk]"     # 可选：Agent-2/3 Claude Agent SDK（需本机 Claude Code CLI）
 pip install -e ".[http]"    # 可选：FastAPI + uvicorn（S4）
 ```
@@ -79,7 +81,7 @@ cp .env.example .env
 bugfix-agent preflight --source ./defects.csv
 ```
 
-在 Claude Code 中按 `skills/defect-batch-prepare/`（纯文档）调用规则管线（规则跑完后可用 `apply-review` 回写意图复核），或：
+在 Claude Code 中按 `agent1/skills/defect-batch-prepare/`（纯文档）调用规则管线（规则跑完后可用 `apply-review` 回写意图复核），或：
 
 ```bash
 bugfix-agent prepare-batch \
@@ -109,7 +111,7 @@ bugfix-agent apply-review \
 ### 2）LangGraph 跑 Agent-2→3（需要已有 defect-batch）
 
 ```bash
-bugfix-agent run \
+bugfix-platform run \
   --work-dir ./path/to/target-repos \
   --product-line hc \
   --defect-batch /tmp/defect-batch.json \
@@ -142,7 +144,7 @@ stdout 会打印摘要：`ok` / `stage` / `funnel` / `profile` / `summary`。
 ### 3）HTTP 服务（S4）
 
 ```bash
-bugfix-agent serve --host 127.0.0.1 --port 8787
+bugfix-platform serve --host 127.0.0.1 --port 8787
 ```
 
 ```bash
@@ -174,7 +176,8 @@ curl -sS http://127.0.0.1:8787/health
 ### 4）库调用
 
 ```python
-from bugfix_agent import create_three_agent_graph, run_defect_batch_prepare, run_three_agent_workflow
+from bugfix_agent1 import run_defect_batch_prepare
+from bugfix_platform import create_three_agent_graph, run_three_agent_workflow
 
 batch = run_defect_batch_prepare(
     product_line="hc",
@@ -210,14 +213,14 @@ final = graph.invoke({
 
 ## 打包
 
-同一个仓出两个产物，边界写在 `packaging/build.py`（`AGENT1_FILES` / `PLATFORM_FILES`）：
+同一个仓出两个产物，打包拷整个产品目录（不再维护文件白名单）：
 
 | 产物 | 内容 | 消费者 |
 |---|---|---|
-| `dist/agent1-standalone.zip` | Agent-1 单文件 exe（零依赖，含 openpyxl） | 在图外跑 `prepare-batch` / `apply-review` |
-| `dist/bugfix-agent-platform.zip` | Agent-2/3 + LangGraph，根目录 `graph.py` 暴露 `build_graph()` / `graph` / `main()` | 内部 agent 平台 |
+| `dist/agent1-standalone.zip` | Agent-1 单文件 exe（零依赖，含 openpyxl）+ 自己的 skill | 在图外跑 `prepare-batch` / `apply-review` |
+| `dist/bugfix-agent-platform.zip` | Agent-2/3 + LangGraph + 平台 skill，根目录 `graph.py` 暴露 `build_graph()` / `graph` / `main()` | 内部 agent 平台 |
 
-两侧只共享 `_version.py` + `contracts/` 5 个文件（共 6 项）；平台包不含 `ingest/`、`defect_batch/`，Agent-1 包不含 `agents/`、`workflow/`、`sdk/`。
+两侧只共享 `bugfix_contracts`；平台包不含 `bugfix_agent1` / Agent-1 skill，Agent-1 包不含 `bugfix_platform` / 平台 skill。
 
 ```bash
 python packaging/build.py                 # 两个都打
@@ -230,16 +233,16 @@ python packaging/build.py agent1 --deliver-to /path/to/delivery
 
 exe 的出处用 `agent1.exe self-check` 查（编译自哪个 commit）；**exe 要在提交之后编译**，否则 self-check 报的 commit 落后于 HEAD。
 
-**真源只有本仓。** `skills/defect-batch-prepare/` 只存操作文档（SKILL.md / references / evals）；所有命令实现在 `bugfix_agent/`；打包产物（含 `agent1.exe`）不进版本库，用上面的命令重建。`--deliver-to` 会在同步后逐字节比对交付目录与构建产物，不一致或出现 `.py`/`.pyc` 泄漏都会直接失败。
+**真源只有本仓。** `agent1/skills/defect-batch-prepare/` 只存操作文档（SKILL.md / references / evals）；所有命令实现在 `agent1/bugfix_agent1/`；打包产物（含 `agent1.exe`）不进版本库，用上面的命令重建。`--deliver-to` 会在同步后逐字节比对交付目录与构建产物，不一致或出现 `.py`/`.pyc` 泄漏都会直接失败。
 
 改 skill 行为时：
 
 | 要改的东西 | 改哪里 |
 |---|---|
-| 筛选 / 分簇 / 意图规则 | `bugfix_agent/defect_batch/` |
-| 列名别名、xlsx 解析 | `bugfix_agent/ingest/{field_map,xlsx_source,csv_source}.py` |
-| 执行规程、评测断言 | `skills/defect-batch-prepare/`（SKILL.md / evals） |
-| CLI 子命令、独立入口、双产物打包 | `bugfix_agent/cli.py` · `bugfix_agent/agent1.py` · `packaging/build.py` |
+| 筛选 / 分簇 / 意图规则 | `agent1/bugfix_agent1/defect_batch/` |
+| 列名别名、xlsx 解析 | `agent1/bugfix_agent1/ingest/{field_map,xlsx_source,csv_source}.py` |
+| 执行规程、评测断言 | `agent1/skills/defect-batch-prepare/`（SKILL.md / evals） |
+| CLI 子命令、独立入口、双产物打包 | `agent1/bugfix_agent1/cli.py` · `packaging/build.py` |
 
 ---
 
@@ -248,14 +251,14 @@ exe 的出处用 `agent1.exe self-check` 查（编译自哪个 commit）；**exe
 ```bash
 # 单测（不需要 API key）
 pytest -q
-pytest -q tests/test_workflow.py tests/test_langgraph_workflow.py tests/test_analyze_sdk.py
+pytest -q tests/platform/test_workflow.py tests/platform/test_langgraph_workflow.py tests/platform/test_analyze_sdk.py
 
 # 只验证 Agent-1 漏斗 / 分簇
 bugfix-agent prepare-batch --product-line sample --source ./your.csv --posture alpha --out /tmp/db.json
 python -c "import json;print(json.load(open('/tmp/db.json'))['funnel'])"
 
 # 强制不走 LLM，便于本地联调
-bugfix-agent run ... --analyze-mode heuristic --out-dir /tmp/out
+bugfix-platform run ... --analyze-mode heuristic --out-dir /tmp/out
 
 # 段失败时看 stdout 的 stage / error（agent2|agent3）
 # 注入假 Agent 做单测：run_three_agent_workflow(..., agent2=..., agent3=...)
@@ -271,7 +274,7 @@ SDK analyze 排障：
 
 ## 关键数据契约（v0.1）
 
-详文与样例：[`docs/contracts/v0.1/`](docs/contracts/v0.1/) · 代码 SSOT：`bugfix_agent/contracts/`
+详文与样例：[`docs/contracts/v0.1/`](docs/contracts/v0.1/) · 代码 SSOT：`contracts/bugfix_contracts/`
 
 ```text
 raw-defects  ──Agent-1──►  defect-batch  ──Agent-2──►  code-knowledge  ──Agent-3──►  analysis-report

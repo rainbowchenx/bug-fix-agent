@@ -29,10 +29,10 @@ bugfix-agent prepare-batch \
   --out /tmp/defect-batch.json
 
 # 或先转 JSON
-python3 bugfix_agent/scripts/csv_to_raw_defects.py \
+python3 agent1/bugfix_agent1/scripts/csv_to_raw_defects.py \
   --csv 缺陷拉取/脱敏/PJ14PD20260423284-assignee-87.csv \
   --product-line hc \
   --out /tmp/raw-defects.json
 ```
 
-映射 SSOT：`bugfix_agent/ingest/field_map.py`。
+映射 SSOT：`agent1/bugfix_agent1/ingest/field_map.py`。

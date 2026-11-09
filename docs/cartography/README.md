@@ -68,8 +68,8 @@ hcp 是**管理设备的平台**，调 ISAPI 比设备自身的界面还多。�
 
 ### 2.3 现在的实现：三类中两类是错的
 
-判型 `agents/cartographer/detect.py:detect_cartography_profile()`，
-架构图 `agents/cartographer/architecture.py:_map_*()`。五个真实仓实测：
+判型 `platform/bugfix_platform/agents/cartographer/detect.py:detect_cartography_profile()`，
+架构图 `platform/bugfix_platform/agents/cartographer/architecture.py:_map_*()`。五个真实仓实测：
 
 | 仓 | 真类 | 现有实现判成 | 架构图产出 |
 |---|---|---|---|
