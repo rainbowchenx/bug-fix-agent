@@ -23,7 +23,7 @@ validate_batch → Agent-2 → validate → Agent-3 → validate
 
 设计文档：
 - `docs/superpowers/specs/2026-11-03-three-agent-architecture.md` — 正式架构
-- `docs/cartography/repo-fingerprints.md` — 仓型指纹（micro_frontend 已齐；electron / device_web 待补）
+- `docs/cartography/` — 仓型分析（`README.md` 索引 + 每类一份完整走读：micro-frontend / device-web / electron）
 - `docs/contracts/v0.1/` — 契约
 - `docs/superpowers/specs/2026-10-23-report-agent-decision-followup.md` — 语言栈 / 去 SWE / 退役 TS 决策
 
