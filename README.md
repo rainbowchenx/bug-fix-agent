@@ -202,6 +202,38 @@ final = graph.invoke({
 
 ---
 
+## 打包
+
+同一个仓出两个产物，边界写在 `packaging/build.py`（`AGENT1_FILES` / `PLATFORM_FILES`）：
+
+| 产物 | 内容 | 消费者 |
+|---|---|---|
+| `dist/agent1-standalone.zip` | Agent-1 单文件 exe（零依赖，含 openpyxl） | 在图外跑 `prepare-batch` / `apply-review` |
+| `dist/bugfix-agent-platform.zip` | Agent-2/3 + LangGraph，根目录 `graph.py` 暴露 `build_graph()` / `graph` / `main()` | 内部 agent 平台 |
+
+两侧只共享 5 个 `contracts/` 文件；平台包不含 `ingest/`、`defect_batch/`，Agent-1 包不含 `agents/`、`workflow/`、`sdk/`。
+
+```bash
+python packaging/build.py                 # 两个都打
+python packaging/build.py agent1          # 只打 exe
+python packaging/build.py platform        # 只打平台包
+
+# 构建后直接同步到交付目录（推荐：别手工 cp）
+python packaging/build.py agent1 --deliver-to /path/to/delivery
+```
+
+**真源只有本仓。** `skills/defect-batch-prepare/` 存源码与文档；打包产物（含 `agent1.exe`）不进版本库，用上面的命令重建。`--deliver-to` 会在同步后逐字节比对交付目录与构建产物，不一致或出现 `.py`/`.pyc` 泄漏都会直接失败。
+
+改 skill 行为时：
+
+| 要改的东西 | 改哪里 |
+|---|---|
+| 筛选 / 分簇 / 意图规则 | `bugfix_agent/defect_batch/` |
+| 列名别名、xlsx 解析 | `bugfix_agent/ingest/{field_map,xlsx_source,csv_source}.py` |
+| 执行规程、命令、评测断言 | `skills/defect-batch-prepare/` |
+
+---
+
 ## 调试
 
 ```bash
