@@ -1,10 +1,12 @@
-node_modules/
+# Python 构建产物
 dist/
-*.tgz
-.env
-.env.local
-.DS_Store
-coverage/
+dist-py/
+*.egg-info/
+
+# 防误提交（仓库无 JS 工具链，但保留兜底）
+node_modules/
+
+# Runtime state
 .bugfix-runs/
 *.log
 .codegraph/
@@ -12,10 +14,17 @@ eval/
 
 logs/
 
-# Python
+# 本地环境与密钥
+.env
+.env.local
+
+# Python 缓存 / 虚拟环境
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
-*.egg-info/
-dist-py/
+
+.DS_Store
+
+# 打包中间产物（dist/ 已在上面）
+build/

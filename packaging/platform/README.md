@@ -1,0 +1,88 @@
+# bugfix-agent 平台包（Agent-2 → Agent-3）
+
+上传到公司 agent 平台（支持 LangGraph）用。**不含 Agent-1**——Agent-1 是图外独立的一步，
+它的产物 `defect-batch.json` 作为本图的输入。
+
+```text
+Agent-1（独立 CLI/包）          本平台包
+export.csv ──> defect-batch.json ──> validate_batch ──> agent2 ──> validate_knowledge
+                                                                        │
+                                                          agent3 <──────┘
+                                                            │
+                                                    validate_report ──> analysis-report.json
+```
+
+## 平台要求对照
+
+| 要求 | 本包 |
+|---|---|
+| zip 根目录有 `graph.py` | ✅ `graph.py` |
+| 暴露 `build_graph()` / `graph` / `main()` 之一 | ✅ 三个都暴露，转发到 `bugfix_agent/workflow/langgraph_app.py` |
+| `requirements.txt` | ✅ |
+| `.env`（可选） | ✅ `.env` 留空 + `.env.example` 说明 |
+| 模型配置复用平台「模型管理」 | ✅ `BUGFIX_ANALYZE_MODE` / `BUGFIX_CARTOGRAPHY_MODE` 留空即自动跟随 |
+
+## 依赖
+
+```text
+pydantic>=2.7
+langgraph>=1.0
+```
+
+**不需要** `openpyxl`（那是 Agent-1 的 ingest 用），**不需要** `claude-agent-sdk`
+（`sdk/*.py` 是惰性 import，只有把 mode 显式设成 `sdk` 才用到）。
+
+## 调用
+
+平台用图 id `three_agent`（见 `langgraph.json`）。输入 state：
+
+```json
+{
+  "work_dir": "/repos",
+  "product_line": "PJ14PD20260423284",
+  "posture": "beta",
+  "defect_batch": "<defect-batch.json 的内容或路径>",
+  "open_mr": false
+}
+```
+
+`defect_batch` 必填——`source` 字段已废弃。约束：`skip_agent2` 必须同时 `skip_agent3`。
+
+## 目录
+
+```text
+bugfix-agent-platform.zip
+├── graph.py                    平台入口（build_graph / graph / main）
+├── langgraph.json              three_agent -> ./graph.py:graph
+├── requirements.txt            pydantic + langgraph
+├── .env / .env.example         模式开关留空，跟平台模型管理走
+├── README.md                   本文件
+├── bugfix_agent/               27 个 .py
+│   ├── contracts/              5   契约（与 Agent-1 共享）
+│   ├── agents/                 9   cartographer + analyst
+│   ├── workflow/               7   graph / gates / run / persist / state / langgraph_app
+│   └── sdk/                    6   analyze / cartography / parse / skills / skill_inject
+└── skills/                     8 个分析向 skill（Agent-2/3 运行时依赖）
+```
+
+## 显式不含的东西
+
+| 不含 | 原因 |
+|---|---|
+| `bugfix_agent/ingest/` | 那是 Agent-1 的 CSV/xlsx 读取 |
+| `bugfix_agent/defect_batch/` | 那是 Agent-1 的蒸馏/筛选/分簇 |
+| `bugfix_agent/http/` | 平台自带 Server，`serve` 子命令用不上 |
+| `bugfix_agent/cli.py` | 平台走图，不走 CLI |
+| `skills/defect-batch-prepare/` | Agent-1 的 skill，与图无关 |
+| `docs/` `tests/` `test/` | 不参与运行 |
+
+## 注意
+
+- **不要**在 `graph.py` 或 `langgraph_app.py` 里挂 `InMemorySaver`——持久化由平台负责
+- 改了 `bugfix_agent/workflow/graph.py` 后必须重新打包，平台不会自动跟随
+
+## 重新打包
+
+```bash
+python packaging/build.py platform
+```

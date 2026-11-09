@@ -65,7 +65,7 @@ cp .env.example .env
 | `BUGFIX_CARTOGRAPHY_MODE` | Agent-2：`heuristic` \| `sdk`（有 key 时默认 sdk） |
 | `BUGFIX_SKILLS_DIR` | Agent-2/3 额外 overlay skill 根目录（`os.pathsep` 分隔；与 `--skills-dir` 合并，overlay 优先） |
 
-> 本机若仍有历史 `dist/`、`node_modules/`，可直接删掉（已 gitignore，不是源码）。
+> 本机若仍有历史 `node_modules/`，可直接删掉（TS 时代残留，不是源码；该目录已不随仓库管理）。
 
 ---
 

@@ -1,0 +1,7 @@
+# Agent-2/3 平台侧依赖。
+# 不需要 openpyxl（那是 Agent-1 的 ingest 用），不需要 claude-agent-sdk（按需惰性 import）。
+pydantic>=2.7
+langgraph>=1.0
+
+# 可选：只有把 BUGFIX_ANALYZE_MODE / BUGFIX_CARTOGRAPHY_MODE 设成 sdk 时才需要
+# claude-agent-sdk>=0.1
