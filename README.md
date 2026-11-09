@@ -96,7 +96,7 @@ bugfix-agent apply-review \
 
 - **平台 CSV**（如 `defectTitle` / `describle` / `flowStatusName`）
 - **raw-defects JSON**（见契约）
-- Excel 可先用 `skills/defect-batch-prepare/scripts/xlsx_to_raw_defects.py`（或 `bugfix_agent/scripts/xlsx_to_raw_defects.py`）转 JSON
+- Excel 可先用 `xlsx-to-raw` 转 JSON（`bugfix-agent xlsx-to-raw`；仓库内用 `python skills/defect-batch-prepare/scripts/agent1.py xlsx-to-raw`）
 
 脱敏样本目录：`缺陷拉取/脱敏/`（若已入库）。夹具：`test/fixtures/defect-batch/`。
 

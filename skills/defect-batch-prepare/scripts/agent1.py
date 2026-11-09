@@ -38,20 +38,20 @@ if os.environ.get("AGENT1_USE_INSTALLED") != "1" and _VENDOR.is_dir():
     # 以本目录的副本为准，避免机器上装了旧版包导致结果不一致。
     sys.path.insert(0, str(_VENDOR))
 
-# 同目录的 preflight / xlsx 转换一并入库（纯标准库 + 延迟 import openpyxl）。
+# preflight 是同目录的独立诊断脚本（无第二份拷贝）；xlsx 转换的实现已归位到
+# ingest/xlsx_source.py，与 csv_source.py 对称。
 if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 try:
     import preflight as _preflight
-    import xlsx_to_raw_defects as _xlsx
 except ImportError:  # pragma: no cover - 脚本被单独拷走时
     _preflight = None  # type: ignore[assignment]
-    _xlsx = None  # type: ignore[assignment]
 
 try:
     from bugfix_agent.contracts.defect_batch import DefectBatch, validate_defect_batch
     from bugfix_agent.defect_batch import run_defect_batch_prepare
     from bugfix_agent.defect_batch.review import IntentReviewFile, apply_intent_review
+    from bugfix_agent.ingest import xlsx_source as _xlsx
 except ImportError as e:  # pragma: no cover - 只在目录被裁剪或打包失败时触发
     raise SystemExit(
         f"cannot import bugfix_agent: {e}\n"
@@ -156,7 +156,7 @@ _PASSTHROUGH = {"preflight": (_preflight, "preflight"), "xlsx-to-raw": (_xlsx, "
 
 
 def _run_passthrough(name: str, rest: list[str]) -> int:
-    """把剩余参数原样交给同目录脚本的 main()，避免再抄一份 argparse 定义。"""
+    """把剩余参数原样交给目标模块的 main()，避免再抄一份 argparse 定义。"""
     module, prog = _PASSTHROUGH[name]
     if module is None:
         raise SystemExit(f"{prog} not available in this build")

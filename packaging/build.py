@@ -59,6 +59,7 @@ AGENT1_FILES = _SHARED_CONTRACTS + [
     "ingest/__init__.py",
     "ingest/field_map.py",
     "ingest/csv_source.py",
+    "ingest/xlsx_source.py",
     "ingest/preloaded.py",
     "defect_batch/__init__.py",
     "defect_batch/run.py",
@@ -247,7 +248,7 @@ def build_agent1(skip_exe: bool = False) -> Path:
         shutil.copytree(skill_src / sub, stage / sub)
     scripts = stage / "scripts"
     scripts.mkdir()
-    for name in ("agent1.py", "preflight.py", "xlsx_to_raw_defects.py"):
+    for name in ("agent1.py", "preflight.py"):
         shutil.copy2(skill_src / "scripts" / name, scripts / name)
 
     vendor = scripts / "_vendor" / "bugfix_agent"

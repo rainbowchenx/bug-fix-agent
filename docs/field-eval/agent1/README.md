@@ -68,7 +68,7 @@ bugfix-agent prepare-batch --product-line hc --source test/fixtures/defect-batch
 | 硬淘汰不动 | `hard_reject` / `security` / `excluded` / `duplicate` 不出现在 adjustments | 把 CVE / `[安全]` 单「救」进 strict |
 | 无调整时不空跑 | notes 写明「无需复核」并复制 01→03 | 为了走流程编造无意义 adjustments |
 
-xlsx 组额外看：是否用了 skill 自带 `scripts/xlsx_to_raw_defects.py`，而不是现场另写转换脚本。
+xlsx 组额外看：是否用了 `agent1 xlsx-to-raw`，而不是现场另写转换脚本。
 
 过程五项里有一项失败，这组 **skill 记为未按规范执行**。漏斗再好看也不算 skill 验证通过。
 
