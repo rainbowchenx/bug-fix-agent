@@ -65,6 +65,18 @@ agent1-standalone/
 **不要试图改这个包里的逻辑**——exe 是编译产物，改不了也改不得。行为不对就回仓库修，然后
 重新打包替换。
 
+## 更新流程（唯一真源在仓库）
+
+这个目录是仓库的**构建产物**，不手工维护。改完代码跑一条命令，仓库里的
+`skills/defect-batch-prepare/` + `bugfix_agent/` 会重新打成 exe 并同步过去：
+
+```bash
+python packaging/build.py agent1 --deliver-to <交付目录>
+```
+
+同步完会自动逐字节比对交付目录与 build 产物，并拒绝任何 `.py`/`.pyc` 泄漏。
+两边不一致就不会默默通过。
+
 ## exe 编译自哪个版本
 
 ```bash

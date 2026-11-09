@@ -419,6 +419,61 @@ def _verify_platform(staging: Path) -> None:
 
 # --------------------------------------------------------------------------- #
 
+def sync_delivery(target_root: Path) -> None:
+    """把仓库里构建好的 skill 同步到交付目录。
+
+    唯一真源始终是仓库：改代码、改文档都在 ``skills/defect-batch-prepare/`` 和
+    ``bugfix_agent/`` 里做，然后跑一次 build 同步出去。目标目录只被本函数写，
+    不要手改——手改出来的东西下一次同步会被覆盖，而漏同步会让两边悄悄分叉。
+    """
+    out_root = BUILD / "agent1-standalone"
+    if not (out_root / AGENT1_SKILL).is_dir():
+        raise SystemExit("sync: run `build.py agent1` first; no staging tree found")
+
+    log(f"sync: -> {target_root}")
+    target_root.mkdir(parents=True, exist_ok=True)
+    for name in (AGENT1_SKILL, "README.md"):
+        dst = target_root / name
+        if dst.is_dir():
+            shutil.rmtree(dst)
+        elif dst.exists():
+            dst.unlink()
+        src = out_root / name
+        if src.is_dir():
+            shutil.copytree(src, dst)
+        else:
+            shutil.copy2(src, dst)
+    strip_pycache(target_root)
+    _verify_delivery(out_root, target_root)
+
+
+def _verify_delivery(out_root: Path, target_root: Path) -> None:
+    """交付目录必须与 build 产物逐字节一致，且不留源码。"""
+    def digest(root: Path, names: tuple[str, ...]) -> dict[str, str]:
+        out: dict[str, str] = {}
+        for name in names:
+            base = root / name
+            paths = [base] if base.is_file() else sorted(p for p in base.rglob("*") if p.is_file())
+            for f in paths:
+                out[str(f.relative_to(root)).replace("\\", "/")] = hashlib.sha256(f.read_bytes()).hexdigest()
+        return out
+
+    names = (AGENT1_SKILL, "README.md")
+    want, got = digest(out_root, names), digest(target_root, names)
+    if want != got:
+        only_build = sorted(set(want) - set(got))
+        only_deliv = sorted(set(got) - set(want))
+        diff = sorted(k for k in set(want) & set(got) if want[k] != got[k])
+        raise SystemExit(
+            "sync: delivery does not match the build -- "
+            f"missing={only_build} extra={only_deliv} differing={diff}"
+        )
+    leaked = [k for k in got if k.endswith((".py", ".pyc"))]
+    if leaked:
+        raise SystemExit(f"sync: source leaked into delivery: {leaked}")
+    log(f"  ok: {len(got)} files match the build byte-for-byte")
+
+
 def zip_tree(src: Path, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     n = 0
@@ -434,11 +489,19 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("target", nargs="?", choices=["all", "agent1", "platform"], default="all")
     ap.add_argument("--skip-exe", action="store_true", help="agent1: 只组装脚本，不跑 PyInstaller")
+    ap.add_argument(
+        "--deliver-to",
+        type=Path,
+        default=None,
+        help="agent1: 构建后把 skill 同步到该交付目录（唯一真源仍是仓库）",
+    )
     args = ap.parse_args(argv)
 
     DIST.mkdir(exist_ok=True)
     if args.target in ("all", "agent1"):
         build_agent1(skip_exe=args.skip_exe)
+        if args.deliver_to is not None:
+            sync_delivery(args.deliver_to)
     if args.target in ("all", "platform"):
         build_platform()
     log("done")
