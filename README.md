@@ -30,7 +30,7 @@ source (CSV/JSON/xlsx)
 | Agent-3 | `agents/analyst/` + `sdk/analyze.py` + `sdk/skill_inject.py` | 路由 + 同一套 overlay skill + 可选 Claude 只读 analyze → `analysis-report` | 🟡 路由+SDK 骨架 |
 | 父编排 | `workflow/` | LangGraph：`validate_batch→agent2→agent3` + 门禁（不含 Agent-1） | ✅ |
 | HTTP（S4） | `http/` | FastAPI：`POST/GET /v1/runs`（入参 `defectBatch`）、`GET /health` | ✅ 兼容壳 |
-| CLI | `cli.py` | `prepare-batch`（Agent-1）/ `run`（2→3）/ `serve` | ✅ |
+| CLI | `cli.py` + `agent1.py` | 8 个子命令全在一处；`main(standalone=True)` 让 exe 只列图外 5 个 | ✅ |
 
 **松耦合约定：** Agent 之间只交换落盘 JSON；禁止跨 Agent import 内部实现或共享 transcript。父图只调用各包公开的 `run_*` + `validate_*`。
 
@@ -73,7 +73,13 @@ cp .env.example .env
 
 ### 1）Agent-1（图外：skill / prepare-batch）
 
-在 Claude Code 中按 `skills/defect-batch-prepare/` 调用规则管线（规则跑完后可用 `apply-review` 回写意图复核），或：
+拿到新导出先做列映射体检（出问题先看这里，`ok:true` 但 0 票时第一步）：
+
+```bash
+bugfix-agent preflight --source ./defects.csv
+```
+
+在 Claude Code 中按 `skills/defect-batch-prepare/`（纯文档）调用规则管线（规则跑完后可用 `apply-review` 回写意图复核），或：
 
 ```bash
 bugfix-agent prepare-batch \
@@ -211,7 +217,7 @@ final = graph.invoke({
 | `dist/agent1-standalone.zip` | Agent-1 单文件 exe（零依赖，含 openpyxl） | 在图外跑 `prepare-batch` / `apply-review` |
 | `dist/bugfix-agent-platform.zip` | Agent-2/3 + LangGraph，根目录 `graph.py` 暴露 `build_graph()` / `graph` / `main()` | 内部 agent 平台 |
 
-两侧只共享 5 个 `contracts/` 文件；平台包不含 `ingest/`、`defect_batch/`，Agent-1 包不含 `agents/`、`workflow/`、`sdk/`。
+两侧只共享 `_version.py` + `contracts/` 5 个文件（共 6 项）；平台包不含 `ingest/`、`defect_batch/`，Agent-1 包不含 `agents/`、`workflow/`、`sdk/`。
 
 ```bash
 python packaging/build.py                 # 两个都打
@@ -222,7 +228,9 @@ python packaging/build.py platform        # 只打平台包
 python packaging/build.py agent1 --deliver-to /path/to/delivery
 ```
 
-**真源只有本仓。** `skills/defect-batch-prepare/` 存源码与文档；打包产物（含 `agent1.exe`）不进版本库，用上面的命令重建。`--deliver-to` 会在同步后逐字节比对交付目录与构建产物，不一致或出现 `.py`/`.pyc` 泄漏都会直接失败。
+exe 的出处用 `agent1.exe self-check` 查（编译自哪个 commit）；**exe 要在提交之后编译**，否则 self-check 报的 commit 落后于 HEAD。
+
+**真源只有本仓。** `skills/defect-batch-prepare/` 只存操作文档（SKILL.md / references / evals）；所有命令实现在 `bugfix_agent/`；打包产物（含 `agent1.exe`）不进版本库，用上面的命令重建。`--deliver-to` 会在同步后逐字节比对交付目录与构建产物，不一致或出现 `.py`/`.pyc` 泄漏都会直接失败。
 
 改 skill 行为时：
 
@@ -230,7 +238,8 @@ python packaging/build.py agent1 --deliver-to /path/to/delivery
 |---|---|
 | 筛选 / 分簇 / 意图规则 | `bugfix_agent/defect_batch/` |
 | 列名别名、xlsx 解析 | `bugfix_agent/ingest/{field_map,xlsx_source,csv_source}.py` |
-| 执行规程、命令、评测断言 | `skills/defect-batch-prepare/` |
+| 执行规程、评测断言 | `skills/defect-batch-prepare/`（SKILL.md / evals） |
+| CLI 子命令、独立入口、双产物打包 | `bugfix_agent/cli.py` · `bugfix_agent/agent1.py` · `packaging/build.py` |
 
 ---
 
