@@ -2,39 +2,56 @@
   "skill_name": "defect-batch-prepare",
   "evals": [
     {
+      "id": 0,
+      "prompt": "产品线 PJ01PM20260711040。帮我把这份导出的缺陷列表做成 defect-batch：先走规则筛选分类，再按原文复核意图，复核前后的 JSON 都给我留一份。文件在 E:\\working_code_webfront\\ai\\bug-fix-测试专用缺陷但列表\\PJ01PM20260711040-当前处理人-chensiyu12-Open-全部检出活动-22条.csv",
+      "expected_output": "A validated defect-batch.json produced by prepare-batch directly from the original CSV (22 tickets). Descriptions parse cleanly, so most tickets keep or refine their rule-stage intent.",
+      "files": [
+        "E:\\working_code_webfront\\ai\\bug-fix-测试专用缺陷但列表\\PJ01PM20260711040-当前处理人-chensiyu12-Open-全部检出活动-22条.csv"
+      ],
+      "assertions": [
+        "Ran the bundled `agent1 prepare-batch` rather than re-implementing the R0-R3 screen rules in the conversation",
+        "Ran it against the original export -- no hand-normalized or renamed copy of the CSV was needed to make the funnel work",
+        "The delivered defect-batch JSON passes `validate_defect_batch`",
+        "Reported ticket count equal to the 22 source rows",
+        "Left a pre-review snapshot of the rule output in addition to the final batch",
+        "Read the original CSV `缺陷描述` text before changing any intent value",
+        "Any intent or pool change went through the bundled `agent1 apply-review`; clusterId / clusters[] / funnel were not hand-edited",
+        "No ticket in hard_reject / security / excluded / duplicate was moved by the review step",
+        "Ticket testModule reflects the export's `所属模块` column instead of being `_unmoduled` for every ticket"
+      ]
+    },
+    {
       "id": 1,
-      "prompt": "仓库在 d:\\codeOnly\\bugfixagent。请用缺陷批次准备流程处理 test/fixtures/defect-batch/hc1-raw.json：产品线 hc，姿态 alpha，产出 defect-batch.json。规则跑完后对照原始 JSON 复核意图，把需要改的票写成 review.json 再回写。不要在对话里重写筛选正则。",
-      "expected_output": "A validated defect-batch.json from prepare-batch, plus apply-review if any intent/pool adjustments were needed. Funnel and cluster ids come from the CLI, not hand-edited JSON.",
-      "files": [],
-      "expectations": [
-        "Invoked bugfix-agent prepare-batch (or run_defect_batch_prepare) instead of re-implementing R0-R3 in chat",
-        "Wrote a defect-batch.json that passes validate_defect_batch",
-        "Read original ticket text before changing intent or match-pool",
-        "If adjustments exist, they went through apply-review rather than hand-edited clusterId/funnel",
-        "Did not move tickets out of hard_reject, security, excluded, or duplicate"
+      "prompt": "这是另一批待处理的缺陷，产品线 PJ01PM20260711040，姿态 beta。请做成 defect-batch 并在规则跑完后按原文复核意图，分错了就改，没问题说明为什么不用改。E:\\working_code_webfront\\ai\\bug-fix-测试专用缺陷但列表\\PJ01PM20260711040-当前处理人-luokai16-Open-全项目-56条.csv",
+      "expected_output": "A validated defect-batch.json with 56 tickets, module populated from `测试模块` (not the empty `所属模块`), and a review that corrects keyword-driven intent misses.",
+      "files": [
+        "E:\\working_code_webfront\\ai\\bug-fix-测试专用缺陷但列表\\PJ01PM20260711040-当前处理人-luokai16-Open-全项目-56条.csv"
+      ],
+      "assertions": [
+        "Ran the bundled `agent1 prepare-batch` against the original export, with no hand-normalized copy required",
+        "The delivered defect-batch JSON passes `validate_defect_batch`",
+        "Reported ticket count equal to the 56 source rows",
+        "At least half of the tickets carry a testModule that is neither empty nor `_unmoduled`",
+        "Compared original descriptions before changing intent, not only the distilled observed/expected/steps",
+        "Any change went through the bundled `agent1 apply-review` and the cluster ids were rebuilt rather than hand-written",
+        "Said how many tickets it changed and in which direction"
       ]
     },
     {
       "id": 2,
-      "prompt": "已经有一份规则跑完的 defect-batch.json（和对应的原始导出）。请只做意图复核：描述很乱，不要相信启发式 intent。对照原文判断分类对不对，有问题就回写，没问题就说明为什么不用改。",
-      "expected_output": "Either a review.json applied via apply-review, or an explicit no-change handoff with reasons. No second prepare-batch unless the batch is missing.",
-      "files": [],
-      "expectations": [
-        "Did not re-run the full screen/cluster pipeline unless the batch file was invalid",
-        "Compared original descriptions, not only observed/expected/steps",
-        "Intent values stayed in the closed enum",
-        "clusterId/clusters/funnel were rebuilt by apply-review when anything changed"
-      ]
-    },
-    {
-      "id": 3,
-      "prompt": "老板丢过来一个 xlsx 缺陷列表，要筛选分类后给我 defect-batch。先转成 raw-defects 再走规则，然后再按原文看意图有没有分错。",
-      "expected_output": "xlsx converted with this skill's scripts/xlsx_to_raw_defects.py, then prepare-batch, then optional intent review via apply-review.",
-      "files": [],
-      "expectations": [
-        "Used scripts/xlsx_to_raw_defects.py (skill-bundled), not a one-off converter",
-        "Ran prepare-batch on the converted JSON",
-        "Did not skip intent review just because the spreadsheet converted cleanly"
+      "prompt": "产品线 PJ14PD20260509167，姿态 beta。这份也帮我做一下 defect-batch，然后看看分类对不对。E:\\working_code_webfront\\ai\\bug-fix-测试专用缺陷但列表\\PJ14PD20260509167-当前处理人-weiya5-Open-整机集成测试-26条.csv",
+      "expected_output": "A validated defect-batch.json with 26 tickets. Five of them carry an unfilled platform template as their description; those should sit in needs_info rather than strict, and no intent should be invented for them.",
+      "files": [
+        "E:\\working_code_webfront\\ai\\bug-fix-测试专用缺陷但列表\\PJ14PD20260509167-当前处理人-weiya5-Open-整机集成测试-26条.csv"
+      ],
+      "assertions": [
+        "Ran the bundled `agent1 prepare-batch` against the original export, with no hand-normalized copy required",
+        "The delivered defect-batch JSON passes `validate_defect_batch`",
+        "Reported ticket count equal to the 26 source rows",
+        "Did not promote any ticket into `strict` during review (this export's sparse descriptions do not support a new checkable expectation)",
+        "At least four tickets ended outside `strict` because their description is an unfilled template",
+        "Did not fabricate an intent for a ticket whose description carries no content",
+        "Named the empty-template tickets explicitly instead of only reporting a healthy-looking funnel"
       ]
     }
   ]

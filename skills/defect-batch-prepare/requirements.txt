@@ -1,0 +1,4 @@
+# 只有仓库内跑 `python scripts/agent1.py`（或 `bugfix-agent`）时才需要。
+# 交付包 `agent1.exe` 自带运行时和这两个库，不需要安装任何东西。
+pydantic>=2.7
+openpyxl>=3.1

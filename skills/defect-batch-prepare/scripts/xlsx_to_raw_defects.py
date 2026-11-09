@@ -22,17 +22,26 @@ def _require_openpyxl():
 
 
 ALIASES = {
-    "defectId": ["缺陷ID", "ID", "id"],
+    "defectId": ["缺陷单号", "缺陷ID", "缺陷编号", "ID", "id"],
     "title": ["缺陷标题", "标题", "title"],
     "description": ["缺陷描述", "描述", "description"],
     "status": ["缺陷状态", "状态", "status"],
     "flowStatus": ["流程状态"],
-    "testModule": ["测试模块"],
+    "testModule": ["测试模块", "所属模块"],
     "fieldType": ["类型", "缺陷类型", "type"],
     "severity": ["严重级别", "severity"],
     "createdAt": ["创建时间", "createdAt"],
     "duplicateOf": ["关联重复缺陷编号", "关联缺陷ID", "duplicateOf"],
 }
+
+# 与 bugfix_agent.ingest.field_map 保持单一真源：能 import 就用包的别名表。
+# 两份表曾经漂过一次（都缺 `缺陷单号`），结果所有中文导出映射 0 行。
+try:  # pragma: no cover - 取决于包是否可 import
+    from bugfix_agent.ingest.field_map import FIELD_ALIASES as _PKG_ALIASES
+
+    ALIASES = {k: list(v) for k, v in _PKG_ALIASES.items()}
+except ImportError:
+    pass
 
 
 def pick(header_index: dict[str, int], names: list[str]) -> int | None:
@@ -61,9 +70,13 @@ def convert(xlsx: Path, product_line: str, sheet: str | None, limit: int | None)
         raise SystemExit(f"missing required columns defectId/title in {xlsx}; headers={headers[:20]}")
 
     defects: list[dict[str, Any]] = []
+    seen_rows = 0
     for r in range(2, ws.max_row + 1):
         defect_id = cell_str(ws.cell(r, cols["defectId"] + 1).value)
         title = cell_str(ws.cell(r, cols["title"] + 1).value)
+        if not defect_id and not title:
+            continue
+        seen_rows += 1
         if not defect_id or not title:
             continue
         row: dict[str, Any] = {
@@ -82,6 +95,14 @@ def convert(xlsx: Path, product_line: str, sheet: str | None, limit: int | None)
         if limit is not None and len(defects) >= limit:
             break
     wb.close()
+
+    # 静默 0 行的老毛病：非空表但一条也没转出来。宁可报错也别交空产物。
+    if seen_rows and not defects:
+        raise SystemExit(
+            f"converted 0 of {seen_rows} rows from {xlsx.name}: no row had both an "
+            f"id and a title. Headers={headers}. "
+            "Check the ID/title column names against bugfix_agent/ingest/field_map.py."
+        )
     return {
         "schemaVersion": "0.1.0",
         "productLine": product_line,

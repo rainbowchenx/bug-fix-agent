@@ -1,7 +1,7 @@
 ---
 name: defect-batch-prepare
-description: Prepares defect-batch.json from exported defect lists (CSV, Excel, or JSON) by running the rule funnel, then rereading original ticket text to correct intent and match-pool placement. Use this skill whenever the user asks to 筛选, 分簇, 分类, or 复核缺陷单; convert a 缺陷列表 or 平台导出; run prepare-batch; build or validate defect-batch; or check whether tickets landed in the right pool or intent—even if they do not name this skill.
-compatibility: Requires Python 3.11+, bugfix-agent CLI on PATH, and openpyxl when the source is .xlsx.
+description: Turns an exported defect list (平台 CSV / Excel / JSON) into a validated defect-batch.json by running the rule funnel in code, then rereading the original ticket text to correct intent and match-pool placement. Use this skill whenever the user asks to 筛选, 分簇, 分类, 复核, or 整理缺陷单; convert a 缺陷列表 or 平台导出; run prepare-batch; build or validate defect-batch; or check whether tickets landed in the right pool or intent — even if they never name this skill, never say "defect-batch", and just paste a CSV path and ask 帮我看下这批缺陷.
+compatibility: Needs only the bundled `agent1` CLI — the packaged `scripts/agent1.exe` runs on Windows with no Python, no pip and no network. Python source is not shipped; the executable is the interface.
 metadata:
   profiles: defect-batch
 ---
@@ -10,49 +10,97 @@ metadata:
 
 Turn an exported defect list into a validated `defect-batch.json`.
 
-Screening and L1/L2 keys run in code so the same export yields the same funnel. Ticket descriptions are too irregular for those rules, so after the script finishes, reread the original text and correct intent (and match-pool mistakes).
-
-## Workflow
+Screening and the L1/L2 grouping keys run in code, so the same export always yields the same funnel. Ticket prose is too irregular for those rules, so after the script finishes you reread the original text and correct intent and match-pool mistakes.
 
 ```text
-export → prepare-batch → defect-batch.json
+export → preflight → prepare-batch → defect-batch.json
        → reread originals → review.json → apply-review → defect-batch.json
 ```
 
-CSV and JSON go straight to `prepare-batch`. For `.xlsx`, convert with the script bundled in this skill (needs `openpyxl`):
+## Invoking `agent1`
+
+Every command below is written `agent1 <subcommand>`. Pick the form that exists on your machine —
+they take identical flags and produce identical bytes:
+
+| Where | Invoke as |
+|---|---|
+| This packaged skill | `scripts\agent1.exe <subcommand>` |
+| Repo checkout | `python skills/defect-batch-prepare/scripts/agent1.py <subcommand>` |
+| Repo, package installed | `bugfix-agent <subcommand>` |
+
+Subcommands: `preflight` · `prepare-batch` · `apply-review` · `xlsx-to-raw` · `self-check`.
+
+`agent1 --help` lists them; `agent1 self-check` prints the committed source revision the
+executable was built from, which is what you quote when a result is questioned.
+
+## Why the split exists
+
+The funnel has to be reproducible. If two people run the same export they must get the same pools, otherwise nobody can argue about a ticket's fate. That is why R0–R3 and L1/L2 live in `bugfix_agent/defect_batch/*` and you must not re-derive them in chat — a one-off rewrite drifts from the contract, and the next run will disagree with yours.
+
+Intent (L3) is the opposite problem: it needs to understand what a human meant by 「按钮偏了」, which keyword matching cannot do. So L3 starts as a heuristic and you are the correction layer.
+
+## Step 0 — Preflight before trusting anything
+
+Run this first, every time:
 
 ```bash
-python scripts/xlsx_to_raw_defects.py \
-  --xlsx path/to/export.xlsx --product-line hc --out raw-defects.json
+agent1 preflight --source path/to/export.csv
 ```
 
-mcp/crawler ingest is still stubbed; use a preloaded file.
+It prints the source row count, which column fed each contract field, which columns it could not place, how many descriptions are unfilled templates, and whether the module column mapped.
 
-### 1. Rule funnel
+Read the output before running the funnel:
+
+- **rows mappable < rows in file** → an ID or title column spelling is unknown. Fix the mapping first; see [references/column-aliases.md](references/column-aliases.md).
+- **testModule MISS** → every cluster collapses into `_unmoduled` and the L1 dimension is dead. Say so, and say that clustering quality is limited by the export rather than by the analysis.
+- **description is an unfilled template** → for those tickets there is nothing to name. They belong in `needs_info`; do not fabricate intent for them.
+
+The failure this prevents is silent: an unrecognised ID column used to make `prepare-batch` return `{"ok": true, "tickets": 0}`. `ok: true` means the rules ran, not that the data was read. It now raises instead, but preflight tells you *which column* before you get there.
+
+## Step 1 — Rule funnel
 
 ```bash
-bugfix-agent prepare-batch \
+agent1 prepare-batch \
   --product-line hc \
   --source path/to/export.csv \
   --posture beta \
   --out defect-batch.json
 ```
 
-Do not re-implement R0–R3 or L1/L2 in chat. Those rules encode CVE/SCA, status posture, and module/tag parsing; a one-off rewrite will drift from the contract.
+Use `beta` for a daily batch (only `Open` / `New` survive) and `alpha` when you need to see how historical closed tickets would have been sorted. Getting this backwards makes the funnel meaningless, so if the user has not said which, ask.
 
-Pool meanings, posture, and CSV quirks: [references/reference.md](references/reference.md).
+**Check the count before you read the pools.** `tickets` must equal the source row count from preflight. If it does not, say how many rows were dropped and why — never report a funnel built on a partial read, because the percentage breakdown looks perfectly healthy either way.
 
-### 2. Intent review
+Pool meanings, posture behaviour and platform quirks: [references/reference.md](references/reference.md).
 
-The batch drops the long `description`. Heuristic L3 only matches keywords, so `unclear`, low confidence, `locatable_only`, and `needs_info` often mean "the template did not parse", not "the reporter said nothing". Read the original export next to `title` / `observed` / `expected` / `steps`.
+For `.xlsx`, convert first — the executable carries `openpyxl` itself, nothing to install:
 
-For each change, write what the reporter meant, which closed intent it is, and whether it still belongs in the current match pool.
+```bash
+agent1 xlsx-to-raw \
+  --xlsx path/to/export.xlsx --product-line hc --out raw-defects.json
+```
+
+Then run `prepare-batch --source raw-defects.json` and count again — spreadsheets drop rows in ways CSVs do not (merged cells, blank IDs, a second worksheet).
+
+mcp/crawler ingest is still stubbed; use a preloaded file.
+
+## Step 2 — Intent review
+
+The batch drops the long `description` on purpose: keeping it makes the artifact unreadable at a glance. But that means the JSON carries only `observed` / `expected` / `steps`, and when the template did not parse those are empty for reasons that have nothing to do with the reporter.
+
+So reread the original export next to the distilled fields. Treat `unclear`, low confidence, `locatable_only` and `needs_info` as *suspicions*, not conclusions: they often mean "the template did not parse", not "the reporter said nothing".
+
+For every ticket you change, be able to state: what the reporter actually meant → which closed intent that is → whether it still belongs in the current pool.
 
 Closed intent set: `ui_layout` · `i18n` · `logic` · `data_wrong` · `perf` · `compat` · `config` · `security_scan` · `crash` · `unclear`
 
-Safe to change: `intent` (then `intentSource` becomes `ai`), and `pool` among `strict` / `locatable_only` / `needs_info`. Promoting into `strict` needs `expectQuality` of `explicit` or `inferred`.
+Safe to change: `intent` (which sets `intentSource` to `ai`) and `pool` among `strict` / `locatable_only` / `needs_info`. Promoting into `strict` requires `expectQuality` of `explicit` or `inferred` — a ticket with no checkable expected result cannot be clustered for code localization however clear its intent is.
 
-Leave `hard_reject` / `security` / `excluded` / `duplicate` alone — those are safety and status gates, not language understanding. Leave `testModule` / `titleTag` to the rules so `所属模块` never becomes a path. Do not hand-edit `clusterId` / `clusters[]` / `funnel`; `apply-review` rebuilds them so the file still validates.
+**Give the intent too when you promote.** `apply-review` accepts a pool change with no intent, but the ticket then lands in an `::unclear` cluster and the grouping you just fixed is wasted.
+
+Leave `hard_reject` / `security` / `excluded` / `duplicate` alone in both directions. Those are safety and status gates, not language judgements — a CVE ticket you "rescue" into `strict` because its prose reads like a normal bug is exactly the failure that boundary exists to prevent.
+
+Leave `testModule` / `titleTag` alone *in the batch* — do not hand-edit them, and never derive a module from `所属模块`-style fields by rewriting a ticket. Fixing the source column mapping upstream is a different thing and is encouraged; that is what preflight is for. Do not hand-edit `clusterId` / `clusters[]` / `funnel` either; `apply-review` rebuilds them so the file still validates.
 
 Write only the tickets you are changing:
 
@@ -72,12 +120,16 @@ Write only the tickets you are changing:
 ```
 
 ```bash
-bugfix-agent apply-review \
+agent1 apply-review \
   --batch defect-batch.json \
   --overrides review.json \
   --out defect-batch.json
 ```
 
-If nothing should change, skip `apply-review` and hand off the rule output.
+If nothing should change, skip `apply-review` and hand off the rule output, saying why nothing needed changing. An empty `adjustments` list is a legitimate result; inventing edits to look busy corrupts a file the rules already got right.
+
+## Step 3 — Hand off honestly
+
+Report: total tickets, the funnel, how many tickets you changed and in which direction, and the final file path. If the batch is materially degraded — most modules unknown, most descriptions empty, a large share still `unclear` — say that in the same breath. The next step (code localization) inherits whatever you paper over, and it cannot tell a real `unclear` from one you created.
 
 Command variants: [references/examples.md](references/examples.md). Output shape: `docs/contracts/v0.1/defect-batch-guide.md`.

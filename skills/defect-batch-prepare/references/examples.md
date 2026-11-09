@@ -1,28 +1,20 @@
 # Examples
 
-## Preloaded JSON
-
-```python
-from bugfix_agent import run_defect_batch_prepare
-
-batch = run_defect_batch_prepare(
-    product_line="demo",
-    posture="beta",
-    source="./raw-defects.json",
-)
-print(batch.funnel, len(batch.clusters))
-```
+Commands are written `agent1 <subcommand>`. In this packaged skill that is
+`scripts\agent1.exe <subcommand>`; in a repo checkout it is
+`python skills/defect-batch-prepare/scripts/agent1.py <subcommand>`, or
+`bugfix-agent <subcommand>` when the package is installed. Flags are identical.
 
 ## CSV export → batch → intent review
 
 ```bash
-bugfix-agent prepare-batch \
+agent1 prepare-batch \
   --product-line hc \
   --source 缺陷拉取/脱敏/export.csv \
   --posture beta \
   --out defect-batch.json
 
-bugfix-agent apply-review \
+agent1 apply-review \
   --batch defect-batch.json \
   --overrides review.json \
   --out defect-batch.json
@@ -32,11 +24,32 @@ bugfix-agent apply-review \
 
 ## Excel export
 
-Run from this skill directory (or pass the skill-relative path):
-
 ```bash
-python scripts/xlsx_to_raw_defects.py \
+agent1 xlsx-to-raw \
   --xlsx path/to/缺陷列表.xlsx \
   --product-line hc \
   --out raw-defects.json
+```
+
+Then `agent1 prepare-batch --source raw-defects.json`. Spreadsheets drop rows in ways CSVs do not
+(merged cells, blank IDs, a second worksheet), so count again.
+
+## Historical batch
+
+`--posture alpha` keeps closed tickets in the functional funnel — use it to see how a past export
+*would* have been sorted, not to decide today's queue.
+
+```bash
+agent1 prepare-batch --product-line hc --source old.csv --posture alpha --out historical.json
+```
+
+## Python API (repo checkout only)
+
+The executable exposes no Python API. From a checkout with the package installed:
+
+```python
+from bugfix_agent import run_defect_batch_prepare
+
+batch = run_defect_batch_prepare(product_line="demo", posture="beta", source="./raw-defects.json")
+print(batch.funnel, len(batch.clusters))
 ```
