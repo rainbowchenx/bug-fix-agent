@@ -6,6 +6,23 @@ from pathlib import Path
 
 from bugfix_contracts.code_knowledge import CartographyProfile, RepoRoot, SpecEntry
 
+_ALLOWED_PROFILES = {"electron_node", "micro_frontend", "device_web", "unknown"}
+
+
+def normalize_cartography_profile(value: str | None) -> CartographyProfile:
+    """调用方给定的仓型；空值视为 ``unknown``，不猜测。"""
+    if value is None:
+        return "unknown"
+    text = str(value).strip()
+    if not text:
+        return "unknown"
+    if text not in _ALLOWED_PROFILES:
+        raise ValueError(
+            "unsupported cartographyProfile "
+            f"{value!r}; expected electron_node|micro_frontend|device_web|unknown"
+        )
+    return text  # type: ignore[return-value]
+
 
 def discover_repo_roots(work_dir: str | Path) -> list[RepoRoot]:
     root = Path(work_dir)
@@ -79,7 +96,6 @@ def detect_cartography_profile(
     frameworks: set[str] = set()
     languages: set[str] = set()
     hints: list[str] = []
-    profile: CartographyProfile = "unknown"
     root = Path(work_dir)
 
     for rr in repo_roots:
@@ -93,13 +109,12 @@ def detect_cartography_profile(
 
         if pkg:
             languages.update({"typescript", "javascript"})
-        if "electron" in deps or "electron-builder" in deps or "electron-vite" in deps:
-            profile = "electron_node"
+        if "electron" in deps:
             frameworks.add("electron")
             hints.append(f"{rr.path}:electron")
+        elif "vite-plugin-electron" in deps:
+            hints.append(f"{rr.path}:vite-plugin-electron-only")
         if "single-spa" in deps or "@single-spa/devtools" in deps:
-            if profile == "unknown":
-                profile = "micro_frontend"
             frameworks.add("single-spa")
             hints.append(f"{rr.path}:single-spa")
         if "vue" in deps or "vue-router" in deps:
@@ -114,20 +129,22 @@ def detect_cartography_profile(
         except OSError:
             continue
         if any(re.search(r"bridge|jsbridge|device-web|webview", n, re.I) for n in names):
-            if profile == "unknown":
-                profile = "device_web"
             hints.append(f"{rr.path}:device-bridge-path")
+        if (abs_path / "src" / "main-pc.js").is_file() and (
+            abs_path / "src" / "main-mobile.js"
+        ).is_file():
+            hints.append(f"{rr.path}:dual-entry")
 
     if not languages:
         languages.add("unknown")
 
     return (
-        profile,
+        "unknown",
         hints,
         {
             "languages": sorted(languages),
             "frameworks": sorted(frameworks),
-            "notes": "no strong cartography signal" if profile == "unknown" else "",
+            "notes": "cartographyProfile is caller-supplied; detect only records stack hints",
         },
     )
 

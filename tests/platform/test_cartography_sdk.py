@@ -63,6 +63,7 @@ def test_heuristic_cartography_annotates(monkeypatch, tmp_path: Path):
         work_dir=work,
         defect_batch=_batch(),
         cartography_mode="heuristic",
+        cartography_profile="electron_node",
     )
     assert "heuristic mode" in knowledge.architecture.summary
     assert knowledge.cartographyProfile == "electron_node"

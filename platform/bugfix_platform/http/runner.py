@@ -99,6 +99,8 @@ def enqueue_run(
                 "analyze_mode": opts.analyzeMode,
                 "cartography_mode": opts.cartographyMode,
             }
+            if opts.cartographyProfile:
+                call_kwargs["cartography_profile"] = opts.cartographyProfile
             if opts.skillsDirs:
                 call_kwargs["extra_skill_dirs"] = list(opts.skillsDirs)
             # 内置 LangGraph runner：渐进落盘 + 阶段流式。

@@ -1,0 +1,9 @@
+[submodule "src/Person"]
+	path = src/Person
+	url = git@example.com:Person.git
+[submodule "src/AppA"]
+	path = src/AppA
+	url = git@example.com:AppA.git
+[submodule "src/AppB"]
+	path = src/AppB
+	url = git@example.com:AppB.git

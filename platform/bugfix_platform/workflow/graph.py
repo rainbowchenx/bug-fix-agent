@@ -148,16 +148,15 @@ def create_three_agent_graph(
             call_kwargs["cartography_mode"] = state["cartography_mode"]
         if state.get("extra_skill_dirs"):
             call_kwargs["extra_skill_dirs"] = state["extra_skill_dirs"]
+        if state.get("cartography_profile"):
+            call_kwargs["cartography_profile"] = state["cartography_profile"]
         try:
             knowledge = cartographer(**call_kwargs)
         except TypeError:
-            # 单测注入的桩可能不接受 cartography_mode / extra_skill_dirs。
-            call_kwargs.pop("cartography_mode", None)
-            try:
-                knowledge = cartographer(**call_kwargs)
-            except TypeError:
-                call_kwargs.pop("extra_skill_dirs", None)
-                knowledge = cartographer(**call_kwargs)
+            # 单测注入的桩可能只接受 work_dir + defect_batch。
+            knowledge = cartographer(
+                work_dir=state["work_dir"], defect_batch=batch
+            )
         # 未预期异常向上抛，交给 RetryPolicy；出口 schema 由 validate_knowledge 把关。
         raw = knowledge.model_dump() if hasattr(knowledge, "model_dump") else knowledge
         return {

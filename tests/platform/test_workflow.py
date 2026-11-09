@@ -30,6 +30,7 @@ def test_workflow_e2e(tmp_path: Path):
         posture="alpha",
         defect_batch=defect_batch_from_hc1(),
         open_mr=False,
+        cartography_profile="electron_node",
     )
     assert result.ok is True
     assert result.artifacts.defect_batch is not None

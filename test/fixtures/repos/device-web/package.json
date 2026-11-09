@@ -1,0 +1,7 @@
+{
+  "name": "web5.0-framework",
+  "dependencies": {},
+  "autoDependencies": {
+    "hui-intl": "3.1.9"
+  }
+}

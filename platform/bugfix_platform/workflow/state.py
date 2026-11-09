@@ -31,6 +31,9 @@ class ThreeAgentState(TypedDict):
     skip_agent3: bool
     analyze_mode: NotRequired[Literal["heuristic", "sdk"]]
     cartography_mode: NotRequired[Literal["heuristic", "sdk"]]
+    cartography_profile: NotRequired[
+        Literal["electron_node", "micro_frontend", "device_web", "unknown"]
+    ]
     extra_skill_dirs: NotRequired[list[str]]
     """Agent-2/3 额外 overlay skill 根目录（与仓内 / .bugfix 合并；overlay 优先）。"""
 

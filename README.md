@@ -116,6 +116,7 @@ bugfix-platform run \
   --product-line hc \
   --defect-batch /tmp/defect-batch.json \
   --posture alpha \
+  --cartography-profile micro_frontend \
   --cartography-mode heuristic \
   --skills-dir ./line-skills \
   --analyze-mode heuristic \
@@ -135,6 +136,7 @@ stdout 会打印摘要：`ok` / `stage` / `funnel` / `profile` / `summary`。
 | 参数 | 含义 |
 |------|------|
 | `--posture alpha\|beta` | beta 时非 Open/New 更易进 `excluded` |
+| `--cartography-profile electron_node\|micro_frontend\|device_web\|unknown` | Agent-2 仓型（调用方给定，不探测；省略则为 `unknown`） |
 | `--cartography-mode heuristic\|sdk` | Agent-2 enrich 模式 |
 | `--skills-dir DIR` | Agent-2/3 注入仓特异性 skill（可重复；overlay 优先于包内置；见 `docs/prompts/agent2/`） |
 | `--analyze-mode heuristic\|sdk` | Agent-3 enrich 模式 |
@@ -159,6 +161,7 @@ curl -sS -X POST http://127.0.0.1:8787/v1/runs \
     "options": {
       "analyzeMode": "heuristic",
       "cartographyMode": "heuristic",
+      "cartographyProfile": "micro_frontend",
       "skillsDirs": ["./line-skills"]
     }
   }'
@@ -189,6 +192,7 @@ result = run_three_agent_workflow(
     product_line="hc",
     defect_batch=batch,
     posture="alpha",
+    cartography_profile="micro_frontend",
     analyze_mode="heuristic",
     extra_skill_dirs=["./line-skills"],
 )

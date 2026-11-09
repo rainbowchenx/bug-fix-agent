@@ -1,0 +1,6 @@
+{
+  "name": "web",
+  "dependencies": {
+    "vue": "3.3.0"
+  }
+}

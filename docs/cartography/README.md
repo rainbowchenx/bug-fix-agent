@@ -1,7 +1,8 @@
 # 仓型分析 · 索引
 
-Agent-2 第一步是**判仓型**，再按仓型画架构图、做路径软匹配。这份目录记录每一类的
-**完整分析**——逐仓走读、结构证据、发现的疑点，判据只是其中一章。
+Agent-2 **不再判仓型**：`cartographyProfile` 由调用方传入（`--cartography-profile` /
+`options.cartographyProfile`）。这份目录是类型已知之后的**读码地图**——每类该先打开哪些
+清单、缺陷沿哪条边跳。评测夹具在 `test/fixtures/repos/`（`pytest tests/platform/test_cartography_eval.py`）。
 
 | 文档 | 类型 | 样本 | 状态 |
 |---|---|---|---|

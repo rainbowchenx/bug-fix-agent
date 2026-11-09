@@ -4,7 +4,13 @@ import re
 from pathlib import Path
 from typing import Literal
 
-from bugfix_contracts.code_knowledge import DefectCodeMatch, MatchCandidate, RepoRoot
+from bugfix_contracts.code_knowledge import (
+    Architecture,
+    CartographyProfile,
+    DefectCodeMatch,
+    MatchCandidate,
+    RepoRoot,
+)
 from bugfix_contracts.defect_batch import BatchTicket
 
 SKIP_DIRS = {
@@ -44,6 +50,20 @@ _SRC_HINT_RE = re.compile(
 )
 
 # Intent / filler tokens that match too many paths if used as substrings.
+_CAPABILITY_TOKENS = {
+    "雨刷",
+    "灰掉",
+    "能力",
+    "鱼眼",
+    "除冰",
+    "球机",
+    "wiper",
+    "ptz",
+    "fisheye",
+    "deicing",
+}
+_MOBILE_TOKENS = {"h5", "mobile", "手机", "移动"}
+_PC_TOKENS = {"pc", "客户端"}
 _STOP_TOKENS = {
     "the",
     "and",
@@ -250,6 +270,140 @@ def _score_file(rel: str, toks: list[str]) -> tuple[int, str] | None:
     return strength, why
 
 
+def _norm_path(rel: str) -> str:
+    return rel.replace("\\", "/").lstrip("./").lower()
+
+
+def _under(rel: str, prefix: str | None) -> bool:
+    if not prefix:
+        return False
+    path = _norm_path(rel)
+    base = _norm_path(prefix)
+    return path == base or path.startswith(base.rstrip("/") + "/")
+
+
+def _ticket_needles(ticket: BatchTicket, toks: list[str]) -> list[str]:
+    extra: list[str] = []
+    for value in (ticket.testModule, ticket.titleTag, ticket.title):
+        if value:
+            extra.append(value.strip().lower())
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in toks + extra:
+        if item and item not in seen:
+            seen.add(item)
+            out.append(item)
+    return out
+
+
+def _architecture_bonus(
+    rel: str,
+    ticket: BatchTicket,
+    toks: list[str],
+    profile: CartographyProfile | None,
+    architecture: Architecture | None,
+    bindings: list[dict] | None,
+) -> tuple[int, str] | None:
+    """Type-specific ranking on top of token hits; may score a file with no token hit."""
+    if architecture is None and not bindings:
+        return None
+    needles = _ticket_needles(ticket, toks)
+    bonus = 0
+    why_parts: list[str] = []
+    modules = list(architecture.modules) if architecture is not None else []
+    entries = list(architecture.entryPoints) if architecture is not None else []
+
+    if profile == "micro_frontend":
+        for mod in modules:
+            if mod.role != "micro_app" or not mod.path:
+                continue
+            names = { (mod.id or "").lower(), Path(mod.path).name.lower() }
+            if any(n in names or n in (mod.notes or "").lower() for n in needles):
+                if _under(rel, mod.path):
+                    bonus += 260
+                    why_parts.append(f'micro_app "{mod.id}"')
+                else:
+                    bonus -= 35
+        if any(tok in _MOBILE_TOKENS or tok == "h5" for tok in needles):
+            if "/mobile/" in _norm_path(rel) or _norm_path(rel).endswith("mobile/init.js"):
+                bonus += 90
+                why_parts.append("h5/mobile fork")
+            elif "/init/" in _norm_path(rel) and "/mobile/" not in _norm_path(rel):
+                bonus -= 40
+        for mod in modules:
+            if mod.role == "shared_kernel" and _under(rel, mod.path):
+                if ticket.testModule and ticket.testModule.lower() in {"common", "共享"}:
+                    bonus += 40
+                    why_parts.append("shared_kernel")
+
+    if profile == "device_web":
+        cap = any(tok in _CAPABILITY_TOKENS for tok in needles)
+        # title may contain capability chars not split as tokens
+        title = (ticket.title or "") + (ticket.titleTag or "")
+        if any(word in title for word in _CAPABILITY_TOKENS):
+            cap = True
+        for mod in modules:
+            if mod.role == "device_capability" and _under(rel, mod.path):
+                if cap:
+                    bonus += 320
+                    why_parts.append("device.js capability")
+                else:
+                    bonus += 40
+                    why_parts.append("device.js")
+        mobile = any(tok in _MOBILE_TOKENS for tok in needles)
+        pc = any(tok in _PC_TOKENS for tok in needles)
+        path_l = _norm_path(rel)
+        if mobile:
+            if "mobile" in path_l:
+                bonus += 120
+                why_parts.append("mobile fork")
+            if "main-pc" in path_l or path_l.endswith("router/pc.js"):
+                bonus -= 50
+        if pc and "mobile" in path_l:
+            bonus -= 50
+        for ep in entries:
+            if _under(rel, ep) or _norm_path(rel) == _norm_path(ep):
+                bonus += 70
+                why_parts.append("dual-entry")
+
+    if profile == "electron_node":
+        intent = (ticket.intent or "").lower()
+        for mod in modules:
+            if not mod.path:
+                continue
+            if mod.role == "ipc_domain" and (
+                (mod.id or "").lower().replace("ipc:", "") in needles
+                or (mod.notes or "").lower() in {f"prefix={n}" for n in needles}
+                or any(n in (mod.id or "").lower() or n in _norm_path(mod.path) for n in needles)
+            ):
+                if _under(rel, mod.path):
+                    bonus += 280
+                    why_parts.append(f'ipc "{mod.id}"')
+            if intent in {"ui_layout", "i18n"} and mod.role == "renderer":
+                if _under(rel, mod.path) or _norm_path(rel).startswith("web/src/"):
+                    bonus += 90
+                    why_parts.append("renderer UI")
+            if intent == "crash" and mod.role == "main" and _under(rel, mod.path):
+                bonus += 90
+                why_parts.append("main crash")
+            if mod.role == "driver_asset" and _under(rel, mod.path):
+                if any(n in {"driver", "驱动", "设备"} for n in needles):
+                    bonus += 200
+                    why_parts.append("driver_asset")
+        for bind in bindings or []:
+            if bind.get("kind") != "ipc":
+                continue
+            prefix = str(bind.get("prefix") or "").lower()
+            bind_path = bind.get("path")
+            if prefix and prefix in needles and bind_path and _under(rel, str(bind_path)):
+                bonus += 50
+                why_parts.append(f'ipc prefix "{prefix}"')
+
+    if bonus == 0:
+        return None
+    return bonus, "+".join(why_parts) or "architecture"
+
+
 def match_tickets(
     work_dir: str | Path,
     repo_roots: list[RepoRoot],
@@ -257,12 +411,16 @@ def match_tickets(
     *,
     code_graph: bool = False,
     max_files: int = MAX_FILES_DEFAULT,
+    profile: CartographyProfile | None = None,
+    architecture: Architecture | None = None,
+    bindings: list[dict] | None = None,
 ) -> list[DefectCodeMatch]:
     """Soft-localize tickets by ranked path tokens (large-repo safe).
 
+    When ``architecture`` / ``profile`` are provided, type-specific indexes
+    (micro-app dirs, PC/mobile fork, device.js, IPC prefix) boost ranking.
     Does **not** stop after the first walk hits — scores all scanned files and
-    keeps the top ``MAX_CANDIDATES``. Test/fixture paths are penalized; src/pkg
-    layouts are preferred. File scan soft-cap defaults to 50k (not 800).
+    keeps the top ``MAX_CANDIDATES``. File scan soft-cap defaults to 50k.
     """
     root = Path(work_dir)
     files_by_root = {
@@ -277,8 +435,20 @@ def match_tickets(
                 for f in files_by_root.get(rr.path, []):
                     hit = _score_file(f, toks)
                     if hit is None:
-                        continue
-                    strength, why = hit
+                        arch_only = _architecture_bonus(
+                            f, t, toks, profile, architecture, bindings
+                        )
+                        if arch_only is None:
+                            continue
+                        strength, why = arch_only
+                    else:
+                        strength, why = hit
+                        bonus = _architecture_bonus(
+                            f, t, toks, profile, architecture, bindings
+                        )
+                        if bonus is not None:
+                            strength += bonus[0]
+                            why = f"{why}+{bonus[1]}"
                     scored.append(
                         (
                             strength,

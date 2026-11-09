@@ -1,0 +1,8 @@
+{
+  "name": "simple-single-spa-webpack-example",
+  "dependencies": {
+    "vue": "2.6.14",
+    "single-spa": "3.8.1",
+    "single-spa-vue": "1.0.0"
+  }
+}

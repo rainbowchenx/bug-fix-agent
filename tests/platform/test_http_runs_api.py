@@ -64,6 +64,35 @@ def test_create_and_get_run_sync(tmp_path: Path):
     assert status["schemaVersion"] == "3-agent-0.1"
 
 
+def test_create_run_forwards_cartography_profile(tmp_path: Path):
+    work = tmp_path / "w"
+    work.mkdir()
+    captured: dict = {}
+
+    def fake_workflow(**kwargs):
+        captured.update(kwargs)
+        return ThreeAgentWorkflowResult(ok=True, stage="done", artifacts=WorkflowArtifacts())
+
+    app = create_app(workflow_fn=fake_workflow, background=False)
+    client = TestClient(app)
+    created = client.post(
+        "/v1/runs",
+        json={
+            "workDir": str(work),
+            "productLine": "hc",
+            "defectBatch": minimal_defect_batch().model_dump(),
+            "posture": "alpha",
+            "options": {
+                "skipAgent2": True,
+                "skipAgent3": True,
+                "cartographyProfile": "device_web",
+            },
+        },
+    )
+    assert created.status_code == 202
+    assert captured.get("cartography_profile") == "device_web"
+
+
 def test_get_run_404(tmp_path: Path):
     app = create_app(background=False)
     client = TestClient(app)

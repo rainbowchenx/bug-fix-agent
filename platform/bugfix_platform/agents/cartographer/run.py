@@ -8,6 +8,7 @@ from bugfix_platform.agents.cartographer.architecture import map_architecture
 from bugfix_platform.agents.cartographer.detect import (
     detect_cartography_profile,
     discover_repo_roots,
+    normalize_cartography_profile,
     read_conventions,
 )
 from bugfix_platform.agents.cartographer.match import filter_existing_candidates, match_tickets
@@ -18,7 +19,7 @@ from bugfix_contracts import (
     is_match_pool,
     validate_code_knowledge,
 )
-from bugfix_contracts.code_knowledge import SpecAtlas, SpecEntry
+from bugfix_contracts.code_knowledge import Architecture, CartographyProfile, SpecAtlas, SpecEntry
 from bugfix_platform.sdk.cartography import (
     CartographyRequest,
     CartographyRunner,
@@ -35,15 +36,18 @@ def run_cartographer(
     cartography_mode: Optional[str] = None,
     extra_skill_dirs: Optional[Sequence[str | Path]] = None,
     cartography_fn: Optional[CartographyRunner] = None,
+    cartography_profile: Optional[str] = None,
 ) -> CodeKnowledge:
     """Agent-2 公开入口：产出供 Agent-3 消费的 ``code-knowledge``。
 
     管线（禁止跨 Agent import）::
 
-        发现仓根 → 探测 profile/技术栈 → 形态化架构图 → 启发式路径匹配
-            →（可选）Claude SDK 加厚 → validate_code_knowledge
+        发现仓根 → 采用调用方 cartographyProfile → 按类型读清单建图
+            → 吃图的路径匹配 →（可选）Claude SDK 加厚
+            → validate_code_knowledge
 
-    软匹配只是起点提示；Agent-3 可改写定位结论。
+    软匹配只是起点提示；Agent-3 可改写定位结论。仓型**不探测**：由
+    ``cartography_profile`` 输入；缺省为 ``unknown``。
 
     Args:
         work_dir: 目标代码根（其下可有多个仓）。
@@ -55,32 +59,63 @@ def run_cartographer(
             ``cartography`` / ``bugfix``，以及 ``.bugfix`` / 显式目录里未写
             profiles 的 skill。
         cartography_fn: 可注入的 ``CartographyRunner``（测试用）。
+        cartography_profile: 调用方给定的仓型
+            ``electron_node`` / ``micro_frontend`` / ``device_web`` /
+            ``unknown``。不传则 ``unknown``，不猜测。
 
     Returns:
         通过 ``validate_code_knowledge`` 的 ``CodeKnowledge``。
     """
     work_dir = str(work_dir)
+    profile: CartographyProfile = normalize_cartography_profile(cartography_profile)
     # 1) 扫描目标 workDir 结构（支持多根 monorepo）。
     repo_roots = discover_repo_roots(work_dir)
-    profile, hints, tech = detect_cartography_profile(work_dir, repo_roots)
+    _ignored, hints, tech = detect_cartography_profile(work_dir, repo_roots)
+    if profile != "unknown":
+        hints = [f"caller:{profile}", *hints]
+        tech = dict(tech)
+        tech["notes"] = f"profile={profile} (caller-supplied)"
     conventions = read_conventions(work_dir, repo_roots)
     injected = discover_cartography_skills(work_dir, repo_roots, extra_skill_dirs)
     bound_skills, atlas_entries = _bind_injected_skills(
         work_dir, conventions, injected
     )
-    arch_summary, entry_points, modules = map_architecture(work_dir, repo_roots, profile)
+    mapped = map_architecture(work_dir, repo_roots, profile)
+    architecture = Architecture(
+        summary=mapped.summary,
+        entryPoints=mapped.entry_points,
+        modules=mapped.modules,
+    )
 
     # 2) 对匹配池票做软定位（strict / locatable_only / needs_info）。
     match_list = [t for t in defect_batch.tickets if is_match_pool(t.pool)]
     code_graph = bool(conventions["codeGraph"])
     defect_code_matches = filter_existing_candidates(
         work_dir,
-        match_tickets(work_dir, repo_roots, match_list, code_graph=code_graph),
+        match_tickets(
+            work_dir,
+            repo_roots,
+            match_list,
+            code_graph=code_graph,
+            profile=profile,
+            architecture=architecture,
+            bindings=mapped.bindings,
+        ),
         code_graph=code_graph,
     )
 
     partial = profile == "unknown" or all(len(m.candidates) == 0 for m in defect_code_matches)
 
+    atlas = SpecAtlas(
+        frameworkId=conventions["frameworkId"],
+        entries=atlas_entries,
+        bindings=mapped.bindings,
+    )
+    arch_summary = (
+        mapped.summary
+        if profile == "unknown"
+        else f"{mapped.summary} across {len(repo_roots)} repo root(s)"
+    )
     baseline = validate_code_knowledge(
         {
             "schemaVersion": CODE_KNOWLEDGE_SCHEMA_VERSION,
@@ -93,23 +128,16 @@ def run_cartographer(
             "secondaryHints": hints,
             "techStack": tech,
             "architecture": {
-                "summary": (
-                    arch_summary
-                    if profile == "unknown"
-                    else f"{arch_summary} across {len(repo_roots)} repo root(s)"
-                ),
-                "entryPoints": entry_points,
-                "modules": [m.model_dump() for m in modules],
+                "summary": arch_summary,
+                "entryPoints": architecture.entryPoints,
+                "modules": [m.model_dump() for m in architecture.modules],
             },
             "conventions": {
                 "fromClaudeMd": conventions["fromClaudeMd"][:30],
                 "fromRules": conventions["fromRules"],
             },
             "boundSkills": bound_skills,
-            "specAtlas": SpecAtlas(
-                frameworkId=conventions["frameworkId"],
-                entries=atlas_entries,
-            ).model_dump(),
+            "specAtlas": atlas.model_dump(),
             "capabilities": {
                 "codeGraph": code_graph,
                 "runtimeVerify": False,

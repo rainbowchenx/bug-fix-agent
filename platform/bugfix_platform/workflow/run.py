@@ -76,6 +76,9 @@ def run_three_agent_workflow(
     skip_agent3: bool = False,
     analyze_mode: Optional[Literal["heuristic", "sdk"]] = None,
     cartography_mode: Optional[Literal["heuristic", "sdk"]] = None,
+    cartography_profile: Optional[
+        Literal["electron_node", "micro_frontend", "device_web", "unknown"]
+    ] = None,
     extra_skill_dirs: Optional[Sequence[str | Path]] = None,
     agent2: Optional[CartographerFn] = None,
     agent3: Optional[AnalystFn] = None,
@@ -87,6 +90,7 @@ def run_three_agent_workflow(
     """父编排入口：校验 defect-batch → Agent-2 → Agent-3。
 
     - ``defect_batch``：图外 Agent-1 产物（路径 / dict / ``DefectBatch``）。
+    - ``cartography_profile``：Agent-2 仓型（调用方给定，不探测）。
     - ``extra_skill_dirs``：Agent-2/3 额外 overlay skill 根目录（两边共用，overlay 优先）。
     - ``artifact_dir``：每个门禁成功后渐进写 JSON。
     - ``thread_id`` / ``checkpointer``：持久化执行（仅给 ``thread_id`` 时
@@ -128,6 +132,8 @@ def run_three_agent_workflow(
         initial["analyze_mode"] = analyze_mode
     if cartography_mode is not None:
         initial["cartography_mode"] = cartography_mode
+    if cartography_profile is not None:
+        initial["cartography_profile"] = cartography_profile
     if extra_skill_dirs:
         initial["extra_skill_dirs"] = [str(p) for p in extra_skill_dirs]
     if artifact_dir is not None:

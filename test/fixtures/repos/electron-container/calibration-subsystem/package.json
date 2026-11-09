@@ -1,0 +1,8 @@
+{
+  "name": "koa-template",
+  "main": "dist/index.js",
+  "dependencies": {
+    "koa": "2.14.0",
+    "vite-plugin-electron": "0.11.2"
+  }
+}

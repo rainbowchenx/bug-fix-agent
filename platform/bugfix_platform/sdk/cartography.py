@@ -228,13 +228,7 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
 def _merge_enrichment(baseline: CodeKnowledge, parsed: dict[str, Any]) -> dict[str, Any]:
     data = baseline.model_dump()
     # Optional top-level overrides that stay within schema.
-    if parsed.get("cartographyProfile") in (
-        "electron_node",
-        "micro_frontend",
-        "device_web",
-        "unknown",
-    ):
-        data["cartographyProfile"] = parsed["cartographyProfile"]
+    # cartographyProfile is caller-supplied; never let the SDK reclassify.
     if isinstance(parsed.get("secondaryHints"), list):
         data["secondaryHints"] = [str(x) for x in parsed["secondaryHints"]][:20]
     if isinstance(parsed.get("techStack"), dict):
@@ -310,6 +304,41 @@ def _merge_enrichment(baseline: CodeKnowledge, parsed: dict[str, Any]) -> dict[s
     return data
 
 
+PROFILE_READING_PLAYBOOK = {
+    "micro_frontend": (
+        "micro_frontend read order: (1) .gitmodules paths that contain vue.app.js, "
+        "src/index.html mount divs, build/config/modules.js — that IS the module list; "
+        "do not treat src/Common as a micro-app. (2) root-application.js for PC vs H5 "
+        "(nature===h5 → Common/mobile/init). (3) localize testModule to src/<App>/ first; "
+        "follow loadModuleExports('X') across apps. (4) @/ is not always src/."
+    ),
+    "device_web": (
+        "device_web read order: (1) split PC vs mobile — main-pc.js / main-mobile.js and "
+        "Router/{pc,mobile}.js. (2) greyed-out / missing-feature defects: read "
+        "Common/service/device.js before views. (3) real bridge is jsWebControl, not a "
+        "folder named bridge. (4) do not look for vue.app.js modules; business dirs are "
+        "route modules in one SPA. (5) index.asp is host, not architecture."
+    ),
+    "electron_node": (
+        "electron_node read order: (1) follow package.json main, loadFile/loadURL, and "
+        "contextBridge.exposeInMainWorld — never classify by a file named main.ts. "
+        "(2) IPC prefix → controller/<domain>/ is the localization jump. "
+        "(3) renderer is web/src boot, not views/*. (4) keep driver/ addon/; "
+        "fork(subsystem) may leave this repo. (5) vite-plugin-electron alone is not Electron."
+    ),
+    "unknown": (
+        "cartographyProfile is unknown: do not guess electron / micro-frontend / device-web. "
+        "Read CLAUDE.md and overlay skills, keep architecture shallow, mark partial."
+    ),
+}
+
+
+def profile_reading_playbook(profile: str | None) -> str:
+    """Type-specific read order for SDK / SOP. Profile is caller-supplied."""
+    key = (profile or "unknown").strip() or "unknown"
+    return PROFILE_READING_PLAYBOOK.get(key, PROFILE_READING_PLAYBOOK["unknown"])
+
+
 _SYSTEM_PROMPT = """You are Agent-2 Code Cartographer for an automated bugfix pipeline.
 Your job is to thoroughly read the target workDir so Agent-3 can fix defects with LESS re-exploration token cost.
 
@@ -317,12 +346,15 @@ Tools: Read, Glob, Grep, and Bash. Bash is for READ-ONLY exploration only
 (e.g. rg/find/git log|blame|grep|show, ls, cat/head/sed -n). NEVER mutate the repo:
 no edit/write tools, no git write, no install, no network, no rm/chmod.
 
+cartographyProfile is CALLER-SUPPLIED. Do not reclassify the repo.
+
 How to work (be thorough, then stop when grounded):
-1) Read CLAUDE.md / README / package manifests and map entryPoints + module roles.
+1) Follow the profile reading playbook in the user prompt, then CLAUDE.md / overlay skills.
    Repo-specific injected skills have HIGHEST PRIORITY over package SOP: follow THEIR
    read order, test/src layout, module aliases, and naming on any conflict.
 2) For EACH match-pool ticket: open baseline candidate files, follow imports/callers
    with Grep/Bash rg until you can name the likely fix locus and a short call-flow note.
+   Stay inside the module / process / PC-mobile fork the architecture map already named.
 3) Prefer improving weak/empty matches; do not invent paths. Cap candidates at 3 per ticket.
    Injected skills never lift these caps or let you match outside
    strict/locatable_only/needs_info.
@@ -330,12 +362,12 @@ How to work (be thorough, then stop when grounded):
    include runtime shape, key modules, and per-hotspot call flow in plain language.
 
 Return one JSON object (optionally in a ```json fence) with any of:
-cartographyProfile, secondaryHints, techStack{languages,frameworks,notes},
+secondaryHints, techStack{languages,frameworks,notes},
 architecture{summary,entryPoints,modules[{id,path,role,shared,notes}]},
 conventions{fromClaudeMd,fromRules}, boundSkills,
 defectCodeMatches[{defectId,candidates[{repoPath,path,symbol,why,source}],confidence}],
 partial.
-cartographyProfile must be one of: electron_node, micro_frontend, device_web, unknown.
+Do not change cartographyProfile.
 candidate source must be one of: codegraph, grep, heuristic, claude_md.
 In each candidate.why, cite the symbol/call edge you actually observed.
 """
@@ -364,11 +396,14 @@ def _build_prompt(req: CartographyRequest) -> str:
         "defectCodeMatches": [m.model_dump() for m in req.baseline.defectCodeMatches][:40],
         "partial": req.baseline.partial,
     }
+    playbook = profile_reading_playbook(req.baseline.cartographyProfile)
     return (
         "Thoroughly read this workDir and enrich the code-knowledge baseline so Agent-3 "
         "can fix tickets without rediscovering architecture. Return the JSON enrich object.\n\n"
         f"productLine: {req.defect_batch.productLine}\n"
         f"workDir: {req.work_dir}\n"
+        f"cartographyProfile: {req.baseline.cartographyProfile} (caller-supplied; do not change)\n"
+        f"readingPlaybook: {playbook}\n"
         f"injectedSkills: {json.dumps([s.name for s in req.injected_skills], ensure_ascii=False)}\n"
         f"matchPoolTickets: {json.dumps(match_pool, ensure_ascii=False)}\n"
         f"baseline: {json.dumps(baseline, ensure_ascii=False)}\n"

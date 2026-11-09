@@ -14,8 +14,11 @@ from bugfix_platform.agents.cartographer.match import (
     match_tickets,
 )
 from bugfix_contracts import DefectBatch
-from bugfix_contracts.code_knowledge import DefectCodeMatch, MatchCandidate
+from bugfix_contracts.code_knowledge import MatchCandidate
 from bugfix_contracts.defect_batch import BatchTicket
+
+ROOT = Path(__file__).resolve().parents[2]
+FIXTURES = ROOT / "test" / "fixtures" / "repos"
 
 
 def _batch_with_module() -> DefectBatch:
@@ -46,47 +49,31 @@ def _batch_with_module() -> DefectBatch:
     )
 
 
-def test_electron_architecture_roles(tmp_path: Path):
-    work = tmp_path / "app"
-    (work / "electron").mkdir(parents=True)
-    (work / "src" / "renderer").mkdir(parents=True)
-    (work / "package.json").write_text(
-        json.dumps(
-            {
-                "name": "e",
-                "main": "electron/main.ts",
-                "dependencies": {"electron": "30"},
-            }
-        ),
-        encoding="utf-8",
-    )
-    (work / "electron" / "main.ts").write_text("export {}\n", encoding="utf-8")
-    (work / "electron" / "preload.ts").write_text("export {}\n", encoding="utf-8")
-    (work / "src" / "renderer" / "App.tsx").write_text("export {}\n", encoding="utf-8")
-
+def test_electron_architecture_roles():
     knowledge = run_cartographer(
-        work_dir=work,
+        work_dir=FIXTURES / "electron",
         defect_batch=_batch_with_module(),
         cartography_mode="heuristic",
+        cartography_profile="electron_node",
     )
     assert knowledge.cartographyProfile == "electron_node"
     roles = {m.role for m in knowledge.architecture.modules}
     assert "main" in roles
-    assert "preload" in roles or "renderer" in roles
+    assert "preload" in roles
+    assert "renderer" in roles
     assert knowledge.architecture.entryPoints
-    assert any("main" in ep for ep in knowledge.architecture.entryPoints)
+    assert any("web/src/main.ts" in ep.replace("\\", "/") for ep in knowledge.architecture.entryPoints)
 
 
-def test_map_architecture_device_web_bridge(tmp_path: Path):
-    work = tmp_path / "dw"
-    (work / "bridge").mkdir(parents=True)
-    (work / "package.json").write_text(json.dumps({"name": "dw"}), encoding="utf-8")
-    (work / "bridge" / "jsbridge.ts").write_text("export {}\n", encoding="utf-8")
+def test_map_architecture_device_web_capability():
+    work = FIXTURES / "device-web"
     roots = discover_repo_roots(work)
-    summary, entries, modules = map_architecture(work, roots, "device_web")
-    assert "bridge" in summary.lower() or modules
-    assert any(m.role == "device_bridge" for m in modules)
-    assert entries
+    mapped = map_architecture(work, roots, "device_web")
+    roles = {m.role for m in mapped.modules}
+    assert "device_capability" in roles
+    assert "device_bridge" in roles
+    assert any("main-pc" in ep for ep in mapped.entry_points)
+    assert any("main-mobile" in ep for ep in mapped.entry_points)
 
 
 def test_match_caps_candidates_and_confidence(tmp_path: Path):

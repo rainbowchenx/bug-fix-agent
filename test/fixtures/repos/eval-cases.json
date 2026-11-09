@@ -1,0 +1,94 @@
+{
+  "cases": [
+    {
+      "id": "mf-person-module",
+      "fixture": "micro-frontend",
+      "profile": "micro_frontend",
+      "ticket": {
+        "defectId": "MF1",
+        "title": "[人员管理] Person list empty",
+        "pool": "strict",
+        "expectQuality": "explicit",
+        "testModule": "Person",
+        "titleTag": "人员管理",
+        "intent": "data_wrong"
+      },
+      "expectPathPrefix": "src/Person/"
+    },
+    {
+      "id": "mf-h5-fork",
+      "fixture": "micro-frontend",
+      "profile": "micro_frontend",
+      "ticket": {
+        "defectId": "MF2",
+        "title": "H5 mobile init blank screen",
+        "pool": "strict",
+        "expectQuality": "explicit",
+        "testModule": "Common",
+        "titleTag": "H5",
+        "intent": "ui_layout"
+      },
+      "expectPathPrefix": "src/Common/mobile/"
+    },
+    {
+      "id": "dw-wiper-capability",
+      "fixture": "device-web",
+      "profile": "device_web",
+      "ticket": {
+        "defectId": "DW1",
+        "title": "雨刷按钮灰掉无法使用",
+        "pool": "strict",
+        "expectQuality": "explicit",
+        "testModule": "预览",
+        "titleTag": "雨刷",
+        "intent": "logic"
+      },
+      "expectPathPrefix": "src/Common/service/device.js"
+    },
+    {
+      "id": "dw-mobile-entry",
+      "fixture": "device-web",
+      "profile": "device_web",
+      "ticket": {
+        "defectId": "DW2",
+        "title": "mobile 端首页无法打开",
+        "pool": "strict",
+        "expectQuality": "explicit",
+        "testModule": "Portal",
+        "titleTag": "mobile",
+        "intent": "ui_layout"
+      },
+      "expectPathPrefix": "src/main-mobile.js"
+    },
+    {
+      "id": "el-ipc-box",
+      "fixture": "electron",
+      "profile": "electron_node",
+      "ticket": {
+        "defectId": "EL1",
+        "title": "盒子校准失败",
+        "pool": "strict",
+        "expectQuality": "explicit",
+        "testModule": "boxCalibration",
+        "titleTag": "BoxManage",
+        "intent": "logic"
+      },
+      "expectPathPrefix": "electron/electron/controller/boxCalibration/"
+    },
+    {
+      "id": "el-ui-renderer",
+      "fixture": "electron",
+      "profile": "electron_node",
+      "ticket": {
+        "defectId": "EL2",
+        "title": "按钮文案显示错误",
+        "pool": "strict",
+        "expectQuality": "explicit",
+        "testModule": "web",
+        "titleTag": "文案",
+        "intent": "ui_layout"
+      },
+      "expectPathPrefix": "web/src/"
+    }
+  ]
+}

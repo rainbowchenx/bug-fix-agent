@@ -45,6 +45,7 @@ def test_langgraph_e2e_invoke(tmp_path: Path):
             "open_mr": False,
             "skip_agent2": False,
             "skip_agent3": False,
+            "cartography_profile": "electron_node",
             "ok": True,
             "stage": "agent2",
             "error": None,

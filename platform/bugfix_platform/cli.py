@@ -52,6 +52,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Agent-2 cartography enrich: heuristic or Claude Agent SDK",
     )
     run_p.add_argument(
+        "--cartography-profile",
+        choices=["electron_node", "micro_frontend", "device_web", "unknown"],
+        default=None,
+        help=(
+            "Agent-2 repo type (caller-supplied; not detected). "
+            "Omit to leave cartographyProfile=unknown."
+        ),
+    )
+    run_p.add_argument(
         "--skills-dir",
         action="append",
         default=None,
@@ -100,6 +109,7 @@ def main(argv: list[str] | None = None) -> int:
         skip_agent3=args.skip_agent3,
         analyze_mode=args.analyze_mode,
         cartography_mode=args.cartography_mode,
+        cartography_profile=args.cartography_profile,
         extra_skill_dirs=args.skills_dirs,
         artifact_dir=args.out_dir,
     )

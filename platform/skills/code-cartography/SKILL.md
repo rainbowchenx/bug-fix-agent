@@ -8,12 +8,14 @@ profiles: cartography
 
 SOP for building `code-knowledge`. Prefer the Python entrypoint; use this skill to guide Claude Code / SDK sessions.
 
+`cartographyProfile` is **caller-supplied** (`--cartography-profile` / `options.cartographyProfile`). Do not infer electron / micro-frontend / device-web from deps or folder names.
+
 ## Do / Don't
 
 | Do | Don't |
 |---|---|
 | Read target `CLAUDE.md` / `.claude` first | Invent file paths that do not exist |
-| Call `run_cartographer` / heuristic detect+match | Dump full ticket observed/expected/steps into matching queries |
+| Call `run_cartographer` with caller `cartography_profile` | Dump full ticket observed/expected/steps into matching queries; do not guess the profile |
 | Cap candidates at **3** per defect; empty OK with `confidence=low` | Exceed candidate cap or invent non-existent paths |
 | Follow profile biases (electron / micro_frontend / device_web) | Write `CODEBASE_MAP.md` or edit target repo by default |
 | SDK: read deeply (imports/call flow) so Agent-3 spends fewer tokens | Mutate the repo via Bash/Edit/Write |
@@ -25,11 +27,11 @@ Read `docs/contracts/v0.1/defect-batch-guide.md` before matching. Default match 
 ## Pipeline
 
 ```text
-workDir + defect-batch
+workDir + defect-batch + cartographyProfile
   → discover repoRoots
-  → detect cartographyProfile + techStack
-  → map architecture (entryPoints / modules by profile)
-  → match tickets (title + titleTag/testModule/intent tokens → paths)
+  → record techStack hints (do not guess profile)
+  → map architecture by the given profile (catalog files, not path regex)
+  → match tickets using architecture indexes + title tokens
   → optional SDK enrich (Read/Glob/Grep + read-only Bash; no max_turns by default)
   → validate_code_knowledge → code-knowledge.json
 ```
@@ -44,6 +46,7 @@ batch = load_defect_batch("./defect-batch.json")
 knowledge = run_cartographer(
     work_dir="./repos",
     defect_batch=batch,
+    cartography_profile="micro_frontend",  # caller-supplied
     cartography_mode="heuristic",  # or "sdk"
 )
 ```
@@ -59,9 +62,9 @@ knowledge = run_cartographer(
 
 ## Profile biases
 
-- **electron_node**: crash/tray/IPC → main/preload; UI copy → renderer
-- **micro_frontend**: testModule/titleTag → micro-app package, then search
-- **device_web**: device/bridge tokens → bridge modules before pure H5
+- **electron_node**: follow `package.json.main` / `loadFile` / `contextBridge`; IPC prefix → `controller/<domain>/`; UI copy → `web/src` renderer boot, not `views/`
+- **micro_frontend**: read `.gitmodules` / mount divs / `vue.app.js` as the module list; `testModule` → `src/<App>/` first; PC vs H5 from `root-application.js`
+- **device_web**: split PC/mobile entries first; capability defects → `Common/service/device.js` before views; real bridge is `jsWebControl`
 
 ## Output contract
 
