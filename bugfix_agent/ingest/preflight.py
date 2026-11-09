@@ -22,32 +22,9 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Iterator
 
-# 单一真源：能用包里的别名表就不要另抄一份。抄一份就会漂。
-try:
-    from bugfix_agent.ingest.field_map import FIELD_ALIASES, METADATA_KEYS
-    from bugfix_agent.defect_batch.distill import (
-        is_empty_template,
-        split_description,
-    )
-
-    _HAS_DISTILL = True
-except ImportError:  # pragma: no cover - 包不可用时退化为最小表
-    _HAS_DISTILL = False
-    FIELD_ALIASES = {
-        "defectId": ["defectId", "缺陷单号", "缺陷ID", "ID", "id"],
-        "title": ["defectTitle", "缺陷标题", "标题", "title"],
-        "description": ["describle", "defectDescribe", "缺陷描述", "描述", "description"],
-        "status": ["defectStatus", "缺陷状态", "状态", "status"],
-        "flowStatus": ["flowStatusName", "flowStatus", "流程状态"],
-        "testModule": ["testModule", "测试模块", "所属模块"],
-        "fieldType": ["defectType", "类型", "缺陷类型", "type", "fieldType"],
-        "severity": ["severityName", "severity", "严重级别"],
-        "createdAt": ["createDate", "createdAt", "创建时间"],
-        "duplicateOf": ["duplicateOf", "关联重复缺陷编号", "关联缺陷ID", "relateDefectId"],
-    }
-    METADATA_KEYS = ["flowInstId", "detectingActivityI18n", "assignee", "discoveredBy"]
-
-EMPTY_TEMPLATE_MARKER = "包括复现方法和现象描述等"
+# 单一真源：别名表与空模板判定都直接 import，不在这里另抄一份。
+from bugfix_agent.defect_batch.distill import is_empty_template, split_description
+from bugfix_agent.ingest.field_map import FIELD_ALIASES, METADATA_KEYS
 
 
 def _cell(v: Any) -> str:
@@ -168,11 +145,8 @@ def main() -> None:
         _, desc = _pick(r, FIELD_ALIASES["description"])
         if desc:
             desc_present += 1
-            if _HAS_DISTILL:
-                obs, exp, stp = split_description(desc)
-                if is_empty_template(desc, obs, exp, stp):
-                    empty_template += 1
-            elif EMPTY_TEMPLATE_MARKER in desc or _is_bare_template(desc):
+            obs, exp, stp = split_description(desc)
+            if is_empty_template(desc, obs, exp, stp):
                 empty_template += 1
         if _pick(r, FIELD_ALIASES["testModule"])[1]:
             module_present += 1
@@ -235,15 +209,6 @@ def main() -> None:
     print("-- module distribution (top 8) --")
     for name, cnt in top:
         print(f"  {cnt:4d}  {name}")
-
-
-def _is_bare_template(desc: str) -> bool:
-    """整段是空模板：只剩段标签，没有任何内容。"""
-    stripped = desc
-    for label in ("用例名称", "前置条件", "操作步骤", "测试数据", "预期结果", "实际结果", "问题", "初步定位", "建议"):
-        stripped = stripped.replace(label, "").replace("：", "").replace(":", "")
-    stripped = "".join(ch for ch in stripped if ch not in "0123456789.、 \t\n")
-    return len(stripped) < 8
 
 
 if __name__ == "__main__":

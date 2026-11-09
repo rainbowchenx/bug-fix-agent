@@ -8,16 +8,15 @@
 产物：
 
     dist/agent1-standalone/
-        defect-batch-prepare/           skill（SKILL.md + references + scripts）
+        defect-batch-prepare/           skill（只有文档：SKILL.md + references + evals）
         defect-batch-prepare/scripts/agent1.exe    零依赖单文件 CLI
-        defect-batch-prepare/scripts/agent1.py     同功能源码版
-    dist/agent1-standalone.zip
+    dist/agent1-standalone.zip        交付包不含任何源码
 
     dist/bugfix-agent-platform.zip      平台包（根级 graph.py + 源码 + skills）
 
 代码边界（两侧只共享 5 个 contracts 文件，见 AGENT1_FILES / PLATFORM_FILES）：
 
-    Agent-1     contracts + ingest + defect_batch      → 图外，独立 CLI
+    Agent-1     contracts + ingest + defect_batch + cli → 图外，独立 CLI
     Platform    contracts + agents + workflow + sdk    → LangGraph 管控
 
 两侧都不导入对方的其余模块。打包时会各生成一份裁剪过的
@@ -48,6 +47,7 @@ BUILD = ROOT / "build"
 # --------------------------------------------------------------------------- #
 
 _SHARED_CONTRACTS = [
+    "_version.py",
     "contracts/__init__.py",
     "contracts/common.py",
     "contracts/defect_batch.py",
@@ -56,7 +56,10 @@ _SHARED_CONTRACTS = [
 ]
 
 AGENT1_FILES = _SHARED_CONTRACTS + [
+    "cli.py",
+    "agent1.py",
     "ingest/__init__.py",
+    "ingest/preflight.py",
     "ingest/field_map.py",
     "ingest/csv_source.py",
     "ingest/xlsx_source.py",
@@ -113,6 +116,7 @@ PLATFORM_SKILLS = [
 
 AGENT1_INIT = '''"""Agent-1 standalone: defect-batch only. No agents / workflow / sdk / langgraph."""
 
+from bugfix_agent._version import __version__
 from bugfix_agent.contracts import (
     CONTRACT_SCHEMA_VERSION,
     DEFECT_BATCH_SCHEMA_VERSION,
@@ -242,14 +246,22 @@ def build_agent1(skip_exe: bool = False) -> Path:
 
     # --- 构建树：编译 exe 需要完整源码，但这棵树不交付 ---
     log("agent1: staging build tree (not shipped)")
-    for name in ("SKILL.md", "requirements.txt"):
+    for name in ("SKILL.md",):
         shutil.copy2(skill_src / name, stage / name)
     for sub in ("references", "evals"):
         shutil.copytree(skill_src / sub, stage / sub)
+    # 入口放在包外：包内目录当 script 跑会让 bugfix_agent/http/ 遮蔽标准库 http。
     scripts = stage / "scripts"
     scripts.mkdir()
-    for name in ("agent1.py", "preflight.py"):
-        shutil.copy2(skill_src / "scripts" / name, scripts / name)
+    (scripts / "entry.py").write_text(
+        chr(10).join([
+            "import sys",
+            "from bugfix_agent.agent1 import entry",
+            "sys.exit(entry())",
+            "",
+        ]),
+        encoding="utf-8",
+    )
 
     vendor = scripts / "_vendor" / "bugfix_agent"
     copy_package(AGENT1_FILES, vendor, AGENT1_INIT)
@@ -285,7 +297,7 @@ def build_agent1(skip_exe: bool = False) -> Path:
                 "--distpath", str(stamp / "dist"),
                 "--workpath", str(stamp / "work"),
                 "--specpath", str(stamp),
-                str(scripts / "agent1.py"),
+                str(scripts / "entry.py"),
             ],
             cwd=scripts, env=env, check=True,
             stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,

@@ -1,7 +1,7 @@
 ---
 name: defect-batch-prepare
 description: Turns an exported defect list (平台 CSV / Excel / JSON) into a validated defect-batch.json by running the rule funnel in code, then rereading the original ticket text to correct intent and match-pool placement. Use this skill whenever the user asks to 筛选, 分簇, 分类, 复核, or 整理缺陷单; convert a 缺陷列表 or 平台导出; run prepare-batch; build or validate defect-batch; or check whether tickets landed in the right pool or intent — even if they never name this skill, never say "defect-batch", and just paste a CSV path and ask 帮我看下这批缺陷.
-compatibility: Needs only the bundled `agent1` CLI — the packaged `scripts/agent1.exe` runs on Windows with no Python, no pip and no network. Python source is not shipped; the executable is the interface.
+compatibility: Needs only the bundled `agent1` CLI — the packaged `scripts/agent1.exe` runs on Windows with no Python, no pip and no network. Python source is not shipped; the executable is the interface. In a repo checkout the same subcommands are served by `bugfix-agent`.
 metadata:
   profiles: defect-batch
 ---
@@ -25,8 +25,7 @@ they take identical flags and produce identical bytes:
 | Where | Invoke as |
 |---|---|
 | This packaged skill | `scripts\agent1.exe <subcommand>` |
-| Repo checkout | `python skills/defect-batch-prepare/scripts/agent1.py <subcommand>` |
-| Repo, package installed | `bugfix-agent <subcommand>` |
+| Repo checkout / installed package | `bugfix-agent <subcommand>` |
 
 Subcommands: `preflight` · `prepare-batch` · `apply-review` · `xlsx-to-raw` · `self-check`.
 

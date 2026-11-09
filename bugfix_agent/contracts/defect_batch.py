@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+import json
+
+from pathlib import Path
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -134,3 +137,22 @@ def safe_validate_defect_batch(data: Any) -> tuple[bool, DefectBatch | str]:
         return True, DefectBatch.model_validate(data)
     except Exception as e:  # noqa: BLE001
         return False, str(e)
+
+
+# 路径 / 已解析 dict / 已构造模型 —— 三种入口都用它标注。
+DefectBatchInput = Union[str, Path, dict[str, Any], DefectBatch]
+
+
+def load_defect_batch(value: DefectBatchInput) -> DefectBatch:
+    """加载并校验 defect-batch（路径 / dict / 已构造模型）。
+
+    住在 ``contracts/`` 而不是 ``workflow/`` 或 ``defect_batch/``：``apply-review``
+    （图外，Agent-1）和 LangGraph 父编排（平台侧）都要用它，两侧共享的只有
+    ``contracts/``。放错一侧就会把另一侧本不该有的模块拖进产物。
+    """
+    if isinstance(value, DefectBatch):
+        return value
+    if isinstance(value, dict):
+        return validate_defect_batch(value)
+    data = json.loads(Path(value).read_text(encoding="utf-8"))
+    return validate_defect_batch(data)

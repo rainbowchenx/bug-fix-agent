@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional, Sequence, Union
 
+from bugfix_agent.contracts.defect_batch import DefectBatchInput, load_defect_batch
 from bugfix_agent.contracts import (
     AnalysisReport,
     CodeKnowledge,
@@ -37,7 +38,6 @@ from bugfix_agent.workflow.state import ThreeAgentState
 WorkflowUpdateFn = Callable[[dict[str, Any]], None]
 """每帧流式 state 快照的回调（stream_mode=values）。"""
 
-DefectBatchInput = Union[str, Path, dict[str, Any], DefectBatch]
 
 
 @dataclass
@@ -63,15 +63,6 @@ class ThreeAgentWorkflowResult:
     error: Optional[str] = None
 
 
-def load_defect_batch(value: DefectBatchInput) -> DefectBatch:
-    """加载并校验 Agent-1 产出的 defect-batch（路径 / dict / 模型）。"""
-    if isinstance(value, DefectBatch):
-        return value
-    if isinstance(value, dict):
-        return validate_defect_batch(value)
-    path = Path(value)
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return validate_defect_batch(data)
 
 
 def run_three_agent_workflow(

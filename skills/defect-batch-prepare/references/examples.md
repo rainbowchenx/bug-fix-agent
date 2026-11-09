@@ -2,7 +2,7 @@
 
 Commands are written `agent1 <subcommand>`. In this packaged skill that is
 `scripts\agent1.exe <subcommand>`; in a repo checkout it is
-`python skills/defect-batch-prepare/scripts/agent1.py <subcommand>`, or
+`bugfix-agent <subcommand>`, or
 `bugfix-agent <subcommand>` when the package is installed. Flags are identical.
 
 ## CSV export → batch → intent review

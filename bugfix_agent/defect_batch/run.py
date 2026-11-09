@@ -6,13 +6,25 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Literal, Optional, Union
 
-from bugfix_agent.contracts.defect_batch import DefectBatch, RawDefect
+from bugfix_agent.contracts.defect_batch import (
+    DefectBatch,
+    DefectBatchInput,
+    RawDefect,
+    validate_defect_batch,
+)
 from bugfix_agent.defect_batch.prepare import prepare_defect_batch
 from bugfix_agent.defect_batch.rules import ScreenProfile
 from bugfix_agent.ingest.preloaded import load_preloaded
+
+
+def load_defect_batch(value: DefectBatchInput) -> DefectBatch:
+    from bugfix_agent.contracts.defect_batch import load_defect_batch as _impl
+
+    return _impl(value)
 
 
 def run_defect_batch_prepare(
