@@ -23,6 +23,7 @@ validate_batch → Agent-2 → validate → Agent-3 → validate
 
 设计文档：
 - `docs/superpowers/specs/2026-11-03-three-agent-architecture.md` — 正式架构
+- `docs/cartography/repo-fingerprints.md` — 仓型指纹（micro_frontend 已齐；electron / device_web 待补）
 - `docs/contracts/v0.1/` — 契约
 - `docs/superpowers/specs/2026-10-23-report-agent-decision-followup.md` — 语言栈 / 去 SWE / 退役 TS 决策
 
@@ -48,7 +49,7 @@ bugfix-agent run --work-dir ./repos --product-line hc --defect-batch /tmp/defect
 | `bugfix_agent/contracts/` | 契约 SSOT（含 `load_defect_batch`，两侧共用） |
 | `bugfix_agent/cli.py` + `agent1.py` | 唯一 CLI；`main(standalone=True)` 让 exe 只挂图外 5 命令 |
 | `bugfix_agent/ingest/` + `defect_batch/` | Agent-1 |
-| `bugfix_agent/agents/cartographer/` | Agent-2 |
+| `bugfix_agent/agents/cartographer/` | Agent-2（判型判据见 `docs/cartography/repo-fingerprints.md`） |
 | `bugfix_agent/agents/analyst/` | Agent-3 |
 | `bugfix_agent/sdk/` | Agent-2/3 Claude Agent SDK + overlay skill 发现 |
 | `bugfix_agent/workflow/` | LangGraph 父编排 + 门禁 |
