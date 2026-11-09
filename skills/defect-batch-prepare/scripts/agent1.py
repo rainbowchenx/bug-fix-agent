@@ -197,10 +197,10 @@ def main(argv: list[str] | None = None) -> int:
     chk = sub.add_parser("self-check", help="Verify vendored copy against VENDOR.json")
     chk.set_defaults(func=_cmd_self_check)
 
-    pre = sub.add_parser("preflight", help="Column-mapping health check (Step 0); args go to preflight.py")
+    pre = sub.add_parser("preflight", help="Column-mapping health check (Step 0); see `agent1 preflight --help`")
     pre.set_defaults(func=_cmd_self_check)
 
-    xl = sub.add_parser("xlsx-to-raw", help="Convert .xlsx to raw-defects.json; args go to xlsx_to_raw_defects.py")
+    xl = sub.add_parser("xlsx-to-raw", help="Convert .xlsx to raw-defects.json; see `agent1 xlsx-to-raw --help`")
     xl.set_defaults(func=_cmd_self_check)
 
     args = parser.parse_args(argv)
