@@ -26,8 +26,8 @@ source (CSV/JSON/xlsx)
 |------|------|------|--------|
 | 契约 SSOT | `bugfix_agent/contracts/` | Pydantic 校验三段 artifact | ✅ |
 | Agent-1 | `ingest/` + `defect_batch/` + `skills/defect-batch-prepare/` | 图外：入口映射 → 蒸馏 / 筛选 / 分簇 → `defect-batch` | ✅ 规则管线 + skill |
-| Agent-2 | `agents/cartographer/` + `sdk/cartography.py` + `skills/code-cartography/` | 仓型探测 + 形态化架构图 + 路径软匹配（候选≤3；置信度不因无 CodeGraph 封顶）+ 可选 SDK 通读 → `code-knowledge` | 🟡 启发式加厚 + SDK 骨架 |
-| Agent-3 | `agents/analyst/` + `sdk/analyze.py` | 路由 + 可选 Claude 只读 analyze → `analysis-report` | 🟡 路由+SDK 骨架 |
+| Agent-2 | `agents/cartographer/` + `sdk/cartography.py` + `sdk/skill_inject.py` + `skills/code-cartography/` | 仓型探测 + 形态化架构图 + 路径软匹配（候选≤3）+ 仓特异性 overlay skill + 可选 SDK 通读 → `code-knowledge` | 🟡 启发式加厚 + SDK 骨架 |
+| Agent-3 | `agents/analyst/` + `sdk/analyze.py` + `sdk/skill_inject.py` | 路由 + 同一套 overlay skill + 可选 Claude 只读 analyze → `analysis-report` | 🟡 路由+SDK 骨架 |
 | 父编排 | `workflow/` | LangGraph：`validate_batch→agent2→agent3` + 门禁（不含 Agent-1） | ✅ |
 | HTTP（S4） | `http/` | FastAPI：`POST/GET /v1/runs`（入参 `defectBatch`）、`GET /health` | ✅ 兼容壳 |
 | CLI | `cli.py` | `prepare-batch`（Agent-1）/ `run`（2→3）/ `serve` | ✅ |
@@ -53,12 +53,12 @@ pip install -e ".[http]"    # 可选：FastAPI + uvicorn（S4）
 
 ```bash
 cp .env.example .env
-# 常用：ANTHROPIC_API_KEY、BUGFIX_ANALYZE_MODE、BUGFIX_ANALYZE_LIMIT
+# 常用：ANTHROPIC_API_KEY、BUGFIX_ANALYZE_MODE、BUGFIX_CARTOGRAPHY_MODE、BUGFIX_SKILLS_DIR
 ```
 
 | 变量 | 说明 |
 |------|------|
-| `ANTHROPIC_API_KEY` | 有则 Agent-3 默认走 SDK analyze |
+| `ANTHROPIC_API_KEY` | 有则 Agent-2 cartography / Agent-3 analyze 默认走 SDK |
 | `ANTHROPIC_BASE_URL` / `ANTHROPIC_MODEL` | 可选网关 / 模型覆盖 |
 | `BUGFIX_ANALYZE_MODE` | Agent-3：`heuristic` \| `sdk`（显式覆盖默认） |
 | `BUGFIX_ANALYZE_LIMIT` | 单次 run 最多 enrich 几张软定位票（空=不限） |
@@ -73,7 +73,7 @@ cp .env.example .env
 
 ### 1）Agent-1（图外：skill / prepare-batch）
 
-在 Claude Code 中按 `skills/defect-batch-prepare/` 调用规则管线，或：
+在 Claude Code 中按 `skills/defect-batch-prepare/` 调用规则管线（规则跑完后可用 `apply-review` 回写意图复核），或：
 
 ```bash
 bugfix-agent prepare-batch \
@@ -83,11 +83,20 @@ bugfix-agent prepare-batch \
   --out /tmp/defect-batch.json
 ```
 
+意图复核回写（重建簇与漏斗，不要手改 `clusterId` / `funnel`）：
+
+```bash
+bugfix-agent apply-review \
+  --batch /tmp/defect-batch.json \
+  --overrides ./review.json \
+  --out /tmp/defect-batch.json
+```
+
 `--source` 支持：
 
 - **平台 CSV**（如 `defectTitle` / `describle` / `flowStatusName`）
 - **raw-defects JSON**（见契约）
-- Excel 可先用 `bugfix_agent/scripts/xlsx_to_raw_defects.py` 转 JSON
+- Excel 可先用 `skills/defect-batch-prepare/scripts/xlsx_to_raw_defects.py`（或 `bugfix_agent/scripts/xlsx_to_raw_defects.py`）转 JSON
 
 脱敏样本目录：`缺陷拉取/脱敏/`（若已入库）。夹具：`test/fixtures/defect-batch/`。
 
@@ -141,7 +150,8 @@ curl -sS -X POST http://127.0.0.1:8787/v1/runs \
     "posture": "alpha",
     "options": {
       "analyzeMode": "heuristic",
-      "cartographyMode": "heuristic"
+      "cartographyMode": "heuristic",
+      "skillsDirs": ["./line-skills"]
     }
   }'
 
@@ -171,6 +181,7 @@ result = run_three_agent_workflow(
     defect_batch=batch,
     posture="alpha",
     analyze_mode="heuristic",
+    extra_skill_dirs=["./line-skills"],
 )
 assert result.ok and result.stage == "done"
 knowledge = result.artifacts.code_knowledge
@@ -241,13 +252,17 @@ raw-defects  ──Agent-1──►  defect-batch  ──Agent-2──►  code-
 ### code-knowledge（Agent-2 出口）
 
 - `cartographyProfile`、`repoRoots`、`techStack`、`architecture`、`specAtlas`
+- `boundSkills[]`：本次绑定的 cartography overlay（在前）+ 包内置 skill 名
 - `defectCodeMatches[]`：给 Agent-3 的**软定位**起点（可空 / 低置信）
 
 ### analysis-report（Agent-3 出口）
 
 - 每票完整报告：`localization` / `rootCause` / `proposedFix` / `blockers` / `confidence` / `verifyStatus`
+- `boundSkills[]`：本次绑定的 analyze overlay（在前）+ 包内置 skill 名
 - `outcome`：`plan_only` · `unlocalized` · `needs_ticket_info` · …（见契约枚举）
 - 当前默认 `verifyStatus=skipped`；`openMr` 不会真正推 MR
+
+仓特异性 skill 写法与注入位置：[`docs/prompts/agent2/`](docs/prompts/agent2/)（Agent-3 共用，见 [`docs/prompts/agent3/`](docs/prompts/agent3/)）。`profiles: bugfix` 两边都加载；overlay 压过包内置 SOP。
 
 **匹配池（默认进入 Agent-2/3）：** `strict` | `locatable_only` | `needs_info`  
 （`hard_reject` / `security` / `excluded` 默认不分析）

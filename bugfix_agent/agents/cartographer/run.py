@@ -49,10 +49,11 @@ def run_cartographer(
         work_dir: 目标代码根（其下可有多个仓）。
         defect_batch: 已通过 ``validate_defect_batch`` 的批次。
         cartography_mode: ``heuristic`` / ``sdk``；``None`` 时看环境变量。
-        extra_skill_dirs: 用户注入的 cartography skill 根目录。与仓内
+        extra_skill_dirs: 用户注入的 overlay skill 根目录。与仓内
             ``.claude/skills``、``workDir/.bugfix/skills``、
-            ``BUGFIX_SKILLS_DIR`` 合并；同名后者覆盖。只收
-            ``profiles`` 含 ``cartography`` 的 skill。
+            ``BUGFIX_SKILLS_DIR`` 合并；同名后者覆盖。加载
+            ``cartography`` / ``bugfix``，以及 ``.bugfix`` / 显式目录里未写
+            profiles 的 skill。
         cartography_fn: 可注入的 ``CartographyRunner``（测试用）。
 
     Returns:

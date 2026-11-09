@@ -14,10 +14,11 @@ validate_batch → Agent-2 → validate → Agent-3 → validate
                    code-knowledge        analysis-report
 ```
 
-- Agent-1 不在 LangGraph 内；用 `skills/defect-batch-prepare/` + Claude Code 或 `prepare-batch`
+- Agent-1 不在 LangGraph 内；用 `skills/defect-batch-prepare/` + Claude Code 或 `prepare-batch` / `apply-review`
 - 编排：LangGraph Python 只跑 Agent-2→3（`bugfix_agent/workflow/graph.py`）
 - 跨段只传落盘 JSON + Pydantic 校验；Agent 之间不互相 import
-- Agent-3 analyze 默认只读（Claude Agent SDK：`Read`/`Glob`/`Grep`）；无 key 时 heuristic 回退
+- Agent-2/3 可注入仓特异性 overlay skill（`.claude/skills`、`workDir/.bugfix/skills`、`--skills-dir` / `BUGFIX_SKILLS_DIR`）；overlay 压过包内置 SOP。发现逻辑：`bugfix_agent/sdk/skill_inject.py`。写法见 `docs/prompts/agent2/`
+- Agent-2 cartography / Agent-3 analyze 默认可走 Claude Agent SDK（只读）；无 key 时 heuristic 回退
 - 旧 TypeScript 簇级 BugFix / npm LangGraph 路径已退役
 
 设计文档：
@@ -29,10 +30,11 @@ validate_batch → Agent-2 → validate → Agent-3 → validate
 
 ```bash
 pip install -e ".[dev]"
-pip install -e ".[sdk]"          # 可选：Agent-3 Claude Agent SDK
+pip install -e ".[sdk]"          # 可选：Agent-2/3 Claude Agent SDK
 pytest -q
 bugfix-agent prepare-batch --product-line hc --source raw.json --out /tmp/defect-batch.json
-bugfix-agent run --work-dir ./repos --product-line hc --defect-batch /tmp/defect-batch.json --posture alpha --out-dir /tmp/out
+bugfix-agent apply-review --batch /tmp/defect-batch.json --overrides review.json --out /tmp/defect-batch.json
+bugfix-agent run --work-dir ./repos --product-line hc --defect-batch /tmp/defect-batch.json --posture alpha --skills-dir ./line-skills --out-dir /tmp/out
 ```
 
 - Python ≥ 3.11；依赖见 `pyproject.toml`（`pydantic` / `openpyxl` / `langgraph`；SDK 为 optional extra）
@@ -45,7 +47,8 @@ bugfix-agent run --work-dir ./repos --product-line hc --defect-batch /tmp/defect
 | `bugfix_agent/contracts/` | 契约 SSOT |
 | `bugfix_agent/ingest/` + `defect_batch/` | Agent-1 |
 | `bugfix_agent/agents/cartographer/` | Agent-2 |
-| `bugfix_agent/agents/analyst/` + `sdk/` | Agent-3 |
+| `bugfix_agent/agents/analyst/` | Agent-3 |
+| `bugfix_agent/sdk/` | Agent-2/3 Claude Agent SDK + overlay skill 发现 |
 | `bugfix_agent/workflow/` | LangGraph 父编排 + 门禁 |
 | `skills/` | Claude Code skills（分析向；修复侧 skill 已删） |
 

@@ -34,10 +34,10 @@ validate_batch → Agent-2 → validate → Agent-3 → validate
 | `bugfix_agent/defect_batch/` | Agent-1 | 蒸馏/筛选/分簇 |
 | `bugfix_agent/agents/cartographer/` | Agent-2 | 通读/匹配 |
 | `bugfix_agent/agents/analyst/` | Agent-3 | 按条路由 + analyze 会话 / 报告 |
-| `bugfix_agent/sdk/` | Agent-3（可复用） | Claude Agent SDK 适配（analyze 只读） |
+| `bugfix_agent/sdk/` | Agent-2/3 | Claude Agent SDK 适配（cartography / analyze 只读）+ overlay skill 发现（`skill_inject.py`） |
 | `bugfix_agent/workflow/` | 父编排 | LangGraph `StateGraph` + 进出校验门禁 |
 | `bugfix_agent/http/` | S4 HTTP | FastAPI：`POST/GET /v1/runs`、落盘 `.bugfix-runs/` |
-| `bugfix_agent/cli.py` | CLI | `bugfix-agent run` / `serve` |
+| `bugfix_agent/cli.py` | CLI | `prepare-batch` / `apply-review` / `run` / `serve` |
 
 禁止 Agent-2/3 互相 import。
 
@@ -55,6 +55,7 @@ bugfix-agent run \
   --product-line hc \
   --defect-batch /tmp/defect-batch.json \
   --posture alpha \
+  --skills-dir ./line-skills \
   --out-dir /tmp/out
 pytest -q
 ```
@@ -75,6 +76,7 @@ pytest -q
 | S2c | Agent-2 启发式加厚 | ✅ 形态化 architecture 图、A3/A4 置信度、`skills/code-cartography/` |
 | S4 | HTTP / LangGraph Server（可选） | ✅ FastAPI 兼容壳：`POST/GET /v1/runs`、`GET /health`（`bugfix_agent/http/`）；LangGraph Server 部署仍可选后续 |
 | S5 | 退役 TS 运行时（`src/`、npm LangGraph、修复侧 skills） | ✅ |
+| S6 | Agent-2/3 仓特异性 overlay skill | ✅ `sdk/skill_inject.py`；`--skills-dir` / `.bugfix/skills` / `BUGFIX_SKILLS_DIR`；overlay 压过包内置 SOP |
 
 ---
 
@@ -92,3 +94,4 @@ pytest -q
 | 2026-11-05 | 评审加固：`flowStatus` 进排除；`duplicate` pool；禁单独 `skip_agent2`；HTTP `runId` 防路径逃逸 + meta 原子写；Agent-2 丢弃不存在路径；Agent-3 单票校验失败 → `other_blocked`；`oversized` 仅绝对阈值；CLI 失败也写 `--out-dir` |
 | 2026-11-06 | **Agent-1 移出 LangGraph**：父图仅 `validate_batch→agent2→agent3`；入参改为 `defectBatch` / `--defect-batch`；Agent-1 走 skill + `prepare-batch` |
 | 2026-11-07 | **S2c**：Agent-2 形态化架构探测、匹配 A3/A4 置信度、`skills/code-cartography/` |
+| 2026-11-08 | **S6**：Agent-2/3 可注入仓特异性 skill（`profiles: cartography` / `analyze` / `bugfix`）；overlay 优先于包内置；产物 `boundSkills[]` |

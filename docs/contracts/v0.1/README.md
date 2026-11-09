@@ -34,8 +34,8 @@ Agent-1 ──defect-batch──► Agent-2 ──code-knowledge──► Agent-
 |---|---|---|
 | contracts | `bugfix_agent/contracts` | pydantic |
 | defect_batch (Agent-1) | `bugfix_agent/defect_batch` | contracts + ingest |
-| cartographer (Agent-2) | `bugfix_agent/agents/cartographer` | contracts + fs |
-| analyst (Agent-3) | `bugfix_agent/agents/analyst` | contracts only |
+| cartographer (Agent-2) | `bugfix_agent/agents/cartographer` | contracts + fs + `sdk/skill_inject` |
+| analyst (Agent-3) | `bugfix_agent/agents/analyst` | contracts + `sdk/skill_inject` |
 | workflow | `bugfix_agent/workflow` | 只调各包公开 `run_*` + `validate_*` |
 
 ## 审阅时请关注
@@ -43,4 +43,5 @@ Agent-1 ──defect-batch──► Agent-2 ──code-knowledge──► Agent-
 1. `code-knowledge.defectCodeMatches` 是否够 Agent-3 软起点  
 2. `TicketOutcome` 枚举与 blockers / proposedFix 互斥是否合理  
 3. `partial` / `integrateMode` / `verifyStatus` 默认语义  
-4. 是否缺字段（多子仓 `repoPath`、DR/DS、confidence 粒度过粗等）
+4. 是否缺字段（多子仓 `repoPath`、DR/DS、confidence 粒度过粗等）  
+5. `boundSkills[]`（code-knowledge / analysis-report）是否足以看出本次 overlay 覆盖了哪些仓特异性规则
