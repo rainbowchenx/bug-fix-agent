@@ -28,21 +28,34 @@ def load_platform_csv(
         映射成功的 ``RawDefect`` 列表。
 
     Raises:
-        ValueError: CSV 没有表头。
+        ValueError: CSV 没有表头，或表头有行可读但一行都映射不出来。
     """
     p = Path(path)
     defects: list[RawDefect] = []
+    seen_rows = 0
     with p.open(encoding=encoding, newline="") as f:
         reader = csv.DictReader(f)
         if not reader.fieldnames:
             raise ValueError(f"CSV has no header: {p}")
         for row in reader:
+            seen_rows += 1
             mapped = row_to_raw_dict(row)
             if not mapped:
                 continue
             defects.append(RawDefect.model_validate(mapped))
             if limit is not None and len(defects) >= limit:
                 break
+
+    # A fully unmappable export used to surface as `{"ok": true,
+    # "tickets": 0}` -- indistinguishable from "every ticket was screened
+    # out". Column names are the usual culprit, so say so and name them.
+    if seen_rows and not defects:
+        headers = csv_headers(p, encoding=encoding)
+        raise ValueError(
+            f"mapped 0 of {seen_rows} rows from {p.name}: no column matched "
+            f"defectId or title. Headers={headers}. "
+            f"Add the missing spelling to FIELD_ALIASES in ingest/field_map.py."
+        )
     return defects
 
 

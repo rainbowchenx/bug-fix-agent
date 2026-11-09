@@ -48,6 +48,25 @@ SECTION_NEXT = "|".join(SECTION_LABELS)
 BOILERPLATE_RE = re.compile(
     r"^(?:如其他项目或产品中存(?:在)?同样缺陷，请说明[:：]?|无|暂无|见标题|同上)[.。\s]*$",
 )
+# The platform's template tail: `问题：1.2.初步定位：无。建议：1.2.…`. When a
+# section is empty, `_section_after("实际结果")` falls through to the `问题`
+# label and returns this tail, which then reads as a real observation.
+_TEMPLATE_TAIL_RE = re.compile(r"\d+(?:\.\d+)*[.、]?")
+_TAIL_NOISE_RE = re.compile(r"[\s.。;；,，、\-—]+")
+
+
+def _is_boilerplate(text: str) -> bool:
+    """True for text carrying no reportable content: filler or template tail."""
+    t = (text or "").strip()
+    if not t:
+        return True
+    if BOILERPLATE_RE.match(t):
+        return True
+    s = _TEMPLATE_TAIL_RE.sub("", t)
+    s = s.replace("初步定位", "")
+    s = _TAIL_NOISE_RE.sub("", s)
+    s = re.sub(r"^[:：]", "", s)
+    return s in ("", "无", "暂无")
 
 
 @dataclass
@@ -127,7 +146,7 @@ def _section_after(desc: str, labels: list[str]) -> str:
             continue
         t = m.group(1).strip()
         t = re.sub(r"\s+", " ", t)
-        if t and not BOILERPLATE_RE.match(t):
+        if t and not _is_boilerplate(t):
             return t
     return ""
 
@@ -152,10 +171,10 @@ def is_empty_template(description: str, observed: str, expected: str, steps: str
         if not observed and not expected and not steps:
             return True
         # only boilerplate after 问题：
-        if not expected and not steps and (not observed or BOILERPLATE_RE.match(observed)):
+        if not expected and not steps and (not observed or _is_boilerplate(observed)):
             return True
     if re.search(r"测试描述.*前置条件：.*操作步骤：.*预期结果：", compact) and not expected and not steps:
-        if not observed or BOILERPLATE_RE.match(observed):
+        if not observed or _is_boilerplate(observed):
             return True
     return False
 

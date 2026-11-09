@@ -11,13 +11,17 @@ from typing import Any, Mapping
 
 # Canonical RawDefect field → accepted source column names (first hit wins).
 FIELD_ALIASES: dict[str, list[str]] = {
-    "defectId": ["defectId", "缺陷ID", "ID", "id"],
+    # `缺陷单号` is the primary key on the Chinese web export. Missing it made
+    # every row unmappable, which the funnel reports as a cheerful 0-ticket run.
+    "defectId": ["defectId", "缺陷单号", "缺陷ID", "缺陷编号", "ID", "id"],
     "title": ["defectTitle", "缺陷标题", "标题", "title"],
     # Platform typo `describle` is intentional and must stay.
     "description": ["describle", "defectDescribe", "缺陷描述", "描述", "description"],
     "status": ["defectStatus", "缺陷状态", "状态", "status"],
     "flowStatus": ["flowStatusName", "flowStatus", "流程状态"],
-    "testModule": ["testModule", "测试模块"],
+    # `测试模块` is filled at creation, `所属模块` at close. Prefer the former:
+    # one export ships both, with `所属模块` blank on every open ticket.
+    "testModule": ["testModule", "测试模块", "所属模块"],
     "fieldType": ["defectType", "类型", "缺陷类型", "type", "fieldType"],
     "severity": ["severityName", "severity", "严重级别"],
     "createdAt": ["createDate", "createdAt", "创建时间"],
@@ -30,6 +34,9 @@ FIELD_ALIASES: dict[str, list[str]] = {
 }
 
 # Extra columns parked into RawDefect.metadata (not screening inputs).
+# Note: `BatchTicket` has no metadata field, so these are dropped before the
+# artifact is written -- they only survive on the in-memory RawDefect. Kept
+# English-only to match what the platform's English export actually ships.
 METADATA_KEYS = [
     "flowInstId",
     "detectingActivityI18n",
