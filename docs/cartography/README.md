@@ -7,7 +7,7 @@ Agent-2 第一步是**判仓型**，再按仓型画架构图、做路径软匹�
 |---|---|---|---|
 | [micro-frontend.md](micro-frontend.md) | `micro_frontend` | hcp（55 子应用）、hct（21 子应用） | ✅ 完整 |
 | [device-web.md](device-web.md) | `device_web` | camera（4.5 代）、peitao（5.x/Vue2）、transport（5.x/Vue3） | ✅ 完整 |
-| [electron.md](electron.md) | `electron_node` | 无 | ⏳ 待补样本 |
+| [electron.md](electron.md) | `electron_node` | led（多仓容器：Electron 产品 + 外挂 Koa 服务） | ✅ 完整 |
 
 **为什么按类型分文档**：每类的结构、入口约定、定位难点差异极大（微前端是"多子应用可独立部署"，设备 web 是"单包双端 + 设备能力对象"），混在一份里必然写成四不像。共性部分（实现缺陷、分析方法、评分机制）留在本文。
 
@@ -45,9 +45,13 @@ hct/hct                  ✓            N 个 UMD 子应用       micro_frontend
 camera/camera            ✓            单包 index.asp        device_web
 peitao                   ✗            单包 index.asp        device_web
 transport                ✗            单包 index.asp        device_web
+calibrationtool          ✗            exe + fork 子服务      electron_node
 ```
 
-**分水岭是部署形态，不是框架**。
+**分水岭是部署形态，不是框架**。补充两个同型陷阱：
+
+- `vite-plugin-electron` ≠ Electron 应用（`calibration-subsystem` 只是拿它当 Node 打包器）
+- `koa` 依赖 ≠ HTTP 服务端（`calibrationtool/electron` 有 `@types/koa` 但只做 HTTP 客户端，`new Koa` 出现 0 次）
 
 ### 2.2 "设备相关"的代码量不能区分任何一类
 
@@ -73,8 +77,12 @@ hcp 是**管理设备的平台**，调 ISAPI 比设备自身的界面还多。�
 | camera/camera | device_web | ❌ **`micro_frontend`（错类）** | ❌ 空 |
 | peitao | device_web | ❌ `unknown` | ❌ 空 |
 | transport | device_web | ❌ `unknown` | ❌ 空 |
+| calibrationtool | electron_node | ✅ `electron_node` | ⚠️ 有产出，但 3 处错（electron.md §6） |
+| calibration-subsystem | Node 服务（非 electron） | ✅ `unknown` | — |
+| led（容器） | 多仓容器 | ✅ `unknown` | ⚠️ 只给两个 `repo_root`，不递归子仓 |
 
-微前端判对是**运气**（根 `package.json` 恰好有 `single-spa`），设备 web 三仓全错。
+微前端判对是**运气**（根 `package.json` 恰好有 `single-spa`），设备 web 三仓全错，
+electron 判型可用但架构图粒度错。
 
 ### 2.4 实现缺陷清单（D1–D9）
 
@@ -96,6 +104,10 @@ hcp 是**管理设备的平台**，调 ISAPI 比设备自身的界面还多。�
 | D5 | `SPA_APP = r"(?:^\|/)(?:apps?\|packages?\|micro)/([^/]+)/"` | 该仓用 `src/<App>/`，0 匹配 |
 | D6 | `_map_micro_frontend` 用 `if "registerApplication" in f` 判 shell，而 `f` 是**文件路径** | 永远不成立（该字符串在文件**内容**里）→ `entryPoints` 恒空 |
 | D7 | `_list_src_rel(limit=400)` | hcp `src/` 下 10330 个源码文件，只看到 3.9%，且按字母序截断（BI/AccessControl/Attendance…） |
+| D10 | `ELECTRON_MAIN` 正则里 `(?:electron/)?` 是**可选**前缀 | 任何 `main.ts` / `main.vue` 都命中 → `web/src/main.ts`（Vue 入口）被判成主进程 |
+| D11 | `_map_*` 对每个 root 各扫一遍，不去重 | `roots=['.','electron','web']` 时 `electron/electron/main/*` 产出两次（`web:main:main` 重复） |
+| D12 | `ELECTRON_RENDERER` 匹配 `src/(renderer\|pages\|views)` 后按遍历顺序取前 5 | renderer 入口变成 5 个随机业务页；真正的入口 `web/src/main.ts` 反被归入 main |
+| D13 | `discover_repo_roots` 不递归、不读 `.gitmodules` | `led`（容器）只给两个 `repo_root`，子仓不被分类；hcp 的 55 个 submodule 全不可见（同 D4） |
 
 ---
 
@@ -117,12 +129,25 @@ hcp 是**管理设备的平台**，调 ISAPI 比设备自身的界面还多。�
 
 ```text
 device_web      有 src/*.asp 时压过 micro_frontend   ← camera 是判据
+electron_node   deps 精确含 electron（vite-plugin-electron 不算）
 micro_frontend  有 ≥3 个含 vue.app.js 的 src/ submodule
-electron_node   有 electron 主依赖
 unknown         都未达阈值
 ```
 
 **不做无条件覆盖**（修 D1），证据全部累加后一次性裁决。
+
+### 3.1 多仓容器（electron 引入的新场景）
+
+`led` 没有 `package.json`，下挂两个独立仓（各有 `.git`）。这类目录的正确处理：
+
+```text
+led/                     容器 → 不判型，只枚举子仓
+├── calibrationtool/     electron_node
+└── calibration-subsystem/  unknown（Node 服务）
+```
+
+现在的实现给两个 `repo_root` 就停了（D13）。多仓容器在工作目录层面很常见
+（`--work-dir` 指向一个产品目录而不是单个仓），值得单独处理。
 
 ---
 
