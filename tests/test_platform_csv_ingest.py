@@ -1,4 +1,12 @@
+"""Platform-CSV ingest 回归。
+
+四个带 ``@skipif`` 的用例依赖本地脱敏导出（gitignore，不入库），数据在才跑：
+``缺陷拉取/脱敏/``。仓库内稳定回归请用 ``test/fixtures/defect-batch/``。
+"""
+
 from pathlib import Path
+
+import pytest
 
 from bugfix_agent.defect_batch import run_defect_batch_prepare
 from bugfix_agent.ingest import FIELD_ALIASES, load_platform_csv, load_preloaded, row_to_raw_dict
@@ -7,6 +15,13 @@ ROOT = Path(__file__).resolve().parents[1]
 CSV_DIR = ROOT / "缺陷拉取" / "脱敏"
 CSV_87 = CSV_DIR / "PJ14PD20260423284-assignee-87.csv"
 CSV_416 = CSV_DIR / "PJ14PD20260509167-reporter-resolver-416.csv"
+
+skip_no_87 = pytest.mark.skipif(
+    not CSV_87.exists(), reason=f"local deidentified CSV not committed: {CSV_87}"
+)
+skip_no_416 = pytest.mark.skipif(
+    not CSV_416.exists(), reason=f"local deidentified CSV not committed: {CSV_416}"
+)
 
 
 def test_field_map_platform_row():
@@ -40,6 +55,7 @@ def test_describle_alias_listed():
     assert "defectTitle" in FIELD_ALIASES["title"]
 
 
+@skip_no_87
 def test_load_csv_87():
     defects = load_platform_csv(CSV_87)
     assert len(defects) == 87
@@ -48,11 +64,13 @@ def test_load_csv_87():
     assert defects[0].status == "Open"
 
 
+@skip_no_87
 def test_load_preloaded_accepts_csv_path():
     defects = load_preloaded(CSV_87)
     assert len(defects) == 87
 
 
+@skip_no_87
 def test_agent1_prepare_from_platform_csv_beta():
     batch = run_defect_batch_prepare(
         product_line="sample",
@@ -66,6 +84,7 @@ def test_agent1_prepare_from_platform_csv_beta():
     assert all((t.status or "") in {"Open", "New"} for t in functional)
 
 
+@skip_no_416
 def test_agent1_prepare_from_larger_csv_alpha():
     batch = run_defect_batch_prepare(
         product_line="sample",
