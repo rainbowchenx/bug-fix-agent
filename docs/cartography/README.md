@@ -5,8 +5,8 @@ Agent-2 第一步是**判仓型**，再按仓型画架构图、做路径软匹�
 
 | 文档 | 类型 | 样本 | 状态 |
 |---|---|---|---|
-| [micro-frontend.md](micro-frontend.md) | `micro_frontend` | hcp（55 子应用）、hct（21 子应用） | ✅ 完整 |
-| [device-web.md](device-web.md) | `device_web` | camera（4.5 代）、peitao（5.x/Vue2）、transport（5.x/Vue3） | ✅ 完整 |
+| [micro-frontend.md](micro-frontend.md) | `micro_frontend` | hcp（55 submodule）、hct（21 submodule）、camera（7 同仓模块） | ✅ 完整 |
+| [device-web.md](device-web.md) | `device_web` | peitao（5.x/Vue2）、transport（5.x/Vue3） | ✅ 完整（camera 已排除，见 §2.5） |
 | [electron.md](electron.md) | `electron_node` | led（多仓容器：Electron 产品 + 外挂 Koa 服务） | ✅ 完整 |
 
 **为什么按类型分文档**：每类的结构、入口约定、定位难点差异极大（微前端是"多子应用可独立部署"，设备 web 是"单包双端 + 设备能力对象"），混在一份里必然写成四不像。共性部分（实现缺陷、分析方法、评分机制）留在本文。
@@ -39,19 +39,20 @@ Agent-2 第一步是**判仓型**，再按仓型画架构图、做路径软匹�
 （hcp、hct、camera），因为同出一套内部脚手架。其中两个是微前端，一个是设备 web。
 
 ```text
-                         single-spa   部署形态              真类
-hcp/hcp                  ✓            N 个 UMD 子应用       micro_frontend
-hct/hct                  ✓            N 个 UMD 子应用       micro_frontend
-camera/camera            ✓            单包 index.asp        device_web
-peitao                   ✗            单包 index.asp        device_web
-transport                ✗            单包 index.asp        device_web
-calibrationtool          ✗            exe + fork 子服务      electron_node
+                    single-spa  每模块 vue.app.js  双入口 main-pc/mobile  真类
+hcp/hcp             ✓           55 个              ✗                    micro_frontend
+hct/hct             ✓           21 个              ✗                    micro_frontend
+camera/camera       ✓           7 个               ✗                    micro_frontend
+peitao              ✗           0                   ✓                    device_web
+transport           ✗           0                   ✓                    device_web
+calibrationtool     ✗           0                   ✗（有 preload）      electron_node
 ```
 
-**分水岭是部署形态，不是框架**。补充两个同型陷阱：
+**分水岭是「模块怎么切、产物怎么发」，不是框架名，也不是宿主**。补充三个同型陷阱：
 
 - `vite-plugin-electron` ≠ Electron 应用（`calibration-subsystem` 只是拿它当 Node 打包器）
 - `koa` 依赖 ≠ HTTP 服务端（`calibrationtool/electron` 有 `@types/koa` 但只做 HTTP 客户端，`new Koa` 出现 0 次）
+- `src/*.asp` + `project_config.json` ≠ device_web（camera 两者都有，却是微前端，见 §2.5）
 
 ### 2.2 "设备相关"的代码量不能区分任何一类
 
@@ -59,7 +60,7 @@ calibrationtool          ✗            exe + fork 子服务      electron_node
 |---|---|---|---|
 | hcp/hcp | micro_frontend | **128** | **1205** |
 | transport | device_web | 64 | 56 |
-| camera/camera | device_web | 36 | 37 |
+| camera/camera | micro_frontend | 36 | 37 |
 | peitao | device_web | 1 | 15 |
 
 hcp 是**管理设备的平台**，调 ISAPI 比设备自身的界面还多。这条思路比框架名更容易踩坑，
@@ -74,17 +75,18 @@ hcp 是**管理设备的平台**，调 ISAPI 比设备自身的界面还多。�
 |---|---|---|---|
 | hcp/hcp | micro_frontend | ✅ `micro_frontend` | ❌ 空（只有兜底 `mf`） |
 | hct/hct | micro_frontend | ✅ `micro_frontend` | ❌ 空 |
-| camera/camera | device_web | ❌ **`micro_frontend`（错类）** | ❌ 空 |
+| camera/camera | micro_frontend | ⚠️ `micro_frontend`（**判对但靠运气**） | ❌ 空 |
 | peitao | device_web | ❌ `unknown` | ❌ 空 |
 | transport | device_web | ❌ `unknown` | ❌ 空 |
 | calibrationtool | electron_node | ✅ `electron_node` | ⚠️ 有产出，但 3 处错（electron.md §6） |
 | calibration-subsystem | Node 服务（非 electron） | ✅ `unknown` | — |
 | led（容器） | 多仓容器 | ✅ `unknown` | ⚠️ 只给两个 `repo_root`，不递归子仓 |
 
-微前端判对是**运气**（根 `package.json` 恰好有 `single-spa`），设备 web 三仓全错，
-electron 判型可用但架构图粒度错。
+微前端判对是**运气**（根 `package.json` 恰好有 `single-spa`；真正普适的判据
+`src/*/vue.app.js` 计数、`index.html` mount div、UMD 模块产物一个都没用上），
+设备 web 两仓全错，electron 判型可用但架构图粒度错。
 
-### 2.4 实现缺陷清单（D1–D9）
+### 2.4 实现缺陷清单（D1–D13）
 
 判型侧：
 
@@ -94,7 +96,7 @@ electron 判型可用但架构图粒度错。
 | D2 | 微前端只认 `single-spa` / `@single-spa/devtools` | qiankun / wujie / micro-app / Module Federation 全判 `unknown` |
 | D3 | `device_web` 靠根目录名匹配 `bridge\|jsbridge\|device-web\|webview` | 命名习惯一变就全错 |
 | D8 | 该正则（含 `native-?api`）对 **5 个真实仓命中 0 次** | `device_web` 是死分支，生产上从未产生过这个分类 |
-| D9 | `single-spa` 同时是微前端与设备 web（4.5 代）的特征 | 不按部署形态判断必然错类，camera 即证据 |
+| D9 | ~~`single-spa` 同时是两类特征~~ **此条已撤销** | 曾据 `.asp` + `project_config.json` 把 camera 判成 device_web。复查后 camera 有 7 个 `vue.app.js` + UMD 模块产物，确属微前端；`.asp` / `project_config.json` 是**宿主标记**，与架构类型正交 |
 
 架构图侧：
 
@@ -108,6 +110,58 @@ electron 判型可用但架构图粒度错。
 | D11 | `_map_*` 对每个 root 各扫一遍，不去重 | `roots=['.','electron','web']` 时 `electron/electron/main/*` 产出两次（`web:main:main` 重复） |
 | D12 | `ELECTRON_RENDERER` 匹配 `src/(renderer\|pages\|views)` 后按遍历顺序取前 5 | renderer 入口变成 5 个随机业务页；真正的入口 `web/src/main.ts` 反被归入 main |
 | D13 | `discover_repo_roots` 不递归、不读 `.gitmodules` | `led`（容器）只给两个 `repo_root`，子仓不被分类；hcp 的 55 个 submodule 全不可见（同 D4） |
+
+### 2.5 一次误判的复盘：宿主 ≠ 架构
+
+最初把 `camera/camera` 归为 `device_web`，依据是三个"看起来很设备"的信号：
+
+```text
+src/*.asp           → 设备内置 ASP 服务托管页面
+src/project_config.json → deviceType / pluginVersion / localService
+Common/service/device.js → PTZ / 雨刷 / 鱼眼 设备能力对象
+```
+
+三条全对，结论却错。camera 的真实结构是：
+
+```text
+src/index.html   7 个 mount div
+src/<Module>/vue.app.js   7 个，每个 import singleSpaVue，el 与 div 一一对应
+build/helper/build.js:703  自动生成 autoloader.js
+build/helper/build.js:717  output.library = 'HCPModule_' + module（UMD）
+```
+
+**它是微前端，只是部署在设备上。** 而 peitao/transport（真 device_web）同样有
+`.asp` 与 `project_config.json` —— 这两个文件只能证明"跑在设备上"，不能证明"怎么切模块"。
+
+修正后的判据把「宿主」和「架构」分开：
+
+| 轴 | 取值 | 从哪看 | 进不进判型 |
+|---|---|---|---|
+| 架构 | 微前端 / 单体双端 / 桌面 | `vue.app.js` 计数、UMD 产物、双入口、preload | ✅ 判型依据 |
+| 宿主 | 设备 ASP / Web 服务器 / exe | `*.asp`、`project_config.json`、`electron-builder` | ❌ 只记 `notes` |
+
+**教训**：判类型要先问"代码怎么组织、产物怎么发"，再问"跑在哪"。
+顺序反了就会像我这次一样，被三个正确的信号带到一个错误的结论。
+
+### 2.6 新旧判据对账（五仓实测）
+
+用两条结构判据（`vue.app.js` 计数 / 双入口）就能全部分对：
+
+```text
+仓                 双入口  vue.app.js  single-spa   新判据结论        现实现
+hcp/hcp             .          48          Y        micro_frontend ✓   ✓（靠运气）
+hct/hct             .          22          Y        micro_frontend ✓   ✓（靠运气）
+camera/camera       .           7          Y        micro_frontend ✓   ✓（靠运气）
+peitao              Y           0          .        device_web     ✓   ✗ unknown
+transport           Y           0          .        device_web     ✓   ✗ unknown
+calibrationtool     .           0          .        electron_node  —    ✓（架构图有错）
+```
+
+新判据 **5/5**，现实现 **2/5**（两个对的都只是"`deps` 里恰好有 `single-spa`"）。
+
+注意 `vue.app.js` 计数与模块数不等（hcp 48 vs 55 个 submodule、hct 22 vs 21），
+因为部分 submodule 未 checkout —— 判型只需 `≥3`，不受影响；但**建 `modules[]` 时必须
+用 `.gitmodules` 或 `index.html` 的 mount div，不能靠目录扫描**。
 
 ---
 
@@ -125,16 +179,20 @@ electron 判型可用但架构图粒度错。
 冲突     → 按类间优先级仲裁，不按命中顺序
 ```
 
-类间优先级（由反例倒推）：
+三条判据轴**互不重叠**，不需要"谁压过谁"：
 
 ```text
-device_web      有 src/*.asp 时压过 micro_frontend   ← camera 是判据
-electron_node   deps 精确含 electron（vite-plugin-electron 不算）
-micro_frontend  有 ≥3 个含 vue.app.js 的 src/ submodule
+micro_frontend  src/*/vue.app.js ≥3（同仓或 submodule 皆可）+ 模块级 UMD 产物
+device_web      main-pc.js + main-mobile.js 双入口，且全仓 vue.app.js = 0
+electron_node   deps 精确含 electron（vite-plugin-electron 不算）+ preload/contextBridge
 unknown         都未达阈值
 ```
 
 **不做无条件覆盖**（修 D1），证据全部累加后一次性裁决。
+
+> 「部署宿主」（设备 ASP / Web 服务器 / 桌面 exe）是**另一个轴**，记进
+> `architecture.notes`，不参与判型。曾经的错误规则「`src/*.asp` 压过 micro_frontend」
+> 已撤销——camera 同时有 `.asp` 与 `vue.app.js`，宿主机 ≠ 架构。
 
 ### 3.1 多仓容器（electron 引入的新场景）
 
