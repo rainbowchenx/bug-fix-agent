@@ -18,7 +18,7 @@ SOP 细节以 `agent1/skills/defect-batch-prepare/SKILL.md` 为准；本页只�
 
 你能做的事：
 - 把平台导出转成批次：CSV/JSON 直接进规则管线；xlsx 先用 `agent1 xlsx-to-raw` 转成 raw-defects，不要现场另写转换脚本。
-- 调用规则管线做蒸馏、筛选（漏斗）、L1 测试模块 / L2 标题括注分簇，以及启发式 L3 意图。同一份导出应得到同一份漏斗。
+- 调用规则管线做蒸馏、筛选（漏斗）、L1 测试模块 / L2 标题括注分簇，以及启发式 L3 意图。规则阶段是确定的：同一份导出、同样的参数，得到同一份漏斗。复核会改池，所以终态 = 规则产物 + 你写的 review.json，两个都要交。
 - 规则跑完后，对照原始缺陷描述判断分类对不对。描述往往不规范，关键词规则会漏或分错；你负责理解「这张单在说什么」，校正 intent，并在必要时把票在 strict / locatable_only / needs_info 之间调整。
 - 解释漏斗：多少进了可匹配池，多少因安全、CVE、作废、重复被旁路。
 - 校验并交出 defect-batch.json。后续步骤默认只处理 strict、locatable_only、needs_info。
@@ -40,6 +40,9 @@ SOP 细节以 `agent1/skills/defect-batch-prepare/SKILL.md` 为准；本页只�
 4. 用 apply-review 回写，让脚本重建簇和漏斗，不要手改 clusterId / clusters[] / funnel。
    bugfix-agent apply-review --batch defect-batch.json --overrides review.json --out defect-batch.json
 5. 没有需要改的票就不要空跑，直接把规则产物交出去，并说明为什么不用改。
+6. 报告里的数字照抄命令输出，不要自己数：prepare-batch / apply-review 会打印
+   clusters {total, singleton, largest} 和漏斗；preflight 会打印语义空模块占比。
+   语义空模块占比高（≥30%）时，直说"分簇基本无效"，不要把簇表当成有意义的分组。
 
 意图只能落在这个封闭集合：
 ui_layout, i18n, logic, data_wrong, perf, compat, config, security_scan, crash, unclear。
@@ -50,7 +53,9 @@ ui_layout, i18n, logic, data_wrong, perf, compat, config, security_scan, crash, 
 当前拉取（MCP/爬虫）仍不可用，只用用户提供的预置文件。只有**源文件缺失**时才问；
 productLine 与 posture 都能自己定（见上），不要为它们停下来。
 
-完成后简短说明：总票数、漏斗、复核改了多少张、终态文件路径。需要字段含义时读 docs/contracts/v0.1/defect-batch-guide.md。
+完成后简短说明：总票数、漏斗、复核改了多少张、终态文件路径。
+需要字段含义时读 skill 里的 `references/defect-batch-guide.md`（随 skill 一起安装）；
+`docs/contracts/…` 之类路径只存在于源码仓，在这里打不开，不要去找。
 ```
 
 ---
