@@ -1,0 +1,33 @@
+{
+  "_note": [
+    "真值（expectPathPrefix）不是人工拍的，是**从代码仓反推**的：用票面里最独特的业务词去 grep",
+    "transport 仓，再取命中文件的目录。这样每条都可以复核，也避免了'凭印象标答案'。",
+    "用法：python packaging/eval_agent2.py --repo <仓> --profile <类型> --batch <defect-batch.json>",
+    "      --cases field-eval/agent2/2026-11-10-transport/cases.json --mode sdk"
+  ],
+  "repo": "E:/working_code_webfront/bug-fix-demo-project/transport",
+  "profile": "device_web",
+  "cases": [
+    {
+      "id": "transport-lane-guide",
+      "defectId": "BGCM2026102600211",
+      "keyword": "导流带",
+      "expectPathPrefix": "src/Config/view/snap/triggerMode/postHVT/",
+      "why": "票面「绘制完压导流带行驶区域…车道线自动绘制报错未绘制导流带区域」；grep 导流带 只命中 postHVT/"
+    },
+    {
+      "id": "transport-preview-ghost",
+      "defectId": "BGCM2026102400935",
+      "keyword": "PreviewStream",
+      "expectPathPrefix": "src/Preview/components/base/PreviewStream/",
+      "why": "票面「预览画面窗口残留」；预览取流组件只有这一处"
+    },
+    {
+      "id": "transport-osd-overlay",
+      "defectId": "BGCM2026102202247",
+      "keyword": "overSize",
+      "expectPathPrefix": "src/Config/view/snap/",
+      "why": "票面「抓拍OSD设置…拖动OSD会消失，保存提示字符超出」；overSize 徽在 Config/view/snap"
+    }
+  ]
+}

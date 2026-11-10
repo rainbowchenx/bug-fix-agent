@@ -1,0 +1,348 @@
+{
+  "mode": "sdk",
+  "profile": "device_web",
+  "repo": "E:\\working_code_webfront\\bug-fix-demo-project\\transport",
+  "elapsedSeconds": 566.1,
+  "maxTurns": "60",
+  "enrich": [
+    "enrich=sdk_fallback; sdk cartography failed: Reached maximum number of turns (60)"
+  ],
+  "diagnostics": [
+    "[agent2] enrich=sdk_fallback; sdk cartography failed: Reached maximum number of turns (60)"
+  ],
+  "hitAt1": "0/3",
+  "hitAt3": "0/3",
+  "rows": [
+    {
+      "id": "transport-lane-guide",
+      "defectId": "BGCM2026102600211",
+      "expect": "src/Config/view/snap/triggerMode/postHVT/",
+      "hit1": false,
+      "hit3": false,
+      "confidence": "medium",
+      "nCandidates": 3,
+      "top1": "src/Router/mobile.js",
+      "candidates": [
+        "src/Router/mobile.js",
+        "src/Router/pc.js",
+        "src/main-mobile.js"
+      ]
+    },
+    {
+      "id": "transport-preview-ghost",
+      "defectId": "BGCM2026102400935",
+      "expect": "src/Preview/components/base/PreviewStream/",
+      "hit1": false,
+      "hit3": false,
+      "confidence": "medium",
+      "nCandidates": 3,
+      "top1": "src/Router/mobile.js",
+      "candidates": [
+        "src/Router/mobile.js",
+        "src/Router/pc.js",
+        "src/main-mobile.js"
+      ]
+    },
+    {
+      "id": "transport-osd-overlay",
+      "defectId": "BGCM2026102202247",
+      "expect": "src/Config/view/snap/",
+      "hit1": false,
+      "hit3": false,
+      "confidence": "medium",
+      "nCandidates": 3,
+      "top1": "src/Router/mobile.js",
+      "candidates": [
+        "src/Router/mobile.js",
+        "src/Router/pc.js",
+        "src/main-mobile.js"
+      ]
+    }
+  ],
+  "knowledge": {
+    "schemaVersion": "0.1.0",
+    "productLine": "PJ01PM20260711040",
+    "workDir": "E:\\working_code_webfront\\bug-fix-demo-project\\transport",
+    "partial": false,
+    "generatedAt": "2026-11-10T07:02:46.178974Z",
+    "repoRoots": [
+      {
+        "path": ".",
+        "gitHead": "92ed6fc0cf03035523dc8d6da656b083a60722cb",
+        "fingerprint": "web5.0-framework@1.0.0"
+      }
+    ],
+    "cartographyProfile": "device_web",
+    "secondaryHints": [
+      "caller:device_web",
+      ".:dual-entry",
+      "enrich=sdk_fallback; sdk cartography failed: Reached maximum number of turns (60)"
+    ],
+    "techStack": {
+      "languages": [
+        "javascript",
+        "typescript"
+      ],
+      "frameworks": [],
+      "notes": "profile=device_web (caller-supplied)"
+    },
+    "architecture": {
+      "summary": "Device-web dual-entry map (pc/mobile + device.js) across 1 repo root(s); cartography enrich skipped (heuristic mode)",
+      "entryPoints": [
+        "src/main-pc.js",
+        "src/main-mobile.js",
+        "src/Router/pc.js",
+        "src/Router/mobile.js"
+      ],
+      "modules": [
+        {
+          "id": "device.js",
+          "path": "src/Common/service/device.js",
+          "role": "device_capability",
+          "shared": null,
+          "notes": "capability object — prefer over views for greyed-out features"
+        },
+        {
+          "id": "jsWebControl",
+          "path": "src/Common/libs/jsWebControl",
+          "role": "device_bridge",
+          "shared": null,
+          "notes": "real bridge (jsWebControl), not a path named bridge"
+        },
+        {
+          "id": "host-asp",
+          "path": "src/index.asp",
+          "role": "host",
+          "shared": null,
+          "notes": "host=device-asp — not an architecture type"
+        }
+      ]
+    },
+    "conventions": {
+      "fromClaudeMd": [
+        "CLAUDE.md",
+        "This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.",
+        "Project Overview",
+        "This is a Hikvision DeviceWeb 5.0 project - a hybrid front-end framework for device web interfaces. It's a Vue 3 application using the Light Front CLI (lft) build system with support for both PC and m",
+        "**Key Technologies:**",
+        "- Vue 3 (Options API style)",
+        "- Vuex for state management",
+        "- Vue Router for routing",
+        "- Element Plus UI component library",
+        "- Webpack-based custom build system",
+        "- i18n support for 40+ languages",
+        "Repository Structure",
+        "```",
+        "transport/",
+        "├── src/",
+        "│   ├── BasicFramework/      # Submodule: Core framework code",
+        "│   ├── Common/              # Shared utilities, components, services",
+        "│   │   ├── components/      # Reusable Vue components (pc/mobile)",
+        "│   │   ├── service/         # API services (device, request, common)",
+        "│   │   ├── utils/           # Utility functions",
+        "│   │   ├── assets/          # Styles, fonts, images",
+        "│   │   └── static/i18n/     # Internationalization files",
+        "│   ├── Config/              # Configuration module (network, system, etc.)",
+        "│   ├── Preview/             # Live preview module",
+        "│   ├── Playback/            # Video playback module",
+        "│   ├── Portal/              # Portal/login module",
+        "│   ├── Radar/               # Radar module",
+        "│   ├── RapidConfig/         # Quick config module",
+        "│   ├── SmartShow/           # Smart display module",
+        "│   ├── TagSearch/           # Tag search module"
+      ],
+      "fromRules": []
+    },
+    "boundSkills": [
+      "code-cartography",
+      "electron-process-boundary",
+      "hierarchical-localization",
+      "monorepo-workspace"
+    ],
+    "specAtlas": {
+      "frameworkId": "unknown",
+      "entries": [
+        {
+          "path": "CLAUDE.md",
+          "kind": "guide",
+          "source": "repo_root"
+        },
+        {
+          "path": "./.claude/skills/assistantengine-mcp",
+          "kind": "skill",
+          "source": "claude_dir"
+        },
+        {
+          "path": "./.claude/skills/component-spec-generator",
+          "kind": "skill",
+          "source": "claude_dir"
+        },
+        {
+          "path": "./.claude/skills/trellis-before-dev",
+          "kind": "skill",
+          "source": "claude_dir"
+        },
+        {
+          "path": "./.claude/skills/trellis-brainstorm",
+          "kind": "skill",
+          "source": "claude_dir"
+        },
+        {
+          "path": "./.claude/skills/trellis-break-loop",
+          "kind": "skill",
+          "source": "claude_dir"
+        },
+        {
+          "path": "./.claude/skills/trellis-channel",
+          "kind": "skill",
+          "source": "claude_dir"
+        },
+        {
+          "path": "./.claude/skills/trellis-check",
+          "kind": "skill",
+          "source": "claude_dir"
+        },
+        {
+          "path": "./.claude/skills/trellis-init",
+          "kind": "skill",
+          "source": "claude_dir"
+        },
+        {
+          "path": "./.claude/skills/trellis-meta",
+          "kind": "skill",
+          "source": "claude_dir"
+        },
+        {
+          "path": "./.claude/skills/trellis-mock-data-generator",
+          "kind": "skill",
+          "source": "claude_dir"
+        },
+        {
+          "path": "./.claude/skills/trellis-phase-time",
+          "kind": "skill",
+          "source": "claude_dir"
+        },
+        {
+          "path": "./.claude/skills/trellis-protocol-guide",
+          "kind": "skill",
+          "source": "claude_dir"
+        },
+        {
+          "path": "./.claude/skills/trellis-session-insight",
+          "kind": "skill",
+          "source": "claude_dir"
+        },
+        {
+          "path": "./.claude/skills/trellis-spec-bootstrap",
+          "kind": "skill",
+          "source": "claude_dir"
+        },
+        {
+          "path": "./.claude/skills/trellis-update-spec",
+          "kind": "skill",
+          "source": "claude_dir"
+        },
+        {
+          "path": "./.claude/skills/use-hc-ui-for-device",
+          "kind": "skill",
+          "source": "claude_dir"
+        }
+      ],
+      "drDs": [],
+      "bindings": []
+    },
+    "capabilities": {
+      "codeGraph": false,
+      "runtimeVerify": false
+    },
+    "defectCodeMatches": [
+      {
+        "defectId": "BGCM2026102202247",
+        "clusterId": "PJ01PM20260711040::基本功能检查表-按前端区分::基本功能检查表-按前端区分::ui_layout",
+        "title": "[基本功能检查表-按前端区分] 抓拍OSD设置【在图上叠加】时，选择所有叠加项，在小图上拖动osd的位置，osd会消失，保存会提示【字符超出图片范围】",
+        "candidates": [
+          {
+            "repoPath": ".",
+            "path": "src/Router/mobile.js",
+            "symbol": null,
+            "why": "dual-entry from title/titleTag/testModule/intent",
+            "source": "grep"
+          },
+          {
+            "repoPath": ".",
+            "path": "src/Router/pc.js",
+            "symbol": null,
+            "why": "dual-entry from title/titleTag/testModule/intent",
+            "source": "grep"
+          },
+          {
+            "repoPath": ".",
+            "path": "src/main-mobile.js",
+            "symbol": null,
+            "why": "dual-entry from title/titleTag/testModule/intent",
+            "source": "grep"
+          }
+        ],
+        "confidence": "medium"
+      },
+      {
+        "defectId": "BGCM2026102400935",
+        "clusterId": "PJ01PM20260711040::基本功能检查表-图像翻转::基本功能检查表-图像翻转::ui_layout",
+        "title": "[基本功能检查表-图像翻转] web预览页面经常出现预览画面窗口残留的情况，只能关闭窗口重新打开",
+        "candidates": [
+          {
+            "repoPath": ".",
+            "path": "src/Router/mobile.js",
+            "symbol": null,
+            "why": "dual-entry from title/titleTag/testModule/intent",
+            "source": "grep"
+          },
+          {
+            "repoPath": ".",
+            "path": "src/Router/pc.js",
+            "symbol": null,
+            "why": "dual-entry from title/titleTag/testModule/intent",
+            "source": "grep"
+          },
+          {
+            "repoPath": ".",
+            "path": "src/main-mobile.js",
+            "symbol": null,
+            "why": "dual-entry from title/titleTag/testModule/intent",
+            "source": "grep"
+          }
+        ],
+        "confidence": "medium"
+      },
+      {
+        "defectId": "BGCM2026102600211",
+        "clusterId": "PJ01PM20260711040::基本功能检查表-卡警模式::基本功能检查表-卡警模式::logic",
+        "title": "[基本功能检查表-卡警模式] 绘制完压导流带行驶区域后，使用车道线自动绘制时候，会报错【未绘制导流带区域】",
+        "candidates": [
+          {
+            "repoPath": ".",
+            "path": "src/Router/mobile.js",
+            "symbol": null,
+            "why": "dual-entry from title/titleTag/testModule/intent",
+            "source": "grep"
+          },
+          {
+            "repoPath": ".",
+            "path": "src/Router/pc.js",
+            "symbol": null,
+            "why": "dual-entry from title/titleTag/testModule/intent",
+            "source": "grep"
+          },
+          {
+            "repoPath": ".",
+            "path": "src/main-mobile.js",
+            "symbol": null,
+            "why": "dual-entry from title/titleTag/testModule/intent",
+            "source": "grep"
+          }
+        ],
+        "confidence": "medium"
+      }
+    ]
+  }
+}

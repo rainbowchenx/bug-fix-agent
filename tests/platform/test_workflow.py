@@ -29,6 +29,8 @@ def test_workflow_e2e(tmp_path: Path):
         product_line="hc",
         posture="alpha",
         defect_batch=defect_batch_from_hc1(),
+        analyze_mode="heuristic",
+        cartography_mode="heuristic",
         open_mr=False,
         cartography_profile="electron_node",
     )
@@ -54,6 +56,8 @@ def test_workflow_hard_stop_invalid_agent2():
         product_line="hc",
         posture="alpha",
         defect_batch=defect_batch_from_hc1(),
+        analyze_mode="heuristic",
+        cartography_mode="heuristic",
         agent2=bad_agent2,
     )
     assert result.ok is False

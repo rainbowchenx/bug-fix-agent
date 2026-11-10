@@ -65,6 +65,8 @@ def test_langgraph_skip_agent2_and_3(tmp_path: Path):
         product_line="hc",
         posture="alpha",
         defect_batch=defect_batch_from_hc1(),
+        analyze_mode="heuristic",
+        cartography_mode="heuristic",
         skip_agent2=True,
         skip_agent3=True,
     )
@@ -84,6 +86,8 @@ def test_langgraph_hard_stop_invalid_agent2():
         product_line="hc",
         posture="alpha",
         defect_batch=defect_batch_from_hc1(),
+        analyze_mode="heuristic",
+        cartography_mode="heuristic",
         agent2=bad_agent2,
     )
     assert result.ok is False

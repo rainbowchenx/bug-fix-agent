@@ -88,3 +88,14 @@ def test_both_clis_load_cwd_dotenv(tmp_path: Path, monkeypatch, capsys):
     with pytest.raises(SystemExit):
         platform_cli.main(["--help"])
     assert os.environ["BFX_MARK"] == "loaded-by-cli"
+
+
+def test_default_path_never_reads_repo_dotenv(tmp_path: Path, monkeypatch):
+    """默认路径是 CWD/.env —— 测试必须切 cwd，否则会把真凭据注入整个 pytest 进程。
+
+    踩过的坑：`load_env_file()` 不传参跑在仓根，把 .env 里的 ANTHROPIC_* 灌进
+    os.environ，后面的 e2e 测试就真的去调 SDK 了（一次 581s、还花钱）。
+    """
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text("BFX_C=from-cwd\n", encoding="utf-8")
+    assert load_env_file()["BFX_C"] == "from-cwd"

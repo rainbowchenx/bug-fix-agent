@@ -14,6 +14,10 @@ from bugfix_platform.sdk.skills import skills_system_addon
 
 CartographyMode = Literal["heuristic", "sdk"]
 
+# 提示词里带给模型的票数上限。Agent-2 以 SDK 为准，票给全比省 token 重要；
+# 这个数只防提示词爆炸，不参与匹配、不参与产物统计。
+MAX_PROMPT_TICKETS = 80
+
 # Thorough read session: Bash allowed for read-only exploration; no mutate tools.
 CARTOGRAPHY_TOOLS = ["Read", "Glob", "Grep", "Bash"]
 DISALLOWED_TOOLS = ["Edit", "Write", "NotebookEdit", "MultiEdit"]
@@ -389,7 +393,7 @@ def _build_prompt(req: CartographyRequest) -> str:
         }
         for t in req.defect_batch.tickets
         if t.pool in ("strict", "locatable_only", "needs_info")
-    ][:40]
+    ][:MAX_PROMPT_TICKETS]
     baseline = {
         "cartographyProfile": req.baseline.cartographyProfile,
         "secondaryHints": req.baseline.secondaryHints,
@@ -397,7 +401,9 @@ def _build_prompt(req: CartographyRequest) -> str:
         "architecture": req.baseline.architecture.model_dump(),
         "conventions": req.baseline.conventions.model_dump(),
         "boundSkills": req.baseline.boundSkills,
-        "defectCodeMatches": [m.model_dump() for m in req.baseline.defectCodeMatches][:40],
+        "defectCodeMatches": [
+            m.model_dump() for m in req.baseline.defectCodeMatches
+        ][:MAX_PROMPT_TICKETS],
         "partial": req.baseline.partial,
     }
     playbook = profile_reading_playbook(req.baseline.cartographyProfile)
