@@ -4,11 +4,14 @@
 这是三类里唯一需要处理"一个工作目录里有多个仓、多种技术栈"的类型。
 
 - 契约枚举：`electron_node`（`contracts/bugfix_contracts/code_knowledge.py:CartographyProfile`）
-- 现有判型：`platform/bugfix_platform/agents/cartographer/detect.py` —— `deps` 含 `electron` / `electron-builder` / `electron-vite`
-- 现有架构图：`platform/bugfix_platform/agents/cartographer/architecture.py:_map_electron()`
+- 判型：**不在 Agent-2**，由调用方传入 `--cartography-profile electron_node`
+- 架构图：`platform/bugfix_platform/agents/cartographer/architecture.py:_map_electron()`
 
-**与另两类最大的不同**：这一类的判型**现阶段基本可用**（实测 `calibrationtool` → `electron_node` ✓），
-问题集中在**架构图粒度**：进程边界抓错了文件、外挂服务完全不可见、跨进程调用链没建。
+**与另两类最大的不同**：这一类的难点全在**读清单**——进程边界、IPC 前缀到 `controller/` 的映射、
+fork 出去的外挂服务。判型现在由调用方给，不再是问题。
+
+（下文 §5–§6 的"现有实现"记录的是改造**前**的 `_map_electron`；改造后实测
+`led` 产出 28 个 module、11 个 IPC 域、fork 绑定，见 `docs/cartography/README.md` §2.6。）
 
 ---
 
@@ -322,7 +325,10 @@ mainWin.loadFile(indexHtml)   ← 主进程里显式加载的文件
 
 ---
 
-## 6. 现有实现的产出（实测）
+## 6. 改造前的产出（历史记录）
+
+改造**前**的 `_map_electron` 产出。保留这段是因为三个错误值钱（改造后已修，
+新产出见 README §2.6：`led` 28 modules / 11 IPC 域 / fork 绑定）。
 
 `calibrationtool`（判型正确，架构图有问题）：
 

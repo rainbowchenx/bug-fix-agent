@@ -67,50 +67,55 @@ calibrationtool     ✗           0                   ✗（有 preload）      
 hcp 是**管理设备的平台**，调 ISAPI 比设备自身的界面还多。这条思路比框架名更容易踩坑，
 因为它符合直觉。
 
-### 2.3 现在的实现：三类中两类是错的
+### 2.3 实现现状：判型已取消
 
-判型 `platform/bugfix_platform/agents/cartographer/detect.py:detect_cartography_profile()`，
-架构图 `platform/bugfix_platform/agents/cartographer/architecture.py:_map_*()`。五个真实仓实测：
+`detect_cartography_profile()` 现在**只收集技术栈线索，不再输出类型**，固定返回 `unknown`；
+`cartographyProfile` 由调用方给定（`--cartography-profile` / `options.cartographyProfile`），
+`architecture.py` 按给定类型定点读清单（catalog），`sdk/cartography.py` 也不允许 SDK 重新分类。
 
-| 仓 | 真类 | 现有实现判成 | 架构图产出 |
-|---|---|---|---|
-| hcp/hcp | micro_frontend | ✅ `micro_frontend` | ❌ 空（只有兜底 `mf`） |
-| hct/hct | micro_frontend | ✅ `micro_frontend` | ❌ 空 |
-| camera/camera | micro_frontend | ⚠️ `micro_frontend`（**判对但靠运气**） | ❌ 空 |
-| peitao | device_web | ❌ `unknown` | ❌ 空 |
-| transport | device_web | ❌ `unknown` | ❌ 空 |
-| calibrationtool | electron_node | ✅ `electron_node` | ⚠️ 有产出，但 3 处错（electron.md §6） |
-| calibration-subsystem | Node 服务（非 electron） | ✅ `unknown` | — |
-| led（容器） | 多仓容器 | ✅ `unknown` | ⚠️ 只给两个 `repo_root`，不递归子仓 |
+这个决定的直接后果：**下面 D1/D2/D3/D8/D9 那批"判型缺陷"整体作废**——不是修好了，
+是那条路被删掉了。判据仍然有用，但它现在是**给人/上游填 profile 用的**，不是 Agent-2 的代码。
 
-微前端判对是**运气**（根 `package.json` 恰好有 `single-spa`；真正普适的判据
-`src/*/vue.app.js` 计数、`index.html` mount div、UMD 模块产物一个都没用上），
-设备 web 两仓全错，electron 判型可用但架构图粒度错。
+### 2.4 实现缺陷清单（D1–D13 的现状）
 
-### 2.4 实现缺陷清单（D1–D13）
+判型侧（已随"取消判型"整体消解）：
 
-判型侧：
-
-| # | 缺陷 | 后果 |
+| # | 原缺陷 | 现状 |
 |---|---|---|
-| D1 | 循环里 `profile = "electron_node"` 无条件赋值 | 多仓混合时结果取决于目录遍历顺序；另两个分支却有 `if profile == "unknown"` 保护，优先级不自洽 |
-| D2 | 微前端只认 `single-spa` / `@single-spa/devtools` | qiankun / wujie / micro-app / Module Federation 全判 `unknown` |
-| D3 | `device_web` 靠根目录名匹配 `bridge\|jsbridge\|device-web\|webview` | 命名习惯一变就全错 |
-| D8 | 该正则（含 `native-?api`）对 **5 个真实仓命中 0 次** | `device_web` 是死分支，生产上从未产生过这个分类 |
-| D9 | ~~`single-spa` 同时是两类特征~~ **此条已撤销** | 曾据 `.asp` + `project_config.json` 把 camera 判成 device_web。复查后 camera 有 7 个 `vue.app.js` + UMD 模块产物，确属微前端；`.asp` / `project_config.json` 是**宿主标记**，与架构类型正交 |
+| D1 | electron 分支无条件覆盖 | 消解：无分支 |
+| D2 | 只认 `single-spa` | 消解：不探测 |
+| D3 | `device_web` 靠根目录名正则 | 降级：只剩 `device-bridge-path` 一条 hint，不参与定型 |
+| D8 | `BRIDGE` 正则五仓命中 0 次 | 消解：`_map_device_web` 改用 `jsWebControl` / `service/device.js` 实际路径 |
+| D9 | `single-spa` 同时是两类特征 | 已撤销，见 §2.5 |
 
-架构图侧：
+架构图侧（本次逐条复验）：
 
-| # | 缺陷 | 后果 |
+| # | 原缺陷 | 现状 |
 |---|---|---|
-| D4 | `discover_repo_roots()` 只扫根 + **深度 1** | submodule 在 `src/<App>`（深度 2）→ hcp 的 55 个子应用全部不可见，`repoRoots` 只有 `['.']` |
-| D5 | `SPA_APP = r"(?:^\|/)(?:apps?\|packages?\|micro)/([^/]+)/"` | 该仓用 `src/<App>/`，0 匹配 |
-| D6 | `_map_micro_frontend` 用 `if "registerApplication" in f` 判 shell，而 `f` 是**文件路径** | 永远不成立（该字符串在文件**内容**里）→ `entryPoints` 恒空 |
-| D7 | `_list_src_rel(limit=400)` | hcp `src/` 下 10330 个源码文件，只看到 3.9%，且按字母序截断（BI/AccessControl/Attendance…） |
-| D10 | `ELECTRON_MAIN` 正则里 `(?:electron/)?` 是**可选**前缀 | 任何 `main.ts` / `main.vue` 都命中 → `web/src/main.ts`（Vue 入口）被判成主进程 |
-| D11 | `_map_*` 对每个 root 各扫一遍，不去重 | `roots=['.','electron','web']` 时 `electron/electron/main/*` 产出两次（`web:main:main` 重复） |
-| D12 | `ELECTRON_RENDERER` 匹配 `src/(renderer\|pages\|views)` 后按遍历顺序取前 5 | renderer 入口变成 5 个随机业务页；真正的入口 `web/src/main.ts` 反被归入 main |
-| D13 | `discover_repo_roots` 不递归、不读 `.gitmodules` | `led`（容器）只给两个 `repo_root`，子仓不被分类；hcp 的 55 个 submodule 全不可见（同 D4） |
+| D5 | `SPA_APP` 正则不认 `src/<App>/` | ✅ 修：改读 `.gitmodules` + `index.html` mount div + `vue.app.js` |
+| D6 | `if "registerApplication" in f`（f 是路径） | ✅ 修：不再靠字符串猜 shell |
+| D7 | `_list_src_rel(limit=400)` | ✅ 修：`_walk_files` 默认 50k，且 src 优先排序 |
+| D10 | `ELECTRON_MAIN` 可选前缀 | ✅ 修：主进程来自 `package.json:main` + `electron/electron/main/` |
+| D11 | 多 root 重复产出 | ✅ 修：`_dedupe` / `_dedupe_modules` |
+| D12 | renderer 取前 5 个业务页 | ✅ 修：显式 `web/src/main.ts`，并排除 `/views/` |
+| D4/D13 | `discover_repo_roots` 只扫深度 1、不递归 | ✅ 本轮修（N4）：容器目录补扫描根 |
+| **N1** | **多仓时路径坐标系错位** | ✅ 本轮修：候选存仓相对路径，打分用 workDir 相对路径 |
+| **N2** | **`device.js` 只认 `src/{Common,common}/service/`** | ✅ 本轮修：补 `**/service/device.js`（peitao 在 `src/common/vue/service/`） |
+| **N3** | **`root-application.js` 为空 → 无 entryPoint** | ✅ 本轮修：退回 `src/index.js/ts/html` 并写 note（camera） |
+
+四条新缺陷（N1–N4）都是从真实仓跑出来的，不是读代码猜的：
+
+```text
+N1  electron 夹具 repoRoots=['electron','web']，候选路径是根相对，
+    而 architecture.modules[].path 是 workDir 相对 → _under() 全部失效，
+    web/src/** 一分不加，EL2 候选为空（pytest 红）
+N2  peitao 的 device.js 在 src/common/vue/service/device.js（多一层 vue/）
+    → modules 只有 host-asp，能力锚点丢失
+N3  camera 的 src/root-application.js 是 0 字节 → entryPoints 为空，
+    7 个模块没有任何装配点
+N4  electron-container 的 calibrationtool 在 depth-2 才有 package.json
+    → repoRoots 只有 ['calibration-subsystem']，match 从不扫 calibrationtool 那棵树
+```
 
 ### 2.5 一次误判的复盘：宿主 ≠ 架构
 
@@ -144,31 +149,46 @@ build/helper/build.js:717  output.library = 'HCPModule_' + module（UMD）
 **教训**：判类型要先问"代码怎么组织、产物怎么发"，再问"跑在哪"。
 顺序反了就会像我这次一样，被三个正确的信号带到一个错误的结论。
 
-### 2.6 新旧判据对账（五仓实测）
+### 2.6 五仓实测（类型由调用方给定后的产出）
 
-用两条结构判据（`vue.app.js` 计数 / 双入口）就能全部分对：
+`python -m pytest tests/platform/test_cartography_eval.py` 走夹具；真实仓手工跑：
 
 ```text
-仓                 双入口  vue.app.js  single-spa   新判据结论        现实现
-hcp/hcp             .          48          Y        micro_frontend ✓   ✓（靠运气）
-hct/hct             .          22          Y        micro_frontend ✓   ✓（靠运气）
-camera/camera       .           7          Y        micro_frontend ✓   ✓（靠运气）
-peitao              Y           0          .        device_web     ✓   ✗ unknown
-transport           Y           0          .        device_web     ✓   ✗ unknown
-calibrationtool     .           0          .        electron_node  —    ✓（架构图有错）
+仓                 roots entries modules 角色                                    top1 候选                     耗时
+hcp/hcp                1       1      58 micro_app,shared_kernel,shell          src/Person/exportData.js      3.3s
+camera/camera          1       1       9 micro_app,shared_kernel,shell          src/Preview/components/index.js 0.3s
+peitao                 1       4       2 device_capability,host                  src/common/vue/service/device.js 0.3s
+transport              1       4       3 device_bridge,device_capability,host    src/Portal/view/login/mobile/Login.vue 0.2s
+led                    2       4      28 driver_asset,ipc_domain,main,preload,renderer  calibrationtool/electron/electron/controller/boxCalibration/… 0.2s
 ```
 
-新判据 **5/5**，现实现 **2/5**（两个对的都只是"`deps` 里恰好有 `single-spa`"）。
+对照改造前（`unknown` + 空架构图 / electron 三处错）：**5/5 有实质产出**，且四个类别
+的 top1 候选都落在正确子树（hcp→`src/Person/`、camera→`src/Preview/`、
+peitao→`device.js` 本身、led→`controller/boxCalibration/`）。
 
-注意 `vue.app.js` 计数与模块数不等（hcp 48 vs 55 个 submodule、hct 22 vs 21），
-因为部分 submodule 未 checkout —— 判型只需 `≥3`，不受影响；但**建 `modules[]` 时必须
-用 `.gitmodules` 或 `index.html` 的 mount div，不能靠目录扫描**。
+peitao 那条最值得看：`雨刷按钮灰掉` 的 top1 直接是 `src/common/vue/service/device.js` ——
+设备能力对象，而不是某个 view。这正是 device-web.md §4.2 想要的定位锚点。
 
----
+判型只需看两条结构特征就能全部分对（供调用方填 profile 用）：
 
-## 3. 判据落码的统一约定
+```text
+仓                 双入口  vue.app.js    profile
+hcp/hcp             .          48          micro_frontend
+hct/hct             .          22          micro_frontend
+camera/camera       .           7          micro_frontend
+peitao              Y           0          device_web
+transport           Y           0          device_web
+calibrationtool     .           0          electron_node（看 deps + preload）
+```
 
-三类共用一套机制，避免又写成一串 `if`：
+注意 `vue.app.js` 计数与模块数不等（hcp 48 vs 55 个 submodule），因为部分 submodule
+未 checkout —— 判型只需 `≥3`；**建 `modules[]` 必须用 `.gitmodules` / mount div**，
+不能靠目录扫描。
+
+## 3. 判据的统一约定（给填 profile 的人/上游）
+
+Agent-2 已不判型，这一节留作**调用方填 `cartographyProfile` 时的判据规范**——
+将来若要恢复自动判型，也按这套来落码，避免又写成一串 `if`：
 
 ```text
 每个判据 = (名称, 分值, 检查函数, 证据文案)
@@ -205,33 +225,56 @@ led/                     容器 → 不判型，只枚举子仓
 └── calibration-subsystem/  unknown（Node 服务）
 ```
 
-现在的实现给两个 `repo_root` 就停了（D13）。多仓容器在工作目录层面很常见
-（`--work-dir` 指向一个产品目录而不是单个仓），值得单独处理。
+本轮补了容器扫描根：`work_dir` **自身不是仓**时，把"自己没有清单、但直接子目录里有
+清单（≥2 个）"的目录也加成扫描根（`_add_container_roots`，N4）。单仓里的 `src/` 不会
+被误加——因为那时 `work_dir` 本身是仓，函数直接返回。
+
+实测 `led`：`repoRoots = ['calibration-subsystem', 'calibrationtool']`，
+`boxCalibration` 缺陷的 top1 是 `calibrationtool/electron/electron/controller/boxCalibration/`。
+
+仍缺：容器内**不是仓也没有嵌套清单的目录**看不出来；以及 `cartographyProfile` 单值装不下
+"Electron 壳 + 远程微前端页面"（见 §5）。
 
 ---
 
-## 4. 回归夹具约定
+## 4. 回归夹具
 
 样本仓不入库（几百 MB，submodule URL 指向内部域名，含未脱敏业务信息）。
 每类在 `test/fixtures/repos/<type>/` 下放人造微型夹具，只保留判据要素：
 
 ```text
 test/fixtures/repos/
-├── micro-frontend/             # single-spa + 3 个 src/<App> + modules.js
-├── device-web/                 # index.asp + project_config.json + 双入口
-├── device-web-single-spa/      # 反例：有 single-spa 但有 .asp
-└── electron/                   # 待补
+├── micro-frontend/            # submodule 型：.gitmodules + 3 个 src/<App> + mount div
+├── micro-frontend-in-repo/    # 同仓模块型（camera）：空 root-application + 3 个 vue.app.js
+├── device-web/                # index.asp + project_config.json + 双入口
+├── device-web-host-mf/        # 反例：有 .asp + project_config，但模块有 vue.app.js
+├── electron/                  # 双根（electron/ + web/）
+├── electron-container/        # 容器：calibrationtool(depth-2 清单) + 独立服务
+└── eval-cases.json            # 7 个 hit@3 用例，绑夹具 + 缺陷票 + 期望路径前缀
 ```
 
-`device-web-single-spa/` 是最关键的一个：它把"框架名不是判据"钉成永久回归测试。
+`device-web-host-mf/` 是最关键的一个：它把 README §2.5 的误判钉成永久回归测试
+（宿主标记相同，架构不同 → 必须判 `micro_frontend`）。
+
+`electron-container/` 钉住 N4：容器目录自身没有 `package.json`，
+清单在 `calibrationtool/{electron,web}/` 这层。
+
+跑法：
+
+```bash
+pytest tests/platform/test_cartography_eval.py -q      # 7 个 hit@3 用例
+pytest tests/platform/test_cartography_architecture.py -q
+```
 
 ---
 
 ## 5. 待决策
 
-| # | 问题 | 倾向 |
+| # | 问题 | 状态 |
 |---|---|---|
-| 1 | `CodeKnowledge` 要不要加 `modules[]`？ | 微前端**要**（定位必须落到子应用）；设备 web **不要**（同仓模块是路由级，无独立部署边界） |
-| 2 | `CodeKnowledge` 要不要加 `productLine`？ | hcp/hct 同模板两条产品线，建议加；或由 `repoRoots` 名称承载 |
-| 3 | 判据何时落 `detect.py`？ | 微前端 + 设备 web 共 5 仓已齐，可先落这两类；electron 待补 |
-| 4 | 阈值怎么定？ | 见各类型文档的评分表；5 仓实测下来 `≥6`（微前端）与 `≥8`（设备 web）都能正确分离 |
+| 1 | `modules[]` 要不要按类型区分 | ✅ 已落：微前端出 `micro_app`（有独立部署边界），设备 web 不出模块清单（同仓模块是路由级） |
+| 2 | 判型要不要留在 Agent-2 | ✅ 已决：**不留**。改为调用方传 `--cartography-profile`，`detect.py` 只收线索 |
+| 3 | 阈值怎么定 | 降级为"给填 profile 的人的参考"，见各类型文档评分表 |
+| 4 | `cartographyProfile` 单值装不下"壳 + 内容" | ⏳ 倾向 A（见 electron.md §7）：只描述被分析代码所在仓，容器记进 `architecture.notes` |
+| 5 | 容器内"不是仓、也没有嵌套清单"的目录 | ⏳ 仍看不出来（N4 只覆盖"子目录有清单"的容器） |
+| 6 | `micro-frontend-in-repo` 是否要补 `src/index.js` 夹具 | ⏳ 目前只靠 `src/index.html` 兜底，camera 真实形态的 JS 引导没夹具 |

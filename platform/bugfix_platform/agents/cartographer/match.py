@@ -274,6 +274,13 @@ def _norm_path(rel: str) -> str:
     return rel.replace("\\", "/").lstrip("./").lower()
 
 
+def _root_prefix(repo_path: str | None) -> str:
+    """仓根相对 workDir 的前缀；``.`` / 空 表示就是 workDir 本身。"""
+    if not repo_path or repo_path in (".", ""):
+        return ""
+    return str(repo_path).replace("\\", "/").strip("/")
+
+
 def _under(rel: str, prefix: str | None) -> bool:
     if not prefix:
         return False
@@ -380,7 +387,7 @@ def _architecture_bonus(
                     bonus += 280
                     why_parts.append(f'ipc "{mod.id}"')
             if intent in {"ui_layout", "i18n"} and mod.role == "renderer":
-                if _under(rel, mod.path) or _norm_path(rel).startswith("web/src/"):
+                if _under(rel, mod.path):
                     bonus += 90
                     why_parts.append("renderer UI")
             if intent == "crash" and mod.role == "main" and _under(rel, mod.path):
@@ -432,11 +439,16 @@ def match_tickets(
         scored: list[tuple[int, str, MatchCandidate]] = []
         if toks:
             for rr in repo_roots:
+                prefix = _root_prefix(rr.path)
                 for f in files_by_root.get(rr.path, []):
-                    hit = _score_file(f, toks)
+                    # architecture.modules[].path 是 workDir 相对；先拼回同一坐标系再打分，
+                    # 否则多仓（electron/web、容器+子仓）下 _under() 全部失效。
+                    # 候选仍存仓相对路径 + repoPath，由调用方自行拼回。
+                    rel_work = f"{prefix}/{f}" if prefix else f
+                    hit = _score_file(rel_work, toks)
                     if hit is None:
                         arch_only = _architecture_bonus(
-                            f, t, toks, profile, architecture, bindings
+                            rel_work, t, toks, profile, architecture, bindings
                         )
                         if arch_only is None:
                             continue
@@ -444,7 +456,7 @@ def match_tickets(
                     else:
                         strength, why = hit
                         bonus = _architecture_bonus(
-                            f, t, toks, profile, architecture, bindings
+                            rel_work, t, toks, profile, architecture, bindings
                         )
                         if bonus is not None:
                             strength += bonus[0]
@@ -452,7 +464,7 @@ def match_tickets(
                     scored.append(
                         (
                             strength,
-                            f,
+                            rel_work,
                             MatchCandidate(
                                 repoPath=rr.path,
                                 path=f,
@@ -461,15 +473,15 @@ def match_tickets(
                             ),
                         )
                     )
-        scored.sort(key=lambda x: (-x[0], x[1]))
-        # Dedupe by path while taking top scores.
+        # 同一文件可能同时落在嵌套扫描根（容器根 + 子仓根）下：按 workDir 相对路径去重，
+        # 相等分时优先更浅的 repoPath（"calibrationtool" 胜过 "calibrationtool/electron"）。
+        scored.sort(key=lambda x: (-x[0], x[2].repoPath.count("/"), x[1]))
         seen_paths: set[str] = set()
         candidates: list[MatchCandidate] = []
-        for _strength, path, cand in scored:
-            key = f"{cand.repoPath}:{path}"
-            if key in seen_paths:
+        for _strength, rel_work, cand in scored:
+            if rel_work in seen_paths:
                 continue
-            seen_paths.add(key)
+            seen_paths.add(rel_work)
             candidates.append(cand)
             if len(candidates) >= MAX_CANDIDATES:
                 break

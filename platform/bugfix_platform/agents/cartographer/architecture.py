@@ -157,6 +157,28 @@ def _map_micro_frontend(root: Path, repo_roots: list[RepoRoot]) -> MappedArchite
             modules.append(
                 ArchModule(id=f"{rel_base or 'root'}:shell", path=ep, role="shell")
             )
+        else:
+            # root-application 缺失或空文件：宿主在仓外（设备页面 / 平台注册）。
+            # 退回主引导文件，否则 7 个模块没有任何装配点。
+            boot = _first_existing(
+                base, ("src/index.js", "src/index.ts", "src/index.html")
+            )
+            if boot is not None:
+                ep = _join(rel_base, _rel_to(base, boot))
+                entries.append(ep)
+                why = (
+                    "root-application.js is empty — apps mounted by host/device page"
+                    if shell is not None
+                    else "no root-application.js — apps mounted by host/device page"
+                )
+                modules.append(
+                    ArchModule(
+                        id=f"{rel_base or 'root'}:shell",
+                        path=ep,
+                        role="shell",
+                        notes=why,
+                    )
+                )
 
         common = None
         for candidate in (base / "src" / "Common", base / "src" / "common"):
@@ -202,6 +224,18 @@ def _map_device_web(root: Path, repo_roots: list[RepoRoot]) -> MappedArchitectur
             if candidate.is_file():
                 device = candidate
                 break
+        if device is None:
+            # 5.x 产品线把能力对象再往下埋一层（peitao: src/common/vue/service/device.js）。
+            device = next(
+                (
+                    p
+                    for p in _rglob_files(
+                        base / "src", "device.js", max_depth=4, limit=20
+                    )
+                    if p.parent.name.lower() == "service"
+                ),
+                None,
+            )
         if device is not None:
             modules.append(
                 ArchModule(

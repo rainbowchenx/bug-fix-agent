@@ -4,8 +4,10 @@
 两个仓 **`package.json` 的 `name` 都是 `web5.0-framework`**，是同一框架的两条产品线。
 
 - 契约枚举：`device_web`（`contracts/bugfix_contracts/code_knowledge.py:CartographyProfile`）
-- 现有判型：`platform/bugfix_platform/agents/cartographer/detect.py` —— 根目录名正则，**对两个样本命中 0 次**
-- 现有架构图：`platform/bugfix_platform/agents/cartographer/architecture.py:_map_device_web()` —— 实测无产出
+- 判型：**不在 Agent-2**，由调用方传入 `--cartography-profile device_web`
+  （旧实现靠根目录名正则，对两个样本命中 0 次；该分支已随"取消判型"删除）
+- 架构图：`platform/bugfix_platform/agents/cartographer/architecture.py:_map_device_web()`，
+  读双入口 + `service/device.js` + `jsWebControl` + `host-asp`，实测见 §5
 
 ---
 
@@ -225,16 +227,29 @@ this.m_oDeviceCapa = {
 
 ---
 
-## 5. 现有实现的产出（实测）
+## 5. 实现的产出（实测）
 
 ```text
-peitao     profile unknown   modules [('.', 'repo_root')]
-transport  profile unknown   modules [('.', 'repo_root')]
+peitao     4 entries  src/main-pc.js  src/main-mobile.js  src/router/{pc,mobile}.js
+           2 modules  device.js(device_capability)  host-asp(host)
+transport  4 entries  src/main-pc.js  src/main-mobile.js  src/Router/{pc,mobile}.js
+           3 modules  device.js  jsWebControl(device_bridge)  host-asp
 ```
 
-根因：`BRIDGE` 正则（`bridge|jsbridge|device-web|webview|native-?api`）对五个真实仓
-**命中 0 次** → `device_web` 是死分支（README D8）。
-真实桥接层目录叫 `Common/libs/jsWebControl/`，不含任何正则里的字样。
+`peitao` 的 `device.js` 在 `src/common/vue/service/device.js` —— 比 transport 多一层 `vue/`。
+本轮补了 `**/service/device.js` 兜底（N2），否则两个能力对象都抓不到：
+
+```text
+雨刷按钮灰掉无法使用  →  top1 = src/common/vue/service/device.js
+```
+
+这条正是 §4.2 想要的：能力类缺陷先看能力对象，而不是 view。
+
+`jsWebControl` 只有 transport 有（5.0 新版桥接层）；peitao 走 `common/vue/` 那套。
+所以桥接层不能按固定路径找，得按"实际存在的那个"记。
+
+`host-asp` 的 note 固定写 `host=device-asp — not an architecture type`，
+提醒它只是宿主标记（README §2.5）。
 
 ---
 

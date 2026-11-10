@@ -89,6 +89,21 @@
         "intent": "ui_layout"
       },
       "expectPathPrefix": "web/src/"
+    },
+    {
+      "id": "el-container-box",
+      "fixture": "electron-container",
+      "profile": "electron_node",
+      "ticket": {
+        "defectId": "EL3",
+        "title": "盒子校准失败",
+        "pool": "strict",
+        "expectQuality": "explicit",
+        "testModule": "boxCalibration",
+        "titleTag": "BoxManage",
+        "intent": "logic"
+      },
+      "expectPathPrefix": "calibrationtool/electron/electron/controller/boxCalibration/"
     }
   ]
 }

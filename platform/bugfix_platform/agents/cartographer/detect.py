@@ -49,9 +49,66 @@ def discover_repo_roots(work_dir: str | Path) -> list[RepoRoot]:
                 )
             )
 
+    _add_container_roots(root, roots)
+
     return roots or [
         RepoRoot(path=".", gitHead=_git_head(root), fingerprint=_fingerprint(root))
     ]
+
+
+def _add_container_roots(root: Path, roots: list[RepoRoot]) -> None:
+    """容器目录：自身不是仓、但直接子目录是仓／带清单。
+
+    仅在 ``work_dir`` 本身不是仓时启用（否则单仓里的 ``src/`` 也会被当成扫描根，
+    而它的子目录恰好都有 ``package.json``）。``led`` 就属于这种情形：
+    ``led/calibrationtool/{electron,web}/package.json``，而 ``led/calibrationtool``
+    自己没有清单——不补的话 match 完全不扫这棵树。
+    """
+    if any(r.path in (".", "") for r in roots):
+        return
+    known = {r.path for r in roots}
+    try:
+        children = [c for c in root.iterdir() if c.is_dir()]
+    except OSError:
+        return
+    for child in children:
+        if child.name.startswith(".") or child.name in {"node_modules", "dist", ".venv"}:
+            continue
+        if child.name in known:
+            continue
+        if (child / "package.json").exists() or (child / ".git").exists():
+            continue
+        if not _readable(child):
+            continue
+        nested = [
+            g
+            for g in child.iterdir()
+            if g.is_dir()
+            and not g.name.startswith(".")
+            and g.name not in {"node_modules", "dist", ".venv"}
+            and (
+                (g / "package.json").exists()
+                or (g / ".git").exists()
+                or (g / "pyproject.toml").exists()
+            )
+        ]
+        if len(nested) >= 2:
+            roots.append(
+                RepoRoot(
+                    path=child.name,
+                    gitHead=_git_head(child),
+                    fingerprint=f"{child.name}@container",
+                )
+            )
+            known.add(child.name)
+
+
+def _readable(path: Path) -> bool:
+    try:
+        next(path.iterdir(), None)
+        return True
+    except OSError:
+        return False
 
 
 def _git_head(dir_path: Path) -> str | None:

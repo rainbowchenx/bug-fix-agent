@@ -11,8 +11,9 @@ hcp 与 hct 是同一模板的两条产品线；camera 是同一产品线的 4.5
 三者共用同一套内部脚手架。
 
 - 契约枚举：`micro_frontend`（`contracts/bugfix_contracts/code_knowledge.py:CartographyProfile`）
-- 现有判型：`platform/bugfix_platform/agents/cartographer/detect.py` —— 只认 `single-spa` 依赖
-- 现有架构图：`platform/bugfix_platform/agents/cartographer/architecture.py:_map_micro_frontend()` —— 实测无产出
+- 判型：**不在 Agent-2**，由调用方传入 `--cartography-profile micro_frontend`
+- 架构图：`platform/bugfix_platform/agents/cartographer/architecture.py:_map_micro_frontend()`，
+  按 `.gitmodules` / `index.html` mount div / `src/*/vue.app.js` 三源建目录，实测见 §5
 
 ---
 
@@ -271,19 +272,29 @@ camera 没有 `.gitmodules`，模块清单藏在 `src/index.html`：
 
 ---
 
-## 5. 现有实现的产出（实测）
+## 5. 实现的产出（实测）
 
 ```text
-hcp/hcp         repoRoots ['.']   entryPoints []   modules [('mf','micro_frontend_root')]
-camera/camera   repoRoots ['.']   profile micro_frontend（判对，但只靠 single-spa 依赖）
-                entryPoints []    modules [('mf','micro_frontend_root')]
+hcp/hcp          1 entry  (src/root-application.js)   58 modules  micro_app / shell / shared_kernel
+camera/camera    1 entry  (src/index.js)               9 modules  micro_app / shell / shared_kernel
+hct/hct          —（同 hcp 模板，未单跑）
 ```
 
-三个仓的架构图**都是空的**。camera 判型对是运气——它恰好有 `single-spa` 依赖，
-而真正普适的判据（`src/*/vue.app.js` 计数、mount div、UMD 模块产物）一个都没用上。
+逐个来源都进了 `notes`，可直接复核为什么算模块：
 
-四个原因（详见 README D4–D7）：子应用在深度 2 扫不到、`SPA_APP` 正则不认 `src/<App>/`、
-shell 判定读的是路径而非内容、`limit=400` 只覆盖 3.9% 文件且按字母序截断。
+```text
+camera  Preview      micro_app  src/Preview      from=mount-div; entry=vue.app.js
+        .:shell      shell      src/index.js     root-application.js is empty — apps mounted by host/device page
+        Common       shared_kernel src/Common    shared kernel — not a micro-app
+hcp     Person       micro_app  src/Person       from=.gitmodules; from=mount-div; entry=vue.app.js
+```
+
+camera 那条 note 是本轮补的（N3）：`src/root-application.js` 是 0 字节空壳，宿主在仓外，
+不退回 `src/index.js` 的话 7 个模块没有任何装配点。
+
+改造前的产出是 `entryPoints []` + `modules [('mf','micro_frontend_root')]`（兜底占位），
+原因是子应用在深度 2 扫不到、`SPA_APP` 正则不认 `src/<App>/`、shell 判定读的是路径而非内容、
+`limit=400` 只覆盖 3.9% 文件且按字母序截断（README D4–D7，已修）。
 
 ---
 
