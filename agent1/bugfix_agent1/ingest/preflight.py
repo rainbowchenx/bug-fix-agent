@@ -17,12 +17,13 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any, Iterator
 
 # 单一真源：别名表与空模板判定都直接 import，不在这里另抄一份。
+from bugfix_contracts.console import force_utf8_console
+
 from bugfix_agent1.defect_batch.distill import (
     is_empty_template,
     normalize_test_module,
@@ -93,10 +94,7 @@ def load_rows(source: Path, sheet: str | None, encoding: str) -> list[dict[str, 
 
 
 def main() -> None:
-    try:  # Windows 控制台默认 cp936，中文列名会乱码
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:  # noqa: BLE001
-        pass
+    force_utf8_console()  # Windows 控制台默认 cp936，中文列名会乱码
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--source", required=True, type=Path)
     ap.add_argument("--sheet", default=None, help="xlsx worksheet (default: first)")

@@ -27,7 +27,7 @@ they take identical flags and produce identical bytes:
 | This packaged skill | `scripts\agent1.exe <subcommand>` |
 | Repo checkout / installed package | `bugfix-agent <subcommand>` |
 
-Subcommands: `preflight` · `prepare-batch` · `apply-review` · `xlsx-to-raw` · `self-check`.
+Subcommands: `preflight` · `prepare-batch` · `apply-review` · `validate` · `xlsx-to-raw` · `self-check`.
 
 `agent1 --help` lists them; `agent1 self-check` prints the committed source revision the
 executable was built from, which is what you quote when a result is questioned.
@@ -146,6 +146,17 @@ If nothing should change, skip `apply-review` and hand off the rule output, sayi
 Report: total tickets, the funnel, how many tickets you changed and in which direction, and the final file path. If the batch is materially degraded — most modules unknown, most descriptions empty, a large share still `unclear` — say that in the same breath. The next step (code localization) inherits whatever you paper over, and it cannot tell a real `unclear` from one you created.
 
 **Quote numbers, do not count them.** `prepare-batch` and `apply-review` both print a `clusters` object (`total` / `singleton` / `largest`) next to the funnel. Copy those figures; hand-counting cluster or singleton totals is where wrong numbers in hand-off reports come from. The same goes for naming a rule: if you say why a heuristic label was wrong, describe the symptom you saw, do not guess at the keyword rule behind it.
+
+`apply-review` also prints a `review` block that sorts your own edits by where they came from:
+
+```text
+"review": {"changedIntent": 36, "fromUnclear": 18, "fromHeuristic": 18,
+           "fromNone": 0, "keptHeuristic": 8, "changedPool": 0}
+```
+
+`fromUnclear` is filling a gap, `fromHeuristic` is correcting a guess — report them as two numbers, never one. A run where these were merged claimed "36 tickets rescued from unclear, 3 heuristic misjudgments" when the truth was 18 + 18. `changedPool` counts pool moves separately because "I changed 40 tickets" hides whether any of them changed bucket.
+
+Before handing off, run `agent1 validate --batch <file>`. It re-checks the JSON against the contract and prints the same summary; exit code 2 with an `error` field means the artifact is broken and must not be passed on.
 
 Command variants: [references/examples.md](references/examples.md). Output artifact shape:
 `references/defect-batch-guide.md` (repo: `docs/contracts/v0.1/defect-batch-guide.md`).

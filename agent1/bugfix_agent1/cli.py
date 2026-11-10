@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+from bugfix_contracts.console import force_utf8_console
 from bugfix_contracts.env import load_env_file
 
 import argparse
@@ -95,7 +96,50 @@ def _cluster_stats(batch: Any) -> dict[str, int]:
     }
 
 
+def _intent_transitions(before: Any, after: Any) -> dict[str, int]:
+    """复核到底动了哪一类标签。
+
+    上一轮 agent 把「36 张」拆成了「18 张 unclear 被救回」+「3 张启发式误判」，
+    两句话都错：实际是 18 + 18。改池与改标签也不是一回事，分开计数。
+    """
+    old = {t.defectId: t for t in before.tickets}
+    out = {"changedIntent": 0, "fromUnclear": 0, "fromHeuristic": 0, "fromNone": 0,
+           "keptHeuristic": 0, "changedPool": 0}
+    for t in after.tickets:
+        prev = old.get(t.defectId)
+        if prev is None:
+            continue
+        if prev.pool != t.pool:
+            out["changedPool"] += 1
+        if prev.intent != t.intent:
+            out["changedIntent"] += 1
+            if prev.intent is None:
+                out["fromNone"] += 1
+            elif prev.intentSource == "unclear":
+                out["fromUnclear"] += 1
+            elif prev.intentSource == "heuristic":
+                out["fromHeuristic"] += 1
+        elif prev.intentSource == "heuristic":
+            out["keptHeuristic"] += 1
+    return out
+
+
+def _intent_stats(batch: Any) -> dict[str, int]:
+    """按 ``intentSource`` 计数。
+
+    报告里最容易说错的就是「改了多少张」：``unclear`` 是补空、``heuristic`` 是纠错，
+    两者混在一起报，数字必然对不上。让产物自己给数。
+    """
+    stats: dict[str, int] = {}
+    for t in batch.tickets:
+        key = t.intentSource if t.intent is not None else "none"
+        stats[key] = stats.get(key, 0) + 1
+    return dict(sorted(stats.items()))
+
+
 def main(argv: list[str] | None = None) -> int:
+    # 平台按 UTF-8 读我们的输出；Windows 默认 cp936，中文和 `→` 会变乱码。
+    force_utf8_console()
     # README 让用户 `cp .env.example .env`；不在这里读的话那个文件是摆设。
     # 已存在的环境变量优先，平台注入的值不会被仓里的 .env 覆盖。
     load_env_file()
@@ -131,6 +175,12 @@ def main(argv: list[str] | None = None) -> int:
     review.add_argument("--overrides", required=True, help="JSON {adjustments: [...]}")
     review.add_argument("--out", required=True, help="Write updated defect-batch JSON")
 
+    val = sub.add_parser(
+        "validate",
+        help="Re-validate a defect-batch.json and print its summary",
+    )
+    val.add_argument("--batch", required=True, help="defect-batch JSON to check")
+
     sub.add_parser(
         "preflight",
         help="Step 0: column-mapping health check",
@@ -151,6 +201,33 @@ def main(argv: list[str] | None = None) -> int:
         from bugfix_agent1 import __version__
 
         print(__version__)
+        return 0
+
+    if args.cmd == "validate":
+        from pydantic import ValidationError
+
+        from bugfix_contracts.defect_batch import load_defect_batch
+
+        try:
+            batch = load_defect_batch(args.batch)
+        except (ValidationError, ValueError) as exc:
+            print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
+            return 2
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "schemaVersion": batch.schemaVersion,
+                    "tickets": len(batch.tickets),
+                    "funnel": batch.funnel,
+                    "clusters": _cluster_stats(batch),
+                    "intentSource": _intent_stats(batch),
+                    "productLine": batch.productLine,
+                    "posture": batch.posture,
+                },
+                ensure_ascii=False,
+            )
+        )
         return 0
 
     if args.cmd == "prepare-batch":
@@ -175,6 +252,7 @@ def main(argv: list[str] | None = None) -> int:
                     "tickets": len(batch.tickets),
                     "funnel": batch.funnel,
                     "clusters": _cluster_stats(batch),
+                    "intentSource": _intent_stats(batch),
                     "productLine": batch.productLine,
                     "posture": batch.posture,
                     "out": str(out),
@@ -202,6 +280,7 @@ def main(argv: list[str] | None = None) -> int:
                     "tickets": len(updated.tickets),
                     "funnel": updated.funnel,
                     "clusters": _cluster_stats(updated),
+                    "review": _intent_transitions(batch, updated),
                     "adjustments": len(review_file.adjustments),
                     "out": str(out),
                 },
