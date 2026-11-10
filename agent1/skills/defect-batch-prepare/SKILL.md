@@ -131,4 +131,5 @@ If nothing should change, skip `apply-review` and hand off the rule output, sayi
 
 Report: total tickets, the funnel, how many tickets you changed and in which direction, and the final file path. If the batch is materially degraded — most modules unknown, most descriptions empty, a large share still `unclear` — say that in the same breath. The next step (code localization) inherits whatever you paper over, and it cannot tell a real `unclear` from one you created.
 
-Command variants: [references/examples.md](references/examples.md). Output shape: `docs/contracts/v0.1/defect-batch-guide.md`.
+Command variants: [references/examples.md](references/examples.md). Output artifact shape:
+`references/defect-batch-guide.md` (repo: `docs/contracts/v0.1/defect-batch-guide.md`).

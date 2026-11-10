@@ -4,11 +4,16 @@ Read this when you need pool meanings, posture, or CSV quirks. Do not re-run the
 
 ## Authority
 
+`SKILL.md` and `references/` in this folder are self-contained: everything you need to run
+Step 1–3 is here. The two design specs below live only in the source repo — do not go looking
+for them in the installed skill.
+
 | Topic | Source |
 |---|---|
-| Screen rules / expectQuality / field bans | `docs/defect-input-analysis/_stage1-rules.md` |
-| R0–R6 pool semantics / L1→L2→L3 keys | `docs/superpowers/specs/2026-10-30-defect-screen-cluster-design.md` |
-| Implementation | `agent1/bugfix_agent1/defect_batch/*`, `agent1/bugfix_agent1/ingest/*` |
+| 产物契约（字段 / 池 / funnel） | `references/defect-batch-guide.md` — shipped with this skill |
+| Screen rules / expectQuality / field bans | repo only: `docs/defect-input-analysis/_stage1-rules.md` |
+| R0–R6 pool semantics / L1→L2→L3 keys | repo only: `docs/superpowers/specs/2026-10-30-defect-screen-cluster-design.md` |
+| Implementation | repo only: `agent1/bugfix_agent1/defect_batch/*`, `agent1/bugfix_agent1/ingest/*` |
 
 ## Pool mapping
 

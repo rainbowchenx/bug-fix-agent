@@ -28,6 +28,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -41,6 +42,18 @@ DIST = ROOT / "dist"
 BUILD = ROOT / "build"
 
 AGENT1_SKILL = "defect-batch-prepare"
+
+# SKILL.md 会引用其中的产物契约；不随包走的话 skill 装到 agent 里就是个死链。
+# 单一真源仍在 docs/contracts/，构建时复制进 references/。
+SKILL_BUNDLED_DOCS = {
+    "references/defect-batch-guide.md": (
+        ROOT / "docs" / "contracts" / "v0.1" / "defect-batch-guide.md"
+    ),
+    # guide 里链了产物样例；不带上就又是一处死链
+    "references/samples/defect-batch.sample.json": (
+        ROOT / "docs" / "contracts" / "v0.1" / "samples" / "defect-batch.sample.json"
+    ),
+}
 _IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo")
 
 
@@ -110,6 +123,7 @@ def build_agent1(skip_exe: bool = False) -> Path:
     shutil.copy2(skill_src / "SKILL.md", stage / "SKILL.md")
     for sub in ("references", "evals"):
         shutil.copytree(skill_src / sub, stage / sub)
+    _bundle_skill_docs(stage)
     scripts = stage / "scripts"
     scripts.mkdir()
     (scripts / "entry.py").write_text(
@@ -181,12 +195,54 @@ def build_agent1(skip_exe: bool = False) -> Path:
     shutil.copy2(PKG / "agent1" / "README.md", out.parent / "README.md")
 
     strip_pycache(out.parent)
+    _verify_skill_docs(out)
     _verify_package(out)
 
     zip_path = DIST / "agent1-standalone.zip"
     zip_tree(out.parent, zip_path)
     log(f"agent1: -> {zip_path.name} {zip_path.stat().st_size / 1e6:.1f} MB")
     return zip_path
+
+
+def _bundle_skill_docs(stage: Path) -> None:
+    """把契约文档/样例复制进 skill（源仍在 docs/contracts/）。"""
+    for rel, src in SKILL_BUNDLED_DOCS.items():
+        if not src.is_file():
+            raise SystemExit(f"agent1: bundled doc missing in repo: {src}")
+        dst = stage / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        log(f"agent1: bundled {rel} ({src.stat().st_size} B)")
+
+
+_MD_LINK = re.compile(r"\]\(([^)#?]+)\)")
+
+
+def _verify_skill_docs(stage: Path) -> None:
+    """skill 装到 agent 里必须自洽：相对链接都得指到包内真文件。"""
+    problems: list[str] = []
+    skill = stage / "SKILL.md"
+    if not skill.is_file():
+        raise SystemExit("agent1: SKILL.md missing in stage")
+    for md in [skill, *sorted((stage / "references").glob("*.md"))]:
+        text = md.read_text(encoding="utf-8")
+        for rel in _MD_LINK.findall(text):
+            if rel.startswith(("http://", "https://", "#", "mailto:")):
+                continue
+            target = (md.parent / rel).resolve()
+            if not target.is_file():
+                problems.append(f"{md.relative_to(stage)} -> {rel}")
+        # 反引号里的 repo 路径在包里不存在；同一行必须标 "repo" 才允许出现
+        for lineno, line in enumerate(text.splitlines(), 1):
+            for raw in re.findall(r"`(docs/[^`]+)`", line):
+                if (ROOT / raw).exists() and "repo" not in line.lower():
+                    problems.append(
+                        f"{md.relative_to(stage)}:{lineno} cites repo path {raw!r} unmarked"
+                    )
+    if problems:
+        joined = "\n  ".join(problems)
+        raise SystemExit(f"agent1: skill docs are not self-contained:\n  {joined}")
+    log("agent1: skill docs self-contained (all relative links resolve)")
 
 
 def _verify_agent1(scripts: Path) -> None:
@@ -325,7 +381,24 @@ def sync_delivery(target_root: Path) -> None:
         else:
             shutil.copy2(src, dst)
     strip_pycache(target_root)
+    _write_skill_zip(out_root, target_root / f"{AGENT1_SKILL}.zip")
     _verify_delivery(out_root, target_root)
+
+
+def _write_skill_zip(out_root: Path, zip_path: Path) -> None:
+    """重生成 skill-only zip。
+
+    交付目录里那份 zip 是直接上传给 agent 平台的安装体；不随目录一起刷新
+    的话，它会停在旧 exe + 旧 SKILL.md（实际就发生过）。
+    """
+    if zip_path.exists():
+        zip_path.unlink()
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        skill = out_root / AGENT1_SKILL
+        for path in sorted(skill.rglob("*")):
+            if path.is_file():
+                zf.write(path, path.relative_to(out_root).as_posix())
+    log(f"sync: refreshed {zip_path.name} ({zip_path.stat().st_size / 1e6:.1f} MB)")
 
 
 def _verify_delivery(out_root: Path, target_root: Path) -> None:
