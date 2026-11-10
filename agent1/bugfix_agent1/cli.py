@@ -102,7 +102,12 @@ def main(argv: list[str] | None = None) -> int:
         "prepare-batch",
         help="Ingest → defect-batch.json",
     )
-    prep.add_argument("--product-line", required=True)
+    prep.add_argument(
+        "--product-line",
+        default=None,
+        help="Batch namespace / clusterId prefix. Omit to derive it from the "
+        "source (project code in the filename, or productLine inside raw-defects).",
+    )
     prep.add_argument("--source", required=True, help="JSON or platform CSV")
     prep.add_argument("--posture", choices=["alpha", "beta"], default="beta")
     prep.add_argument("--out", required=True, help="Write defect-batch JSON")
@@ -139,12 +144,16 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "prepare-batch":
         from bugfix_agent1.defect_batch import run_defect_batch_prepare
+        from bugfix_agent1.ingest.project import resolve_product_line
 
+        # 先把命名空间定下来，再把出处打出来：clusterId 的前缀不该凭空出现。
+        product_line, provenance = resolve_product_line(args.source, args.product_line)
         batch = run_defect_batch_prepare(
-            product_line=args.product_line,
+            product_line=product_line,
             source=args.source,
             posture=args.posture,
         )
+        print(f"productLine: {product_line} (via {provenance})", file=sys.stderr)
         out = Path(args.out)
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(batch.model_dump_json(indent=2), encoding="utf-8")

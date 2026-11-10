@@ -36,11 +36,12 @@ Then `agent1 prepare-batch --source raw-defects.json`. Spreadsheets drop rows in
 
 ## Historical batch
 
-`--posture alpha` keeps closed tickets in the functional funnel — use it to see how a past export
-*would* have been sorted, not to decide today's queue.
+`--posture` defaults to `beta`; leave it. `alpha` keeps closed tickets in the functional funnel —
+use it to see how a past export *would* have been sorted, never to decide today’s queue (closed
+tickets carry the resolver and root cause, so they leak the answer).
 
 ```bash
-agent1 prepare-batch --product-line hc --source old.csv --posture alpha --out historical.json
+agent1 prepare-batch --source old-export.csv --posture alpha --out historical.json
 ```
 
 ## Python API (repo checkout only)

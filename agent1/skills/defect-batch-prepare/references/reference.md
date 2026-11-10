@@ -39,8 +39,28 @@ L3 first pass is a keyword heuristic. Intent review after `prepare-batch` sets `
 
 ## Posture
 
-- `alpha` — keep all statuses in the functional funnel (rule-shape analysis)
-- `beta` — only `Open` / `New` (daily-batch simulation)
+A single switch: does the status gate close?
+
+- `beta` (default, and the normal answer) — non-`Open`/`New` goes to `excluded`
+  (`reasonDetail: beta posture skips non-Open/New`). Closed tickets are not work.
+- `alpha` — gate off, every status reaches the functional funnel. Rule-shape
+  research and regression only: closed tickets carry closed-loop fields
+  (resolver, root cause), so using them to judge pools leaks the answer.
+
+`is_open_like` accepts exactly `Open` / `New` / `打开` / `新建` (full string, case-insensitive).
+`处理中`, `已解决`, `待验证`, `Resolved` all count as closed. On an all-`Open` export the two
+postures give identical tickets — only the `posture` field differs.
+
+`excluded` mixes two things: void / not-a-bug (`reasonDetail: Cancel / Not a bug / void`) and the
+posture gate. Read `reasonDetail`, not the pool name.
+
+## Product line
+
+Not a column in the export; there is no alias for it in `field_map.py`. It is a namespace written
+to the artifact and used as the `clusterId` prefix. Derived when omitted (`--product-line` →
+`BUGFIX_PRODUCT_LINE` → raw-defects `productLine` → project code in the file name). `hc` in the
+examples is an **example value, not a default** — changing it mid-stream makes cluster ids
+incomparable across batches, silently.
 
 ## Platform CSV notes
 

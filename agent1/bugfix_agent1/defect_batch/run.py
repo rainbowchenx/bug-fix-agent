@@ -19,6 +19,7 @@ from bugfix_contracts.defect_batch import (
 from bugfix_agent1.defect_batch.prepare import prepare_defect_batch
 from bugfix_agent1.defect_batch.rules import ScreenProfile
 from bugfix_agent1.ingest.preloaded import load_preloaded
+from bugfix_agent1.ingest.project import resolve_product_line
 
 
 def load_defect_batch(value: DefectBatchInput) -> DefectBatch:
@@ -29,7 +30,7 @@ def load_defect_batch(value: DefectBatchInput) -> DefectBatch:
 
 def run_defect_batch_prepare(
     *,
-    product_line: str,
+    product_line: Optional[str] = None,
     mode: Literal["preloaded", "mcp", "crawler"] = "preloaded",
     source: Optional[Union[str, Path, dict[str, Any], list[Any]]] = None,
     defects: Optional[list[RawDefect]] = None,
@@ -41,8 +42,10 @@ def run_defect_batch_prepare(
     供 CLI ``prepare-batch`` 与 ``defect-batch-prepare`` skill 调用。
 
     Args:
-        product_line: 产品线标识。写入 ``defect-batch.productLine``，并参与
-            ``clusterId``（``{line}::{module}::{tag}::{intent}``）。
+        product_line: 批次命名空间。写入 ``defect-batch.productLine``，并参与
+            ``clusterId``（``{line}::{module}::{tag}::{intent}``）。为 None 时
+            按 :func:`resolve_product_line` 派生（文件名里的项目号等），不打断
+            调用方。
         mode: Ingest 方式。当前仅 ``preloaded`` 可用；``mcp`` / ``crawler``
             仍为 stub。
         source: ``preloaded`` 且未给 ``defects`` 时的原始载荷。可为文件路径
@@ -64,6 +67,7 @@ def run_defect_batch_prepare(
     """
     if mode != "preloaded":
         raise NotImplementedError(f"ingest mode {mode!r} is stubbed; use preloaded")
+    product_line, _ = resolve_product_line(source, product_line)
     if defects is None:
         if source is None:
             raise ValueError("source or defects is required for preloaded mode")

@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from bugfix_contracts.defect_batch import RawDefect
+from bugfix_agent1.ingest.project import resolve_product_line
 from bugfix_agent1.ingest.field_map import FIELD_ALIASES, row_to_raw_dict
 
 
@@ -107,18 +108,26 @@ def main(argv: list[str] | None = None) -> None:
         description="Convert a defect Excel export into raw-defects JSON.",
     )
     ap.add_argument("--xlsx", required=True, type=Path)
-    ap.add_argument("--product-line", required=True)
+    ap.add_argument(
+        "--product-line",
+        default=None,
+        help="Batch namespace written into raw-defects; omit to derive from the file name.",
+    )
     ap.add_argument("--sheet", default=None, help="Worksheet name (default: first sheet)")
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--limit", type=int, default=None)
     args = ap.parse_args(argv)
 
     defects = load_xlsx_defects(args.xlsx, sheet=args.sheet, limit=args.limit)
+    product_line, provenance = resolve_product_line(args.xlsx, args.product_line)
     payload = {
         "schemaVersion": "0.1.0",
-        "productLine": args.product_line,
+        "productLine": product_line,
         "defects": [d.model_dump(exclude_none=True) for d in defects],
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"wrote {len(defects)} defects → {args.out}", file=sys.stderr)
+    print(
+        f"wrote {len(defects)} defects → {args.out} (productLine={product_line} via {provenance})",
+        file=sys.stderr,
+    )

@@ -60,13 +60,26 @@ The failure this prevents is silent: an unrecognised ID column used to make `pre
 
 ```bash
 agent1 prepare-batch \
-  --product-line hc \
   --source path/to/export.csv \
-  --posture beta \
   --out defect-batch.json
 ```
 
-Use `beta` for a daily batch (only `Open` / `New` survive) and `alpha` when you need to see how historical closed tickets would have been sorted. Getting this backwards makes the funnel meaningless, so if the user has not said which, ask.
+**Nothing here needs asking.** Both optional flags resolve deterministically; pass them only to override.
+
+`--product-line` is a **batch namespace**, not a column in the export and not a repo type — repo type
+is Agent-2's `cartographyProfile`, unrelated. It becomes the `clusterId` prefix, so the only
+requirement is that it stays stable across batches of the same project. Omitted, it resolves in
+this order: `--product-line` → `BUGFIX_PRODUCT_LINE` → `productLine` inside raw-defects → the
+project code in the source file name (`PJ01PM20260711040-….csv`) → else `unspecified` with a
+stderr warning. The resolved value and its provenance print as
+`productLine: <value> (via filename)` — quote that line when a cluster id looks odd.
+
+`--posture` defaults to `beta` and should stay there: resolved / closed tickets are not ours to
+work on, so `beta` gates them into `excluded`. Pass `alpha` only when the ask is explicitly
+"replay history and show where closed tickets would have landed" — never to build a fix queue,
+because closed tickets carry the resolver and root cause. On an all-`Open`/`New` export (the
+usual daily export) `alpha` and `beta` produce identical tickets and only the `posture` field
+differs, so there is nothing to decide.
 
 **Check the count before you read the pools.** `tickets` must equal the source row count from preflight. If it does not, say how many rows were dropped and why — never report a funnel built on a partial read, because the percentage breakdown looks perfectly healthy either way.
 
@@ -76,7 +89,7 @@ For `.xlsx`, convert first — the executable carries `openpyxl` itself, nothing
 
 ```bash
 agent1 xlsx-to-raw \
-  --xlsx path/to/export.xlsx --product-line hc --out raw-defects.json
+  --xlsx path/to/export.xlsx --out raw-defects.json
 ```
 
 Then run `prepare-batch --source raw-defects.json` and count again — spreadsheets drop rows in ways CSVs do not (merged cells, blank IDs, a second worksheet).

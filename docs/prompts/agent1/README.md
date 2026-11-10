@@ -25,8 +25,16 @@ SOP 细节以 `agent1/skills/defect-batch-prepare/SKILL.md` 为准；本页只�
 
 你这样工作：
 1. 先跑命令，不要在对话里重写筛选正则或 L1/L2 取值：
-   bugfix-agent prepare-batch --product-line <线别> --source <导出文件> --posture <alpha|beta> --out defect-batch.json
-   日批用 posture=beta（非 Open/New 会进 excluded）；要看历史已关单用 alpha。
+   bugfix-agent prepare-batch --source <导出文件> --out defect-batch.json
+   两个可选参数都有确定默认值，**不要为了它们打断用户**：
+   - posture 默认 beta，就让它默认。已解决 / 已关闭的单不归我们处理，beta 会打
+     excluded；只有在"要用历史已关单复算漏斗"时才显式给 alpha。
+     全部 Open/New 的日批导出下，alpha 与 beta 产物逐票相同，只有 posture 字段不同。
+   - product-line 是批次命名空间（clusterId 前缀），不是导出里的字段，也不是仓型
+     （仓型是后续 Agent-2 的 cartographyProfile，两回事）。省略时按
+     --product-line → BUGFIX_PRODUCT_LINE → raw-defects 里的 productLine →
+     文件名里的项目号（PJ01PM20260711040-….csv）→ unspecified 逐级派生，
+     stderr 会打印 `productLine: <值> (via <出处>)`。报告里引用这一行。
 2. 把规则产物另存一份（复核前快照）。然后打开原始导出的完整描述——批次里已经丢掉长 description，只留下 observed / expected / steps。
 3. 优先看 unclear、低置信、启发式结果，以及 locatable_only / needs_info。对要改的票写清：原文在说什么 → 哪类意图 → 是否还留在当前功能池。
 4. 用 apply-review 回写，让脚本重建簇和漏斗，不要手改 clusterId / clusters[] / funnel。
@@ -39,7 +47,8 @@ ui_layout, i18n, logic, data_wrong, perf, compat, config, security_scan, crash, 
 可以改：intent（回写后 intentSource 为 ai），以及匹配池之间的 pool。升入 strict 时必须带 expectQuality=explicit 或 inferred。
 不要改：hard_reject / security / excluded / duplicate（进或出都不行）；不要改 testModule / titleTag；不要使用「所属模块」。
 
-当前拉取（MCP/爬虫）仍不可用，只用用户提供的预置文件。缺 productLine、posture 或源文件时先问，不要猜线别。
+当前拉取（MCP/爬虫）仍不可用，只用用户提供的预置文件。只有**源文件缺失**时才问；
+productLine 与 posture 都能自己定（见上），不要为它们停下来。
 
 完成后简短说明：总票数、漏斗、复核改了多少张、终态文件路径。需要字段含义时读 docs/contracts/v0.1/defect-batch-guide.md。
 ```

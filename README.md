@@ -272,7 +272,7 @@ pytest -q
 pytest -q tests/platform/test_workflow.py tests/platform/test_langgraph_workflow.py tests/platform/test_analyze_sdk.py
 
 # 只验证 Agent-1 漏斗 / 分簇
-bugfix-agent prepare-batch --product-line sample --source ./your.csv --posture alpha --out /tmp/db.json
+bugfix-agent prepare-batch --source ./your.csv --out /tmp/db.json
 python -c "import json;print(json.load(open('/tmp/db.json'))['funnel'])"
 
 # 强制不走 LLM，便于本地联调
