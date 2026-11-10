@@ -23,7 +23,11 @@ from pathlib import Path
 from typing import Any, Iterator
 
 # 单一真源：别名表与空模板判定都直接 import，不在这里另抄一份。
-from bugfix_agent1.defect_batch.distill import is_empty_template, split_description
+from bugfix_agent1.defect_batch.distill import (
+    is_empty_template,
+    normalize_test_module,
+    split_description,
+)
 from bugfix_agent1.ingest.field_map import FIELD_ALIASES, METADATA_KEYS
 
 
@@ -137,6 +141,8 @@ def main() -> None:
     desc_present = 0
     empty_template = 0
     module_present = 0
+    semantic_free = 0
+    modules: Counter[str] = Counter()
     for r in rows:
         _, did = _pick(r, FIELD_ALIASES["defectId"])
         _, title = _pick(r, FIELD_ALIASES["title"])
@@ -148,14 +154,26 @@ def main() -> None:
             obs, exp, stp = split_description(desc)
             if is_empty_template(desc, obs, exp, stp):
                 empty_template += 1
-        if _pick(r, FIELD_ALIASES["testModule"])[1]:
+        _, module_raw = _pick(r, FIELD_ALIASES["testModule"])
+        if module_raw:
             module_present += 1
+            module, free = normalize_test_module(module_raw)
+            modules[module] += 1
+            if free:
+                semantic_free += 1
 
     print("-- content --")
     print(f"  rows mappable (id+title) : {mapped}/{len(rows)}")
     print(f"  description present      : {desc_present}/{len(rows)}")
     print(f"  description is an unfilled template : {empty_template}/{len(rows)}")
     print(f"  testModule present       : {module_present}/{len(rows)}")
+    if module_present:
+        share = semantic_free / module_present
+        print(
+            f"  testModule semantic-free : {semantic_free}/{module_present} "
+            f"({share:.0%})  <- 无产品语义的模块名（【公共】/用例集/系统…）"
+        )
+        print(f"  distinct modules (L1)    : {len(modules)}")
     print()
 
     # 判定
@@ -178,6 +196,15 @@ def main() -> None:
         verdicts.append(
             "WARN: no module column mapped — every cluster collapses into _unmoduled, "
             "so the L1 grouping dimension is dead for this export."
+        )
+    elif module_present and semantic_free / module_present >= 0.30:
+        share = semantic_free / module_present
+        verdicts.append(
+            f"WARN: {semantic_free}/{module_present} modules ({share:.0%}) carry no product "
+            "semantics — they are case-set / 【公共】/ checklist names, not code areas. "
+            "The column is present, so the funnel will look healthy, but L1 grouping is "
+            "mostly noise: expect many singleton clusters. Say this in the hand-off instead "
+            "of reporting the cluster view as if it were meaningful."
         )
 
     if args.batch is not None:

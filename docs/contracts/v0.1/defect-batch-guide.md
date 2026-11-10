@@ -136,7 +136,7 @@ raw-defects  ──►  defect-batch.json  ──► 后续步骤
 
 - `observed` / `expected` / `steps`：从描述模板拆出；可能为空。检索代码时用这些短切片，不要回填整份 `description`（产物里也不再带原始长描述）。
 - `status` / `severity` / `createdAt` / `fieldType`：透传，供姿态与报告；不要当模块路径。
-- `reasonCode` / `reasonDetail`：非 strict 时常说明为什么被分流。
+- `reasonCode` / `reasonDetail`：非 strict 时常说明为什么被分流。**复核改池后会被清空**（旧筛因已过期；复核理由记在 review.json，不写在票上）。
 - `semanticFree`：测试模块本身没有产品语义（如「其他」「checklist」）。
 - `priority`：仅 strict 票有排序权重。
 - `duplicate`：是否重复单。

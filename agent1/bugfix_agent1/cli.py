@@ -21,6 +21,7 @@ import hashlib
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 # 这两个子命令的外部参数各自独立，与其在 cli 里再抄一份 argparse，
 # 不如把剩余参数原样交给它们自己的 main()。
@@ -82,6 +83,16 @@ def _cmd_self_check() -> int:
         return 1
     print("  OK  all hashes match")
     return 0
+
+
+def _cluster_stats(batch: Any) -> dict[str, int]:
+    """簇健康度的可抄数字。报告里写错簇数/单票簇数是常见事故。"""
+    sizes = sorted((len(c.defectIds) for c in batch.clusters), reverse=True)
+    return {
+        "total": len(sizes),
+        "singleton": sum(1 for s in sizes if s == 1),
+        "largest": sizes[0] if sizes else 0,
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -159,7 +170,15 @@ def main(argv: list[str] | None = None) -> int:
         out.write_text(batch.model_dump_json(indent=2), encoding="utf-8")
         print(
             json.dumps(
-                {"ok": True, "tickets": len(batch.tickets), "funnel": batch.funnel, "out": str(out)},
+                {
+                    "ok": True,
+                    "tickets": len(batch.tickets),
+                    "funnel": batch.funnel,
+                    "clusters": _cluster_stats(batch),
+                    "productLine": batch.productLine,
+                    "posture": batch.posture,
+                    "out": str(out),
+                },
                 ensure_ascii=False,
             )
         )
@@ -182,6 +201,7 @@ def main(argv: list[str] | None = None) -> int:
                     "ok": True,
                     "tickets": len(updated.tickets),
                     "funnel": updated.funnel,
+                    "clusters": _cluster_stats(updated),
                     "adjustments": len(review_file.adjustments),
                     "out": str(out),
                 },

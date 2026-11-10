@@ -34,6 +34,17 @@ class IntentResult:
     rationale: str
 
 
+# 「机型」和裸「兼容」曾经在这里，实测全错：平台导出的【前置条件】几乎每张都写
+# 「设备机型为…」，产品里还有个叫「兼容模式」的模式名，两者都与兼容性无关。
+# 这类语料下宁可落到 unclear（诚实），也别制造 5/5 的假阳性。
+COMPAT_RE = re.compile(
+    r"火狐|firefox|safari|chrome|安卓|android"
+    r"|(?<![a-z])ios(?![a-z])"
+    r"|兼容性|不兼容|浏览器版本|插件版本|不同浏览器",
+    re.I,
+)
+
+
 IntentClassifier = Callable[[list[DefectDigest]], dict[str, IntentResult]]
 
 
@@ -53,16 +64,18 @@ def heuristic_classify_intent(d: DefectDigest) -> IntentResult:
         return IntentResult("crash", "heuristic", "high", "crash keywords")
     if re.search(r"较慢|卡顿|超时|延迟|\d+\s*秒", text):
         return IntentResult("perf", "heuristic", "medium", "performance keywords")
-    if re.search(r"火狐|safari|chrome|机型|安卓|ios|兼容", text, re.I):
+    if COMPAT_RE.search(text):
         return IntentResult("compat", "heuristic", "medium", "compat keywords")
     if re.search(r"未翻译|没有翻译|翻译错误|乱码|文案|词条|i18n", text, re.I):
         return IntentResult("i18n", "heuristic", "high", "i18n keywords")
     if re.search(r"溢出|截断|偏移|间距|边框|遮挡|布局|显示不全|看不到", text):
         return IntentResult("ui_layout", "heuristic", "medium", "ui/layout keywords")
+    # data_wrong 必须在 config 之前：「配置下发不一致」「未更新」这类是数据/状态
+    # 不对，而「配置」二字在平台模板里遍地都是，先判 config 会把它全吃掉。
+    if re.search(r"数据错误|数量不对|列表为空|未更新|不符|不一致", text):
+        return IntentResult("data_wrong", "heuristic", "medium", "data keywords")
     if re.search(r"配置|开关|权限|鉴权", text):
         return IntentResult("config", "heuristic", "low", "config keywords")
-    if re.search(r"数据错误|数量不对|列表为空|未更新|不符", text):
-        return IntentResult("data_wrong", "heuristic", "medium", "data keywords")
 
     if d.fieldType and d.fieldType.strip():
         key = d.fieldType.strip().lower()

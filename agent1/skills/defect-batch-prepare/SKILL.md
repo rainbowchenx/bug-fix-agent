@@ -46,12 +46,13 @@ Run this first, every time:
 agent1 preflight --source path/to/export.csv
 ```
 
-It prints the source row count, which column fed each contract field, which columns it could not place, how many descriptions are unfilled templates, and whether the module column mapped.
+It prints the source row count, which column fed each contract field, which columns it could not place, how many descriptions are unfilled templates, whether the module column mapped, and what share of those modules carry no product semantics.
 
 Read the output before running the funnel:
 
 - **rows mappable < rows in file** → an ID or title column spelling is unknown. Fix the mapping first; see [references/column-aliases.md](references/column-aliases.md).
 - **testModule MISS** → every cluster collapses into `_unmoduled` and the L1 dimension is dead. Say so, and say that clustering quality is limited by the export rather than by the analysis.
+- **testModule semantic-free ≥ 30%** → the column is present, so the funnel will look healthy, but those are case-set / 【公共】/ checklist names, not code areas. Expect mostly singleton clusters; say the cluster view is of limited value instead of presenting it as a grouping.
 - **description is an unfilled template** → for those tickets there is nothing to name. They belong in `needs_info`; do not fabricate intent for them.
 
 The failure this prevents is silent: an unrecognised ID column used to make `prepare-batch` return `{"ok": true, "tickets": 0}`. `ok: true` means the rules ran, not that the data was read. It now raises instead, but preflight tells you *which column* before you get there.
@@ -143,6 +144,8 @@ If nothing should change, skip `apply-review` and hand off the rule output, sayi
 ## Step 3 — Hand off honestly
 
 Report: total tickets, the funnel, how many tickets you changed and in which direction, and the final file path. If the batch is materially degraded — most modules unknown, most descriptions empty, a large share still `unclear` — say that in the same breath. The next step (code localization) inherits whatever you paper over, and it cannot tell a real `unclear` from one you created.
+
+**Quote numbers, do not count them.** `prepare-batch` and `apply-review` both print a `clusters` object (`total` / `singleton` / `largest`) next to the funnel. Copy those figures; hand-counting cluster or singleton totals is where wrong numbers in hand-off reports come from. The same goes for naming a rule: if you say why a heuristic label was wrong, describe the symptom you saw, do not guess at the keyword rule behind it.
 
 Command variants: [references/examples.md](references/examples.md). Output artifact shape:
 `references/defect-batch-guide.md` (repo: `docs/contracts/v0.1/defect-batch-guide.md`).

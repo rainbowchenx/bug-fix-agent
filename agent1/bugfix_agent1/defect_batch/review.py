@@ -88,6 +88,12 @@ def apply_intent_review(
                 raise ValueError(
                     f"cannot move {item.defectId} into protected or unknown pool {item.pool}"
                 )
+            if item.pool != ticket.pool:
+                # 筛因是「为什么没进 strict」的解释。池一变它就过期了：升进 strict
+                # 的票还挂着 C1e「报错无细节」，会原样进 AnalysisReport，
+                # 让交付物自相矛盾。复核记录在 review.json 里，这里清掉不丢信息。
+                ticket.reasonCode = None
+                ticket.reasonDetail = None
             ticket.pool = item.pool
         if item.expectQuality is not None:
             ticket.expectQuality = item.expectQuality
