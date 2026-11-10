@@ -85,6 +85,11 @@ _STOP_TOKENS = {
     "security_scan",
     "i18n",
     "perf",
+    # 目录名当 token 没有区分力：夹具里 'web' 出现在 device-web 100%、
+    # electron 33% 的文件路径中。它一旦作为优先 token 命中，就会把整个 web/
+    # 子树倒进候选（模糊标题实测：0 候选/low → 3 候选/medium，top1 是错的）。
+    # 导出的 `[WEB]` 标签在 P0-b 修好后会变成这个 token，所以必须在源头堵住。
+    "web",
 }
 
 
