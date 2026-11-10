@@ -550,6 +550,11 @@ def _score_confidence(
     - codegraph hit, or ≥2 path hits → high
     - single path/grep hit → medium
     - missing suggested ticket fields (A1) → at most medium
+
+    注意：``run.py`` 每次匹配后调 :func:`filter_existing_candidates` 复算，而它构造的
+    ``ticket_stub`` 只带 defectId/title/pool/expectQuality，缺 testModule/titleTag/intent，
+    于是 ``rich`` 恒为 False —— **当前管线里 high 实际不可达，一律封顶 medium**。
+    要让 high 可达，得让 stub 带上这三个字段；那是产品判断，不要顺手改。
     """
     if not candidates:
         return "low"

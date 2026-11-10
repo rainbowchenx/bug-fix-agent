@@ -122,8 +122,7 @@ raw-defects  ──►  defect-batch.json  ──► 后续步骤
 缺 `titleTag` / `testModule` / `intent` 时，代码匹配置信度应封顶 **medium**。
 
 > **平台导出上 L1 与 L2 通常就是同一个值。** 标题前缀 `[模块名]` 与「测试模块」列同源，实测五份导出里 `titleTag == testModule` 的比例是 5/5、21/26、19/19、36/37、54/56（96–100%）。因此 `clusterId` 的 `module::tag::intent` 实际是 `module::module::intent`，分辨率只来自 `intent` 这一维。读产物时**不要把 L1/L2 当成两个互相印证的独立证据**；只有括号名与模块列不同时（例如 `[WEB]` 而模块列是 `WEB基础组(正式批)`）L2 才携带额外信息。
->
-> 实现备注：`filter_existing_candidates` 用只带 `defectId` / `title` / `pool` / `expectQuality` 的 stub 复算 confidence，因此当前**一律封顶 medium、`high` 不可达**。别把 medium 读成“证据不足”。
+
 
 ### 4.3 `expectQuality`
 
