@@ -147,6 +147,20 @@ async def _can_use_cartography_tool(
     return PermissionResultAllow()
 
 
+def _billing(
+    turns: int | None, cost: float | None, terminal: str | None
+) -> str:
+    """``turns=17; reason=completed; cost=$0.42`` —— 写进产物，让成本可复核。"""
+    bits: list[str] = []
+    if turns is not None:
+        bits.append(f"turns={turns}")
+    if terminal:
+        bits.append(f"reason={terminal}")
+    if cost is not None:
+        bits.append(f"cost=${cost:.4f}" if cost < 0.01 else f"cost=${cost:.2f}")
+    return "; ".join(bits)
+
+
 def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
     """Claude Agent SDK session: thorough read of workDir to thicken code-knowledge."""
     if not has_credentials():
@@ -194,11 +208,18 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
 
     result_text = ""
     structured: Any = None
+    turns: int | None = None
+    cost: float | None = None
+    terminal: str | None = None
 
     async def _run() -> None:
-        nonlocal result_text, structured
+        nonlocal result_text, structured, turns, cost, terminal
         async for message in query(prompt=prompt, options=options):
             if isinstance(message, ResultMessage):
+                # 账单与终止原因只有这一条消息里才有；不接就等于每次跑完都不知道花了多少。
+                turns = message.num_turns
+                cost = message.total_cost_usd
+                terminal = message.terminal_reason
                 if message.is_error:
                     raise RuntimeError(
                         "; ".join(message.errors or []) or message.result or "cartography SDK error"
@@ -211,7 +232,8 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
     except Exception as err:  # noqa: BLE001
         fallback = heuristic_cartography(req)
         fallback.source = "sdk_fallback"
-        fallback.detail = f"sdk cartography failed: {err}"
+        billing = _billing(turns, cost, terminal)
+        fallback.detail = f"sdk cartography failed: {err}" + (f"; {billing}" if billing else "")
         return fallback
 
     parsed = parse_json_payload(structured if structured is not None else result_text)
@@ -230,7 +252,12 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
         fallback.detail = f"enriched code-knowledge invalid: {err}"
         return fallback
 
-    return CartographyResult(ok=True, knowledge=knowledge, source="sdk")
+    return CartographyResult(
+        ok=True,
+        knowledge=knowledge,
+        source="sdk",
+        detail=_billing(turns, cost, terminal) or None,
+    )
 
 
 def _merge_enrichment(baseline: CodeKnowledge, parsed: dict[str, Any]) -> dict[str, Any]:
