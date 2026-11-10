@@ -148,6 +148,7 @@ def build_agent1(skip_exe: bool = False) -> Path:
         if not (scripts / exe_name).exists():
             raise SystemExit("agent1: --skip-exe but the staging tree has no prebuilt exe")
     else:
+        _require_pyinstaller()
         log("agent1: running PyInstaller (30-60s)")
         stamp = BUILD / "pyinstaller"
         env = dict(os.environ, PYTHONPATH=str(vendor))
@@ -243,6 +244,23 @@ def _verify_skill_docs(stage: Path) -> None:
         joined = "\n  ".join(problems)
         raise SystemExit(f"agent1: skill docs are not self-contained:\n  {joined}")
     log("agent1: skill docs self-contained (all relative links resolve)")
+
+
+def _require_pyinstaller() -> None:
+    """编译 exe 前先确认 PyInstaller 在：缺了就给能直接粘的命令，而不是 traceback。”"""
+    probe = subprocess.run(
+        [sys.executable, "-c", "import PyInstaller; print(PyInstaller.__version__)"],
+        capture_output=True,
+        text=True,
+    )
+    if probe.returncode != 0:
+        raise SystemExit(
+            "agent1: PyInstaller is not installed in this interpreter\n"
+            f"  interpreter: {sys.executable}\n"
+            '  fix: pip install -e ".[build]"     (or: pip install "pyinstaller>=6.10")\n'
+            '  or: python packaging/build.py agent1 --skip-exe   (assemble scripts only)'
+        )
+    log(f"agent1: PyInstaller {probe.stdout.strip()}")
 
 
 def _verify_agent1(scripts: Path) -> None:

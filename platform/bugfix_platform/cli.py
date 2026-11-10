@@ -11,6 +11,8 @@ Agent-1 的 ``prepare-batch`` / ``apply-review`` 在 ``bugfix-agent``，不在�
 
 from __future__ import annotations
 
+from bugfix_contracts.env import load_env_file
+
 import argparse
 import json
 import sys
@@ -18,6 +20,9 @@ from pathlib import Path
 
 
 def main(argv: list[str] | None = None) -> int:
+    # README 让用户 `cp .env.example .env`；不在这里读的话那个文件是摆设。
+    # 已存在的环境变量优先，平台注入的值不会被仓里的 .env 覆盖。
+    load_env_file()
     parser = argparse.ArgumentParser(
         prog="bugfix-platform",
         description="LangGraph Agent-2→3 (requires defect-batch from Agent-1)",

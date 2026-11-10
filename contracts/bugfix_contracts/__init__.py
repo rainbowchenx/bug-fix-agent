@@ -1,5 +1,6 @@
 """Cross-agent contracts — the ONLY allowed coupling surface."""
 
+from bugfix_contracts.env import ENV_FILE_VAR, load_env_file
 from bugfix_contracts.common import (
     CONTRACT_SCHEMA_VERSION,
     MATCH_POOLS,

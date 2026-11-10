@@ -49,6 +49,7 @@ pip install -e ".[agent1]"  # 只装 Agent-1（openpyxl）
 pip install -e ".[platform]" # 只装平台（langgraph）
 pip install -e ".[sdk]"     # 可选：Agent-2/3 Claude Agent SDK（需本机 Claude Code CLI）
 pip install -e ".[http]"    # 可选：FastAPI + uvicorn（S4）
+pip install -e ".[build]"   # 要跑 packaging/build.py 编译 exe 时必须（PyInstaller）
 ```
 
 复制环境变量模板：
@@ -57,6 +58,13 @@ pip install -e ".[http]"    # 可选：FastAPI + uvicorn（S4）
 cp .env.example .env
 # 常用：ANTHROPIC_API_KEY、BUGFIX_ANALYZE_MODE、BUGFIX_CARTOGRAPHY_MODE、BUGFIX_SKILLS_DIR
 ```
+
+CLI 启动时读取 **CWD 下的 `.env`**（`bugfix-agent` / `bugfix-platform` 都读，实现见
+`contracts/bugfix_contracts/env.py`）。规则：
+
+- **已存在的环境变量优先** —— 平台注入的凭据不会被仓里的 `.env` 覆盖
+- 换文件用 `BUGFIX_ENV_FILE=/path/to/env`
+- 不做变量展开；`BUGFIX_ANALYZE_LIMIT=` 这种空值就是空（=不限）
 
 | 变量 | 说明 |
 |------|------|
@@ -225,6 +233,12 @@ final = graph.invoke({
 | `dist/bugfix-agent-platform.zip` | Agent-2/3 + LangGraph + 平台 skill，根目录 `graph.py` 暴露 `build_graph()` / `graph` / `main()` | 内部 agent 平台 |
 
 两侧只共享 `bugfix_contracts`；平台包不含 `bugfix_agent1` / Agent-1 skill，Agent-1 包不含 `bugfix_platform` / 平台 skill。
+
+先装构建依赖（只需一次）：
+
+```bash
+pip install -e ".[build]"                 # PyInstaller；缺了 build.py 会直接告诉你装什么
+```
 
 ```bash
 python packaging/build.py                 # 两个都打

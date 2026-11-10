@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+from bugfix_contracts.env import load_env_file
+
 import argparse
 import hashlib
 import json
@@ -83,6 +85,9 @@ def _cmd_self_check() -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # README 让用户 `cp .env.example .env`；不在这里读的话那个文件是摆设。
+    # 已存在的环境变量优先，平台注入的值不会被仓里的 .env 覆盖。
+    load_env_file()
     raw = list(sys.argv[1:] if argv is None else argv)
     if raw and raw[0] in _PASSTHROUGH:
         return _run_passthrough(raw[0], raw[1:])
