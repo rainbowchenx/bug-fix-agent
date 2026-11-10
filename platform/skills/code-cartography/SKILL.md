@@ -18,7 +18,7 @@ SOP for building `code-knowledge`. Prefer the Python entrypoint; use this skill 
 | Call `run_cartographer` with caller `cartography_profile` | Dump full ticket observed/expected/steps into matching queries; do not guess the profile |
 | Cap candidates at **3** per defect; empty OK with `confidence=low` | Exceed candidate cap or invent non-existent paths |
 | Follow profile biases (electron / micro_frontend / device_web) | Write `CODEBASE_MAP.md` or edit target repo by default |
-| SDK: read deeply (imports/call flow) so Agent-3 spends fewer tokens | Mutate the repo via Bash/Edit/Write |
+| SDK: thicken architecture + weak path matches only | Follow imports/call-flow per ticket (that is Agent-3); mutate the repo |
 
 ## Input contract
 
@@ -32,7 +32,10 @@ workDir + defect-batch + cartographyProfile
   → record techStack hints (do not guess profile)
   → map architecture by the given profile (catalog files, not path regex)
   → match tickets using architecture indexes + title tokens
-  → optional SDK enrich (Read/Glob/Grep + read-only Bash; no max_turns by default)
+    (do not fill tickets with architecture entryPoints when no path token hit)
+  → optional SDK enrich (Read/Glob/Grep + read-only Bash; default max_turns=24;
+     prompt only weak/empty/false-medium tickets, cap 8)
+  → on max_turns: salvage JSON from the stream / one resume turn; keep baseline
   → validate_code_knowledge → code-knowledge.json
 ```
 

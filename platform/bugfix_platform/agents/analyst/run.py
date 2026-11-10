@@ -21,6 +21,7 @@ from bugfix_platform.sdk.analyze import (
     analyze_mode_from_env,
     create_analyze_runner,
 )
+from bugfix_platform.sdk.cartography import profile_reading_playbook
 from bugfix_platform.sdk.skill_inject import discover_analyze_skills
 
 
@@ -91,6 +92,11 @@ def run_analyst(
                     ticket=t,
                     routed=routed,
                     injected_skills=tuple(injected),
+                    cartography_profile=code_knowledge.cartographyProfile,
+                    architecture=code_knowledge.architecture.model_dump(),
+                    reading_playbook=profile_reading_playbook(
+                        code_knowledge.cartographyProfile
+                    ),
                 )
             )
             entry.update(result.payload)

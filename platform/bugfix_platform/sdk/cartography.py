@@ -14,9 +14,16 @@ from bugfix_platform.sdk.skills import skills_system_addon
 
 CartographyMode = Literal["heuristic", "sdk"]
 
-# 提示词里带给模型的票数上限。Agent-2 以 SDK 为准，票给全比省 token 重要；
-# 这个数只防提示词爆炸，不参与匹配、不参与产物统计。
-MAX_PROMPT_TICKETS = 80
+# 提示词里带给模型的弱票上限。强匹配票不进 SDK prompt。
+MAX_PROMPT_TICKETS = 8
+MAX_WEAK_PROMPT_TICKETS = 8
+DEFAULT_CARTOGRAPHY_MAX_TURNS = 24
+_BUDGET_SUBTYPES = frozenset({"error_max_turns", "error_max_budget_usd"})
+_SALVAGE_PROMPT = (
+    "Stop exploring. Based only on what you already observed, return the JSON "
+    "enrich object now. Incomplete is OK; set partial=true. Do not follow "
+    "imports or name a fix locus. Do not call more tools unless required to emit JSON."
+)
 
 # Thorough read session: Bash allowed for read-only exploration; no mutate tools.
 CARTOGRAPHY_TOOLS = ["Read", "Glob", "Grep", "Bash"]
@@ -44,18 +51,21 @@ def resolve_cartography_max_turns(explicit: Optional[int] = None) -> Optional[in
 
     - Request explicit ``>0`` → that value
     - Request explicit ``<=0`` → unlimited
-    - Env empty / ``0`` / ``none`` / ``unlimited`` → unlimited (default)
+    - Env empty → ``DEFAULT_CARTOGRAPHY_MAX_TURNS`` (24)
+    - Env ``0`` / ``none`` / ``unlimited`` → unlimited
     - Env positive int → that value
     """
     if explicit is not None:
         return None if explicit <= 0 else explicit
     raw = (os.environ.get("BUGFIX_CARTOGRAPHY_MAX_TURNS") or "").strip().lower()
-    if raw in ("", "0", "none", "null", "unlimited", "inf", "infinite"):
+    if raw in ("0", "none", "null", "unlimited", "inf", "infinite"):
         return None
+    if raw == "":
+        return DEFAULT_CARTOGRAPHY_MAX_TURNS
     try:
         n = int(raw)
     except ValueError:
-        return None
+        return DEFAULT_CARTOGRAPHY_MAX_TURNS
     return None if n <= 0 else n
 
 
@@ -83,7 +93,7 @@ class CartographyRequest:
     work_dir: str
     defect_batch: DefectBatch
     baseline: CodeKnowledge
-    # None → resolve from env (default unlimited). <=0 also means unlimited.
+    # None → resolve from env (default 24). <=0 also means unlimited.
     max_turns: Optional[int] = None
     model: Optional[str] = None
     injected_skills: tuple[InjectedSkill, ...] = ()
@@ -147,6 +157,83 @@ async def _can_use_cartography_tool(
     return PermissionResultAllow()
 
 
+def is_weak_match(match: Any, entry_points: list[str] | None = None) -> bool:
+    """Whether SDK should try to improve this ticket's candidates.
+
+    Weak = empty / low confidence / candidates are only architecture entryPoints
+    / ``why`` is dual-entry-only (the false-medium baseline).
+    """
+    if match is None:
+        return True
+    if isinstance(match, dict):
+        cands = list(match.get("candidates") or [])
+        conf = str(match.get("confidence") or "low")
+    else:
+        cands = list(getattr(match, "candidates", None) or [])
+        conf = str(getattr(match, "confidence", None) or "low")
+    if not cands or conf == "low":
+        return True
+    entries = {_norm_rel(ep) for ep in (entry_points or []) if ep}
+
+    def _cand_path(item: Any) -> str:
+        if isinstance(item, dict):
+            return str(item.get("path") or "")
+        return str(getattr(item, "path", "") or "")
+
+    def _cand_why(item: Any) -> str:
+        if isinstance(item, dict):
+            return str(item.get("why") or "")
+        return str(getattr(item, "why", "") or "")
+
+    paths = [_norm_rel(_cand_path(c)) for c in cands]
+    if entries and paths and all(p in entries for p in paths):
+        return True
+    whys = [_cand_why(c).lower() for c in cands]
+    if whys and all("dual-entry" in w for w in whys):
+        return True
+    return False
+
+
+def _norm_rel(rel: str) -> str:
+    return rel.replace("\\", "/").lstrip("./").lower()
+
+
+def _message_text(message: Any) -> str:
+    result = getattr(message, "result", None)
+    if isinstance(result, str) and result.strip():
+        return result
+    content = getattr(message, "content", None)
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    bits: list[str] = []
+    for block in content:
+        text = getattr(block, "text", None)
+        if isinstance(text, str):
+            bits.append(text)
+        elif isinstance(block, dict) and isinstance(block.get("text"), str):
+            bits.append(block["text"])
+    return "\n".join(bits)
+
+
+def _budget_exhausted(message: Any) -> bool:
+    subtype = str(getattr(message, "subtype", "") or "")
+    terminal = str(getattr(message, "terminal_reason", "") or "")
+    return subtype in _BUDGET_SUBTYPES or terminal in {"max_turns", "max_budget_usd"}
+
+
+def _parse_session_json(structured: Any, texts: list[str]) -> Optional[dict[str, Any]]:
+    parsed = parse_json_payload(structured)
+    if parsed is not None:
+        return parsed
+    for text in reversed(texts):
+        parsed = parse_json_payload(text)
+        if parsed is not None:
+            return parsed
+    return None
+
+
 def _billing(
     turns: int | None, cost: float | None, terminal: str | None
 ) -> str:
@@ -161,8 +248,20 @@ def _billing(
     return "; ".join(bits)
 
 
+def _sdk_keep_baseline(req: CartographyRequest, billing: str) -> CartographyResult:
+    """触顶且无 JSON：保留进 SDK 前的启发式图，不标 sdk_fallback。"""
+    data = req.baseline.model_dump()
+    data["partial"] = True
+    return CartographyResult(
+        ok=True,
+        knowledge=validate_code_knowledge(data),
+        source="sdk",
+        detail=billing or None,
+    )
+
+
 def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
-    """Claude Agent SDK session: thorough read of workDir to thicken code-knowledge."""
+    """Claude Agent SDK session: thicken architecture + weak path matches."""
     if not has_credentials():
         fallback = heuristic_cartography(req)
         fallback.source = "sdk_fallback"
@@ -195,69 +294,136 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
             )
         )
     max_turns = resolve_cartography_max_turns(req.max_turns)
-    options = ClaudeAgentOptions(
-        cwd=req.work_dir,
-        system_prompt=system_prompt,
-        allowed_tools=list(CARTOGRAPHY_TOOLS),
-        disallowed_tools=list(DISALLOWED_TOOLS),
-        permission_mode="dontAsk",
-        max_turns=max_turns,
-        model=model,
-        can_use_tool=_can_use_cartography_tool,
-    )
 
+    def _make_options(*, resume: str | None = None, turns: Optional[int] = None) -> Any:
+        kwargs: dict[str, Any] = {
+            "cwd": req.work_dir,
+            "system_prompt": system_prompt,
+            "allowed_tools": list(CARTOGRAPHY_TOOLS),
+            "disallowed_tools": list(DISALLOWED_TOOLS),
+            "permission_mode": "dontAsk",
+            "max_turns": turns if turns is not None else max_turns,
+            "model": model,
+            "can_use_tool": _can_use_cartography_tool,
+        }
+        if resume:
+            kwargs["resume"] = resume
+        try:
+            return ClaudeAgentOptions(**kwargs)
+        except TypeError:
+            kwargs.pop("resume", None)
+            return ClaudeAgentOptions(**kwargs)
+
+    texts: list[str] = []
     result_text = ""
     structured: Any = None
     turns: int | None = None
     cost: float | None = None
     terminal: str | None = None
+    session_id: str | None = None
+    budget_stop = False
 
-    async def _run() -> None:
-        nonlocal result_text, structured, turns, cost, terminal
-        async for message in query(prompt=prompt, options=options):
-            if isinstance(message, ResultMessage):
-                # 账单与终止原因只有这一条消息里才有；不接就等于每次跑完都不知道花了多少。
-                turns = message.num_turns
-                cost = message.total_cost_usd
-                terminal = message.terminal_reason
-                if message.is_error:
-                    raise RuntimeError(
-                        "; ".join(message.errors or []) or message.result or "cartography SDK error"
-                    )
-                result_text = message.result or ""
+    async def _drive(prompt_text: str, opts: Any) -> None:
+        nonlocal result_text, structured, turns, cost, terminal, session_id, budget_stop
+        async for message in query(prompt=prompt_text, options=opts):
+            text = _message_text(message)
+            if text.strip():
+                texts.append(text)
+            if not isinstance(message, ResultMessage):
+                continue
+            turns = message.num_turns
+            cost = message.total_cost_usd
+            terminal = message.terminal_reason
+            session_id = getattr(message, "session_id", None) or session_id
+            structured = message.structured_output
+            result_text = message.result or ""
+            if _budget_exhausted(message):
+                budget_stop = True
+                continue
+            if message.is_error:
+                raise RuntimeError(
+                    "; ".join(message.errors or []) or message.result or "cartography SDK error"
+                )
+
+    try:
+        anyio.run(_drive, prompt, _make_options())
+    except Exception as err:  # noqa: BLE001
+        if not budget_stop:
+            fallback = heuristic_cartography(req)
+            fallback.source = "sdk_fallback"
+            billing = _billing(turns, cost, terminal)
+            fallback.detail = f"sdk cartography failed: {err}" + (
+                f"; {billing}" if billing else ""
+            )
+            return fallback
+
+    parsed = _parse_session_json(structured, texts)
+    if parsed is None and budget_stop and session_id:
+        salvage_texts: list[str] = []
+
+        async def _salvage() -> None:
+            nonlocal structured, result_text, turns, cost, terminal
+            async for message in query(
+                prompt=_SALVAGE_PROMPT,
+                options=_make_options(resume=session_id, turns=2),
+            ):
+                text = _message_text(message)
+                if text.strip():
+                    salvage_texts.append(text)
+                if not isinstance(message, ResultMessage):
+                    continue
+                extra_turns = message.num_turns
+                if extra_turns is not None:
+                    turns = (turns or 0) + extra_turns
+                if message.total_cost_usd is not None:
+                    cost = (cost or 0.0) + float(message.total_cost_usd)
                 structured = message.structured_output
+                result_text = message.result or ""
+                if message.is_error and not _budget_exhausted(message):
+                    raise RuntimeError(
+                        "; ".join(message.errors or [])
+                        or message.result
+                        or "cartography salvage error"
+                    )
 
-    try:
-        anyio.run(_run)
-    except Exception as err:  # noqa: BLE001
-        fallback = heuristic_cartography(req)
-        fallback.source = "sdk_fallback"
-        billing = _billing(turns, cost, terminal)
-        fallback.detail = f"sdk cartography failed: {err}" + (f"; {billing}" if billing else "")
-        return fallback
+        first_turns, first_cost, first_terminal = turns, cost, terminal
+        try:
+            anyio.run(_salvage)
+        except Exception:  # noqa: BLE001
+            pass
+        texts.extend(salvage_texts)
+        parsed = _parse_session_json(structured, texts)
+        if parsed is None:
+            turns, cost, terminal = first_turns, first_cost, first_terminal
 
-    parsed = parse_json_payload(structured if structured is not None else result_text)
-    if parsed is None:
-        fallback = heuristic_cartography(req)
-        fallback.source = "sdk_fallback"
-        fallback.detail = "sdk returned no parseable JSON cartography"
-        return fallback
+    if budget_stop and not terminal:
+        terminal = "max_turns"
+    billing = _billing(turns, cost, terminal)
 
-    try:
-        merged = _merge_enrichment(req.baseline, parsed)
-        knowledge = validate_code_knowledge(merged)
-    except Exception as err:  # noqa: BLE001
-        fallback = heuristic_cartography(req)
-        fallback.source = "sdk_fallback"
-        fallback.detail = f"enriched code-knowledge invalid: {err}"
-        return fallback
+    if parsed is not None:
+        try:
+            merged = _merge_enrichment(req.baseline, parsed)
+            if budget_stop:
+                merged["partial"] = True
+            knowledge = validate_code_knowledge(merged)
+        except Exception as err:  # noqa: BLE001
+            if budget_stop:
+                return _sdk_keep_baseline(req, billing)
+            fallback = heuristic_cartography(req)
+            fallback.source = "sdk_fallback"
+            fallback.detail = f"enriched code-knowledge invalid: {err}"
+            return fallback
+        return CartographyResult(
+            ok=True, knowledge=knowledge, source="sdk", detail=billing or None
+        )
 
-    return CartographyResult(
-        ok=True,
-        knowledge=knowledge,
-        source="sdk",
-        detail=_billing(turns, cost, terminal) or None,
-    )
+    if budget_stop:
+        return _sdk_keep_baseline(req, billing)
+
+    fallback = heuristic_cartography(req)
+    fallback.source = "sdk_fallback"
+    fallback.detail = "sdk returned no parseable JSON cartography"
+    return fallback
 
 
 def _merge_enrichment(baseline: CodeKnowledge, parsed: dict[str, Any]) -> dict[str, Any]:
@@ -349,10 +515,11 @@ PROFILE_READING_PLAYBOOK = {
     ),
     "device_web": (
         "device_web read order: (1) split PC vs mobile — main-pc.js / main-mobile.js and "
-        "Router/{pc,mobile}.js. (2) greyed-out / missing-feature defects: read "
-        "Common/service/device.js before views. (3) real bridge is jsWebControl, not a "
-        "folder named bridge. (4) do not look for vue.app.js modules; business dirs are "
-        "route modules in one SPA. (5) index.asp is host, not architecture."
+        "Router/{pc,mobile}.js. (2) src/<Business>/ directories (Config, Preview, …) are "
+        "route modules in one SPA — list them into architecture.modules. (3) greyed-out / "
+        "missing-feature defects: read Common/service/device.js before views. (4) real "
+        "bridge is jsWebControl, not a folder named bridge. (5) do not look for vue.app.js. "
+        "(6) index.asp is host, not architecture."
     ),
     "electron_node": (
         "electron_node read order: (1) follow package.json main, loadFile/loadURL, and "
@@ -375,7 +542,8 @@ def profile_reading_playbook(profile: str | None) -> str:
 
 
 _SYSTEM_PROMPT = """You are Agent-2 Code Cartographer for an automated bugfix pipeline.
-Your job is to thoroughly read the target workDir so Agent-3 can fix defects with LESS re-exploration token cost.
+Your job is to thicken the architecture map and improve WEAK/EMPTY path matches.
+Agent-3 follows imports and names the fix locus. You do not.
 
 Tools: Read, Glob, Grep, and Bash. Bash is for READ-ONLY exploration only
 (e.g. rg/find/git log|blame|grep|show, ls, cat/head/sed -n). NEVER mutate the repo:
@@ -383,18 +551,15 @@ no edit/write tools, no git write, no install, no network, no rm/chmod.
 
 cartographyProfile is CALLER-SUPPLIED. Do not reclassify the repo.
 
-How to work (be thorough, then stop when grounded):
-1) Follow the profile reading playbook in the user prompt, then CLAUDE.md / overlay skills.
-   Repo-specific injected skills have HIGHEST PRIORITY over package SOP: follow THEIR
-   read order, test/src layout, module aliases, and naming on any conflict.
-2) For EACH match-pool ticket: open baseline candidate files, follow imports/callers
-   with Grep/Bash rg until you can name the likely fix locus and a short call-flow note.
-   Stay inside the module / process / PC-mobile fork the architecture map already named.
-3) Prefer improving weak/empty matches; do not invent paths. Cap candidates at 3 per ticket.
-   Injected skills never lift these caps or let you match outside
-   strict/locatable_only/needs_info.
-4) Write architecture.summary rich enough that Agent-3 need not re-map the repo:
-   include runtime shape, key modules, and per-hotspot call flow in plain language.
+How to work:
+1) Follow the profile reading playbook, then CLAUDE.md / overlay skills.
+   Overlay skills have HIGHEST PRIORITY over package SOP on read order, layout, aliases.
+2) Thicken architecture (entryPoints, route/business modules, runtime shape).
+   Read catalog files; do not walk the whole repo.
+3) Improve ONLY the weak/empty tickets listed in the user prompt. Cap 3 real paths
+   per ticket. candidate.why = why the path resembles the title/module — not a root
+   cause, not a call-flow. Do not follow imports/callers per ticket.
+4) Leave a turn to emit JSON. Incomplete is OK; set partial=true.
 
 Return one JSON object (optionally in a ```json fence) with any of:
 secondaryHints, techStack{languages,frameworks,notes},
@@ -404,23 +569,34 @@ defectCodeMatches[{defectId,candidates[{repoPath,path,symbol,why,source}],confid
 partial.
 Do not change cartographyProfile.
 candidate source must be one of: codegraph, grep, heuristic, claude_md.
-In each candidate.why, cite the symbol/call edge you actually observed.
 """
 
 
 def _build_prompt(req: CartographyRequest) -> str:
-    match_pool = [
-        {
-            "defectId": t.defectId,
-            "title": t.title,
-            "pool": t.pool,
-            "testModule": t.testModule,
-            "titleTag": t.titleTag,
-            "intent": t.intent,
-        }
-        for t in req.defect_batch.tickets
-        if t.pool in ("strict", "locatable_only", "needs_info")
-    ][:MAX_PROMPT_TICKETS]
+    entries = list(req.baseline.architecture.entryPoints)
+    by_id = {m.defectId: m for m in req.baseline.defectCodeMatches}
+    weak_tickets = []
+    weak_matches = []
+    for t in req.defect_batch.tickets:
+        if t.pool not in ("strict", "locatable_only", "needs_info"):
+            continue
+        match = by_id.get(t.defectId)
+        if match is not None and not is_weak_match(match, entries):
+            continue
+        weak_tickets.append(
+            {
+                "defectId": t.defectId,
+                "title": t.title,
+                "pool": t.pool,
+                "testModule": t.testModule,
+                "titleTag": t.titleTag,
+                "intent": t.intent,
+            }
+        )
+        if match is not None:
+            weak_matches.append(match.model_dump())
+        if len(weak_tickets) >= MAX_WEAK_PROMPT_TICKETS:
+            break
     baseline = {
         "cartographyProfile": req.baseline.cartographyProfile,
         "secondaryHints": req.baseline.secondaryHints,
@@ -428,20 +604,19 @@ def _build_prompt(req: CartographyRequest) -> str:
         "architecture": req.baseline.architecture.model_dump(),
         "conventions": req.baseline.conventions.model_dump(),
         "boundSkills": req.baseline.boundSkills,
-        "defectCodeMatches": [
-            m.model_dump() for m in req.baseline.defectCodeMatches
-        ][:MAX_PROMPT_TICKETS],
+        "defectCodeMatches": weak_matches,
         "partial": req.baseline.partial,
     }
     playbook = profile_reading_playbook(req.baseline.cartographyProfile)
     return (
-        "Thoroughly read this workDir and enrich the code-knowledge baseline so Agent-3 "
-        "can fix tickets without rediscovering architecture. Return the JSON enrich object.\n\n"
+        "Thicken architecture from the playbook, then improve ONLY the listed weak "
+        "tickets' path candidates (max 3 each). Do not follow imports or name a fix "
+        "locus. Return the JSON enrich object before you run out of turns.\n\n"
         f"productLine: {req.defect_batch.productLine}\n"
         f"workDir: {req.work_dir}\n"
         f"cartographyProfile: {req.baseline.cartographyProfile} (caller-supplied; do not change)\n"
         f"readingPlaybook: {playbook}\n"
         f"injectedSkills: {json.dumps([s.name for s in req.injected_skills], ensure_ascii=False)}\n"
-        f"matchPoolTickets: {json.dumps(match_pool, ensure_ascii=False)}\n"
+        f"matchPoolTickets: {json.dumps(weak_tickets, ensure_ascii=False)}\n"
         f"baseline: {json.dumps(baseline, ensure_ascii=False)}\n"
     )

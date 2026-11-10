@@ -290,6 +290,14 @@ def _root_prefix(repo_path: str | None) -> str:
     return str(repo_path).replace("\\", "/").strip("/")
 
 
+def _is_architecture_entry(rel: str, architecture: Architecture | None) -> bool:
+    """True when ``rel`` is exactly an architecture entryPoint (not a ticket locus)."""
+    if architecture is None:
+        return False
+    path = _norm_path(rel)
+    return any(_norm_path(ep) == path for ep in architecture.entryPoints if ep)
+
+
 def _under(rel: str, prefix: str | None) -> bool:
     if not prefix:
         return False
@@ -327,7 +335,6 @@ def _architecture_bonus(
     bonus = 0
     why_parts: list[str] = []
     modules = list(architecture.modules) if architecture is not None else []
-    entries = list(architecture.entryPoints) if architecture is not None else []
 
     if profile == "micro_frontend":
         for mod in modules:
@@ -363,9 +370,6 @@ def _architecture_bonus(
                 if cap:
                     bonus += 320
                     why_parts.append("device.js capability")
-                else:
-                    bonus += 40
-                    why_parts.append("device.js")
         mobile = any(tok in _MOBILE_TOKENS for tok in needles)
         pc = any(tok in _PC_TOKENS for tok in needles)
         path_l = _norm_path(rel)
@@ -377,10 +381,15 @@ def _architecture_bonus(
                 bonus -= 50
         if pc and "mobile" in path_l:
             bonus -= 50
-        for ep in entries:
-            if _under(rel, ep) or _norm_path(rel) == _norm_path(ep):
-                bonus += 70
-                why_parts.append("dual-entry")
+        for mod in modules:
+            if mod.role != "route_module" or not mod.path:
+                continue
+            names = {(mod.id or "").lower(), Path(mod.path).name.lower()}
+            if any(n and n in names for n in needles):
+                if _under(rel, mod.path):
+                    bonus += 200
+                    why_parts.append(f'route_module "{mod.id}"')
+        # entryPoints 只属于仓图，不得在无路径 token 时当成票候选（见 dual-entry 假 medium）。
 
     if profile == "electron_node":
         intent = (ticket.intent or "").lower()
@@ -460,6 +469,8 @@ def match_tickets(
                             rel_work, t, toks, profile, architecture, bindings
                         )
                         if arch_only is None:
+                            continue
+                        if _is_architecture_entry(rel_work, architecture):
                             continue
                         strength, why = arch_only
                     else:

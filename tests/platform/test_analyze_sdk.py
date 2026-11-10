@@ -6,6 +6,8 @@ from bugfix_contracts import CodeKnowledge, DefectBatch
 from bugfix_platform.sdk.analyze import (
     AnalyzeRequest,
     AnalyzeResult,
+    _SYSTEM_PROMPT,
+    _build_prompt,
     analyze_mode_from_env,
     heuristic_analyze,
     parse_analyze_payload,
@@ -14,6 +16,35 @@ from bugfix_platform.workflow import run_three_agent_workflow
 
 ROOT = Path(__file__).resolve().parents[2]
 HC1 = ROOT / "test" / "fixtures" / "defect-batch" / "hc1-raw.json"
+
+
+def test_analyze_prompt_includes_architecture_map():
+    from bugfix_contracts.defect_batch import BatchTicket
+
+    ticket = BatchTicket(
+        defectId="1",
+        title="osd overlay",
+        pool="strict",
+        expectQuality="explicit",
+    )
+    req = AnalyzeRequest(
+        work_dir="/tmp",
+        ticket=ticket,
+        routed={"outcome": "plan_only", "localization": {"candidates": []}},
+        cartography_profile="device_web",
+        architecture={
+            "summary": "Device-web dual-entry map",
+            "entryPoints": ["src/main-pc.js"],
+            "modules": [{"id": "Config", "path": "src/Config", "role": "route_module"}],
+        },
+        reading_playbook="device_web read order: split PC vs mobile",
+    )
+    prompt = _build_prompt(req)
+    assert "Device-web dual-entry map" in prompt
+    assert "src/Config" in prompt
+    assert "device_web" in prompt
+    assert "follow" in _SYSTEM_PROMPT.lower()
+    assert "soft-start" in _SYSTEM_PROMPT.lower() or "soft start" in _SYSTEM_PROMPT.lower()
 
 
 def test_parse_analyze_payload_fence():
@@ -126,6 +157,8 @@ def test_analyst_uses_injected_analyze_fn(tmp_path: Path):
 
     def fake_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         calls["n"] += 1
+        assert req.cartography_profile == "electron_node"
+        assert req.architecture is not None
         return AnalyzeResult(
             ok=True,
             source="sdk",

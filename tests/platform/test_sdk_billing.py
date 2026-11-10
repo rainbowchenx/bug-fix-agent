@@ -62,16 +62,31 @@ def _result(**kw: Any):
     return ResultMessage(**payload)
 
 
-def _install_fake_query(monkeypatch: pytest.MonkeyPatch, messages: list[Any]) -> None:
+def _install_fake_query(
+    monkeypatch: pytest.MonkeyPatch,
+    messages: list[Any],
+    *,
+    raise_after: bool = False,
+    salvage_messages: list[Any] | None = None,
+) -> list[str]:
     """替换 SDK 的 query；import 在函数内部，所以改模块属性即可生效。"""
     import claude_agent_sdk
 
+    prompts: list[str] = []
+
     async def fake_query(*, prompt: str, options: Any):
-        for message in messages:
+        prompts.append(prompt)
+        batch = messages
+        if salvage_messages is not None and getattr(options, "resume", None):
+            batch = salvage_messages
+        for message in batch:
             yield message
+        if raise_after and getattr(options, "resume", None) is None:
+            raise RuntimeError("Reached maximum number of turns (18)")
 
     monkeypatch.setattr(claude_agent_sdk, "query", fake_query)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    return prompts
 
 
 def test_billing_formats_turns_reason_cost():
@@ -93,7 +108,8 @@ def test_success_records_billing_in_artifact(monkeypatch):
     assert hints[0].startswith("enrich=sdk; turns=3; reason=completed; cost=$0.42"), hints[0]
 
 
-def test_max_turns_fallback_records_billing_and_reason(monkeypatch):
+def test_max_turns_keeps_baseline_as_sdk_partial(monkeypatch):
+    """触顶不是失败：保留启发式 baseline，标 reason=max_turns，不走 sdk_fallback。"""
     _install_fake_query(
         monkeypatch,
         [
@@ -108,6 +124,7 @@ def test_max_turns_fallback_records_billing_and_reason(monkeypatch):
                 terminal_reason="max_turns",
             )
         ],
+        raise_after=True,
     )
     knowledge = run_cartographer(
         work_dir=FIXTURES / "electron",
@@ -116,8 +133,84 @@ def test_max_turns_fallback_records_billing_and_reason(monkeypatch):
         cartography_profile="electron_node",
     )
     hint = next(h for h in knowledge.secondaryHints if h.startswith("enrich="))
-    assert hint.startswith("enrich=sdk_fallback; "), hint
-    assert "maximum number of turns" in hint
+    assert hint.startswith("enrich=sdk; "), hint
+    assert "sdk_fallback" not in hint
     assert "turns=18" in hint
     assert "reason=max_turns" in hint
     assert "cost=$1.50" in hint
+    assert knowledge.partial is True
+    assert "heuristic mode" not in knowledge.architecture.summary
+    assert knowledge.architecture.entryPoints
+
+
+def test_max_turns_merges_json_from_assistant_stream(monkeypatch):
+    class _Block:
+        text = '{"architecture": {"summary": "salvaged from stream"}}'
+
+    class _Assistant:
+        content = [_Block()]
+
+    _install_fake_query(
+        monkeypatch,
+        [
+            _Assistant(),
+            _result(
+                is_error=True,
+                subtype="error_max_turns",
+                errors=["Reached maximum number of turns (18)"],
+                result=None,
+                structured_output=None,
+                num_turns=18,
+                total_cost_usd=0.4,
+                terminal_reason="max_turns",
+            ),
+        ],
+        raise_after=True,
+    )
+    knowledge = run_cartographer(
+        work_dir=FIXTURES / "electron",
+        defect_batch=_batch(),
+        cartography_mode="sdk",
+        cartography_profile="electron_node",
+    )
+    hint = next(h for h in knowledge.secondaryHints if h.startswith("enrich="))
+    assert hint.startswith("enrich=sdk; "), hint
+    assert "reason=max_turns" in hint
+    assert "salvaged from stream" in knowledge.architecture.summary
+
+
+def test_max_turns_salvage_resume_merges_json(monkeypatch):
+    _install_fake_query(
+        monkeypatch,
+        [
+            _result(
+                is_error=True,
+                subtype="error_max_turns",
+                errors=["Reached maximum number of turns (18)"],
+                result=None,
+                structured_output=None,
+                num_turns=18,
+                total_cost_usd=0.9,
+                terminal_reason="max_turns",
+                session_id="s-resume",
+            )
+        ],
+        raise_after=True,
+        salvage_messages=[
+            _result(
+                structured_output={"architecture": {"summary": "emitted on salvage"}},
+                num_turns=2,
+                total_cost_usd=0.1,
+                terminal_reason="completed",
+            )
+        ],
+    )
+    knowledge = run_cartographer(
+        work_dir=FIXTURES / "electron",
+        defect_batch=_batch(),
+        cartography_mode="sdk",
+        cartography_profile="electron_node",
+    )
+    assert "emitted on salvage" in knowledge.architecture.summary
+    hint = next(h for h in knowledge.secondaryHints if h.startswith("enrich="))
+    assert hint.startswith("enrich=sdk; "), hint

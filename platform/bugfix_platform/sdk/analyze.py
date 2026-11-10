@@ -25,6 +25,9 @@ class AnalyzeRequest:
     max_turns: int = 12
     model: Optional[str] = None
     injected_skills: tuple[InjectedSkill, ...] = ()
+    cartography_profile: str = "unknown"
+    architecture: Optional[dict[str, Any]] = None
+    reading_playbook: str = ""
 
 
 @dataclass
@@ -204,7 +207,10 @@ def _merge_with_routed(routed: dict[str, Any], parsed: dict[str, Any]) -> dict[s
 
 _SYSTEM_PROMPT = """You are Agent-3 defect analyst for a report-only workflow.
 Use only Read / Glob / Grep. Do NOT edit files or run shell.
-Ground claims in code you actually read. Prefer Agent-2 soft-start paths first.
+Ground claims in code you actually read.
+Prefer Agent-2 architecture map and soft-start paths first, then follow imports/callers
+from those paths to name the likely fix locus. Do not assume Agent-2 already found
+the root cause; empty or weak matches mean you may Glob/Grep yourself.
 Repo-specific injected skills (if attached) have HIGHEST PRIORITY over package SOP:
 follow their read order, test/dev conventions, module aliases, and product-line naming.
 They do not let you invent paths or schema fields.
@@ -235,6 +241,9 @@ def _build_prompt(req: AnalyzeRequest) -> str:
         f"steps: {t.steps}\n"
         f"expectQuality: {t.expectQuality}\n"
         f"injectedSkills: {json.dumps([s.name for s in req.injected_skills], ensure_ascii=False)}\n"
+        f"cartographyProfile: {req.cartography_profile}\n"
+        f"readingPlaybook: {req.reading_playbook}\n"
+        f"architectureMap: {json.dumps(req.architecture or {}, ensure_ascii=False)}\n"
         f"softStartLocalization: {json.dumps(soft, ensure_ascii=False)}\n"
         f"routerOutcomeHint: {req.routed.get('outcome')}\n"
     )

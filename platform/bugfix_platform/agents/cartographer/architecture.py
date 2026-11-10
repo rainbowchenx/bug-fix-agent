@@ -22,6 +22,27 @@ _SKIP_DIR = {
 }
 _MF_SKIP_APPS = {"common", "node_modules", "dist", "shared", "components", "assets"}
 _IPC_PREFIX_RE = re.compile(r"\b([A-Za-z][A-Za-z0-9]*)_[A-Za-z0-9_]+")
+# device_web：src 下一层业务目录才是路由模块；框架/共享目录不当模块。
+_DW_SKIP_SRC = {
+    "common",
+    "basicframework",
+    "router",
+    "assets",
+    "static",
+    "libs",
+    "node_modules",
+    "store",
+    "i18n",
+    "utils",
+    "service",
+    "components",
+    "mixins",
+    "filters",
+    "directives",
+    "plugins",
+    "locale",
+    "lang",
+}
 _MODULE_KEY_RE = re.compile(r"^\s*([A-Za-z][\w]*)\s*:", re.M)
 _GITMODULE_PATH_RE = re.compile(r"^\s*path\s*=\s*(\S+)", re.M)
 _MOUNT_ID_RE = re.compile(r"""id\s*=\s*["']([A-Za-z][\w-]*)["']""", re.I)
@@ -284,11 +305,41 @@ def _map_device_web(root: Path, repo_roots: list[RepoRoot]) -> MappedArchitectur
                     notes="host=device-asp — not an architecture type",
                 )
             )
+        _append_device_web_route_modules(base, rel_base, modules)
     return MappedArchitecture(
-        summary="Device-web dual-entry map (pc/mobile + device.js)",
+        summary="Device-web dual-entry map (pc/mobile + device.js + route modules)",
         entry_points=entries,
         modules=modules,
     )
+
+
+def _append_device_web_route_modules(
+    base: Path, rel_base: str, modules: list[ArchModule]
+) -> None:
+    """把 ``src/<Business>/`` 收进 architecture.modules（role=route_module）。"""
+    src = base / "src"
+    if not src.is_dir():
+        return
+    seen = {(m.id or "").lower() for m in modules}
+    try:
+        children = sorted(src.iterdir(), key=lambda p: p.name.lower())
+    except OSError:
+        return
+    for child in children:
+        if not child.is_dir() or child.name.startswith("."):
+            continue
+        key = child.name.lower()
+        if key in _DW_SKIP_SRC or key in seen:
+            continue
+        seen.add(key)
+        modules.append(
+            ArchModule(
+                id=child.name,
+                path=_join(rel_base, _rel_to(base, child)),
+                role="route_module",
+                notes="SPA business/route module — not a micro-app",
+            )
+        )
 
 
 def _map_electron(root: Path, repo_roots: list[RepoRoot]) -> MappedArchitecture:

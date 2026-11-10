@@ -5,12 +5,17 @@ from bugfix_platform.agents.cartographer import run_cartographer
 from bugfix_contracts import DefectBatch
 from bugfix_platform.sdk.cartography import (
     CARTOGRAPHY_TOOLS,
+    DEFAULT_CARTOGRAPHY_MAX_TURNS,
     DISALLOWED_TOOLS,
+    MAX_WEAK_PROMPT_TICKETS,
     CartographyRequest,
     CartographyResult,
+    _SYSTEM_PROMPT,
+    _build_prompt,
     bash_command_allowed,
     cartography_mode_from_env,
     heuristic_cartography,
+    is_weak_match,
     resolve_cartography_max_turns,
 )
 from bugfix_platform.workflow import run_three_agent_workflow
@@ -179,9 +184,10 @@ def test_cartography_tools_allow_bash_forbid_writes():
     assert "Bash" not in DISALLOWED_TOOLS
 
 
-def test_resolve_cartography_max_turns_unlimited_by_default(monkeypatch):
+def test_resolve_cartography_max_turns_defaults_to_24(monkeypatch):
     monkeypatch.delenv("BUGFIX_CARTOGRAPHY_MAX_TURNS", raising=False)
-    assert resolve_cartography_max_turns() is None
+    assert DEFAULT_CARTOGRAPHY_MAX_TURNS == 24
+    assert resolve_cartography_max_turns() == 24
     monkeypatch.setenv("BUGFIX_CARTOGRAPHY_MAX_TURNS", "unlimited")
     assert resolve_cartography_max_turns() is None
     monkeypatch.setenv("BUGFIX_CARTOGRAPHY_MAX_TURNS", "0")
@@ -199,3 +205,147 @@ def test_bash_command_allowed_readonly_vs_mutating():
     assert bash_command_allowed("rm -rf src")[0] is False
     assert bash_command_allowed("curl https://example.com")[0] is False
     assert bash_command_allowed("npm install lodash")[0] is False
+
+
+def test_system_prompt_forbids_per_ticket_call_flow():
+    assert "For EACH match-pool ticket" not in _SYSTEM_PROMPT
+    assert "likely fix locus" not in _SYSTEM_PROMPT
+    assert "Do not follow imports/callers per ticket" in _SYSTEM_PROMPT
+    assert "weak" in _SYSTEM_PROMPT.lower() or "empty" in _SYSTEM_PROMPT.lower()
+
+
+def _knowledge_with_matches(tmp_path: Path, matches: list[dict]):
+    from bugfix_contracts import validate_code_knowledge
+
+    return validate_code_knowledge(
+        {
+            "schemaVersion": "0.1.0",
+            "productLine": "hc",
+            "workDir": str(tmp_path),
+            "partial": False,
+            "generatedAt": "2026-01-01T00:00:00Z",
+            "repoRoots": [{"path": "."}],
+            "cartographyProfile": "device_web",
+            "architecture": {
+                "summary": "dual-entry",
+                "entryPoints": [
+                    "src/main-pc.js",
+                    "src/main-mobile.js",
+                    "src/Router/pc.js",
+                    "src/Router/mobile.js",
+                ],
+                "modules": [],
+            },
+            "defectCodeMatches": matches,
+        }
+    )
+
+
+def test_is_weak_match_includes_entry_only_false_medium():
+    from bugfix_contracts.code_knowledge import DefectCodeMatch
+
+    strong = DefectCodeMatch.model_validate(
+        {
+            "defectId": "S",
+            "candidates": [
+                {
+                    "path": "src/Config/snap.vue",
+                    "why": 'basename "snap"',
+                    "source": "grep",
+                }
+            ],
+            "confidence": "medium",
+        }
+    )
+    empty = DefectCodeMatch.model_validate(
+        {"defectId": "E", "candidates": [], "confidence": "low"}
+    )
+    fake = DefectCodeMatch.model_validate(
+        {
+            "defectId": "F",
+            "candidates": [
+                {
+                    "path": "src/Router/mobile.js",
+                    "why": "dual-entry from title/titleTag/testModule/intent",
+                    "source": "grep",
+                },
+                {
+                    "path": "src/main-mobile.js",
+                    "why": "dual-entry from title/titleTag/testModule/intent",
+                    "source": "grep",
+                },
+            ],
+            "confidence": "medium",
+        }
+    )
+    entries = [
+        "src/main-pc.js",
+        "src/main-mobile.js",
+        "src/Router/pc.js",
+        "src/Router/mobile.js",
+    ]
+    assert is_weak_match(strong, entries) is False
+    assert is_weak_match(empty, entries) is True
+    assert is_weak_match(fake, entries) is True
+    assert MAX_WEAK_PROMPT_TICKETS == 8
+
+
+def test_prompt_only_includes_weak_tickets(tmp_path: Path):
+    tickets = []
+    matches = []
+    for i in range(12):
+        tickets.append(
+            {
+                "defectId": f"W{i}",
+                "title": f"weak {i}",
+                "pool": "strict",
+                "expectQuality": "explicit",
+            }
+        )
+        matches.append(
+            {"defectId": f"W{i}", "candidates": [], "confidence": "low"}
+        )
+    tickets.append(
+        {
+            "defectId": "STRONG",
+            "title": "snap overlay",
+            "pool": "strict",
+            "expectQuality": "explicit",
+            "testModule": "Config",
+            "titleTag": "snap",
+            "intent": "ui_layout",
+        }
+    )
+    matches.append(
+        {
+            "defectId": "STRONG",
+            "candidates": [
+                {
+                    "path": "src/Config/snap.vue",
+                    "why": 'basename "snap"',
+                    "source": "grep",
+                }
+            ],
+            "confidence": "medium",
+        }
+    )
+    batch = DefectBatch.model_validate(
+        {
+            "schemaVersion": "0.1.0",
+            "productLine": "hc",
+            "posture": "alpha",
+            "generatedAt": "2026-01-01T00:00:00Z",
+            "funnel": {"total": len(tickets), "strict": len(tickets)},
+            "clusters": [],
+            "tickets": tickets,
+        }
+    )
+    req = CartographyRequest(
+        work_dir=str(tmp_path),
+        defect_batch=batch,
+        baseline=_knowledge_with_matches(tmp_path, matches),
+    )
+    prompt = _build_prompt(req)
+    assert "STRONG" not in prompt
+    assert '"defectId": "W7"' in prompt
+    assert '"defectId": "W8"' not in prompt

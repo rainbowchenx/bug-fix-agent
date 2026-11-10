@@ -14,7 +14,7 @@ from bugfix_platform.agents.cartographer.match import (
     match_tickets,
 )
 from bugfix_contracts import DefectBatch
-from bugfix_contracts.code_knowledge import MatchCandidate
+from bugfix_contracts.code_knowledge import Architecture, MatchCandidate
 from bugfix_contracts.defect_batch import BatchTicket
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -74,6 +74,8 @@ def test_map_architecture_device_web_capability():
     assert "device_bridge" in roles
     assert any("main-pc" in ep for ep in mapped.entry_points)
     assert any("main-mobile" in ep for ep in mapped.entry_points)
+    route_ids = {m.id for m in mapped.modules if m.role == "route_module"}
+    assert {"Config", "Preview"} <= route_ids
 
 
 def test_map_architecture_device_web_nested_service_path(tmp_path: Path):
@@ -158,6 +160,71 @@ def test_confidence_high_without_codegraph_capability():
 
     one_cg = [MatchCandidate(path="src/a.ts", why="cg", source="codegraph")]
     assert _score_confidence(one_cg, code_graph=False, ticket=ticket) == "high"
+
+
+def test_device_web_chinese_ticket_does_not_fill_entry_points():
+    """无路径 token 时不得用 dual-entry 把 Router/main 填成票候选。"""
+    work = FIXTURES / "device-web"
+    roots = discover_repo_roots(work)
+    mapped = map_architecture(work, roots, "device_web")
+    architecture = Architecture(
+        summary=mapped.summary,
+        entryPoints=mapped.entry_points,
+        modules=mapped.modules,
+    )
+    ticket = BatchTicket(
+        defectId="OSD1",
+        title="[基本功能检查表-按前端区分] 抓拍OSD设置时拖动osd消失",
+        pool="strict",
+        expectQuality="explicit",
+        testModule="基本功能检查表-按前端区分",
+        titleTag="基本功能检查表-按前端区分",
+        intent="ui_layout",
+    )
+    matched = match_tickets(
+        work,
+        roots,
+        [ticket],
+        profile="device_web",
+        architecture=architecture,
+        bindings=mapped.bindings,
+    )
+    paths = [c.path.replace("\\", "/") for c in matched[0].candidates]
+    assert not any(p.endswith("Router/mobile.js") for p in paths), paths
+    assert not any(p.endswith("Router/pc.js") for p in paths), paths
+    assert not any(p.endswith("main-mobile.js") for p in paths), paths
+    assert not any(p.endswith("main-pc.js") for p in paths), paths
+    assert matched[0].confidence == "low"
+
+
+def test_device_web_capability_still_hits_device_js():
+    work = FIXTURES / "device-web"
+    roots = discover_repo_roots(work)
+    mapped = map_architecture(work, roots, "device_web")
+    architecture = Architecture(
+        summary=mapped.summary,
+        entryPoints=mapped.entry_points,
+        modules=mapped.modules,
+    )
+    ticket = BatchTicket(
+        defectId="DW1",
+        title="雨刷按钮灰掉无法使用",
+        pool="strict",
+        expectQuality="explicit",
+        testModule="预览",
+        titleTag="雨刷",
+        intent="logic",
+    )
+    matched = match_tickets(
+        work,
+        roots,
+        [ticket],
+        profile="device_web",
+        architecture=architecture,
+        bindings=mapped.bindings,
+    )
+    paths = [c.path.replace("\\", "/") for c in matched[0].candidates]
+    assert any(p.endswith("device.js") for p in paths), paths
 
 
 def test_code_cartography_skill_present():

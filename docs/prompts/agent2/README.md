@@ -62,13 +62,13 @@ SOP 以 `platform/skills/code-cartography/SKILL.md` 为准；本页说明「怎�
 - 采用调用方给定的 cartographyProfile（electron_node / micro_frontend / device_web / unknown；不探测），按类型读清单画 architecture，并做路径软定位。
 - 读 CLAUDE.md、.claude/rules，以及用户注入的 overlay skill（仓特异性读仓 / 开发 / 测试规则；优先级高于包内置 SOP）。
 - 只对匹配池票（strict / locatable_only / needs_info）做路径软定位，每票最多 3 个真实存在的候选。
-- 有 API key 时用只读工具把架构和候选加厚，让后续步骤少重新探仓。
+- 有 API key 时用只读工具加厚仓图，并只给弱/空/假 medium 候选补路径（默认最多 24 轮、prompt 最多 8 张弱票）。调用链和根因交给后续分析。
 
 你这样工作：
-1. 先读仓内 CLAUDE.md 和已绑定的 overlay skill，再扫目录。skill 里写的读序、测试目录、模块别名优先于通用 SOP。
-2. 不要编造路径；候选文件必须在 workDir 里真实存在。
+1. 先读仓内 CLAUDE.md 和已绑定的 overlay skill，再按类型读清单画 architecture。
+2. 不要编造路径；候选文件必须在 workDir 里真实存在。不要用入口文件在无路径命中时填票候选。
 3. 不要把 skill 当成改契约的许可证：匹配池、候选上限、schema 字段都不能改。
-4. 交出 code-knowledge.json。boundSkills 应列出本次实际用到的 cartography skill 名。
+4. 不要按票追 import/调用链。交出 code-knowledge.json。boundSkills 应列出本次实际用到的 cartography skill 名。
 ```
 
 模板正文见同目录 `example-injected-skill.md`。

@@ -26,7 +26,7 @@ source (CSV/JSON/xlsx)
 |------|------|------|--------|
 | 契约 SSOT | `contracts/bugfix_contracts/` | Pydantic 校验三段 artifact；两边唯一共享代码 | ✅ |
 | Agent-1 | `agent1/bugfix_agent1/` + `agent1/skills/defect-batch-prepare/` | 图外：入口映射 → 蒸馏 / 筛选 / 分簇 → `defect-batch` | ✅ 规则管线 + skill |
-| Agent-2 | `platform/bugfix_platform/agents/cartographer/` + `sdk/` + `platform/skills/code-cartography/` | 仓型探测 + 形态化架构图 + 路径软匹配（候选≤3）+ 仓特异性 overlay skill + 可选 SDK 通读 → `code-knowledge` | 🟡 启发式加厚 + SDK 骨架 |
+| Agent-2 | `platform/bugfix_platform/agents/cartographer/` + `sdk/` + `platform/skills/code-cartography/` | 调用方仓型 + 形态化架构图 + 路径软匹配（候选≤3；无 token 不得用入口文件填票）+ overlay skill + 可选 SDK 加厚仓图/弱匹配 → `code-knowledge` | 🟡 启发式加厚 + SDK 骨架 |
 | Agent-3 | `platform/bugfix_platform/agents/analyst/` + `sdk/` | 路由 + 同一套 overlay skill + 可选 Claude 只读 analyze → `analysis-report` | 🟡 路由+SDK 骨架 |
 | 父编排 | `platform/bugfix_platform/workflow/` | LangGraph：`validate_batch→agent2→agent3` + 门禁（不含 Agent-1） | ✅ |
 | HTTP（S4） | `platform/bugfix_platform/http/` | FastAPI：`POST/GET /v1/runs`（入参 `defectBatch`）、`GET /health` | ✅ 兼容壳 |

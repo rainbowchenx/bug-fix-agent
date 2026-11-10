@@ -43,14 +43,14 @@ SDK 会话还会带账单和终止原因（来自 `ResultMessage`）：
 
 ```text
 enrich=sdk; turns=17; reason=completed; cost=$0.42
-enrich=sdk_fallback; sdk cartography failed: Reached maximum number of turns (80); turns=80; reason=max_turns; cost=$3.10
+enrich=sdk; turns=24; reason=max_turns; cost=$1.10
+enrich=sdk_fallback; no Anthropic credentials in env ...
 enrich=heuristic                       # 没凭据/显式 heuristic，不产生费用
 ```
 
-`reason=max_turns` 说明轮数用尽而中止；`total_cost_usd` 由网关回传，可直接对账。
+`reason=max_turns` 说明回合用尽。触顶会尝试从会话文本 / 再问一轮 salvage 收 JSON；仍没有则**保留启发式 baseline**，`partial=true`，`source` 仍是 `sdk`（不是 `sdk_fallback`）。
 
-`enrich=sdk_fallback` 就是「本来要走 LLM 但没走成」，原因在该条后面
-（缺凭据 / `claude-agent-sdk` 没装 / 输出不可解析 / 合并后不合契约）。
+`enrich=sdk_fallback` 只表示 LLM 没跑成：缺凭据 / 没装 `claude-agent-sdk` / 进程崩溃 / 成功结束但 JSON 不合契约。
 
 ## 调用
 
