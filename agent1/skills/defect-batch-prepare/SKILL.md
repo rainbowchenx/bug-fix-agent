@@ -46,7 +46,9 @@ Run this first, every time:
 agent1 preflight --source path/to/export.csv
 ```
 
-It prints the source row count, which column fed each contract field, which columns it could not place, how many descriptions are unfilled templates, whether the module column mapped, and what share of those modules carry no product semantics.
+The **first line is the build identity** — `build : <commit> · vendor N files · frozen|dev`. Quote it in the hand-off when a result is questioned; without it nobody can tell two runs apart from the log, and "which version produced this" has cost real re-runs.
+
+It then prints the source row count, which column fed each contract field, which columns it could not place, how many descriptions are unfilled templates, whether the module column mapped, and what share of those modules carry no product semantics.
 
 Read the output before running the funnel:
 
@@ -82,6 +84,8 @@ because closed tickets carry the resolver and root cause. On an all-`Open`/`New`
 usual daily export) `alpha` and `beta` produce identical tickets and only the `posture` field
 differs, so there is nothing to decide.
 
+Cluster size has a **ceiling**: a group holding more than 25% of the `strict` tickets (and more than 4 tickets) is re-split by title token. So on a small batch the shape is forced — with 4 strict tickets a cluster of 3 is 75%, above the line, and the earlier behaviour split it into 4 singletons. Do not read a wall of singleton clusters as "the grouping failed": say the batch is small, quote the ceilings, and move on. Conversely, do not expect tickets you just gave the same intent to merge — they only merge if the group stays under the threshold.
+
 **Check the count before you read the pools.** `tickets` must equal the source row count from preflight. If it does not, say how many rows were dropped and why — never report a funnel built on a partial read, because the percentage breakdown looks perfectly healthy either way.
 
 Pool meanings, posture behaviour and platform quirks: [references/reference.md](references/reference.md).
@@ -98,6 +102,8 @@ Then run `prepare-batch --source raw-defects.json` and count again — spreadshe
 mcp/crawler ingest is still stubbed; use a preloaded file.
 
 ## Step 2 — Intent review
+
+Save the rule output before you touch anything, as `defect-batch.rules-snapshot.json` — the name is fixed so the downstream step can find it without asking (three runs named it three different things, and a glob found nothing).
 
 The batch drops the long `description` on purpose: keeping it makes the artifact unreadable at a glance. But that means the JSON carries only `observed` / `expected` / `steps`, and when the template did not parse those are empty for reasons that have nothing to do with the reporter.
 

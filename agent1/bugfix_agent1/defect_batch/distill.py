@@ -100,10 +100,15 @@ def extract_title_tag(title: str) -> str:
     m = re.search(r"【([^】]+)】|\[([^\]]+)\]", title)
     raw = ((m.group(1) if m and m.group(1) else None) or (m.group(2) if m else "") or "").strip()
     if raw:
-        # Ignore accidental bracket captures like [Number, String] from code titles
-        if re.fullmatch(r"[\d\s,.'\"A-Za-z_+/-]{1,24}", raw) and not re.search(r"[\u4e00-\u9fff]", raw):
-            if len(raw) <= 3 or "," in raw or raw in {"0", "''", '""', "当前"}:
-                raw = ""
+        # 只丢真正的噪声：纯数字/符号（[1]、[32]）、代码式的 [Number, String]、
+        # 空占位。不能按「纯 ASCII 且 ≤3 字符」判 —— 那会把 [WEB]/[ACS]/[NVR]
+        # 这类短英文模块名一起杀掉（实测某海外项目 26 票里 4 票的 L2 因此丢了）。
+        if (
+            not re.search(r"[A-Za-z\u4e00-\u9fff]", raw)
+            or "," in raw
+            or raw in {"0", "''", '""', "当前"}
+        ):
+            raw = ""
         if raw:
             return strip_end_side(raw) or "_untagged"
 

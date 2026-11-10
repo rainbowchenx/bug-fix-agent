@@ -43,24 +43,18 @@ def _run_passthrough(name: str, rest: list[str]) -> int:
     return 0
 
 
-def _manifest_path() -> Path:
-    """``VENDOR.json`` 的位置：onefile 打包后在 ``_MEIPASS``，源码树里在包的上层。"""
-    if hasattr(sys, "_MEIPASS"):
-        return Path(sys._MEIPASS) / "VENDOR.json"
-    return Path(__file__).resolve().parents[1] / "VENDOR.json"
-
-
 def _cmd_self_check() -> int:
     """打印这份构建的来源；能读到 VENDOR.json 时再逐文件校验哈希。"""
     from bugfix_agent1 import __version__
+    from bugfix_agent1.provenance import load_manifest, manifest_path
 
-    path = _manifest_path()
+    path = manifest_path()
     if not path.exists():
         print(f"version      : {__version__}")
         print("build        : source checkout / installed package (no VENDOR.json)")
         return 0
 
-    manifest = json.loads(path.read_text(encoding="utf-8"))
+    manifest = load_manifest() or {}
     print(f"vendor files : {len(manifest['files'])}")
     print(f"source       : {manifest['source']}")
     print(f"commit       : {manifest['commit']}")

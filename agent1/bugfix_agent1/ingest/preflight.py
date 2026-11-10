@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 # 单一真源：别名表与空模板判定都直接 import，不在这里另抄一份。
+from bugfix_agent1.provenance import build_stamp
 from bugfix_contracts.console import force_utf8_console
 
 from bugfix_agent1.defect_batch.distill import (
@@ -95,6 +96,8 @@ def load_rows(source: Path, sheet: str | None, encoding: str) -> list[dict[str, 
 
 def main() -> None:
     force_utf8_console()  # Windows 控制台默认 cp936，中文列名会乱码
+    # 版本必须写在第一屏：否则日志无法证明这轮跑的是哪份构建。
+    print(f"build       : {build_stamp()}")
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--source", required=True, type=Path)
     ap.add_argument("--sheet", default=None, help="xlsx worksheet (default: first)")

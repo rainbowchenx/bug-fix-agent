@@ -36,6 +36,7 @@ def cluster_screened(
     intent_classifier: Optional[IntentClassifier] = None,
     fat_ratio: float = 0.25,
     fat_absolute: int = 40,
+    fat_min: int = 4,
     intent_on_locatable: bool = False,
 ) -> tuple[list[BatchCluster], list[BatchTicket]]:
     """把筛选结果编成簇与全量票（L1/L2 规则 + L3 意图 + R5/R6）。
@@ -50,6 +51,13 @@ def cluster_screened(
         intent_classifier: L3 分类器；默认启发式，不调 LLM。
         fat_ratio: 相对 ``strict`` 总数的过肥阈值（默认 0.25）。
         fat_absolute: 绝对条数过肥阈值（默认 40）。
+        fat_min: 切分下限，小于它的簇一律保持成组。相对阈值没有绝对下限时
+            小批次无法成簇：``2/strict > 0.25 ⟺ strict < 8``，于是 5 票批次
+            （strict=4）里任何 2 票簇都会被判过肥切开，簇大小上限只剩
+            ``floor(strict/4)``，整批退化成全单票。
+            取 4 而不是 8：实测 19 票批次下 ``fat_min=8`` 会让 42% 的票
+            留在同一簇（比不修还糙），而 4 只在 strict ≤ 16 的小批次里生效，
+            大批次行为与原来逐簇一致。
         intent_on_locatable: 为 True 时也对 ``locatable_only`` 打意图。
 
     Returns:
@@ -114,10 +122,9 @@ def cluster_screened(
     final_buckets: dict[str, list[ScreenedTicket]] = {}
     for cid, lst in cluster_buckets.items():
         code_review_heavy = sum(1 for t in lst if t.digest.titleTag == "_code_review") >= max(3, len(lst) // 2)
-        fat = (
-            len(lst) / strict_count > fat_ratio
-            or len(lst) > fat_absolute
-            or (code_review_heavy and len(lst) > 5)
+        fat = (code_review_heavy and len(lst) > 5) or (
+            len(lst) > fat_min
+            and (len(lst) / strict_count > fat_ratio or len(lst) > fat_absolute)
         )
         if not fat:
             final_buckets[cid] = lst
@@ -177,6 +184,7 @@ def rebuild_clusters_from_tickets(
     *,
     fat_ratio: float = 0.25,
     fat_absolute: int = 40,
+    fat_min: int = 4,
 ) -> list[BatchCluster]:
     """按票上现有的 L1/L2/intent 重建簇（R5 过肥再切 + R6 排序）。
 
@@ -188,6 +196,7 @@ def rebuild_clusters_from_tickets(
         product_line: ``clusterId`` 前缀。
         fat_ratio: 相对 ``strict`` 总数的过肥阈值。
         fat_absolute: 绝对条数过肥阈值。
+        fat_min: 切分下限（同 :func:`cluster_screened`）。
 
     Returns:
         仅含 strict 的簇列表。
@@ -214,10 +223,9 @@ def rebuild_clusters_from_tickets(
         code_review_heavy = sum(1 for t in lst if t.titleTag == "_code_review") >= max(
             3, len(lst) // 2
         )
-        fat = (
-            len(lst) / strict_count > fat_ratio
-            or len(lst) > fat_absolute
-            or (code_review_heavy and len(lst) > 5)
+        fat = (code_review_heavy and len(lst) > 5) or (
+            len(lst) > fat_min
+            and (len(lst) / strict_count > fat_ratio or len(lst) > fat_absolute)
         )
         if not fat:
             final_buckets[cid] = lst
