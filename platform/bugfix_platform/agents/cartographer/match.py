@@ -134,7 +134,11 @@ def _is_src_hint(rel: str) -> bool:
 
 
 def _tokens(ticket: BatchTicket) -> list[str]:
-    """Query tokens: title + titleTag / testModule / intent（不灌蒸馏全文，见 C8）。"""
+    """Query tokens: title + titleTag / testModule / intent（不灌蒸馏全文，见 C8）。
+
+    平台导出的标题前缀 `[模块名]` 与「测试模块」列同源，titleTag 多数时候就是
+    testModule 的复本；下面的去重（`k not in priority`）是有意的，别当成 bug 修掉。
+    """
     title = ticket.title or ""
     title = re.sub(r"【[^】]+】|\[[^\]]+\]", " ", title)
     raw = " ".join(

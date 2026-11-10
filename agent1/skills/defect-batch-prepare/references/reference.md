@@ -37,6 +37,13 @@ Match pool (default work set after this skill): `strict` ∪ `locatable_only` �
 
 L3 first pass is a keyword heuristic. Intent review after `prepare-batch` sets `intentSource=ai` and `apply-review` rebuilds cluster ids.
 
+**`testModule` and `titleTag` are usually the same string.** The title prefix `[模块名]` is the
+module column, so on the exports measured (`5/5`, `21/26`, `19/19`, `36/37`, `54/56`) the key is
+really `module::module::intent`. All the resolution comes from `intent`; do not present L1 and L2 as
+two corroborating signals in a hand-off. They differ only when the bracket names something else than
+the module column — e.g. `[WEB]` on an export whose module column says `WEB基础组(正式批)`, which is
+the one case where L2 carries information of its own.
+
 ## Posture
 
 A single switch: does the status gate close?
