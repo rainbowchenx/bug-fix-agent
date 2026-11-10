@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Sequence
@@ -158,7 +159,37 @@ def run_cartographer(
             injected_skills=tuple(injected),
         )
     )
-    return result.knowledge
+    # 有没真的调用 LLM，必须能从产物读出来：否则 heuristic 与
+    # sdk_fallback（缺 key / 缺 SDK / 输出不可解析）在 JSON 上完全同形。
+    print(_enrich_line(result.source, result.detail), file=sys.stderr)
+    return _with_enrich_hint(result.knowledge, result.source, result.detail)
+
+
+def _one_line(text: object) -> str:
+    return " ".join(str(text or "").split())
+
+
+def _enrich_line(source: str, detail: str | None) -> str:
+    """一行诊断，走 stderr——stdout 要留给 CLI 的 JSON 结果。"""
+    reason = _one_line(detail)
+    return f"[agent2] enrich={source}" + (f"; {reason[:200]}" if reason else "")
+
+
+def _with_enrich_hint(
+    knowledge: CodeKnowledge, source: str, detail: str | None
+) -> CodeKnowledge:
+    """把增强来源写进 ``secondaryHints``（重复调用只保留最新一条）。"""
+    note = f"enrich={source}"
+    reason = _one_line(detail)
+    if reason:
+        note = f"{note}; {reason[:200]}"
+    data = knowledge.model_dump()
+    hints = [
+        h for h in (data.get("secondaryHints") or []) if not str(h).startswith("enrich=")
+    ]
+    hints.append(note)
+    data["secondaryHints"] = hints
+    return validate_code_knowledge(data)
 
 
 def _bind_injected_skills(

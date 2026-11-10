@@ -19,18 +19,28 @@ export.csv ──> defect-batch.json ──> validate_batch ──> agent2 ─�
 | zip 根目录有 `graph.py` | ✅ `graph.py` |
 | 暴露 `build_graph()` / `graph` / `main()` 之一 | ✅ 三个都暴露，转发到 `bugfix_platform/workflow/langgraph_app.py` |
 | `requirements.txt` | ✅ |
-| `.env`（可选） | ✅ `.env` 留空 + `.env.example` 说明 |
-| 模型配置复用平台「模型管理」 | ✅ `BUGFIX_ANALYZE_MODE` / `BUGFIX_CARTOGRAPHY_MODE` 留空即自动跟随 |
+| `.env`（可选） | ✅ 由 `graph.py` import 时读取（真实环境变量优先，不会被覆盖） |
+| 模型配置复用平台「模型管理」 | ✅ `BUGFIX_ANALYZE_MODE` / `BUGFIX_CARTOGRAPHY_MODE` 留空即自动跟随：env 里出现 `ANTHROPIC_API_KEY` 或 `ANTHROPIC_AUTH_TOKEN` 就自动走 sdk |
 
 ## 依赖
 
 ```text
 pydantic>=2.7
 langgraph>=1.0
+claude-agent-sdk>=0.1
 ```
 
-**不需要** `openpyxl`（那是 Agent-1 的 ingest 用），**不需要** `claude-agent-sdk`
-（`sdk/*.py` 是惰性 import，只有把 mode 显式设成 `sdk` 才用到）。
+**不需要** `openpyxl`（那是 Agent-1 的 ingest 用）。`claude-agent-sdk` 现在装进依赖：
+`mode` 自动跟随时有凭据就会走 sdk，不装就永远退化 heuristic。
+
+### 怎么确认 LLM 到底跑没跑
+
+- 产物 `code-knowledge.secondaryHints` 里有一条 `enrich=<sdk|heuristic|sdk_fallback>; <原因>`
+- 产物 `analysis-report` 每票 `localization.notes` 里有 `analyze=<同上>`
+- 日志里有 `[agent2] enrich=...` / `[agent3] analyze=...`
+
+`enrich=sdk_fallback` 就是「本来要走 LLM 但没走成」，原因在该条后面
+（缺凭据 / `claude-agent-sdk` 没装 / 输出不可解析 / 合并后不合契约）。
 
 ## 调用
 

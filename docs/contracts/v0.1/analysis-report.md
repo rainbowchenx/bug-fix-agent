@@ -14,6 +14,9 @@
 | `boundSkills[]` | string | 本次实际绑定的 analyze skill 名（overlay 在前，包内置在后） |
 | `tickets[]` | **每票完整报告** | D2 |
 
+`tickets[].localization.notes` 里带 `analyze=<sdk\|heuristic\|sdk_fallback>` 及降级原因——
+判断 Agent-3 到底调用没调用 LLM 看这一处，不要靠猜。
+
 ### tickets[] 互斥规则
 
 | `outcome` | 必填 | 禁止糊写 |

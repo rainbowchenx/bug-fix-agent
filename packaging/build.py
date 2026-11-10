@@ -346,7 +346,19 @@ def build_platform() -> Path:
         shutil.copy2(PKG / "platform" / name, out / name)
     shutil.copy2(ROOT / ".env.example", out / ".env.example")
     shutil.copy2(PKG / "platform" / "README.md", out / "README.md")
-    (out / ".env").write_text("# 平台复用「模型管理」，这里留空即可。\n", encoding="utf-8")
+    # 平台若不在「模型管理」里注入，运维可以直接填这里；两条路径都走 load_env_file。
+    (out / ".env").write_text(
+        "# 平台在「模型管理」里注入即可；也可以填在这里（真实环境变量优先）。\n"
+        "# 凭据二选一，任一非空即自动走 sdk 模式：\n"
+        "# ANTHROPIC_API_KEY=\n"
+        "# ANTHROPIC_AUTH_TOKEN=\n"
+        "# ANTHROPIC_BASE_URL=\n"
+        "# ANTHROPIC_MODEL=\n"
+        "# 模式留空 = 自动跟随；显式 heuristic 会压过凭据：\n"
+        "# BUGFIX_CARTOGRAPHY_MODE=\n"
+        "# BUGFIX_ANALYZE_MODE=\n",
+        encoding="utf-8",
+    )
 
     log("platform: verifying graph builds from the staged tree alone")
     _verify_platform(out)

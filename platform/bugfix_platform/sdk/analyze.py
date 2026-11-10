@@ -7,6 +7,7 @@ from typing import Any, Callable, Literal, Optional
 
 from bugfix_contracts.defect_batch import BatchTicket
 from bugfix_platform.sdk.parse import parse_json_payload
+from bugfix_platform.sdk.credentials import has_credentials
 from bugfix_platform.sdk.skill_inject import InjectedSkill, analyze_skills_addon
 from bugfix_platform.sdk.skills import skills_system_addon
 
@@ -42,7 +43,7 @@ def analyze_mode_from_env(explicit: Optional[str] = None) -> AnalyzeMode:
     raw = (explicit or os.environ.get("BUGFIX_ANALYZE_MODE") or "").strip().lower()
     if raw in ("sdk", "heuristic"):
         return raw  # type: ignore[return-value]
-    if os.environ.get("ANTHROPIC_API_KEY"):
+    if has_credentials():
         return "sdk"
     return "heuristic"
 
@@ -68,10 +69,13 @@ def heuristic_analyze(req: AnalyzeRequest) -> AnalyzeResult:
 
 def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
     """Read-only Claude Agent SDK session → structured ticket analysis fields."""
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+    if not has_credentials():
         fallback = heuristic_analyze(req)
         fallback.source = "sdk_fallback"
-        fallback.detail = "ANTHROPIC_API_KEY missing; fell back to heuristic"
+        fallback.detail = (
+            "no Anthropic credentials in env (ANTHROPIC_API_KEY / "
+            "ANTHROPIC_AUTH_TOKEN); fell back to heuristic"
+        )
         return fallback
 
     try:

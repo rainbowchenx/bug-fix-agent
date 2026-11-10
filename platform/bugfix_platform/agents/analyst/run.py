@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional, Sequence
@@ -71,6 +72,7 @@ def run_analyst(
     remaining = analyze_limit if analyze_limit is not None else _limit_from_env()
 
     tickets: list[dict[str, Any]] = []
+    analyze_sources: list[str] = []
     for t in defect_batch.tickets:
         if not is_match_pool(t.pool):
             continue
@@ -92,6 +94,12 @@ def run_analyst(
                 )
             )
             entry.update(result.payload)
+            analyze_sources.append(result.source)
+            _note = " ".join(str(result.detail or "").split())
+            if _note:
+                print(
+                  f"[agent3] analyze={result.source}; {_note[:200]}", file=sys.stderr
+              )
             loc = dict(entry.get("localization") or {})
             note_bits = [x for x in [loc.get("notes"), f"analyze={result.source}"] if x]
             if result.detail:
@@ -102,6 +110,13 @@ def run_analyst(
                 remaining -= 1
 
         tickets.append(_coerce_ticket_entry(entry))
+
+    if analyze_sources:
+        tally: dict[str, int] = {}
+        for src in analyze_sources:
+            tally[src] = tally.get(src, 0) + 1
+        parts = ", ".join(f"{k}×{v}" for k, v in sorted(tally.items()))
+        print(f"[agent3] analyze summary: {parts}", file=sys.stderr)
 
     by_outcome: dict[str, int] = {}
     for tr in tickets:

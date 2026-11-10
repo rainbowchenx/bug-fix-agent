@@ -10,7 +10,7 @@
 | `generatedAt` | ISO string | |
 | `repoRoots[]` | `{ path, gitHead?, fingerprint? }` | 多子仓；`path` 相对 workDir |
 | `cartographyProfile` | enum | `electron_node` \| `micro_frontend` \| `device_web` \| `unknown`。由平台入口传入，Agent-2 **不探测** |
-| `secondaryHints[]` | string | |
+| `secondaryHints[]` | string | 含 `enrich=<sdk\|heuristic\|sdk_fallback>; <原因>`，用来判断 Agent-2 到底调用没调用 LLM |
 | `techStack` | `{ languages[], frameworks[], notes }` | |
 | `architecture` | `{ summary, entryPoints[], modules[] }` | modules: `{ id, path?, role? }` |
 | `conventions` | `{ fromClaudeMd[], fromRules[] }` | |

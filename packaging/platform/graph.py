@@ -11,7 +11,15 @@
 
 from __future__ import annotations
 
-from bugfix_platform.workflow.langgraph_app import graph
+# 平台只负责 import 这个模块，不会替我们读 zip 里的 .env；不在这里读，
+# 那个文件就是摆设（实测：import 后 ANTHROPIC_API_KEY 仍是 None，mode=heuristic）。
+# load_env_file 幂等，且**已存在的真实环境变量优先**——平台「模型管理」注入的值
+# 不会被仓里的 .env 覆盖。
+from bugfix_contracts.env import load_env_file
+
+load_env_file()
+
+from bugfix_platform.workflow.langgraph_app import graph  # noqa: E402
 
 __all__ = ["graph", "build_graph", "main"]
 

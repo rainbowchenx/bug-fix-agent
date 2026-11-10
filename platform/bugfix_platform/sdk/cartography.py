@@ -8,6 +8,7 @@ from typing import Any, Callable, Literal, Optional
 
 from bugfix_contracts import CodeKnowledge, DefectBatch, validate_code_knowledge
 from bugfix_platform.sdk.parse import parse_json_payload
+from bugfix_platform.sdk.credentials import has_credentials
 from bugfix_platform.sdk.skill_inject import InjectedSkill, cartography_skills_addon
 from bugfix_platform.sdk.skills import skills_system_addon
 
@@ -99,7 +100,7 @@ def cartography_mode_from_env(explicit: Optional[str] = None) -> CartographyMode
     raw = (explicit or os.environ.get("BUGFIX_CARTOGRAPHY_MODE") or "").strip().lower()
     if raw in ("sdk", "heuristic"):
         return raw  # type: ignore[return-value]
-    if os.environ.get("ANTHROPIC_API_KEY"):
+    if has_credentials():
         return "sdk"
     return "heuristic"
 
@@ -144,10 +145,13 @@ async def _can_use_cartography_tool(
 
 def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
     """Claude Agent SDK session: thorough read of workDir to thicken code-knowledge."""
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+    if not has_credentials():
         fallback = heuristic_cartography(req)
         fallback.source = "sdk_fallback"
-        fallback.detail = "ANTHROPIC_API_KEY missing; fell back to heuristic"
+        fallback.detail = (
+            "no Anthropic credentials in env (ANTHROPIC_API_KEY / "
+            "ANTHROPIC_AUTH_TOKEN); fell back to heuristic"
+        )
         return fallback
 
     try:
