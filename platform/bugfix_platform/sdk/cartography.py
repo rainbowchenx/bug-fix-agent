@@ -402,7 +402,9 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
 
     if parsed is not None:
         try:
-            merged = _merge_enrichment(req.baseline, parsed)
+            merged = _merge_enrichment(
+                req.baseline, parsed, tickets=req.defect_batch.tickets
+            )
             if budget_stop:
                 merged["partial"] = True
             knowledge = validate_code_knowledge(merged)
@@ -426,7 +428,11 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
     return fallback
 
 
-def _merge_enrichment(baseline: CodeKnowledge, parsed: dict[str, Any]) -> dict[str, Any]:
+def _merge_enrichment(
+    baseline: CodeKnowledge,
+    parsed: dict[str, Any],
+    tickets: list[Any] | None = None,
+) -> dict[str, Any]:
     data = baseline.model_dump()
     # Optional top-level overrides that stay within schema.
     # cartographyProfile is caller-supplied; never let the SDK reclassify.
@@ -477,7 +483,10 @@ def _merge_enrichment(baseline: CodeKnowledge, parsed: dict[str, Any]) -> dict[s
             by_id[did] = item
         data["defectCodeMatches"] = list(by_id.values())
     # Drop hallucinated paths (SDK or merge). Empty SDK tickets fall back to baseline.
-    from bugfix_platform.agents.cartographer.match import filter_existing_candidates
+    from bugfix_platform.agents.cartographer.match import (
+        filter_existing_candidates,
+        ticket_variant,
+    )
     from bugfix_contracts.code_knowledge import DefectCodeMatch
 
     parsed_matches = []
@@ -489,11 +498,16 @@ def _merge_enrichment(baseline: CodeKnowledge, parsed: dict[str, Any]) -> dict[s
         except Exception:  # noqa: BLE001
             continue
     baseline_by_id = {m.defectId: m for m in baseline.defectCodeMatches}
+    variant_by_id = {
+        t.defectId: ticket_variant(t) for t in (tickets or []) if getattr(t, "defectId", None)
+    }
     merged_matches: list[dict[str, Any]] = []
     for match in filter_existing_candidates(
         baseline.workDir,
         parsed_matches,
         profile=baseline.cartographyProfile,
+        architecture=baseline.architecture,
+        variant_by_id=variant_by_id or None,
     ):
         if match.defectId in sdk_ids:
             if not match.candidates:
@@ -532,6 +546,7 @@ PROFILE_READING_PLAYBOOK = {
         "device_web read order: (1) split PC vs mobile — main-pc.js / main-mobile.js and "
         "Router/{pc,mobile}.js. (2) src/<Business>/ directories (Config, Preview, …) are "
         "route modules in one SPA; drill view/<subdomain> (Config.snap) into modules. "
+        "Router/**/{pc,mobile}.js are route tables, not fix loci. "
         "(3) greyed-out / "
         "missing-feature defects: read Common/service/device.js before views. (4) real "
         "bridge is jsWebControl, not a folder named bridge. (5) do not look for vue.app.js. "
@@ -577,6 +592,8 @@ How to work:
    (mixin.js / isapi.js with no logic). candidate.why = why the path resembles
    the title/module — not a root cause, not a call-flow.
    Do not follow imports/callers per ticket.
+   Route tables, shells, hosts and entryPoints are not fix loci. If the ticket
+   names web/PC, do not return /mobile/ or /h5/ exclusive files.
 4) Leave a turn to emit JSON. Incomplete is OK; set partial=true.
 
 Return one JSON object (optionally in a ```json fence) with any of:
@@ -630,7 +647,8 @@ def _build_prompt(req: CartographyRequest) -> str:
     playbook = profile_reading_playbook(req.baseline.cartographyProfile)
     return (
         "Thicken architecture from the playbook, then improve ONLY the listed weak "
-        "tickets' path candidates (max 3 each; 0 is valid, do not pad). Do not follow imports or name a fix "
+        "tickets' path candidates (max 3 each; 0 is valid, do not pad). "
+        "Catalog files are not loci. Do not follow imports or name a fix "
         "locus. Return the JSON enrich object before you run out of turns.\n\n"
         f"productLine: {req.defect_batch.productLine}\n"
         f"workDir: {req.work_dir}\n"

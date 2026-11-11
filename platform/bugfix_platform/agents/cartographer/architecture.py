@@ -144,6 +144,14 @@ def _map_micro_frontend(root: Path, repo_roots: list[RepoRoot]) -> MappedArchite
         listed: set[str] = set()
         empty_embed: set[str] = set()
         if modules_js is not None:
+            modules.append(
+                ArchModule(
+                    id=f"{rel_base or 'root'}:modules.js",
+                    path=_join(rel_base, _rel_to(base, modules_js)),
+                    role="route_table",
+                    notes="module catalog — not a fix locus",
+                )
+            )
             text = _read_text(modules_js)
             for key in _MODULE_KEY_RE.findall(text):
                 listed.add(key)
@@ -319,12 +327,58 @@ def _map_device_web(root: Path, repo_roots: list[RepoRoot]) -> MappedArchitectur
                     notes="host=device-asp — not an architecture type",
                 )
             )
+        _append_device_web_route_tables(base, rel_base, modules)
         _append_device_web_route_modules(base, rel_base, modules)
     return MappedArchitecture(
         summary="Device-web dual-entry map (pc/mobile + device.js + route modules)",
         entry_points=entries,
         modules=modules,
     )
+
+
+def _append_device_web_route_tables(
+    base: Path, rel_base: str, modules: list[ArchModule]
+) -> None:
+    """Mark pc/mobile route tables and app shells as catalog files, not loci."""
+    seen = {(m.path or "").replace("\\", "/").lower() for m in modules if m.path}
+    src = base / "src"
+    for folder in ("Router", "router"):
+        root = src / folder
+        if not root.is_dir():
+            continue
+        for path in _rglob_files(root, "*.js", max_depth=4, limit=40):
+            if path.name.lower() not in {"pc.js", "mobile.js"}:
+                continue
+            rel = _join(rel_base, _rel_to(base, path))
+            key = rel.replace("\\", "/").lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            modules.append(
+                ArchModule(
+                    id=f"routes:{_rel_to(base, path).replace('/', '.')}",
+                    path=rel,
+                    role="route_table",
+                    notes="pc/mobile route table — not a fix locus",
+                )
+            )
+    for name in ("src/APP-pc.vue", "src/APP-mobile.vue"):
+        hit = _first_existing(base, (name,))
+        if hit is None:
+            continue
+        rel = _join(rel_base, _rel_to(base, hit))
+        key = rel.replace("\\", "/").lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        modules.append(
+            ArchModule(
+                id=Path(name).stem,
+                path=rel,
+                role="route_table",
+                notes="app shell — not a fix locus",
+            )
+        )
 
 
 def _append_device_web_route_modules(

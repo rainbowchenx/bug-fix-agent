@@ -213,6 +213,7 @@ def test_system_prompt_forbids_per_ticket_call_flow():
     assert "Do not follow imports/callers per ticket" in _SYSTEM_PROMPT
     assert "weak" in _SYSTEM_PROMPT.lower() or "empty" in _SYSTEM_PROMPT.lower()
     assert "0 is valid" in _SYSTEM_PROMPT.lower() or "do not pad" in _SYSTEM_PROMPT.lower()
+    assert "not fix loci" in _SYSTEM_PROMPT.lower() or "catalog" in _SYSTEM_PROMPT.lower()
 
 
 def _knowledge_with_matches(tmp_path: Path, matches: list[dict]):

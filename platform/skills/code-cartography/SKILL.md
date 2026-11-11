@@ -16,7 +16,7 @@ SOP for building `code-knowledge`. Prefer the Python entrypoint; use this skill 
 |---|---|
 | Read target `CLAUDE.md` / `.claude` first | Invent file paths that do not exist |
 | Call `run_cartographer` with caller `cartography_profile` | Dump full ticket observed/expected/steps into matching queries; do not guess the profile |
-| Cap candidates at **3** per defect; **0 is valid (do not pad)** | Exceed cap, pad to 3, or invent paths / empty `mixin.js` stubs |
+| Cap candidates at **3** per defect; **0 is valid (do not pad)** | Exceed cap, pad to 3, cite route tables/shells, or invent paths |
 | Follow profile biases (electron / micro_frontend / device_web) | Write `CODEBASE_MAP.md` or edit target repo by default |
 | SDK: thicken architecture + weak path matches only | Follow imports/call-flow per ticket (that is Agent-3); mutate the repo |
 

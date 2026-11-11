@@ -117,6 +117,7 @@ def test_device_web_dual_entry_and_device_js():
     assert "device_capability" in roles
     assert "device_bridge" in roles
     assert "route_module" in roles
+    assert "route_table" in roles
     assert "micro_app" not in roles
     assert {"Config", "Preview"} <= _ids(knowledge)
     assert any(i.startswith("Config.") for i in _ids(knowledge))

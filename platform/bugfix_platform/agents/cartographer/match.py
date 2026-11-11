@@ -49,9 +49,19 @@ _CONF_RANK = {"low": 0, "medium": 1, "high": 2}
 
 # Path segments / basename patterns that are usually tests or fixtures.
 _TEST_PATH_RE = re.compile(
-    r"(?:^|/)(?:tests?|testing|__tests__|e2e|spec|fixtures?|mocks?|testdata)(?:/|$)"
+    r"(?:^|/)(?:tests?|testing|__tests__|e2e|spec|fixtures?|mocks?|testdata|static)(?:/|$)"
     r"|(?:^|/).*[._-](?:test|spec|tests)(?:\.[^/]+)?$"
     r"|(?:^|/)integrations?(?:/|$)",
+    re.I,
+)
+_CATALOG_ROLES = frozenset({"shell", "host", "route_table"})
+_MOBILE_DIR_NAMES = frozenset({"mobile", "h5"})
+_PC_DIR_NAMES = frozenset({"pc"})
+_MOBILE_FILE_NAMES = frozenset({"mobile.js", "main-mobile.js", "app-mobile.vue"})
+_PC_FILE_NAMES = frozenset({"pc.js", "main-pc.js", "app-pc.vue"})
+_PC_VARIANT_RE = re.compile(r"web\s*端|客户端|电脑|(?:^|[\s\[\]\-_/])pc(?:$|[\s\[\]\-_/])", re.I)
+_MOBILE_VARIANT_RE = re.compile(
+    r"手机端|移动端|手机|(?:^|[\s\[\]\-_/])(?:h5|mobile)(?:$|[\s\[\]\-_/])",
     re.I,
 )
 _SRC_HINT_RE = re.compile(
@@ -329,6 +339,67 @@ def _is_architecture_entry(rel: str, architecture: Architecture | None) -> bool:
     return any(_norm_path(ep) == path for ep in architecture.entryPoints if ep)
 
 
+def _is_catalog_path(rel: str, architecture: Architecture | None) -> bool:
+    """Shells, hosts and route tables are indexes, not fix loci.
+
+    Boot entryPoints (main-pc / main-mobile) stay matchable when the ticket
+    actually names them; they are only skipped on architecture-only fills.
+    """
+    if architecture is None:
+        return False
+    path = _norm_path(rel)
+    for mod in architecture.modules:
+        if (mod.role or "") not in _CATALOG_ROLES or not mod.path:
+            continue
+        if _norm_path(mod.path) == path:
+            return True
+    return False
+
+
+def ticket_variant(ticket: BatchTicket) -> str | None:
+    """pc / mobile when the ticket names one end; None if missing or mixed."""
+    blob = " ".join(
+        part
+        for part in (
+            ticket.title,
+            ticket.testModule,
+            ticket.titleTag,
+            ticket.intentRationale,
+        )
+        if part
+    )
+    if not blob.strip():
+        return None
+    pc = bool(_PC_VARIANT_RE.search(blob))
+    mobile = bool(_MOBILE_VARIANT_RE.search(blob))
+    if pc and not mobile:
+        return "pc"
+    if mobile and not pc:
+        return "mobile"
+    return None
+
+
+def _path_variant(rel: str) -> str | None:
+    """Exclusive pc/mobile path; shared dirs (Common, controller) return None."""
+    path = _norm_path(rel)
+    parts = [p for p in path.split("/") if p]
+    if not parts:
+        return None
+    name = parts[-1]
+    dirs = set(parts[:-1])
+    if dirs & _MOBILE_DIR_NAMES or name in _MOBILE_FILE_NAMES or name.endswith("-mobile.vue"):
+        return "mobile"
+    if dirs & _PC_DIR_NAMES or name in _PC_FILE_NAMES or name.endswith("-pc.vue"):
+        return "pc"
+    return None
+
+
+def _work_rel(candidate: MatchCandidate) -> str:
+    prefix = _root_prefix(candidate.repoPath)
+    path = (candidate.path or "").replace("\\", "/")
+    return f"{prefix}/{path}" if prefix else path
+
+
 def _under(rel: str, prefix: str | None) -> bool:
     if not prefix:
         return False
@@ -486,6 +557,7 @@ def match_tickets(
     for t in tickets:
         toks = _tokens(t)
         scored: list[tuple[int, str, MatchCandidate]] = []
+        want_variant = ticket_variant(t)
         if toks:
             for rr in repo_roots:
                 prefix = _root_prefix(rr.path)
@@ -494,6 +566,11 @@ def match_tickets(
                     # 否则多仓（electron/web、容器+子仓）下 _under() 全部失效。
                     # 候选仍存仓相对路径 + repoPath，由调用方自行拼回。
                     rel_work = f"{prefix}/{f}" if prefix else f
+                    if _is_catalog_path(rel_work, architecture):
+                        continue
+                    path_var = _path_variant(rel_work)
+                    if want_variant and path_var and want_variant != path_var:
+                        continue
                     hit = _score_file(rel_work, toks)
                     if hit is None:
                         arch_only = _architecture_bonus(
@@ -558,13 +635,31 @@ def filter_existing_candidates(
     code_graph: bool = False,
     profile: CartographyProfile | str | None = None,
     cap_confidence: Confidence | None = None,
+    architecture: Architecture | None = None,
+    variant_by_id: dict[str, str | None] | None = None,
 ) -> list[DefectCodeMatch]:
-    """Drop missing/vacuum/fake-symbol candidates; re-score confidence."""
+    """Drop missing/vacuum/fake-symbol/catalog/wrong-variant candidates; re-score."""
     root = Path(work_dir)
     out: list[DefectCodeMatch] = []
     for m in matches:
         kept: list[MatchCandidate] = []
+        want_variant = (variant_by_id or {}).get(m.defectId)
+        if want_variant is None and m.title:
+            want_variant = ticket_variant(
+                BatchTicket(
+                    defectId=m.defectId,
+                    title=m.title,
+                    pool="strict",
+                    expectQuality="explicit",
+                )
+            )
         for c in m.candidates[:MAX_CANDIDATES]:
+            rel_work = _work_rel(c)
+            if _is_catalog_path(rel_work, architecture):
+                continue
+            path_var = _path_variant(rel_work)
+            if want_variant and path_var and want_variant != path_var:
+                continue
             rel = Path(c.path)
             abs_path = root / c.repoPath / rel if c.repoPath not in (".", "") else root / rel
             try:

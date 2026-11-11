@@ -12,7 +12,11 @@ from bugfix_platform.agents.cartographer.detect import (
     normalize_cartography_profile,
     read_conventions,
 )
-from bugfix_platform.agents.cartographer.match import filter_existing_candidates, match_tickets
+from bugfix_platform.agents.cartographer.match import (
+    filter_existing_candidates,
+    match_tickets,
+    ticket_variant,
+)
 from bugfix_contracts import (
     CODE_KNOWLEDGE_SCHEMA_VERSION,
     CodeKnowledge,
@@ -104,6 +108,8 @@ def run_cartographer(
         ),
         code_graph=code_graph,
         profile=profile,
+        architecture=architecture,
+        variant_by_id={t.defectId: ticket_variant(t) for t in match_list},
     )
 
     partial = profile == "unknown" or all(len(m.candidates) == 0 for m in defect_code_matches)
