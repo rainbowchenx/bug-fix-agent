@@ -39,3 +39,5 @@ Agent-3 分析加载 `profiles` 含 **`analyze`** 或 **`bugfix`** 的 skill；`
 3. applyFix=false 时有可信根因和修复计划也走 outcome=plan_only；suggestedVerify.executed 必须为 false。
 4. 交出 analysis-report.json。boundSkills 应列出本次实际用到的 analyze skill 名。
 ```
+
+效果怎么判（定位 / 结局桶 / 根因人审，以及过程门禁）：[`docs/field-eval/agent3/README.md`](../../field-eval/agent3/README.md)。对已有报告打分：`python packaging/eval_agent3.py --report analysis-report.json --cases cases.json`。

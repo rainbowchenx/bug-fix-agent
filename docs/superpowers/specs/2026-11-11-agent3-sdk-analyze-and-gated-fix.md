@@ -53,3 +53,7 @@ Agent-3 默认**全程用 Claude Agent SDK**，吃 Agent-1 票切片 + Agent-2 �
 ## 6. 测试
 
 可注入 `analyze_fn` / `fix_fn`。覆盖：空候选仍进 analyze；`needs_info` 不进；无凭证 sdk → `other_blocked`；默认不调 fix；`--apply-fix` 才调；`--open-mr` 无 apply-fix 失败。
+
+## 7. 效果评估
+
+单测只保证走对流程。实仓报告用 [`docs/field-eval/agent3/README.md`](../../../field-eval/agent3/README.md)：G0 过程必须满分，再看 loc@k、结局桶、根因人分。脚本：`packaging/eval_agent3.py`。

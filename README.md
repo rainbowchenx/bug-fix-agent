@@ -326,6 +326,7 @@ raw-defects  ──Agent-1──►  defect-batch  ──Agent-2──►  code-
 - `boundSkills[]`：本次绑定的 analyze overlay（在前）+ 包内置 skill 名
 - `outcome`：`plan_only` · `unlocalized` · `needs_ticket_info` · …（见契约枚举）
 - 当前默认 `verifyStatus=skipped`；`applyFix=false` 只出报告；`openMr` 不会真正推 MR
+- 实仓怎么打分：[`docs/field-eval/agent3/README.md`](docs/field-eval/agent3/README.md)（`packaging/eval_agent3.py`）
 
 仓特异性 skill 写法与注入位置：[`docs/prompts/agent2/`](docs/prompts/agent2/)（Agent-3 共用，见 [`docs/prompts/agent3/`](docs/prompts/agent3/)）。`profiles: bugfix` 两边都加载；overlay 压过包内置 SOP。
 
