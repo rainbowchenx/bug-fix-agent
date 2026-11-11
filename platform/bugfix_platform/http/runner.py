@@ -94,6 +94,7 @@ def enqueue_run(
                 "defect_batch": request.defectBatch,
                 "posture": request.posture,
                 "open_mr": opts.openMr,
+                "apply_fix": True if opts.applyFix else None,
                 "skip_agent2": opts.skipAgent2,
                 "skip_agent3": opts.skipAgent3,
                 "analyze_mode": opts.analyzeMode,

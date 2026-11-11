@@ -27,7 +27,7 @@ source (CSV/JSON/xlsx)
 | 契约 SSOT | `contracts/bugfix_contracts/` | Pydantic 校验三段 artifact；两边唯一共享代码 | ✅ |
 | Agent-1 | `agent1/bugfix_agent1/` + `agent1/skills/defect-batch-prepare/` | 图外：入口映射 → 蒸馏 / 筛选 / 分簇 → `defect-batch` | ✅ 规则管线 + skill |
 | Agent-2 | `platform/bugfix_platform/agents/cartographer/` + `sdk/` + `platform/skills/code-cartography/` | 调用方仓型 + 形态化架构图 + 路径软匹配（候选≤3；无 token 不得用入口文件填票）+ overlay skill + 可选 SDK 加厚仓图/弱匹配 → `code-knowledge` | 🟡 启发式加厚 + SDK 骨架 |
-| Agent-3 | `platform/bugfix_platform/agents/analyst/` + `sdk/` | 路由 + 同一套 overlay skill + 可选 Claude 只读 analyze → `analysis-report` | 🟡 路由+SDK 骨架 |
+| Agent-3 | `platform/bugfix_platform/agents/analyst/` + `sdk/` | 全程 SDK 分析出完整报告；`--apply-fix` 才 worktree 改码（默认关） | 🟡 报告路径可用，改码默认关 |
 | 父编排 | `platform/bugfix_platform/workflow/` | LangGraph：`validate_batch→agent2→agent3` + 门禁（不含 Agent-1） | ✅ |
 | HTTP（S4） | `platform/bugfix_platform/http/` | FastAPI：`POST/GET /v1/runs`（入参 `defectBatch`）、`GET /health` | ✅ 兼容壳 |
 | CLI | `bugfix-agent` / `bugfix-platform` | 两个入口：Agent-1 图外命令 vs 平台 `run` / `serve` | ✅ |
@@ -72,6 +72,8 @@ CLI 启动时读取 **CWD 下的 `.env`**（`bugfix-agent` / `bugfix-platform` �
 | `ANTHROPIC_BASE_URL` / `ANTHROPIC_MODEL` | 可选网关 / 模型覆盖 |
 | `BUGFIX_ANALYZE_MODE` | Agent-3：`heuristic` \| `sdk`（显式覆盖默认） |
 | `BUGFIX_ANALYZE_LIMIT` | 单次 run 最多 enrich 几张软定位票（空=不限） |
+| `BUGFIX_APPLY_FIX` | Agent-3 是否在报告后改码（`1`/`true`；默认关；等价 `--apply-fix`） |
+| `BUGFIX_ANALYZE_MAX_TURNS` | Agent-3 SDK 回合上限（默认 24） |
 | `BUGFIX_CARTOGRAPHY_MODE` | Agent-2：`heuristic` \| `sdk`（有 key 时默认 sdk） |
 | `BUGFIX_SKILLS_DIR` | Agent-2/3 额外 overlay skill 根目录（`os.pathsep` 分隔；与 `--skills-dir` 合并，overlay 优先） |
 
@@ -147,9 +149,10 @@ stdout 会打印摘要：`ok` / `stage` / `funnel` / `profile` / `summary`。
 | `--cartography-profile electron_node\|micro_frontend\|device_web\|unknown` | Agent-2 仓型（调用方给定，不探测；省略则为 `unknown`） |
 | `--cartography-mode heuristic\|sdk` | Agent-2 enrich 模式 |
 | `--skills-dir DIR` | Agent-2/3 注入仓特异性 skill（可重复；overlay 优先于包内置；见 `docs/prompts/agent2/`） |
-| `--analyze-mode heuristic\|sdk` | Agent-3 enrich 模式 |
+| `--analyze-mode heuristic\|sdk` | Agent-3 enrich 模式（产品路径是 sdk；heuristic 留给无 key 测试） |
+| `--apply-fix` | Agent-3 在完整报告之后跑 worktree 改码（默认关） |
 | `--skip-agent2` / `--skip-agent3` | 调试跳过；`skip-agent2` 必须与 `skip-agent3` 同开（Agent-3 依赖 code-knowledge） |
-| `--open-mr` | 仅改报告 `integrateMode` 标志；**当前不会真正开 MR** |
+| `--open-mr` | 仅改报告 `integrateMode` 标志；**必须同时 `--apply-fix`**；当前不会真正开 MR |
 
 ### 3）HTTP 服务（S4）
 
@@ -322,7 +325,7 @@ raw-defects  ──Agent-1──►  defect-batch  ──Agent-2──►  code-
 - 每票完整报告：`localization` / `rootCause` / `proposedFix` / `blockers` / `confidence` / `verifyStatus`
 - `boundSkills[]`：本次绑定的 analyze overlay（在前）+ 包内置 skill 名
 - `outcome`：`plan_only` · `unlocalized` · `needs_ticket_info` · …（见契约枚举）
-- 当前默认 `verifyStatus=skipped`；`openMr` 不会真正推 MR
+- 当前默认 `verifyStatus=skipped`；`applyFix=false` 只出报告；`openMr` 不会真正推 MR
 
 仓特异性 skill 写法与注入位置：[`docs/prompts/agent2/`](docs/prompts/agent2/)（Agent-3 共用，见 [`docs/prompts/agent3/`](docs/prompts/agent3/)）。`profiles: bugfix` 两边都加载；overlay 压过包内置 SOP。
 
@@ -336,7 +339,7 @@ raw-defects  ──Agent-1──►  defect-batch  ──Agent-2──►  code-
 | 项 | 状态 |
 |----|------|
 | Agent-2 CodeGraph 真工具环 / 业务形态指纹样本仓 | 后续（启发式架构图 + code-cartography skill 已落地） |
-| Agent-3 出 patch / worktree 迭代 / 真 MR | 后续 |
+| Agent-3 真 MR / 本地集成冲突 | 后续（`--apply-fix` 已可出 patch 文件，默认关） |
 | LangGraph Server 原生部署（S4 增强） | 后续（现有 FastAPI 兼容壳） |
 | 生产 MCP 拉缺陷 | stub（现用 CSV/JSON/xlsx） |
 

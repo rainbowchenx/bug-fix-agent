@@ -18,7 +18,7 @@ validate_batch → Agent-2 → validate → Agent-3 → validate
 - 编排：LangGraph Python 只跑 Agent-2→3（`platform/bugfix_platform/workflow/graph.py`）；CLI 是 `bugfix-platform`
 - 跨段只传落盘 JSON + Pydantic 校验；Agent-1 与平台禁止互相 import
 - Agent-2/3 可注入仓特异性 overlay skill（`.claude/skills`、`workDir/.bugfix/skills`、`--skills-dir` / `BUGFIX_SKILLS_DIR`）；overlay 压过包内置 SOP。发现逻辑：`platform/bugfix_platform/sdk/skill_inject.py`。写法见 `docs/prompts/agent2/`
-- Agent-2 cartography / Agent-3 analyze 默认可走 Claude Agent SDK（只读）；无 key 时 heuristic 回退
+- Agent-2 cartography / Agent-3 analyze 默认可走 Claude Agent SDK（只读）。Agent-3 匹配池票全程 analyze（`needs_info` 除外）；无 key 的 SDK 路径记 `other_blocked`，不装启发式分析。`--apply-fix` 默认关
 - 旧 TypeScript 簇级 BugFix / npm LangGraph 路径已退役
 
 设计文档：

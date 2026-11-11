@@ -8,10 +8,10 @@
 Profile 过滤（frontmatter 顶层或 ``metadata.profiles``）：
 
 - ``cartography`` → Agent-2
-- ``analyze`` → Agent-3
+- ``analyze`` → Agent-3 只读分析
+- ``fix`` → Agent-3 ``--apply-fix`` 改码会话
 - ``bugfix`` → 两边都加载（推荐给线别 overlay）
 - ``.bugfix/skills`` / ``--skills-dir`` 未写 profiles 的，默认两边都加载
-- ``profiles: fix`` 等其它值不会进 2/3
 
 指导怎么读这个仓、测试/开发习惯、模块别名；不改契约门禁。
 """
@@ -29,6 +29,7 @@ from bugfix_platform.sdk.skills import package_skills_root
 
 CARTOGRAPHY_PROFILE = "cartography"
 ANALYZE_PROFILE = "analyze"
+FIX_PROFILE = "fix"
 BUGFIX_PROFILE = "bugfix"
 PACKAGE_CARTOGRAPHY_SKILLS = (
     "code-cartography",
@@ -40,6 +41,14 @@ PACKAGE_ANALYZE_SKILLS = (
     "hierarchical-localization",
     "systematic-debugging",
     "test-triage",
+    "typescript-null-safety",
+    "vue-debug",
+    "electron-process-boundary",
+    "monorepo-workspace",
+)
+PACKAGE_FIX_SKILLS = (
+    "hierarchical-localization",
+    "systematic-debugging",
     "typescript-null-safety",
     "vue-debug",
     "electron-process-boundary",
@@ -98,6 +107,20 @@ def discover_analyze_skills(
     )
 
 
+def discover_fix_skills(
+    work_dir: str | Path,
+    repo_roots: Sequence[RepoRoot] | None = None,
+    extra_dirs: Sequence[str | Path] | None = None,
+) -> list[InjectedSkill]:
+    """发现 Agent-3 ``--apply-fix`` 改码 skill（overlay 在前）。"""
+    return discover_injected_skills(
+        work_dir,
+        repo_roots=repo_roots,
+        extra_dirs=extra_dirs,
+        profile=FIX_PROFILE,
+    )
+
+
 def discover_injected_skills(
     work_dir: str | Path,
     repo_roots: Sequence[RepoRoot] | None = None,
@@ -111,7 +134,7 @@ def discover_injected_skills(
         work_dir: 目标代码根。
         repo_roots: 已发现的仓根；缺省只扫 ``work_dir`` 自身。
         extra_dirs: Run 级注入目录（每个目录下是 skill 文件夹）。
-        profile: ``cartography`` 或 ``analyze``。
+        profile: ``cartography`` / ``analyze`` / ``fix``。
 
     Returns:
         overlay（显式 / ``.bugfix`` / 仓内）在前、包内置在后；同名已按来源覆盖。
@@ -212,6 +235,18 @@ def analyze_skills_addon(skills: Sequence[InjectedSkill]) -> str:
     )
 
 
+def fix_skills_addon(skills: Sequence[InjectedSkill]) -> str:
+    """Agent-3 apply-fix system-prompt 附录。"""
+    return injected_skills_addon(
+        skills,
+        agent="fix",
+        hard_limits=(
+            "Minimal diff only. Stay inside proposedFix.targetFiles unless a "
+            "file you read proves another file is required. Never commit or push."
+        ),
+    )
+
+
 def _priority_order(skills: Iterable[InjectedSkill]) -> list[InjectedSkill]:
     items = list(skills)
     overlay = sorted(
@@ -245,6 +280,8 @@ def _package_skills(match_profiles: frozenset[str]) -> list[InjectedSkill]:
         allow.update(PACKAGE_CARTOGRAPHY_SKILLS)
     if ANALYZE_PROFILE in match_profiles:
         allow.update(PACKAGE_ANALYZE_SKILLS)
+    if FIX_PROFILE in match_profiles:
+        allow.update(PACKAGE_FIX_SKILLS)
     found: dict[str, InjectedSkill] = {}
     for child in sorted(root.iterdir()):
         skill = _load_skill(child / "SKILL.md", source="package")

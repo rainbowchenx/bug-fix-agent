@@ -7,7 +7,8 @@
 | `schemaVersion` | string | `"0.1.0"` |
 | `productLine` / `workDir` | string | |
 | `generatedAt` | ISO string | |
-| `openMr` | boolean | 默认 false |
+| `openMr` | boolean | 默认 false；没有 `applyFix` 时禁止开启 |
+| `applyFix` | boolean | 默认 false；true 才跑第二段 worktree 改码 |
 | `mrUrl` | string \| null | |
 | `integrateMode` | `none` \| `single_mr` | openMr 时为 single_mr |
 | `summary` | `{ total, byOutcome }` | 浏览用；真源是 tickets[] |
@@ -16,6 +17,8 @@
 
 `tickets[].localization.notes` 里带 `analyze=<sdk\|heuristic\|sdk_fallback>` 及降级原因——
 判断 Agent-3 到底调用没调用 LLM 看这一处，不要靠猜。
+
+默认只出报告。`--apply-fix` / `BUGFIX_APPLY_FIX` 打开后，可修票才进 worktree fix 会话；空 diff 仍是 `plan_only`。`--open-mr` 本轮仍不真推远端。
 
 ### tickets[] 互斥规则
 

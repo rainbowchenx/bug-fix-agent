@@ -18,6 +18,7 @@ class CreateRunOptions(BaseModel):
     skipAgent2: bool = False
     skipAgent3: bool = False
     openMr: bool = False
+    applyFix: bool = False
 
 
 class CreateRunRequest(BaseModel):

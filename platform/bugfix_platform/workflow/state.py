@@ -27,6 +27,7 @@ class ThreeAgentState(TypedDict):
     product_line: str
     posture: Literal["alpha", "beta"]
     open_mr: bool
+    apply_fix: NotRequired[bool]
     skip_agent2: bool
     skip_agent3: bool
     analyze_mode: NotRequired[Literal["heuristic", "sdk"]]

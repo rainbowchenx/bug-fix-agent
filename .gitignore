@@ -8,6 +8,7 @@ node_modules/
 
 # Runtime state
 .bugfix-runs/
+.bugfix/
 *.log
 .codegraph/
 eval/

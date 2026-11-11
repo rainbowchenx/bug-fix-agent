@@ -1,4 +1,4 @@
-"""Claude Agent SDK adapters (analyze / cartography)."""
+"""Claude Agent SDK adapters (analyze / cartography / gated fix)."""
 
 from bugfix_platform.sdk.analyze import (
     AnalyzeRequest,
@@ -8,6 +8,14 @@ from bugfix_platform.sdk.analyze import (
     heuristic_analyze,
     parse_analyze_payload,
     run_claude_analyze,
+)
+from bugfix_platform.sdk.fix import (
+    FixRequest,
+    FixResult,
+    apply_fix_from_env,
+    create_fix_runner,
+    ensure_ticket_worktree,
+    run_claude_fix,
 )
 from bugfix_platform.sdk.cartography import (
     CartographyRequest,
@@ -26,6 +34,12 @@ __all__ = [
     "heuristic_analyze",
     "parse_analyze_payload",
     "run_claude_analyze",
+    "FixRequest",
+    "FixResult",
+    "apply_fix_from_env",
+    "create_fix_runner",
+    "ensure_ticket_worktree",
+    "run_claude_fix",
     "CartographyRequest",
     "CartographyResult",
     "cartography_mode_from_env",

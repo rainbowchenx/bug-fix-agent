@@ -117,6 +117,7 @@ class AnalysisReport(BaseModel):
     workDir: str = Field(min_length=1)
     generatedAt: str = Field(min_length=1)
     openMr: bool = False
+    applyFix: bool = False
     mrUrl: Optional[str] = None
     integrateMode: Literal["none", "single_mr"] = "none"
     summary: Optional[ReportSummary] = None

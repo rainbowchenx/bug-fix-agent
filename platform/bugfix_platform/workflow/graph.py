@@ -222,21 +222,32 @@ def create_three_agent_graph(
             "defect_batch": batch,
             "code_knowledge": knowledge,
             "open_mr": bool(state.get("open_mr")),
+            "apply_fix": bool(state.get("apply_fix")),
         }
         if state.get("analyze_mode"):
             call_kwargs["analyze_mode"] = state["analyze_mode"]
         if state.get("extra_skill_dirs"):
             call_kwargs["extra_skill_dirs"] = state["extra_skill_dirs"]
+        if state.get("artifact_dir"):
+            call_kwargs["artifact_dir"] = state["artifact_dir"]
         try:
             report = analyst(**call_kwargs)
         except TypeError:
-            # 单测注入的桩可能不接受 analyze_mode / extra_skill_dirs。
-            call_kwargs.pop("analyze_mode", None)
-            try:
-                report = analyst(**call_kwargs)
-            except TypeError:
-                call_kwargs.pop("extra_skill_dirs", None)
-                report = analyst(**call_kwargs)
+            # 单测注入的桩可能不接受较新的 kwargs。
+            for extra in ("artifact_dir", "apply_fix", "analyze_mode", "extra_skill_dirs"):
+                call_kwargs.pop(extra, None)
+                try:
+                    report = analyst(**call_kwargs)
+                    break
+                except TypeError:
+                    continue
+            else:
+                report = analyst(
+                    work_dir=state["work_dir"],
+                    defect_batch=batch,
+                    code_knowledge=knowledge,
+                    open_mr=bool(state.get("open_mr")),
+                )
         # 未预期异常向上抛，交给 RetryPolicy。
         raw = report.model_dump() if hasattr(report, "model_dump") else report
         return {

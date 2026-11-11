@@ -42,6 +42,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     run_p.add_argument("--posture", choices=["alpha", "beta"], default="beta")
     run_p.add_argument("--open-mr", action="store_true")
+    run_p.add_argument(
+        "--apply-fix",
+        action="store_true",
+        help="Agent-3: after the report, run a worktree fix session (default off)",
+    )
     run_p.add_argument("--skip-agent2", action="store_true")
     run_p.add_argument("--skip-agent3", action="store_true")
     run_p.add_argument(
@@ -110,6 +115,7 @@ def main(argv: list[str] | None = None) -> int:
         defect_batch=args.defect_batch,
         posture=args.posture,
         open_mr=args.open_mr,
+        apply_fix=True if args.apply_fix else None,
         skip_agent2=args.skip_agent2,
         skip_agent3=args.skip_agent3,
         analyze_mode=args.analyze_mode,

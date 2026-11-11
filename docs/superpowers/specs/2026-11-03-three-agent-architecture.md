@@ -73,7 +73,7 @@ pytest -q
 | S1 | Agent-1 规则管线 | ✅ |
 | S2a | Agent-2 detect/match | ✅ |
 | S3a | Agent-3 outcome 路由 | ✅ |
-| S3b | Agent-3 analyze 会话（Claude Agent SDK，只读） | ✅ 骨架：`platform/bugfix_platform/sdk/analyze.py`；无 key 时 heuristic 回退 |
+| S3b | Agent-3 analyze 会话（Claude Agent SDK，只读） | ✅ 匹配池全程 SDK（`needs_info` 除外）；`--apply-fix` 默认关；无凭证不装启发式分析 |
 | S2b | Agent-2 LLM 通读加厚 | ✅ 骨架：`platform/bugfix_platform/sdk/cartography.py`；启发式 detect/match + 可选 SDK enrich |
 | S2c | Agent-2 启发式加厚 | ✅ 形态化 architecture 图、A3/A4 置信度、`platform/skills/code-cartography/` |
 | S4 | HTTP / LangGraph Server（可选） | ✅ FastAPI 兼容壳：`POST/GET /v1/runs`、`GET /health`（`platform/bugfix_platform/http/`）；LangGraph Server 部署仍可选后续 |
@@ -98,3 +98,4 @@ pytest -q
 | 2026-11-07 | **S2c**：Agent-2 形态化架构探测、匹配 A3/A4 置信度、`skills/code-cartography/` |
 | 2026-11-08 | **S6**：Agent-2/3 可注入仓特异性 skill（`profiles: cartography` / `analyze` / `bugfix`）；overlay 优先于包内置；产物 `boundSkills[]` |
 | 2026-11-09 | **拆包**：`contracts/` / `agent1/` / `platform/` 三个目录；skill 随产品切开；CLI 拆成 `bugfix-agent` 与 `bugfix-platform` |
+| 2026-11-11 | **Agent-3 C 路径**：全程 SDK 出完整报告；`--apply-fix` 控制 worktree 改码（默认关）；`--open-mr` 依赖 apply-fix |

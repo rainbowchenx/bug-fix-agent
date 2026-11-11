@@ -41,9 +41,10 @@ SOP 以 `platform/skills/code-cartography/SKILL.md` 为准；本页说明「怎�
 |---|---|
 | `bugfix` | Agent-2 **和** Agent-3（推荐给线别 overlay） |
 | `cartography` | 仅 Agent-2 |
-| `analyze` | 仅 Agent-3 |
+| `analyze` | 仅 Agent-3 只读分析 |
+| `fix` | 仅 Agent-3 `--apply-fix` 改码会话 |
 | `.bugfix/skills` / `--skills-dir` 且未写 profiles | 两边都加载 |
-| `fix` / `defect-batch` 等 | 不进 2/3 |
+| `defect-batch` 等其它值 | 不进 2/3 |
 
 同名覆盖之后，**overlay 在 system prompt 里永远高于包内置 SOP**。
 

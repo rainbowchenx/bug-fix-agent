@@ -26,6 +26,7 @@ from bugfix_contracts import (
     DefectBatch,
     validate_defect_batch,
 )
+from bugfix_platform.sdk.fix import apply_fix_from_env
 from bugfix_platform.workflow.gates import ArtifactValidationError
 from bugfix_platform.workflow.graph import (
     AnalystFn,
@@ -72,6 +73,7 @@ def run_three_agent_workflow(
     defect_batch: DefectBatchInput,
     posture: Literal["alpha", "beta"] = "beta",
     open_mr: bool = False,
+    apply_fix: Optional[bool] = None,
     skip_agent2: bool = False,
     skip_agent3: bool = False,
     analyze_mode: Optional[Literal["heuristic", "sdk"]] = None,
@@ -107,6 +109,15 @@ def run_three_agent_workflow(
             error=f"invalid defect-batch: {err}",
         )
 
+    want_fix = apply_fix_from_env(apply_fix)
+    if open_mr and not want_fix:
+        return ThreeAgentWorkflowResult(
+            ok=False,
+            stage="agent3",
+            artifacts=WorkflowArtifacts(defect_batch=batch),
+            error="open_mr requires apply_fix (--apply-fix / BUGFIX_APPLY_FIX)",
+        )
+
     if skip_agent2 and not skip_agent3:
         return ThreeAgentWorkflowResult(
             ok=False,
@@ -121,6 +132,7 @@ def run_three_agent_workflow(
         "product_line": product_line,
         "posture": posture,
         "open_mr": open_mr,
+        "apply_fix": want_fix,
         "skip_agent2": skip_agent2,
         "skip_agent3": skip_agent3,
         "defect_batch": batch.model_dump(),

@@ -62,7 +62,8 @@ enrich=heuristic                       # 没凭据/显式 heuristic，不产生�
   "product_line": "PJ14PD20260423284",
   "posture": "beta",
   "defect_batch": "<defect-batch.json 的内容或路径>",
-  "open_mr": false
+  "open_mr": false,
+  "apply_fix": false
 }
 ```
 
