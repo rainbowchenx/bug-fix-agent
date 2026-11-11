@@ -16,7 +16,7 @@ SOP for building `code-knowledge`. Prefer the Python entrypoint; use this skill 
 |---|---|
 | Read target `CLAUDE.md` / `.claude` first | Invent file paths that do not exist |
 | Call `run_cartographer` with caller `cartography_profile` | Dump full ticket observed/expected/steps into matching queries; do not guess the profile |
-| Cap candidates at **3** per defect; empty OK with `confidence=low` | Exceed candidate cap or invent non-existent paths |
+| Cap candidates at **3** per defect; **0 is valid (do not pad)** | Exceed cap, pad to 3, or invent paths / empty `mixin.js` stubs |
 | Follow profile biases (electron / micro_frontend / device_web) | Write `CODEBASE_MAP.md` or edit target repo by default |
 | SDK: thicken architecture + weak path matches only | Follow imports/call-flow per ticket (that is Agent-3); mutate the repo |
 
@@ -60,7 +60,7 @@ knowledge = run_cartographer(
 |---|---|
 | No candidates | `low`（词表不重合时另标 `gap=no_path_token_overlap`） |
 | Single path/grep hit | `medium` |
-| ≥2 path hits, or CodeGraph hit | `high`（**不**因缺少 CodeGraph 能力而封顶） |
+| ≥2 path hits, or CodeGraph hit | `high`（启发式；**SDK 覆盖进来的票最多 `medium`**） |
 | Missing titleTag/testModule/intent (A1) | ≤ `medium` |
 
 ## Profile biases

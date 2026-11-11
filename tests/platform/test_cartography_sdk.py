@@ -212,6 +212,7 @@ def test_system_prompt_forbids_per_ticket_call_flow():
     assert "likely fix locus" not in _SYSTEM_PROMPT
     assert "Do not follow imports/callers per ticket" in _SYSTEM_PROMPT
     assert "weak" in _SYSTEM_PROMPT.lower() or "empty" in _SYSTEM_PROMPT.lower()
+    assert "0 is valid" in _SYSTEM_PROMPT.lower() or "do not pad" in _SYSTEM_PROMPT.lower()
 
 
 def _knowledge_with_matches(tmp_path: Path, matches: list[dict]):
@@ -351,3 +352,90 @@ def test_prompt_only_includes_weak_tickets(tmp_path: Path):
     assert '"defectId": "W7"' in prompt
     assert '"defectId": "W8"' not in prompt
     assert "OSD 拖动后消失" in prompt
+    assert "do not pad" in prompt.lower() or "0 is valid" in prompt.lower()
+
+
+def test_merge_falls_back_to_baseline_when_sdk_candidates_all_drop(tmp_path: Path):
+    from bugfix_platform.sdk.cartography import _merge_enrichment
+
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "mixin.js").write_text("export default {}\n", encoding="utf-8")
+    baseline = _knowledge_with_matches(
+        tmp_path,
+        [
+            {
+                "defectId": "D1",
+                "candidates": [],
+                "confidence": "low",
+                "gap": "no_path_token_overlap",
+            }
+        ],
+    )
+    merged = _merge_enrichment(
+        baseline,
+        {
+            "defectCodeMatches": [
+                {
+                    "defectId": "D1",
+                    "candidates": [
+                        {
+                            "path": "src/mixin.js",
+                            "why": "osd overlay mixin",
+                            "source": "grep",
+                        }
+                    ],
+                    "confidence": "high",
+                }
+            ]
+        },
+    )
+    match = next(m for m in merged["defectCodeMatches"] if m["defectId"] == "D1")
+    assert match["candidates"] == []
+    assert match["confidence"] == "low"
+    assert match.get("gap") == "no_path_token_overlap"
+
+
+def test_merge_keeps_real_file_and_caps_sdk_confidence(tmp_path: Path):
+    from bugfix_platform.sdk.cartography import _merge_enrichment
+
+    src = tmp_path / "src" / "Config"
+    src.mkdir(parents=True)
+    (src / "snapOverlay.vue").write_text(
+        "<script>export default { methods: { dragOsd() {} } }</script>\n",
+        encoding="utf-8",
+    )
+    (src / "other.vue").write_text(
+        "<script>export default { methods: { save() {} } }</script>\n",
+        encoding="utf-8",
+    )
+    baseline = _knowledge_with_matches(
+        tmp_path,
+        [{"defectId": "D1", "candidates": [], "confidence": "low"}],
+    )
+    merged = _merge_enrichment(
+        baseline,
+        {
+            "defectCodeMatches": [
+                {
+                    "defectId": "D1",
+                    "candidates": [
+                        {
+                            "path": "src/Config/snapOverlay.vue",
+                            "why": "osd page",
+                            "source": "codegraph",
+                        },
+                        {
+                            "path": "src/Config/other.vue",
+                            "why": "pad",
+                            "source": "grep",
+                        },
+                    ],
+                    "confidence": "high",
+                }
+            ]
+        },
+    )
+    match = next(m for m in merged["defectCodeMatches"] if m["defectId"] == "D1")
+    assert len(match["candidates"]) == 2
+    assert match["confidence"] == "medium"

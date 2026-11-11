@@ -465,15 +465,18 @@ def _merge_enrichment(baseline: CodeKnowledge, parsed: dict[str, Any]) -> dict[s
                 [str(x) for x in parsed["boundSkills"]] + list(baseline.boundSkills)
             )
         )[:40]
+    sdk_ids: set[str] = set()
     if isinstance(parsed.get("defectCodeMatches"), list) and parsed["defectCodeMatches"]:
         # Prefer SDK matches when present; keep baseline for ids SDK omitted.
         by_id = {m["defectId"]: m for m in data.get("defectCodeMatches") or []}
         for item in parsed["defectCodeMatches"]:
             if not isinstance(item, dict) or not item.get("defectId"):
                 continue
-            by_id[str(item["defectId"])] = item
+            did = str(item["defectId"])
+            sdk_ids.add(did)
+            by_id[did] = item
         data["defectCodeMatches"] = list(by_id.values())
-    # Drop hallucinated paths (SDK or merge).
+    # Drop hallucinated paths (SDK or merge). Empty SDK tickets fall back to baseline.
     from bugfix_platform.agents.cartographer.match import filter_existing_candidates
     from bugfix_contracts.code_knowledge import DefectCodeMatch
 
@@ -485,10 +488,22 @@ def _merge_enrichment(baseline: CodeKnowledge, parsed: dict[str, Any]) -> dict[s
             parsed_matches.append(DefectCodeMatch.model_validate(item))
         except Exception:  # noqa: BLE001
             continue
-    data["defectCodeMatches"] = [
-        m.model_dump()
-        for m in filter_existing_candidates(baseline.workDir, parsed_matches)
-    ]
+    baseline_by_id = {m.defectId: m for m in baseline.defectCodeMatches}
+    merged_matches: list[dict[str, Any]] = []
+    for match in filter_existing_candidates(
+        baseline.workDir,
+        parsed_matches,
+        profile=baseline.cartographyProfile,
+    ):
+        if match.defectId in sdk_ids:
+            if not match.candidates:
+                orig = baseline_by_id.get(match.defectId)
+                merged_matches.append((orig or match).model_dump())
+                continue
+            if match.confidence == "high":
+                match = match.model_copy(update={"confidence": "medium"})
+        merged_matches.append(match.model_dump())
+    data["defectCodeMatches"] = merged_matches
     if isinstance(parsed.get("partial"), bool):
         data["partial"] = parsed["partial"]
     else:
@@ -558,8 +573,10 @@ How to work:
 2) Thicken architecture (entryPoints, route/business modules, runtime shape).
    Read catalog files; do not walk the whole repo.
 3) Improve ONLY the weak/empty tickets listed in the user prompt. Cap 3 real paths
-   per ticket. candidate.why = why the path resembles the title/module — not a root
-   cause, not a call-flow. Do not follow imports/callers per ticket.
+   per ticket; 0 is valid — do not pad. Empty is better than sibling stubs
+   (mixin.js / isapi.js with no logic). candidate.why = why the path resembles
+   the title/module — not a root cause, not a call-flow.
+   Do not follow imports/callers per ticket.
 4) Leave a turn to emit JSON. Incomplete is OK; set partial=true.
 
 Return one JSON object (optionally in a ```json fence) with any of:
@@ -613,7 +630,7 @@ def _build_prompt(req: CartographyRequest) -> str:
     playbook = profile_reading_playbook(req.baseline.cartographyProfile)
     return (
         "Thicken architecture from the playbook, then improve ONLY the listed weak "
-        "tickets' path candidates (max 3 each). Do not follow imports or name a fix "
+        "tickets' path candidates (max 3 each; 0 is valid, do not pad). Do not follow imports or name a fix "
         "locus. Return the JSON enrich object before you run out of turns.\n\n"
         f"productLine: {req.defect_batch.productLine}\n"
         f"workDir: {req.work_dir}\n"

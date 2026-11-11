@@ -103,6 +103,7 @@ def run_cartographer(
             bindings=mapped.bindings,
         ),
         code_graph=code_graph,
+        profile=profile,
     )
 
     partial = profile == "unknown" or all(len(m.candidates) == 0 for m in defect_code_matches)

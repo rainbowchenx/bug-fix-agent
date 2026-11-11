@@ -11,6 +11,7 @@ from bugfix_contracts.code_knowledge import (
     MatchCandidate,
     RepoRoot,
 )
+from bugfix_contracts.common import Confidence
 from bugfix_contracts.defect_batch import BatchTicket
 
 SKIP_DIRS = {
@@ -36,6 +37,15 @@ SRC_EXT = re.compile(r"\.(ts|tsx|js|jsx|vue|py|go|java|kt|cs)$", re.I)
 MAX_CANDIDATES = 3  # A3
 # Soft ceiling only — real product repos are often >>800 files; ranking handles noise.
 MAX_FILES_DEFAULT = 50_000
+_MAX_SANITIZE_BYTES = 1_000_000
+_DW_STUB_NAMES = frozenset({"mixin.js", "isapi.js"})
+_BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.S)
+_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+_EMPTY_EXPORT_RE = re.compile(
+    r"^(?:export\s+(?:default\s+)?\{\s*\}|module\.exports\s*=\s*\{\s*\})\s*;?\s*$"
+)
+_SYMBOL_SPLIT_RE = re.compile(r"[^\w]+", re.UNICODE)
+_CONF_RANK = {"low": 0, "medium": 1, "high": 2}
 
 # Path segments / basename patterns that are usually tests or fixtures.
 _TEST_PATH_RE = re.compile(
@@ -546,8 +556,10 @@ def filter_existing_candidates(
     matches: list[DefectCodeMatch],
     *,
     code_graph: bool = False,
+    profile: CartographyProfile | str | None = None,
+    cap_confidence: Confidence | None = None,
 ) -> list[DefectCodeMatch]:
-    """Drop candidates whose files do not exist; re-score confidence."""
+    """Drop missing/vacuum/fake-symbol candidates; re-score confidence."""
     root = Path(work_dir)
     out: list[DefectCodeMatch] = []
     for m in matches:
@@ -556,10 +568,14 @@ def filter_existing_candidates(
             rel = Path(c.path)
             abs_path = root / c.repoPath / rel if c.repoPath not in (".", "") else root / rel
             try:
-                if abs_path.resolve().is_file():
-                    kept.append(c)
+                resolved = abs_path.resolve()
+                if not resolved.is_file():
+                    continue
             except OSError:
                 continue
+            if not _candidate_survives(resolved, c, profile):
+                continue
+            kept.append(c)
         ticket_stub = BatchTicket(
             defectId=m.defectId,
             title=m.title or "",
@@ -568,11 +584,68 @@ def filter_existing_candidates(
             clusterId=m.clusterId,
         )
         conf = _score_confidence(kept, code_graph=code_graph, ticket=ticket_stub)
+        conf = _clamp_confidence(conf, cap_confidence)
         gap = m.gap if not kept else None
         out.append(
             m.model_copy(update={"candidates": kept, "confidence": conf, "gap": gap})
         )
     return out
+
+
+def _candidate_survives(
+    path: Path, candidate: MatchCandidate, profile: CartographyProfile | str | None
+) -> bool:
+    """Keep files that exist and are not vacuum / fake-symbol / empty device_web stubs."""
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return False
+    if size > _MAX_SANITIZE_BYTES:
+        return True
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    stripped = _stripped_source(text)
+    if not stripped:
+        return False
+    if (profile or "") == "device_web" and path.name.lower() in _DW_STUB_NAMES:
+        if _EMPTY_EXPORT_RE.match(stripped):
+            return False
+    idents = _symbol_idents(candidate.symbol)
+    if idents and not any(ident in text for ident in idents):
+        return False
+    return True
+
+
+def _stripped_source(text: str) -> str:
+    """Drop block comments and full-line ``//`` comments; keep real statements."""
+    text = _BLOCK_COMMENT_RE.sub("", text)
+    text = _HTML_COMMENT_RE.sub("", text)
+    kept: list[str] = []
+    for line in text.splitlines():
+        code = line.split("//", 1)[0].rstrip()
+        if code.strip():
+            kept.append(code)
+    return "\n".join(kept).strip()
+
+
+def _symbol_idents(symbol: str | None) -> list[str]:
+    if not (symbol or "").strip():
+        return []
+    out: list[str] = []
+    for part in _SYMBOL_SPLIT_RE.split(symbol.strip()):
+        if len(part) >= 2 and (part[0].isalpha() or part[0] == "_"):
+            out.append(part)
+    return out
+
+
+def _clamp_confidence(conf: Confidence, cap: Confidence | None) -> Confidence:
+    if cap is None:
+        return conf
+    if _CONF_RANK.get(conf, 0) > _CONF_RANK.get(cap, 0):
+        return cap
+    return conf
 
 
 def _score_confidence(
