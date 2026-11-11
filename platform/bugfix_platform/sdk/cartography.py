@@ -516,7 +516,8 @@ PROFILE_READING_PLAYBOOK = {
     "device_web": (
         "device_web read order: (1) split PC vs mobile — main-pc.js / main-mobile.js and "
         "Router/{pc,mobile}.js. (2) src/<Business>/ directories (Config, Preview, …) are "
-        "route modules in one SPA — list them into architecture.modules. (3) greyed-out / "
+        "route modules in one SPA; drill view/<subdomain> (Config.snap) into modules. "
+        "(3) greyed-out / "
         "missing-feature defects: read Common/service/device.js before views. (4) real "
         "bridge is jsWebControl, not a folder named bridge. (5) do not look for vue.app.js. "
         "(6) index.asp is host, not architecture."
@@ -583,6 +584,7 @@ def _build_prompt(req: CartographyRequest) -> str:
         match = by_id.get(t.defectId)
         if match is not None and not is_weak_match(match, entries):
             continue
+        rationale = (t.intentRationale or "").strip()
         weak_tickets.append(
             {
                 "defectId": t.defectId,
@@ -591,6 +593,7 @@ def _build_prompt(req: CartographyRequest) -> str:
                 "testModule": t.testModule,
                 "titleTag": t.titleTag,
                 "intent": t.intent,
+                "intentRationale": rationale[:400] or None,
             }
         )
         if match is not None:

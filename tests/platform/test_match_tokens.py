@@ -71,6 +71,31 @@ def test_vague_web_tag_does_not_invent_candidates():
     assert match.confidence == "low", [c.path for c in match.candidates]
 
 
+def test_cjk_ascii_boundary_and_chinese_punct():
+    """中英边界 + 中文逗号切开；osd 这类短缩写放行；不再吞掉「导流带」。"""
+    osd = _tokens(
+        _ticket(
+            title="[基本功能检查表-按前端区分] 抓拍OSD设置时，拖动osd消失",
+            testModule="基本功能检查表-按前端区分",
+            titleTag="基本功能检查表-按前端区分",
+            intent="ui_layout",
+        )
+    )
+    assert "osd" in osd, osd
+    assert all("，" not in t for t in osd), osd
+    assert not any(len(t) > 24 for t in osd), osd
+
+    lane = _tokens(
+        _ticket(
+            title="绘制完压导流带行驶区域后，车道线自动绘制报错未绘制导流带区域",
+            testModule="卡警模式",
+            titleTag="卡警模式",
+            intent="logic",
+        )
+    )
+    assert "导流带" in lane, lane
+
+
 def test_real_tag_still_reaches_candidates():
     """停用表只针对目录名，不误伤真实模块名（boxCalibration 仍要能命中）。"""
     knowledge = run_cartographer(

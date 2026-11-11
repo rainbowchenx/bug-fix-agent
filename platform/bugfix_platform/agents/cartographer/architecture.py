@@ -22,6 +22,20 @@ _SKIP_DIR = {
 }
 _MF_SKIP_APPS = {"common", "node_modules", "dist", "shared", "components", "assets"}
 _IPC_PREFIX_RE = re.compile(r"\b([A-Za-z][A-Za-z0-9]*)_[A-Za-z0-9_]+")
+_MAX_ROUTE_CHILDREN = 8
+_MAX_DRILL_MODULES = 24
+_DW_SKIP_CHILD = {
+    "components",
+    "assets",
+    "utils",
+    "static",
+    "i18n",
+    "mixins",
+    "common",
+    "libs",
+    "service",
+    "store",
+}
 # device_web：src 下一层业务目录才是路由模块；框架/共享目录不当模块。
 _DW_SKIP_SRC = {
     "common",
@@ -321,6 +335,7 @@ def _append_device_web_route_modules(
     if not src.is_dir():
         return
     seen = {(m.id or "").lower() for m in modules}
+    drilled: list[ArchModule] = []
     try:
         children = sorted(src.iterdir(), key=lambda p: p.name.lower())
     except OSError:
@@ -332,14 +347,50 @@ def _append_device_web_route_modules(
         if key in _DW_SKIP_SRC or key in seen:
             continue
         seen.add(key)
-        modules.append(
+        parent = ArchModule(
+            id=child.name,
+            path=_join(rel_base, _rel_to(base, child)),
+            role="route_module",
+            notes="SPA business/route module — not a micro-app",
+        )
+        modules.append(parent)
+        if len(drilled) < _MAX_DRILL_MODULES:
+            extra = _drill_route_children(child, rel_base, parent)
+            room = _MAX_DRILL_MODULES - len(drilled)
+            modules.extend(extra[:room])
+            drilled.extend(extra[:room])
+
+
+def _drill_route_children(
+    module_dir: Path, rel_base: str, parent: ArchModule
+) -> list[ArchModule]:
+    """List ``view/<subdomain>`` when present, otherwise immediate subdirs."""
+    del rel_base  # parent.path is already workDir-relative
+    view = module_dir / "view"
+    search = view if view.is_dir() else module_dir
+    try:
+        kids = sorted(search.iterdir(), key=lambda p: p.name.lower())
+    except OSError:
+        return []
+    out: list[ArchModule] = []
+    parent_rel = (parent.path or "").replace("\\", "/").rstrip("/")
+    for kid in kids:
+        if not kid.is_dir() or kid.name.startswith("."):
+            continue
+        if kid.name.lower() in _DW_SKIP_CHILD:
+            continue
+        suffix = f"view/{kid.name}" if search == view else kid.name
+        out.append(
             ArchModule(
-                id=child.name,
-                path=_join(rel_base, _rel_to(base, child)),
+                id=f"{parent.id}.{kid.name}",
+                path=f"{parent_rel}/{suffix}" if parent_rel else suffix,
                 role="route_module",
-                notes="SPA business/route module — not a micro-app",
+                notes=f"under {parent.id}",
             )
         )
+        if len(out) >= _MAX_ROUTE_CHILDREN:
+            break
+    return out
 
 
 def _map_electron(root: Path, repo_roots: list[RepoRoot]) -> MappedArchitecture:
@@ -565,7 +616,13 @@ def _module_block(text: str, key: str) -> str | None:
 
 def _deps(pkg: dict) -> dict:
     deps: dict = {}
-    for key in ("dependencies", "devDependencies"):
+    for key in (
+        "dependencies",
+        "devDependencies",
+        "optionalDependencies",
+        "peerDependencies",
+        "autoDependencies",
+    ):
         val = pkg.get(key)
         if isinstance(val, dict):
             deps.update(val)

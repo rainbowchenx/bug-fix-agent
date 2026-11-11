@@ -236,6 +236,7 @@ def _build_prompt(req: AnalyzeRequest) -> str:
         f"testModule: {t.testModule}\n"
         f"titleTag: {t.titleTag}\n"
         f"intent: {t.intent}\n"
+        f"intentRationale: {(t.intentRationale or '')[:400]}\n"
         f"observed: {t.observed}\n"
         f"expected: {t.expected}\n"
         f"steps: {t.steps}\n"

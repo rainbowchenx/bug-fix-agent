@@ -49,6 +49,13 @@ _SRC_HINT_RE = re.compile(
     re.I,
 )
 
+# ASCII shorter than 3 is dropped unless listed here (osd / hvt / tls …).
+_ASCII_SHORT_ALLOW = {"osd", "hvt", "tls", "ipc", "h5", "i18n"}
+_SPLIT_RE = re.compile(
+    r"[\s/|_\-\[\]()（）:：,.@，。；、！？「」『』【】《》—…·]+"
+)
+_CJK_ASCII_RE = re.compile(r"[\u4e00-\u9fff]+|[A-Za-z0-9]+")
+
 # Intent / filler tokens that match too many paths if used as substrings.
 _CAPABILITY_TOKENS = {
     "雨刷",
@@ -144,33 +151,18 @@ def _tokens(ticket: BatchTicket) -> list[str]:
     raw = " ".join(
         x for x in [title, ticket.titleTag, ticket.testModule, ticket.intent] if x
     )
-    parts = re.split(r"[\s/|_\-【】\[\]（）():：,.@]+", raw)
     toks: list[str] = []
-    for s in parts:
-        t = s.strip().lower()
-        if not t or t in _STOP_TOKENS:
-            continue
-        # ASCII: require length ≥3 to avoid "down"⊂downloads / "css"⊂postcss noise.
-        if re.fullmatch(r"[a-z0-9_\-]+", t):
-            if len(t) < 3:
-                continue
-        elif len(t) < 2:
-            continue
-        toks.append(t)
-    # Chinese runs from title (cheap signal); keep short phrases only.
-    for m in re.finditer(r"[\u4e00-\u9fff]{2,6}", title):
-        toks.append(m.group(0).lower())
+    for piece in _SPLIT_RE.split(raw):
+        toks.extend(_piece_tokens(piece))
 
-    # Prefer distinctive tokens first: testModule / titleTag, then longer ascii.
     priority: list[str] = []
     for key in (ticket.testModule, ticket.titleTag):
         if not key:
             continue
-        k = key.strip().lower()
-        if k and k not in _STOP_TOKENS and k not in priority:
-            if re.fullmatch(r"[a-z0-9_\-]+", k) and len(k) < 3:
-                continue
-            priority.append(k)
+        for piece in _SPLIT_RE.split(key):
+            for tok in _piece_tokens(piece):
+                if tok not in priority:
+                    priority.append(tok)
 
     seen: set[str] = set()
     out: list[str] = []
@@ -184,6 +176,35 @@ def _tokens(ticket: BatchTicket) -> list[str]:
         if len(out) >= 12:
             break
     return out
+
+
+def _piece_tokens(piece: str) -> list[str]:
+    """Split one punctuation-free span on CJK/ASCII boundaries."""
+    text = (piece or "").strip()
+    if not text:
+        return []
+    out: list[str] = []
+    for run in _CJK_ASCII_RE.findall(text):
+        if re.fullmatch(r"[A-Za-z0-9]+", run):
+            t = run.lower()
+            if t in _STOP_TOKENS:
+                continue
+            if len(t) < 3 and t not in _ASCII_SHORT_ALLOW:
+                continue
+            out.append(t)
+            continue
+        out.extend(_chinese_grams(run))
+    return out
+
+
+def _chinese_grams(run: str) -> list[str]:
+    """Keep short Chinese spans; long spans yield 3-char grams so 导流带 survives."""
+    text = run.strip()
+    if len(text) < 2:
+        return []
+    if len(text) <= 6:
+        return [text] if text not in _STOP_TOKENS else []
+    return [text[i : i + 3] for i in range(0, len(text) - 2) if text[i : i + 3] not in _STOP_TOKENS]
 
 
 def _basename_pieces(stem: str) -> set[str]:
@@ -506,6 +527,7 @@ def match_tickets(
             if len(candidates) >= MAX_CANDIDATES:
                 break
         confidence = _score_confidence(candidates, code_graph=code_graph, ticket=t)
+        gap = "no_path_token_overlap" if toks and not candidates else None
         results.append(
             DefectCodeMatch(
                 defectId=t.defectId,
@@ -513,6 +535,7 @@ def match_tickets(
                 title=t.title,
                 candidates=candidates,
                 confidence=confidence,
+                gap=gap,
             )
         )
     return results
@@ -545,7 +568,10 @@ def filter_existing_candidates(
             clusterId=m.clusterId,
         )
         conf = _score_confidence(kept, code_graph=code_graph, ticket=ticket_stub)
-        out.append(m.model_copy(update={"candidates": kept, "confidence": conf}))
+        gap = m.gap if not kept else None
+        out.append(
+            m.model_copy(update={"candidates": kept, "confidence": conf, "gap": gap})
+        )
     return out
 
 

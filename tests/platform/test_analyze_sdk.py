@@ -26,6 +26,7 @@ def test_analyze_prompt_includes_architecture_map():
         title="osd overlay",
         pool="strict",
         expectQuality="explicit",
+        intentRationale="小图上拖动 OSD 后消失，是叠加位置交互问题",
     )
     req = AnalyzeRequest(
         work_dir="/tmp",
@@ -43,6 +44,7 @@ def test_analyze_prompt_includes_architecture_map():
     assert "Device-web dual-entry map" in prompt
     assert "src/Config" in prompt
     assert "device_web" in prompt
+    assert "叠加位置交互" in prompt
     assert "follow" in _SYSTEM_PROMPT.lower()
     assert "soft-start" in _SYSTEM_PROMPT.lower() or "soft start" in _SYSTEM_PROMPT.lower()
 

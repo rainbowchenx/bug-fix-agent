@@ -300,6 +300,7 @@ def test_prompt_only_includes_weak_tickets(tmp_path: Path):
                 "title": f"weak {i}",
                 "pool": "strict",
                 "expectQuality": "explicit",
+                "intentRationale": "OSD 拖动后消失" if i == 0 else None,
             }
         )
         matches.append(
@@ -349,3 +350,4 @@ def test_prompt_only_includes_weak_tickets(tmp_path: Path):
     assert "STRONG" not in prompt
     assert '"defectId": "W7"' in prompt
     assert '"defectId": "W8"' not in prompt
+    assert "OSD 拖动后消失" in prompt

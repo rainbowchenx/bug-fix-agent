@@ -91,7 +91,10 @@ def route_ticket(ticket: BatchTicket, match: Optional[DefectCodeMatch]) -> dict[
             },
             "localization": {
                 "candidates": [],
-                "notes": "empty defectCodeMatches.candidates",
+                "notes": (
+                    "empty defectCodeMatches.candidates"
+                    + (f"; gap={match.gap}" if match and match.gap else "")
+                ),
                 "degradedSearch": False,
             },
             "suggestedVerify": {"steps": [], "executed": False},

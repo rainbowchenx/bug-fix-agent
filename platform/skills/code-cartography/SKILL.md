@@ -58,7 +58,7 @@ knowledge = run_cartographer(
 
 | Situation | Level |
 |---|---|
-| No candidates | `low` |
+| No candidates | `low`（词表不重合时另标 `gap=no_path_token_overlap`） |
 | Single path/grep hit | `medium` |
 | ≥2 path hits, or CodeGraph hit | `high`（**不**因缺少 CodeGraph 能力而封顶） |
 | Missing titleTag/testModule/intent (A1) | ≤ `medium` |

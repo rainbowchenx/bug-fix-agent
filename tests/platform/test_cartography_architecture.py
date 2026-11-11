@@ -7,7 +7,10 @@ from pathlib import Path
 
 from bugfix_platform.agents.cartographer import run_cartographer
 from bugfix_platform.agents.cartographer.architecture import map_architecture
-from bugfix_platform.agents.cartographer.detect import discover_repo_roots
+from bugfix_platform.agents.cartographer.detect import (
+    detect_cartography_profile,
+    discover_repo_roots,
+)
 from bugfix_platform.agents.cartographer.match import (
     MAX_CANDIDATES,
     filter_existing_candidates,
@@ -76,6 +79,29 @@ def test_map_architecture_device_web_capability():
     assert any("main-mobile" in ep for ep in mapped.entry_points)
     route_ids = {m.id for m in mapped.modules if m.role == "route_module"}
     assert {"Config", "Preview"} <= route_ids
+    assert any(i.startswith("Config.") and "snap" in i.lower() for i in route_ids), route_ids
+
+
+def test_auto_dependencies_fill_tech_stack(tmp_path: Path):
+    work = tmp_path / "repo"
+    work.mkdir()
+    (work / "package.json").write_text(
+        json.dumps(
+            {
+                "name": "web5.0-framework",
+                "autoDependencies": {
+                    "hui-intl": "3.1.9",
+                    "@hc-ui/common": "3.0.2",
+                    "@hc-ui/device": "3.0.1",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    _profile, _hints, tech = detect_cartography_profile(work, discover_repo_roots(work))
+    assert "vue" in tech["frameworks"]
+    assert "hui-intl" in tech["frameworks"]
+    assert any(x.startswith("@hc-ui/") for x in tech["frameworks"])
 
 
 def test_map_architecture_device_web_nested_service_path(tmp_path: Path):
@@ -195,6 +221,7 @@ def test_device_web_chinese_ticket_does_not_fill_entry_points():
     assert not any(p.endswith("main-mobile.js") for p in paths), paths
     assert not any(p.endswith("main-pc.js") for p in paths), paths
     assert matched[0].confidence == "low"
+    assert matched[0].gap == "no_path_token_overlap"
 
 
 def test_device_web_capability_still_hits_device_js():

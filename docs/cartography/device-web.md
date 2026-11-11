@@ -219,11 +219,13 @@ this.m_oDeviceCapa = {
 入口是 `index.asp`（`HtmlWebpackPlugin` 的 `filename: '../index.asp'`）。
 任何基于 `index.html` 的入口启发式在此失效。**但注意**：camera 也这样，所以这只能说明"跑在设备上"。
 
-### 4.4 不需要 `modules[]`
+### 4.4 `modules[]` 是 SPA 路由模块，不是子应用
 
 设备 web 的产物是**一个包**（peitao `dist/` 129 MB，顶层仅 `index.asp` + `doc/`）。
-同仓内的业务模块目录（peitao 5 个 / transport 15 个）是**同一 SPA 内的路由模块**，
-没有独立部署边界 → 定位粒度到模块目录即可，不需要子应用清单。
+同仓内的业务目录（peitao 5 个 / transport 15 个）是**同一 SPA 内的路由模块**，
+没有独立部署边界，不能当微前端子应用列。启发式把 `src/<Business>/` 收进
+`architecture.modules`（`role=route_module`），并下钻一层 `view/<subdomain>`
+（如 `Config.snap`），给弱票匹配提供路径词，而不是停在业务根目录。
 
 ---
 
@@ -231,9 +233,12 @@ this.m_oDeviceCapa = {
 
 ```text
 peitao     4 entries  src/main-pc.js  src/main-mobile.js  src/router/{pc,mobile}.js
-           2 modules  device.js(device_capability)  host-asp(host)
+           modules    device.js(device_capability)  host-asp(host)
+                      + src/<Business>/ 与 view/<subdomain> 作 route_module
 transport  4 entries  src/main-pc.js  src/main-mobile.js  src/Router/{pc,mobile}.js
-           3 modules  device.js  jsWebControl(device_bridge)  host-asp
+           modules    device.js  jsWebControl(device_bridge)  host-asp
+                      + src/<Business>/ 与 view/<subdomain> 作 route_module
+                      （夹具：Config.snap → src/Config/view/snap）
 ```
 
 `peitao` 的 `device.js` 在 `src/common/vue/service/device.js` —— 比 transport 多一层 `vue/`。

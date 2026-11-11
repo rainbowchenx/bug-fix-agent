@@ -119,6 +119,7 @@ def test_device_web_dual_entry_and_device_js():
     assert "route_module" in roles
     assert "micro_app" not in roles
     assert {"Config", "Preview"} <= _ids(knowledge)
+    assert any(i.startswith("Config.") for i in _ids(knowledge))
     paths = [m.path or "" for m in knowledge.architecture.modules]
     assert any(p.replace("\\", "/").endswith("device.js") for p in paths)
     assert any("jsWebControl" in (p.replace("\\", "/")) for p in paths)

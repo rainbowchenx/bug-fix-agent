@@ -8,6 +8,26 @@ from bugfix_contracts import (
 )
 
 
+def test_code_knowledge_accepts_match_gap():
+    data = validate_code_knowledge(
+        {
+            "schemaVersion": CODE_KNOWLEDGE_SCHEMA_VERSION,
+            "productLine": "hc",
+            "workDir": "/tmp/w",
+            "generatedAt": "2026-11-03T00:00:00Z",
+            "defectCodeMatches": [
+                {
+                    "defectId": "D1",
+                    "candidates": [],
+                    "confidence": "low",
+                    "gap": "no_path_token_overlap",
+                }
+            ],
+        }
+    )
+    assert data.defectCodeMatches[0].gap == "no_path_token_overlap"
+
+
 def test_code_knowledge_minimal():
     data = validate_code_knowledge(
         {

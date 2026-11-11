@@ -15,6 +15,7 @@ CartographyProfile = Literal[
     "unknown",
 ]
 MatchSource = Literal["codegraph", "grep", "heuristic", "claude_md"]
+MatchGap = Literal["no_path_token_overlap"]
 
 
 class RepoRoot(BaseModel):
@@ -37,6 +38,8 @@ class DefectCodeMatch(BaseModel):
     title: Optional[str] = None
     candidates: list[MatchCandidate] = Field(default_factory=list)
     confidence: Confidence = "low"
+    gap: Optional[MatchGap] = None
+    """空候选原因。``no_path_token_overlap`` = 票面词与路径词表不重合，不是检索失败。"""
 
 
 class SpecEntry(BaseModel):

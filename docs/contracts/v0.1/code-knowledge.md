@@ -27,6 +27,7 @@
 | `clusterId` / `title` | ? | |
 | `candidates[]` | `{ repoPath, path, symbol?, why, source }` | 可空 |
 | `confidence` | high/medium/low | |
+| `gap` | `no_path_token_overlap` \| omit | 空候选且票面词与路径无交集时填写；不是分析失败 |
 
 `source`: `codegraph` \| `grep` \| `heuristic` \| `claude_md`
 

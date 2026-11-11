@@ -139,6 +139,25 @@ def _fingerprint(dir_path: Path) -> str:
     return dir_path.name
 
 
+_DEP_KEYS = (
+    "dependencies",
+    "devDependencies",
+    "optionalDependencies",
+    "peerDependencies",
+    "autoDependencies",
+)
+
+
+def _package_deps(pkg: dict) -> dict:
+    """Merge public and private package.json dependency tables."""
+    deps: dict = {}
+    for key in _DEP_KEYS:
+        val = pkg.get(key)
+        if isinstance(val, dict):
+            deps.update(val)
+    return deps
+
+
 def _read_json(path: Path) -> dict | None:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -158,11 +177,7 @@ def detect_cartography_profile(
     for rr in repo_roots:
         abs_path = root / rr.path
         pkg = _read_json(abs_path / "package.json") or {}
-        deps = {}
-        if isinstance(pkg.get("dependencies"), dict):
-            deps.update(pkg["dependencies"])
-        if isinstance(pkg.get("devDependencies"), dict):
-            deps.update(pkg["devDependencies"])
+        deps = _package_deps(pkg)
 
         if pkg:
             languages.update({"typescript", "javascript"})
@@ -178,6 +193,15 @@ def detect_cartography_profile(
             frameworks.add("vue")
         if "react" in deps or "react-dom" in deps:
             frameworks.add("react")
+        private = [
+            name
+            for name in deps
+            if name.startswith("@hc-ui/") or name in {"hui-intl", "hui"}
+        ]
+        if private:
+            frameworks.add("vue")
+            frameworks.update(private[:6])
+            hints.append(f"{rr.path}:autoDependencies")
         if (abs_path / "pyproject.toml").exists() or (abs_path / "requirements.txt").exists():
             languages.add("python")
 
