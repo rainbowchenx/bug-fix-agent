@@ -38,6 +38,23 @@ def _missing_from_ticket(t: BatchTicket) -> list[str]:
     return missing or ["更完整的缺陷描述/附件"]
 
 
+def _soft_start_confidence(match: Optional[DefectCodeMatch]) -> str:
+    """Agent-2 soft-start 置信度进 Agent-3 路由时的降权。
+
+    纯 ``heuristic`` 候选只是路径 token 命中，不能当 medium/high 起点（否则
+    analyze 会钉在错文件上）。有 grep/codegraph/claude_md 时仍封顶 medium。
+    """
+    if match is None or not match.candidates:
+        return "low"
+    sources = {str(c.source or "") for c in match.candidates}
+    if sources and sources <= {"heuristic"}:
+        return "low"
+    conf = str(match.confidence or "low")
+    if conf == "high":
+        return "medium"
+    return conf if conf in ("high", "medium", "low") else "low"
+
+
 def route_ticket(ticket: BatchTicket, match: Optional[DefectCodeMatch]) -> dict[str, Any]:
     candidates = [
         {
@@ -49,6 +66,10 @@ def route_ticket(ticket: BatchTicket, match: Optional[DefectCodeMatch]) -> dict[
         }
         for c in (match.candidates if match else [])
     ]
+    soft_conf = _soft_start_confidence(match)
+    heuristic_only = bool(candidates) and {
+        str(c.get("source") or "") for c in candidates
+    } <= {"heuristic"}
 
     if ticket.pool == "needs_info":
         missing = _missing_from_ticket(ticket)
@@ -105,12 +126,16 @@ def route_ticket(ticket: BatchTicket, match: Optional[DefectCodeMatch]) -> dict[
     targets = [
         c["path"] if c["repoPath"] == "." else f'{c["repoPath"]}/{c["path"]}' for c in candidates
     ]
+    notes = "consumed Agent-2 defectCodeMatches as soft start (D4)"
+    if heuristic_only:
+        notes += "; heuristic-only soft-start demoted to low — re-verify before trusting paths"
     return {
         "outcome": "plan_only",
         "proposedFix": {
             "summary": f"Inspect and fix around soft-matched paths for: {ticket.title[:80]}",
             "steps": [
-                "Review soft-start candidates from code-knowledge",
+                "Review soft-start candidates from code-knowledge"
+                + (" (heuristic-only — re-search if doubtful)" if heuristic_only else ""),
                 "Confirm root cause",
                 "Apply minimal-diff patch under scope lock",
             ],
@@ -125,12 +150,12 @@ def route_ticket(ticket: BatchTicket, match: Optional[DefectCodeMatch]) -> dict[
         },
         "localization": {
             "candidates": candidates,
-            "notes": "consumed Agent-2 defectCodeMatches as soft start (D4)",
+            "notes": notes,
         },
         "suggestedVerify": {
             "steps": ["按业务模块手测复现步骤", "关注 candidate 文件相关单测（若有）"],
             "executed": False,
         },
-        "confidence": (match.confidence if match else "low"),
+        "confidence": soft_conf,
         "verifyStatus": "skipped",
     }

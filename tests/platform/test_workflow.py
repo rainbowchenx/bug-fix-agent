@@ -91,3 +91,17 @@ def test_router_outcomes():
     )
     assert r3["outcome"] == "plan_only"
     assert r3["proposedFix"]["targetFiles"][0] == "src/a.ts"
+    # 纯启发式 soft-start 不得把 medium 带进 Agent-3 路由。
+    assert r3["confidence"] == "low"
+    assert "heuristic-only" in r3["localization"]["notes"]
+
+    r4 = route_ticket(
+        base,
+        DefectCodeMatch(
+            defectId="1",
+            candidates=[{"repoPath": ".", "path": "src/b.ts", "why": "sdk", "source": "grep"}],
+            confidence="high",
+        ),
+    )
+    assert r4["outcome"] == "plan_only"
+    assert r4["confidence"] == "medium"  # high 封顶 medium，非启发式可保留

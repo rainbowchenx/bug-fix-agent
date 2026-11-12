@@ -430,7 +430,8 @@ Use only Read / Glob / Grep. Do NOT edit files or run shell.
 Ground claims in code you actually read.
 Prefer Agent-2 architecture map and soft-start paths first, then follow imports/callers
 from those paths to name the likely fix locus. Do not assume Agent-2 already found
-the root cause; empty or weak matches mean you may Glob/Grep yourself.
+the root cause. Heuristic-only soft-start paths are unverified token hits — re-Grep
+before trusting them; empty or weak matches mean you may Glob/Grep yourself.
 Shell / host / route_table files are catalogs, not fix loci.
 Repo-specific injected skills (if attached) have HIGHEST PRIORITY over package SOP:
 follow their read order, test/dev conventions, module aliases, and product-line naming.
