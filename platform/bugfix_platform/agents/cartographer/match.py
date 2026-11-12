@@ -637,8 +637,13 @@ def filter_existing_candidates(
     cap_confidence: Confidence | None = None,
     architecture: Architecture | None = None,
     variant_by_id: dict[str, str | None] | None = None,
+    stats: dict[str, int] | None = None,
 ) -> list[DefectCodeMatch]:
-    """Drop missing/vacuum/fake-symbol/catalog/wrong-variant candidates; re-score."""
+    """Drop missing/vacuum/fake-symbol/catalog/wrong-variant/duplicate candidates.
+
+    ``stats``（可选）按原因累加被丢弃的候选数，调用方可以据此报账——否则
+    「模型给了 3 个候选、交付里 0 个」在产物里看不出任何痕迹。
+    """
     root = Path(work_dir)
     out: list[DefectCodeMatch] = []
     for m in matches:
@@ -653,24 +658,32 @@ def filter_existing_candidates(
                     expectQuality="explicit",
                 )
             )
+        seen: set[Path] = set()
         for c in m.candidates[:MAX_CANDIDATES]:
-            rel_work = _work_rel(c)
+            found = _resolve_candidate_path(root, c)
+            if found is None:
+                _bump(stats, "missing")
+                continue
+            resolved, cand = found
+            if resolved in seen:
+                _bump(stats, "duplicate")
+                continue
+            # 目录/索引类文件（路由表、壳、宿主）不是缺陷落点；判据用归一后的
+            # 仓相对路径，所以必须排在 repoPath 回退之后。
+            rel_work = _work_rel(cand)
             if _is_catalog_path(rel_work, architecture):
+                _bump(stats, "catalog")
                 continue
             path_var = _path_variant(rel_work)
             if want_variant and path_var and want_variant != path_var:
+                _bump(stats, "variant")
                 continue
-            rel = Path(c.path)
-            abs_path = root / c.repoPath / rel if c.repoPath not in (".", "") else root / rel
-            try:
-                resolved = abs_path.resolve()
-                if not resolved.is_file():
-                    continue
-            except OSError:
+            reason = _reject_reason(resolved, cand, profile)
+            if reason:
+                _bump(stats, reason)
                 continue
-            if not _candidate_survives(resolved, c, profile):
-                continue
-            kept.append(c)
+            seen.add(resolved)
+            kept.append(cand)
         ticket_stub = BatchTicket(
             defectId=m.defectId,
             title=m.title or "",
@@ -687,30 +700,76 @@ def filter_existing_candidates(
     return out
 
 
+def _bump(stats: dict[str, int] | None, key: str) -> None:
+    if stats is not None:
+        stats[key] = stats.get(key, 0) + 1
+
+
+def _resolve_candidate_path(
+    root: Path, candidate: MatchCandidate
+) -> tuple[Path, MatchCandidate] | None:
+    """找到候选对应的真实文件；容忍 ``repoPath`` 被填成了文件路径本身。
+
+    提示词只列出 ``{repoPath, path}`` 字段名、从不解释 ``repoPath`` 是仓根，
+    于是模型经常把同一个文件路径塞进两个字段（transport 09 轮、peitao 02 轮
+    两次都是如此）。直接拼 ``repoPath/path`` 得到 ``<file>/<file>``，不存在，
+    候选就被静默丢掉——把模型答对的答案一起丢掉。
+
+    顺序：``repoPath/path`` → 单独 ``path``。走到回退说明 ``repoPath`` 是错的，
+    归一成 ``"."``，让交付的 JSON 自洽（否则下游再读一遍又会拼错）。
+    """
+    rel = (candidate.path or "").strip().replace("\\", "/")
+    if not rel:
+        return None
+    repo = (candidate.repoPath or "").strip().replace("\\", "/")
+    if repo in ("", "."):
+        attempts: list[tuple[Path, bool]] = [(root / rel, False)]
+    else:
+        attempts = [(root / repo / rel, False), (root / rel, True)]
+    for path, via_fallback in attempts:
+        try:
+            resolved = path.resolve()
+        except OSError:
+            continue
+        if not resolved.is_file():
+            continue
+        if via_fallback:
+            candidate = candidate.model_copy(update={"repoPath": "."})
+        return resolved, candidate
+    return None
+
+
 def _candidate_survives(
     path: Path, candidate: MatchCandidate, profile: CartographyProfile | str | None
 ) -> bool:
     """Keep files that exist and are not vacuum / fake-symbol / empty device_web stubs."""
+    return _reject_reason(path, candidate, profile) is None
+
+
+def _reject_reason(
+    path: Path, candidate: MatchCandidate, profile: CartographyProfile | str | None
+) -> str | None:
+    """``None`` 表示通过；否则返回丢弃原因（统计用，也是排查的唯一线索）。"""
     try:
         size = path.stat().st_size
     except OSError:
-        return False
+        return "missing"
     if size > _MAX_SANITIZE_BYTES:
-        return True
+        return None
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
-        return False
+        return "missing"
     stripped = _stripped_source(text)
     if not stripped:
-        return False
+        return "vacuum"
     if (profile or "") == "device_web" and path.name.lower() in _DW_STUB_NAMES:
         if _EMPTY_EXPORT_RE.match(stripped):
-            return False
+            return "vacuum"
     idents = _symbol_idents(candidate.symbol)
     if idents and not any(ident in text for ident in idents):
-        return False
-    return True
+        return "symbol"
+    return None
 
 
 def _stripped_source(text: str) -> str:

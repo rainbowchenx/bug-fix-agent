@@ -401,9 +401,13 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
     billing = _billing(turns, cost, terminal)
 
     if parsed is not None:
+        drop_stats: dict[str, int] = {}
         try:
             merged = _merge_enrichment(
-                req.baseline, parsed, tickets=req.defect_batch.tickets
+                req.baseline,
+                parsed,
+                tickets=req.defect_batch.tickets,
+                stats=drop_stats,
             )
             if budget_stop:
                 merged["partial"] = True
@@ -415,8 +419,9 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
             fallback.source = "sdk_fallback"
             fallback.detail = f"enriched code-knowledge invalid: {err}"
             return fallback
+        detail = _with_drop_detail(billing, drop_stats)
         return CartographyResult(
-            ok=True, knowledge=knowledge, source="sdk", detail=billing or None
+            ok=True, knowledge=knowledge, source="sdk", detail=detail or None
         )
 
     if budget_stop:
@@ -428,10 +433,26 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
     return fallback
 
 
+def _with_drop_detail(
+    billing: str | None, stats: dict[str, int] | None
+) -> str | None:
+    """把被丢弃的候选数并进报账行。
+
+    SDK 报的候选被静态闸（不存在 / 空壳 / 假符号）杀光时不报账，产物上只剩
+    ``enrich=sdk``，看不出模型答了却被扔掉——peitao 那次 6 个候选就是这么消失的。
+    """
+    if not stats:
+        return billing
+    dropped = "/".join(f"{k}:{v}" for k, v in sorted(stats.items()))
+    return f"{billing}; dropped={dropped}" if billing else f"dropped={dropped}"
+
+
 def _merge_enrichment(
     baseline: CodeKnowledge,
     parsed: dict[str, Any],
     tickets: list[Any] | None = None,
+    *,
+    stats: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     data = baseline.model_dump()
     # Optional top-level overrides that stay within schema.
@@ -508,6 +529,7 @@ def _merge_enrichment(
         profile=baseline.cartographyProfile,
         architecture=baseline.architecture,
         variant_by_id=variant_by_id or None,
+        stats=stats,
     ):
         if match.defectId in sdk_ids:
             if not match.candidates:
@@ -604,6 +626,9 @@ defectCodeMatches[{defectId,candidates[{repoPath,path,symbol,why,source}],confid
 partial.
 Do not change cartographyProfile.
 candidate source must be one of: codegraph, grep, heuristic, claude_md.
+repoPath = the repo root as listed in repoRoots; use "." for a single-repo workDir.
+path = the file path relative to that root. Never put the file path in both fields:
+a candidate whose repoPath/path cannot be resolved is dropped before delivery.
 """
 
 

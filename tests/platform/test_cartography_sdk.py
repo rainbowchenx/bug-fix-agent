@@ -440,3 +440,69 @@ def test_merge_keeps_real_file_and_caps_sdk_confidence(tmp_path: Path):
     match = next(m for m in merged["defectCodeMatches"] if m["defectId"] == "D1")
     assert len(match["candidates"]) == 2
     assert match["confidence"] == "medium"
+
+
+def test_merge_rescues_candidate_whose_repo_path_is_the_file(tmp_path: Path):
+    """peitao 02 轮的真实形状：repoPath 与 path 都填成文件路径。"""
+    from bugfix_platform.sdk.cartography import _merge_enrichment
+
+    rel = "src/view/portal/login/pc/components/loginOne.vue"
+    target = tmp_path / rel
+    target.parent.mkdir(parents=True)
+    target.write_text("export default { methods: { doActive() {} } };\n", encoding="utf-8")
+    baseline = _knowledge_with_matches(
+        tmp_path, [{"defectId": "D1", "candidates": [], "confidence": "low"}]
+    )
+    merged = _merge_enrichment(
+        baseline,
+        {
+            "defectCodeMatches": [
+                {
+                    "defectId": "D1",
+                    "candidates": [
+                        {
+                            "repoPath": rel,
+                            "path": rel,
+                            "symbol": "doActive",
+                            "why": "activation button state",
+                            "source": "grep",
+                        }
+                    ],
+                    "confidence": "high",
+                }
+            ]
+        },
+    )
+    match = next(m for m in merged["defectCodeMatches"] if m["defectId"] == "D1")
+    assert [c["path"] for c in match["candidates"]] == [rel]
+    assert match["candidates"][0]["repoPath"] == "."
+    assert match["confidence"] == "medium"  # SDK 覆盖的票封顶 medium
+
+
+def test_merge_reports_dropped_candidates(tmp_path: Path):
+    """丢弃必须留痕，否则「模型给了 3 个、交付 0 个」在产物里查不出。"""
+    from bugfix_platform.sdk.cartography import _merge_enrichment, _with_drop_detail
+
+    baseline = _knowledge_with_matches(
+        tmp_path, [{"defectId": "D1", "candidates": [], "confidence": "low"}]
+    )
+    stats: dict[str, int] = {}
+    _merge_enrichment(
+        baseline,
+        {
+            "defectCodeMatches": [
+                {
+                    "defectId": "D1",
+                    "candidates": [{"path": "src/ghost.vue", "why": "x", "source": "grep"}],
+                    "confidence": "high",
+                }
+            ]
+        },
+        stats=stats,
+    )
+    assert stats == {"missing": 1}
+    assert _with_drop_detail("turns=26; cost=$3.05", stats) == (
+        "turns=26; cost=$3.05; dropped=missing:1"
+    )
+    assert _with_drop_detail("turns=26", {}) == "turns=26"
+    assert _with_drop_detail(None, {"missing": 2}) == "dropped=missing:2"
