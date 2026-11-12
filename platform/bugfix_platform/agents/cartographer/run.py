@@ -32,6 +32,7 @@ from bugfix_platform.sdk.cartography import (
     cartography_mode_from_env,
     create_cartography_runner,
 )
+from bugfix_platform.sdk.codegraph import ensure_codegraph
 from bugfix_platform.sdk.skill_inject import InjectedSkill, discover_cartography_skills
 
 
@@ -99,9 +100,14 @@ def run_cartographer(
         modules=mapped.modules,
     )
 
-    # 2) 对匹配池票做软定位（strict / locatable_only / needs_info）。
+    # 2) CodeGraph：有本地索引就用；没有就 init；供 capabilities + SDK MCP。
+    cg_status = ensure_codegraph(work_dir, repo_roots)
+    if cg_status.detail:
+        print(f"[agent2] codegraph={cg_status.detail[:240]}", file=sys.stderr)
+
+    # 3) 对匹配池票做软定位（strict / locatable_only / needs_info）。
     match_list = [t for t in defect_batch.tickets if is_match_pool(t.pool)]
-    code_graph = bool(conventions["codeGraph"])
+    code_graph = bool(conventions["codeGraph"]) or cg_status.ready
     defect_code_matches = filter_existing_candidates(
         work_dir,
         match_tickets(
@@ -161,7 +167,7 @@ def run_cartographer(
         }
     )
 
-    # 3) 可选 LLM 加厚（无 key / SDK 失败时回退 heuristic）。
+    # 4) 可选 LLM 加厚（无 key / SDK 失败时回退 heuristic）；SDK 挂 CodeGraph MCP。
     runner = cartography_fn or create_cartography_runner(
         cartography_mode_from_env(cartography_mode)
     )
@@ -171,6 +177,7 @@ def run_cartographer(
             defect_batch=defect_batch,
             baseline=baseline,
             injected_skills=tuple(injected),
+            codegraph=cg_status,
         )
     )
     # 有没真的调用 LLM，必须能从产物读出来：否则 heuristic 与

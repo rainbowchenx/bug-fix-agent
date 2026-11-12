@@ -184,6 +184,7 @@ def test_heuristic_cartography_direct(tmp_path: Path):
 def test_cartography_tools_allow_bash_forbid_writes():
     assert "Bash" in CARTOGRAPHY_TOOLS
     assert "Read" in CARTOGRAPHY_TOOLS
+    assert "codegraph_explore" in CARTOGRAPHY_TOOLS
     for blocked in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
         assert blocked in DISALLOWED_TOOLS
     assert "Bash" not in DISALLOWED_TOOLS
@@ -241,8 +242,31 @@ def test_system_prompt_forbids_per_ticket_call_flow():
     assert "Do not follow imports/callers per ticket" in _SYSTEM_PROMPT
     assert "shallow" in _SYSTEM_PROMPT.lower()
     assert "unverified" in _SYSTEM_PROMPT.lower()
+    assert "codegraph" in _SYSTEM_PROMPT.lower()
     assert "0 is valid" in _SYSTEM_PROMPT.lower() or "do not pad" in _SYSTEM_PROMPT.lower()
     assert "not fix loci" in _SYSTEM_PROMPT.lower() or "catalog" in _SYSTEM_PROMPT.lower()
+
+
+def test_prompt_mentions_codegraph_when_ready(tmp_path: Path):
+    from bugfix_platform.sdk.codegraph import CodeGraphStatus
+
+    batch = _batch()
+    baseline = _knowledge_with_matches(tmp_path, [])
+    ready = CodeGraphStatus(
+        ready=True,
+        roots=[str(tmp_path)],
+        bin="/usr/bin/codegraph",
+    )
+    prompt = _build_prompt(
+        CartographyRequest(
+            work_dir=str(tmp_path),
+            defect_batch=batch,
+            baseline=baseline,
+            codegraph=ready,
+        )
+    )
+    assert "codeGraph: ready" in prompt
+    assert "codegraph_explore" in prompt
 
 
 def _knowledge_with_matches(tmp_path: Path, matches: list[dict]):

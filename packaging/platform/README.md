@@ -52,6 +52,8 @@ enrich=heuristic                       # 没凭据/显式 heuristic，不产生�
 
 Agent-2 默认把匹配池票都送进 enrich（启发式 medium 也过，标 `heuristicUnverified` 并降权），按**进 prompt 的票数**定预算：`max_turns = BASE + PER × n`（默认 `6 + 2×n`，n≤16）。`BUGFIX_CARTOGRAPHY_MAX_TURNS` 设成正整数则改为绝对上限；`0`/`unlimited` 不限制。
 
+CodeGraph（`@colbymchenry/codegraph`）默认开启：workDir 已有 `.codegraph/` 则挂 MCP；没有则 `codegraph init -y` 再建。`BUGFIX_CODEGRAPH=0` 关掉；`BUGFIX_CODEGRAPH_INIT=0` 只用不自动建。
+
 `enrich=sdk_fallback` 只表示 LLM 没跑成：缺凭据 / 没装 `claude-agent-sdk` / 进程崩溃 / 成功结束但 JSON 不合契约。
 
 ## 调用
