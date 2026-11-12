@@ -13,7 +13,17 @@ from typing import Any, Mapping
 FIELD_ALIASES: dict[str, list[str]] = {
     # `缺陷单号` is the primary key on the Chinese web export. Missing it made
     # every row unmappable, which the funnel reports as a cheerful 0-ticket run.
-    "defectId": ["defectId", "缺陷单号", "缺陷ID", "缺陷编号", "ID", "id"],
+    # `单号` is the headline on 缺陷拉取 (iRDMS) CSV exports; without it every
+    # row is unmappable and the funnel reports a cheerful 0-ticket run.
+    "defectId": [
+        "defectId",
+        "缺陷单号",
+        "单号",
+        "缺陷ID",
+        "缺陷编号",
+        "ID",
+        "id",
+    ],
     "title": ["defectTitle", "缺陷标题", "标题", "title"],
     # Platform typo `describle` is intentional and must stay.
     "description": ["describle", "defectDescribe", "缺陷描述", "描述", "description"],
@@ -21,9 +31,11 @@ FIELD_ALIASES: dict[str, list[str]] = {
     "flowStatus": ["flowStatusName", "flowStatus", "流程状态"],
     # `测试模块` is filled at creation, `所属模块` at close. Prefer the former:
     # one export ships both, with `所属模块` blank on every open ticket.
-    "testModule": ["testModule", "测试模块", "所属模块"],
+    # `模块` is what the iRDMS export calls it (comma-joined path, e.g.
+    # `结构,校正工具,接收卡`).
+    "testModule": ["testModule", "测试模块", "所属模块", "模块"],
     "fieldType": ["defectType", "类型", "缺陷类型", "type", "fieldType"],
-    "severity": ["severityName", "severity", "严重级别"],
+    "severity": ["severityName", "severity", "严重级别", "级别"],
     "createdAt": ["createDate", "createdAt", "创建时间"],
     "duplicateOf": [
         "duplicateOf",

@@ -55,6 +55,32 @@ def test_describle_alias_listed():
     assert "defectTitle" in FIELD_ALIASES["title"]
 
 
+def test_field_map_irdms_chinese_row():
+    """iRDMS 缺陷拉取的中文导出：单号 / 模块 / 级别。
+
+    这三个表头曾经都不在别名表里，于是 ``缺陷拉取`` 的 CSV 一行都映不进来，
+    ``prepare-batch`` 却报 ``{"ok": true, "tickets": 0}``。
+    """
+    mapped = row_to_raw_dict(
+        {
+            "单号": "BGCM2026060502981",
+            "标题": "[LED Tool-校正工具] 标题",
+            "状态": "Open",
+            "流程状态": "开启",
+            "级别": "低",
+            "缺陷类型": "缺陷",
+            "模块": "结构,校正工具,接收卡",
+            "创建时间": "2026-06-05 16:24:17",
+            "缺陷描述": "预期结果：应显示\n实际结果：未显示",
+        }
+    )
+    assert mapped is not None
+    assert mapped["defectId"] == "BGCM2026060502981"
+    assert mapped["testModule"] == "结构,校正工具,接收卡"
+    assert mapped["severity"] == "低"
+    assert mapped["flowStatus"] == "开启"
+
+
 @skip_no_87
 def test_load_csv_87():
     defects = load_platform_csv(CSV_87)
