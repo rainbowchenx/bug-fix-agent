@@ -33,8 +33,9 @@ workDir + defect-batch + cartographyProfile
   → map architecture by the given profile (catalog files, not path regex)
   → match tickets using architecture indexes + title tokens
     (do not fill tickets with architecture entryPoints when no path token hit)
-  → optional SDK enrich (Read/Glob/Grep + read-only Bash; default max_turns=24;
-     prompt only weak/empty/false-medium tickets, cap 8)
+  → optional SDK enrich (Read/Glob/Grep + read-only Bash;
+     prompt only weak/empty/false-medium tickets, cap 8;
+     max_turns = base + per_ticket × weak_count, default 6+3×n)
   → on max_turns: salvage JSON from the stream / one resume turn; keep baseline
   → validate_code_knowledge → code-knowledge.json
 ```

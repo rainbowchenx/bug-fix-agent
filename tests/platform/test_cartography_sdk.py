@@ -5,7 +5,9 @@ from bugfix_platform.agents.cartographer import run_cartographer
 from bugfix_contracts import DefectBatch
 from bugfix_platform.sdk.cartography import (
     CARTOGRAPHY_TOOLS,
+    DEFAULT_CARTOGRAPHY_BASE_TURNS,
     DEFAULT_CARTOGRAPHY_MAX_TURNS,
+    DEFAULT_CARTOGRAPHY_TURNS_PER_TICKET,
     DISALLOWED_TOOLS,
     MAX_WEAK_PROMPT_TICKETS,
     CartographyRequest,
@@ -14,6 +16,7 @@ from bugfix_platform.sdk.cartography import (
     _build_prompt,
     bash_command_allowed,
     cartography_mode_from_env,
+    cartography_turns_for_tickets,
     heuristic_cartography,
     is_weak_match,
     resolve_cartography_max_turns,
@@ -186,7 +189,10 @@ def test_cartography_tools_allow_bash_forbid_writes():
 
 def test_resolve_cartography_max_turns_defaults_to_24(monkeypatch):
     monkeypatch.delenv("BUGFIX_CARTOGRAPHY_MAX_TURNS", raising=False)
+    monkeypatch.delenv("BUGFIX_CARTOGRAPHY_BASE_TURNS", raising=False)
+    monkeypatch.delenv("BUGFIX_CARTOGRAPHY_TURNS_PER_TICKET", raising=False)
     assert DEFAULT_CARTOGRAPHY_MAX_TURNS == 24
+    # No ticket count → compat fallback.
     assert resolve_cartography_max_turns() == 24
     monkeypatch.setenv("BUGFIX_CARTOGRAPHY_MAX_TURNS", "unlimited")
     assert resolve_cartography_max_turns() is None
@@ -196,6 +202,25 @@ def test_resolve_cartography_max_turns_defaults_to_24(monkeypatch):
     assert resolve_cartography_max_turns() == 64
     assert resolve_cartography_max_turns(12) == 12
     assert resolve_cartography_max_turns(0) is None
+
+
+def test_cartography_turns_scale_with_weak_ticket_count(monkeypatch):
+    monkeypatch.delenv("BUGFIX_CARTOGRAPHY_MAX_TURNS", raising=False)
+    monkeypatch.delenv("BUGFIX_CARTOGRAPHY_BASE_TURNS", raising=False)
+    monkeypatch.delenv("BUGFIX_CARTOGRAPHY_TURNS_PER_TICKET", raising=False)
+    assert DEFAULT_CARTOGRAPHY_BASE_TURNS == 6
+    assert DEFAULT_CARTOGRAPHY_TURNS_PER_TICKET == 3
+    assert cartography_turns_for_tickets(0) == 6
+    assert cartography_turns_for_tickets(1) == 9
+    assert cartography_turns_for_tickets(8) == 30
+    assert resolve_cartography_max_turns(weak_ticket_count=8) == 30
+    # Absolute env still wins over ticket budget.
+    monkeypatch.setenv("BUGFIX_CARTOGRAPHY_MAX_TURNS", "40")
+    assert resolve_cartography_max_turns(weak_ticket_count=8) == 40
+    monkeypatch.delenv("BUGFIX_CARTOGRAPHY_MAX_TURNS", raising=False)
+    monkeypatch.setenv("BUGFIX_CARTOGRAPHY_BASE_TURNS", "4")
+    monkeypatch.setenv("BUGFIX_CARTOGRAPHY_TURNS_PER_TICKET", "5")
+    assert cartography_turns_for_tickets(3) == 19
 
 
 def test_bash_command_allowed_readonly_vs_mutating():

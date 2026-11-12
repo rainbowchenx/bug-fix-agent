@@ -18,7 +18,12 @@ CartographyMode = Literal["heuristic", "sdk"]
 # 提示词里带给模型的弱票上限。强匹配票不进 SDK prompt。
 MAX_PROMPT_TICKETS = 8
 MAX_WEAK_PROMPT_TICKETS = 8
+# 无票数上下文时的兜底（兼容旧调用）；正常路径按票数预算。
 DEFAULT_CARTOGRAPHY_MAX_TURNS = 24
+# 地图/playbook 开销 + 每张弱票配额。实测：盲目加总 turn 不涨覆盖率，
+# 覆盖率取决于进 prompt 的弱票；配额决定这些票能不能做完。
+DEFAULT_CARTOGRAPHY_BASE_TURNS = 6
+DEFAULT_CARTOGRAPHY_TURNS_PER_TICKET = 3
 # ``gap`` 是机器枚举（空候选的原因码），不是给模型写解释的地方。
 _ALLOWED_GAPS = frozenset(get_args(MatchGap))
 # 候选集完全相同的票达到这个数，说明打分并列、路径 token 没区分度（假 medium）。
@@ -51,27 +56,56 @@ _BASH_DENY_RE = re.compile(
 )
 
 
-def resolve_cartography_max_turns(explicit: Optional[int] = None) -> Optional[int]:
+def _env_positive_int(name: str, default: int) -> int:
+    raw = (os.environ.get(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return default
+
+
+def cartography_turns_for_tickets(weak_ticket_count: int) -> int:
+    """``base + per_ticket * n`` — n is the weak-ticket count that enters the prompt."""
+    n = max(0, int(weak_ticket_count))
+    base = _env_positive_int(
+        "BUGFIX_CARTOGRAPHY_BASE_TURNS", DEFAULT_CARTOGRAPHY_BASE_TURNS
+    )
+    per = _env_positive_int(
+        "BUGFIX_CARTOGRAPHY_TURNS_PER_TICKET", DEFAULT_CARTOGRAPHY_TURNS_PER_TICKET
+    )
+    return base + per * n
+
+
+def resolve_cartography_max_turns(
+    explicit: Optional[int] = None,
+    *,
+    weak_ticket_count: Optional[int] = None,
+) -> Optional[int]:
     """Return SDK ``max_turns`` or ``None`` for unlimited.
 
     - Request explicit ``>0`` → that value
     - Request explicit ``<=0`` → unlimited
-    - Env empty → ``DEFAULT_CARTOGRAPHY_MAX_TURNS`` (24)
+    - Env ``BUGFIX_CARTOGRAPHY_MAX_TURNS`` set to a positive int → absolute override
     - Env ``0`` / ``none`` / ``unlimited`` → unlimited
-    - Env positive int → that value
+    - Env empty + ``weak_ticket_count`` given → ``base + per_ticket * n``
+    - Env empty + no ticket count → ``DEFAULT_CARTOGRAPHY_MAX_TURNS`` (compat)
     """
     if explicit is not None:
         return None if explicit <= 0 else explicit
     raw = (os.environ.get("BUGFIX_CARTOGRAPHY_MAX_TURNS") or "").strip().lower()
     if raw in ("0", "none", "null", "unlimited", "inf", "infinite"):
         return None
-    if raw == "":
-        return DEFAULT_CARTOGRAPHY_MAX_TURNS
-    try:
-        n = int(raw)
-    except ValueError:
-        return DEFAULT_CARTOGRAPHY_MAX_TURNS
-    return None if n <= 0 else n
+    if raw != "":
+        try:
+            n = int(raw)
+        except ValueError:
+            n = DEFAULT_CARTOGRAPHY_MAX_TURNS
+        return None if n <= 0 else n
+    if weak_ticket_count is not None:
+        return cartography_turns_for_tickets(weak_ticket_count)
+    return DEFAULT_CARTOGRAPHY_MAX_TURNS
 
 
 def bash_command_allowed(command: str) -> tuple[bool, str]:
@@ -98,7 +132,7 @@ class CartographyRequest:
     work_dir: str
     defect_batch: DefectBatch
     baseline: CodeKnowledge
-    # None → resolve from env (default 24). <=0 also means unlimited.
+    # None → ticket-based budget (or env absolute override). <=0 = unlimited.
     max_turns: Optional[int] = None
     model: Optional[str] = None
     injected_skills: tuple[InjectedSkill, ...] = ()
@@ -285,7 +319,8 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
         fallback.detail = f"claude-agent-sdk not installed ({err}); fell back to heuristic"
         return fallback
 
-    prompt = _build_prompt(req)
+    weak_pairs = select_weak_tickets(req)
+    prompt = _build_prompt(req, weak_pairs=weak_pairs)
     model = req.model or os.environ.get("ANTHROPIC_MODEL") or None
     if req.injected_skills:
         system_prompt = _SYSTEM_PROMPT + cartography_skills_addon(req.injected_skills)
@@ -298,7 +333,9 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
                 "hierarchical-localization",
             )
         )
-    max_turns = resolve_cartography_max_turns(req.max_turns)
+    max_turns = resolve_cartography_max_turns(
+        req.max_turns, weak_ticket_count=len(weak_pairs)
+    )
 
     def _make_options(*, resume: str | None = None, turns: Optional[int] = None) -> Any:
         kwargs: dict[str, Any] = {
@@ -723,13 +760,16 @@ def _shared_signatures(matches: list[Any]) -> set[tuple[str, ...]]:
     return {sig for sig, n in counts.items() if n >= SHARED_SIGNATURE_MIN_TICKETS}
 
 
-def _build_prompt(req: CartographyRequest) -> str:
+def select_weak_tickets(
+    req: CartographyRequest,
+) -> list[tuple[Any, Any]]:
+    """弱票选取：真弱优先，并列假 medium 填剩余名额；最多 ``MAX_WEAK_PROMPT_TICKETS``。
+
+    返回 ``[(ticket, match), ...]``，与进 prompt / turn 预算共用，避免两处各算一遍。
+    """
     entries = list(req.baseline.architecture.entryPoints)
     by_id = {m.defectId: m for m in req.baseline.defectCodeMatches}
     shared = _shared_signatures(req.baseline.defectCodeMatches)
-    # 两类弱票：真弱（空候选 / low / 全是 entryPoints）优先占位，
-    # “有候选但多票并列”排后面。不分开的话，新的并列票按批次顺序把
-    # 空候选那张挤出 8 个名额（led 轮：BGCM2026060502981 被挤掉）。
     genuine: list[tuple[Any, Any]] = []
     ambiguous: list[tuple[Any, Any]] = []
     for t in req.defect_batch.tickets:
@@ -740,11 +780,18 @@ def _build_prompt(req: CartographyRequest) -> str:
             genuine.append((t, match))
         elif match is not None and _candidate_signature(match) in shared:
             ambiguous.append((t, match))
-        else:
-            continue
+    return (genuine + ambiguous)[:MAX_WEAK_PROMPT_TICKETS]
+
+
+def _build_prompt(
+    req: CartographyRequest,
+    *,
+    weak_pairs: list[tuple[Any, Any]] | None = None,
+) -> str:
+    pairs = weak_pairs if weak_pairs is not None else select_weak_tickets(req)
     weak_tickets = []
     weak_matches = []
-    for t, match in (genuine + ambiguous)[:MAX_WEAK_PROMPT_TICKETS]:
+    for t, match in pairs:
         rationale = (t.intentRationale or "").strip()
         weak_tickets.append(
             {
@@ -762,6 +809,7 @@ def _build_prompt(req: CartographyRequest) -> str:
             # ``gap`` 是机器枚举；作为示例给出去，模型会把它当自由文本填回来。
             payload.pop("gap", None)
             weak_matches.append(payload)
+    budget = cartography_turns_for_tickets(len(pairs))
     baseline = {
         "cartographyProfile": req.baseline.cartographyProfile,
         "secondaryHints": req.baseline.secondaryHints,
@@ -782,6 +830,10 @@ def _build_prompt(req: CartographyRequest) -> str:
         f"workDir: {req.work_dir}\n"
         f"cartographyProfile: {req.baseline.cartographyProfile} (caller-supplied; do not change)\n"
         f"readingPlaybook: {playbook}\n"
+        f"turnBudget: {budget} "
+        f"(base={_env_positive_int('BUGFIX_CARTOGRAPHY_BASE_TURNS', DEFAULT_CARTOGRAPHY_BASE_TURNS)}"
+        f" + perTicket={_env_positive_int('BUGFIX_CARTOGRAPHY_TURNS_PER_TICKET', DEFAULT_CARTOGRAPHY_TURNS_PER_TICKET)}"
+        f" × weakTickets={len(pairs)})\n"
         f"injectedSkills: {json.dumps([s.name for s in req.injected_skills], ensure_ascii=False)}\n"
         f"matchPoolTickets: {json.dumps(weak_tickets, ensure_ascii=False)}\n"
         f"baseline: {json.dumps(baseline, ensure_ascii=False)}\n"
