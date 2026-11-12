@@ -18,7 +18,7 @@ SOP for building `code-knowledge`. Prefer the Python entrypoint; use this skill 
 | Call `run_cartographer` with caller `cartography_profile` | Dump full ticket observed/expected/steps into matching queries; do not guess the profile |
 | Cap candidates at **3** per defect; **0 is valid (do not pad)** | Exceed cap, pad to 3, cite route tables/shells, or invent paths |
 | Follow profile biases (electron / micro_frontend / device_web) | Write `CODEBASE_MAP.md` or edit target repo by default |
-| SDK: thicken architecture + shallow-pass all match-pool tickets | Follow imports/call-flow per ticket (that is Agent-3); mutate the repo; skip heuristic medium |
+| SDK: CodeGraph MCP first, then shallow-pass all match-pool tickets | Follow imports/call-flow per ticket (that is Agent-3); mutate the repo; skip heuristic medium; ignore local `.codegraph/` |
 
 ## Input contract
 
@@ -33,8 +33,9 @@ workDir + defect-batch + cartographyProfile
   → map architecture by the given profile (catalog files, not path regex)
   → match tickets using architecture indexes + title tokens
     (do not fill tickets with architecture entryPoints when no path token hit)
-  → optional SDK enrich (Read/Glob/Grep + read-only Bash;
-     prompt all match-pool tickets, weak first, cap 16;
+  → ensure CodeGraph (use `.codegraph/` or `codegraph init -y`; mount MCP)
+  → optional SDK enrich (CodeGraph MCP + Read/Glob/Grep + read-only Bash;
+     prefer codegraph_explore; prompt all match-pool tickets, weak first, cap 16;
      heuristic medium marked unverified / demoted;
      max_turns = base + per_ticket × n, default 6+2×n)
   → on max_turns: salvage JSON from the stream / one resume turn; keep baseline

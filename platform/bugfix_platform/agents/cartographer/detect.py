@@ -284,6 +284,18 @@ def read_conventions(work_dir: str | Path, repo_roots: list[RepoRoot]) -> dict:
 
     for rr in repo_roots:
         abs_path = root / rr.path
+        # 本地索引优先于文档提及：有 .codegraph/codegraph.db 即视为可用。
+        cg_db = abs_path / ".codegraph" / "codegraph.db"
+        if cg_db.is_file() and cg_db.stat().st_size > 0:
+            code_graph = True
+        mcp_json = abs_path / ".mcp.json"
+        if mcp_json.is_file():
+            try:
+                if "codegraph" in mcp_json.read_text(encoding="utf-8", errors="ignore").lower():
+                    code_graph = True
+            except OSError:
+                pass
+
         claude = abs_path / "CLAUDE.md"
         if claude.exists():
             entries.append(SpecEntry(path=f"{rr.path}/CLAUDE.md".replace("./", ""), kind="guide", source="repo_root"))

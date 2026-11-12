@@ -91,6 +91,16 @@ def test_claude_md_signals_kept_but_text_not_copied(tmp_path: Path):
     assert "第二段正文" not in joined
 
 
+def test_codegraph_db_sets_capability_without_claude_md(tmp_path: Path):
+    repo = tmp_path / "app"
+    _pkg(repo)
+    db = repo / ".codegraph"
+    db.mkdir()
+    (db / "codegraph.db").write_bytes(b"sqlite-fake" * 8)
+    conv = read_conventions(tmp_path, discover_repo_roots(tmp_path))
+    assert conv["codeGraph"] is True
+
+
 def test_profile_is_never_detected_only_echoed(tmp_path: Path):
     """detect 不判型：第一个返回值恒为 unknown，仓型由调用方给。"""
     repo = tmp_path / "mf"

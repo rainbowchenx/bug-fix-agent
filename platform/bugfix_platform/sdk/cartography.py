@@ -10,6 +10,7 @@ from bugfix_contracts import CodeKnowledge, DefectBatch, validate_code_knowledge
 from bugfix_contracts.code_knowledge import DefectCodeMatch, MatchGap
 from bugfix_platform.sdk.parse import parse_json_payload
 from bugfix_platform.sdk.credentials import has_credentials
+from bugfix_platform.sdk.codegraph import CODEGRAPH_MCP_TOOLS, CodeGraphStatus
 from bugfix_platform.sdk.skill_inject import InjectedSkill, cartography_skills_addon
 from bugfix_platform.sdk.skills import skills_system_addon
 
@@ -37,8 +38,8 @@ _SALVAGE_PROMPT = (
     "imports or name a fix locus. Do not call more tools unless required to emit JSON."
 )
 
-# Thorough read session: Bash allowed for read-only exploration; no mutate tools.
-CARTOGRAPHY_TOOLS = ["Read", "Glob", "Grep", "Bash"]
+# Thorough read session: Bash + CodeGraph MCP; no mutate tools.
+CARTOGRAPHY_TOOLS = ["Read", "Glob", "Grep", "Bash", *CODEGRAPH_MCP_TOOLS]
 DISALLOWED_TOOLS = ["Edit", "Write", "NotebookEdit", "MultiEdit"]
 
 # Destructive / egress patterns for Bash (defense in depth; prompt also forbids mutation).
@@ -140,6 +141,7 @@ class CartographyRequest:
     max_turns: Optional[int] = None
     model: Optional[str] = None
     injected_skills: tuple[InjectedSkill, ...] = ()
+    codegraph: Optional[CodeGraphStatus] = None
 
 
 @dataclass
@@ -341,6 +343,9 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
         req.max_turns, ticket_count=len(prompt_pairs)
     )
 
+    cg = req.codegraph
+    mcp_servers = cg.mcp_servers(req.work_dir) if cg is not None else {}
+
     def _make_options(*, resume: str | None = None, turns: Optional[int] = None) -> Any:
         kwargs: dict[str, Any] = {
             "cwd": req.work_dir,
@@ -352,13 +357,22 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
             "model": model,
             "can_use_tool": _can_use_cartography_tool,
         }
+        if mcp_servers:
+            kwargs["mcp_servers"] = mcp_servers
+            # 只用我们显式挂的 CodeGraph，避免拉进用户全局杂项 MCP。
+            kwargs["strict_mcp_config"] = True
         if resume:
             kwargs["resume"] = resume
         try:
             return ClaudeAgentOptions(**kwargs)
         except TypeError:
             kwargs.pop("resume", None)
-            return ClaudeAgentOptions(**kwargs)
+            kwargs.pop("strict_mcp_config", None)
+            try:
+                return ClaudeAgentOptions(**kwargs)
+            except TypeError:
+                kwargs.pop("mcp_servers", None)
+                return ClaudeAgentOptions(**kwargs)
 
     texts: list[str] = []
     result_text = ""
@@ -706,8 +720,13 @@ Your job is to thicken the architecture map and SHALLOW-PASS every listed match-
 ticket (confirm or replace heuristic candidates). Agent-3 follows imports and names
 the fix locus. You do not.
 
-Tools: Read, Glob, Grep, and Bash. Bash is for READ-ONLY exploration only
-(e.g. rg/find/git log|blame|grep|show, ls, cat/head/sed -n). NEVER mutate the repo:
+Tools: CodeGraph MCP (preferred), Read, Glob, Grep, and Bash.
+When CodeGraph is available (codegraph_explore / codegraph_node), use it FIRST for
+structural / symbol / module questions — it is a pre-built local index; do not
+re-grep what it already returned. Treat CodeGraph source excerpts as already Read.
+Fall back to Grep/Read/Glob only when CodeGraph is unavailable or returns empty.
+Bash is for READ-ONLY exploration only (e.g. rg/find/git log|blame|grep|show,
+ls, cat/head/sed -n, or `codegraph explore` CLI). NEVER mutate the repo:
 no edit/write tools, no git write, no install, no network, no rm/chmod.
 
 cartographyProfile is CALLER-SUPPLIED. Do not reclassify the repo.
@@ -716,12 +735,15 @@ How to work:
 1) Follow the profile reading playbook, then CLAUDE.md / overlay skills.
    Overlay skills have HIGHEST PRIORITY over package SOP on read order, layout, aliases.
 2) Thicken architecture (entryPoints, route/business modules, runtime shape).
-   Read catalog files; do not walk the whole repo.
+   Prefer CodeGraph explore for module/symbol maps; catalog files next.
+   Do not walk the whole repo file-by-file.
 3) Cover EVERY ticket in matchPoolTickets — shallow, not deep. Cap 3 real paths
    per ticket; 0 is valid — do not pad. Empty is better than a wrong path or
    sibling stubs (mixin.js / isapi.js with no logic).
-   Heuristic medium/high candidates are UNVERIFIED path-token hits: confirm with
-   a quick Grep/Read, replace if wrong, or clear them. Do not copy them blindly.
+   Prefer CodeGraph for ticket localization; set candidate.source = "codegraph"
+   when the path came from CodeGraph. Heuristic medium/high candidates are
+   UNVERIFIED path-token hits: confirm with CodeGraph (or Grep/Read), replace
+   if wrong, or clear them. Do not copy them blindly.
    candidate.why = why the path resembles the title/module — not a root cause,
    not a call-flow. Do not follow imports/callers per ticket.
    Route tables, shells, hosts and entryPoints are not fix loci. If the ticket
@@ -851,17 +873,26 @@ def _build_prompt(
         "partial": req.baseline.partial,
     }
     playbook = profile_reading_playbook(req.baseline.cartographyProfile)
+    cg = req.codegraph
+    cg_ready = bool(cg and cg.ready)
+    cg_line = (
+        f"codeGraph: ready roots={json.dumps(cg.roots if cg else [], ensure_ascii=False)}; "
+        "prefer codegraph_explore / codegraph_node; candidate.source=codegraph when used"
+        if cg_ready
+        else "codeGraph: unavailable — use Grep/Read/Glob only"
+    )
     return (
         "Thicken architecture from the playbook, then shallow-pass EVERY listed "
         "match-pool ticket (max 3 paths each; 0 is valid, do not pad). "
-        "heuristicUnverified=true means baseline candidates are untrusted — "
-        "confirm, replace, or clear. Catalog files are not loci. Do not follow "
-        "imports or name a fix locus. Return the JSON enrich object before you "
-        "run out of turns.\n\n"
+        "Prefer CodeGraph when ready. heuristicUnverified=true means baseline "
+        "candidates are untrusted — confirm, replace, or clear. Catalog files "
+        "are not loci. Do not follow imports or name a fix locus. Return the "
+        "JSON enrich object before you run out of turns.\n\n"
         f"productLine: {req.defect_batch.productLine}\n"
         f"workDir: {req.work_dir}\n"
         f"cartographyProfile: {req.baseline.cartographyProfile} (caller-supplied; do not change)\n"
         f"readingPlaybook: {playbook}\n"
+        f"{cg_line}\n"
         f"turnBudget: {budget} "
         f"(base={_env_positive_int('BUGFIX_CARTOGRAPHY_BASE_TURNS', DEFAULT_CARTOGRAPHY_BASE_TURNS)}"
         f" + perTicket={_env_positive_int('BUGFIX_CARTOGRAPHY_TURNS_PER_TICKET', DEFAULT_CARTOGRAPHY_TURNS_PER_TICKET)}"

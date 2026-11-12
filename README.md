@@ -339,7 +339,7 @@ raw-defects  ──Agent-1──►  defect-batch  ──Agent-2──►  code-
 
 | 项 | 状态 |
 |----|------|
-| Agent-2 CodeGraph 真工具环 / 业务形态指纹样本仓 | 后续（启发式架构图 + code-cartography skill 已落地） |
+| Agent-2 业务形态指纹样本仓 | 后续（CodeGraph ensure + MCP 已默认接入） |
 | Agent-3 真 MR / 本地集成冲突 | 后续（`--apply-fix` 已可出 patch 文件，默认关） |
 | LangGraph Server 原生部署（S4 增强） | 后续（现有 FastAPI 兼容壳） |
 | 生产 MCP 拉缺陷 | stub（现用 CSV/JSON/xlsx） |
