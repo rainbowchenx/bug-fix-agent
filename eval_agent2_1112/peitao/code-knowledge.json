@@ -1,0 +1,661 @@
+{
+  "schemaVersion": "0.1.0",
+  "productLine": "PJ14PD20260423284",
+  "workDir": "E:/working_code_webfront/bug-fix-demo-project/peitao",
+  "partial": false,
+  "generatedAt": "2026-11-12T11:15:28.186044Z",
+  "repoRoots": [
+    {
+      "path": ".",
+      "gitHead": "4e819a59d37623c89cac62d053dd98b633321891",
+      "fingerprint": "web5.0-framework@1.0.0"
+    }
+  ],
+  "cartographyProfile": "device_web",
+  "secondaryHints": [
+    "caller:device_web",
+    ".:autoDependencies",
+    ".:dual-entry",
+    "enrich=sdk; turns=62; reason=completed; cost=$2.63; dropped=duplicate:4"
+  ],
+  "techStack": {
+    "languages": [
+      "javascript"
+    ],
+    "frameworks": [
+      "vue2",
+      "hui",
+      "vue-router",
+      "vuex"
+    ],
+    "notes": "device_web SPA：main-pc.js/main-mobile.js 双入口 + Router/{pc,mobile}.js 双路由表；业务按 src/view/<Business>/{pc,mobile} 分栏，能力集集中在 common/vue/service/device.js，请求层为 service/request/*（Axios/WebAuth/Otap）"
+  },
+  "architecture": {
+    "summary": "报警主机本地 Web 配置端（AX Pro / Hybrid Pro 系列）：pc 与 mobile 两套入口与路由表共用同一套 service（device.js 能力集、request/otap 协议封装、request/webAuth 登录与激活）；业务页面按 src/view/{device,area,config,operations,portal,advanceSetting} 分域，每域内 pc/ 与 mobile/ 分包；网络设备（IPC/NVR 通道）配置集中在 view/device/ipc，升级与日志在 view/operations/maintain，激活/登录在 view/portal/login。; cartography=sdk",
+    "entryPoints": [
+      "src/main-pc.js",
+      "src/main-mobile.js",
+      "src/router/pc.js",
+      "src/router/mobile.js"
+    ],
+    "modules": [
+      {
+        "id": "device.js",
+        "path": "src/common/vue/service/device.js",
+        "role": "device_capability",
+        "shared": null,
+        "notes": "capability object — prefer over views for greyed-out features"
+      },
+      {
+        "id": "host-asp",
+        "path": "src/index.asp",
+        "role": "host",
+        "shared": null,
+        "notes": "host=device-asp — not an architecture type"
+      },
+      {
+        "id": "routes:src.router.area.mobile.js",
+        "path": "src/router/area/mobile.js",
+        "role": "route_table",
+        "shared": null,
+        "notes": "pc/mobile route table — not a fix locus"
+      },
+      {
+        "id": "routes:src.router.area.pc.js",
+        "path": "src/router/area/pc.js",
+        "role": "route_table",
+        "shared": null,
+        "notes": "pc/mobile route table — not a fix locus"
+      },
+      {
+        "id": "routes:src.router.config.mobile.js",
+        "path": "src/router/config/mobile.js",
+        "role": "route_table",
+        "shared": null,
+        "notes": "pc/mobile route table — not a fix locus"
+      },
+      {
+        "id": "routes:src.router.config.pc.js",
+        "path": "src/router/config/pc.js",
+        "role": "route_table",
+        "shared": null,
+        "notes": "pc/mobile route table — not a fix locus"
+      },
+      {
+        "id": "routes:src.router.dashboard.mobile.js",
+        "path": "src/router/dashboard/mobile.js",
+        "role": "route_table",
+        "shared": null,
+        "notes": "pc/mobile route table — not a fix locus"
+      },
+      {
+        "id": "routes:src.router.dashboard.pc.js",
+        "path": "src/router/dashboard/pc.js",
+        "role": "route_table",
+        "shared": null,
+        "notes": "pc/mobile route table — not a fix locus"
+      },
+      {
+        "id": "routes:src.router.device.mobile.js",
+        "path": "src/router/device/mobile.js",
+        "role": "route_table",
+        "shared": null,
+        "notes": "pc/mobile route table — not a fix locus"
+      },
+      {
+        "id": "routes:src.router.device.pc.js",
+        "path": "src/router/device/pc.js",
+        "role": "route_table",
+        "shared": null,
+        "notes": "pc/mobile route table — not a fix locus"
+      },
+      {
+        "id": "routes:src.router.mobile.js",
+        "path": "src/router/mobile.js",
+        "role": "route_table",
+        "shared": null,
+        "notes": "pc/mobile route table — not a fix locus"
+      },
+      {
+        "id": "routes:src.router.operations.mobile.js",
+        "path": "src/router/operations/mobile.js",
+        "role": "route_table",
+        "shared": null,
+        "notes": "pc/mobile route table — not a fix locus"
+      },
+      {
+        "id": "routes:src.router.operations.pc.js",
+        "path": "src/router/operations/pc.js",
+        "role": "route_table",
+        "shared": null,
+        "notes": "pc/mobile route table — not a fix locus"
+      },
+      {
+        "id": "routes:src.router.pc.js",
+        "path": "src/router/pc.js",
+        "role": "route_table",
+        "shared": null,
+        "notes": "pc/mobile route table — not a fix locus"
+      },
+      {
+        "id": "routes:src.router.portal.mobile.js",
+        "path": "src/router/portal/mobile.js",
+        "role": "route_table",
+        "shared": null,
+        "notes": "pc/mobile route table — not a fix locus"
+      },
+      {
+        "id": "routes:src.router.portal.pc.js",
+        "path": "src/router/portal/pc.js",
+        "role": "route_table",
+        "shared": null,
+        "notes": "pc/mobile route table — not a fix locus"
+      },
+      {
+        "id": "routes:src.router.scene.mobile.js",
+        "path": "src/router/scene/mobile.js",
+        "role": "route_table",
+        "shared": null,
+        "notes": "pc/mobile route table — not a fix locus"
+      },
+      {
+        "id": "routes:src.router.scene.pc.js",
+        "path": "src/router/scene/pc.js",
+        "role": "route_table",
+        "shared": null,
+        "notes": "pc/mobile route table — not a fix locus"
+      },
+      {
+        "id": "NotSupport",
+        "path": "src/NotSupport",
+        "role": "route_module",
+        "shared": null,
+        "notes": "SPA business/route module — not a micro-app"
+      },
+      {
+        "id": "view",
+        "path": "src/view",
+        "role": "route_module",
+        "shared": null,
+        "notes": "SPA business/route module — not a micro-app"
+      },
+      {
+        "id": "view.advanceSetting",
+        "path": "src/view/advanceSetting",
+        "role": "route_module",
+        "shared": null,
+        "notes": "under view"
+      },
+      {
+        "id": "view.area",
+        "path": "src/view/area",
+        "role": "route_module",
+        "shared": null,
+        "notes": "under view"
+      },
+      {
+        "id": "view.config",
+        "path": "src/view/config",
+        "role": "route_module",
+        "shared": null,
+        "notes": "under view"
+      },
+      {
+        "id": "view.dashboard",
+        "path": "src/view/dashboard",
+        "role": "route_module",
+        "shared": null,
+        "notes": "under view"
+      },
+      {
+        "id": "view.device",
+        "path": "src/view/device",
+        "role": "route_module",
+        "shared": null,
+        "notes": "under view"
+      },
+      {
+        "id": "view.deviceManage",
+        "path": "src/view/deviceManage",
+        "role": "route_module",
+        "shared": null,
+        "notes": "under view"
+      },
+      {
+        "id": "view.operations",
+        "path": "src/view/operations",
+        "role": "route_module",
+        "shared": null,
+        "notes": "under view"
+      },
+      {
+        "id": "view.portal",
+        "path": "src/view/portal",
+        "role": "route_module",
+        "shared": null,
+        "notes": "under view"
+      },
+      {
+        "id": "device-service",
+        "path": "src/common/vue/service/device.js",
+        "role": "capability_service",
+        "shared": true,
+        "notes": "主机/子设备能力集与 SupportModelInfo、getFunctions、getHostSubDeviceSupport 等，判断功能是否可配/置灰先看这里"
+      },
+      {
+        "id": "request-otap",
+        "path": "src/common/vue/service/request/otap.js",
+        "role": "protocol_layer",
+        "shared": true,
+        "notes": "operate/Activate、GetFunctions 等 ISAPI 封装；webAuth.js 负责登录与激活（activeDevice/encodeChallenge）"
+      },
+      {
+        "id": "ipc",
+        "path": "src/view/device/ipc",
+        "role": "device_config_module",
+        "shared": false,
+        "notes": "网络相机（IPC/NVR 通道）配置：params/two 栏 pc（ipcSet/ipcChannelSet/singleChannelConfig/multiChannelConfig）与 mobile（ipcSet/videoParameter），otap.js 内 addVideoChannel/setVideoCodingParams/modifyVideoChannel"
+      },
+      {
+        "id": "zone",
+        "path": "src/view/device/zone",
+        "role": "device_config_module",
+        "shared": false,
+        "notes": "防区配置：pc/zoneSet.vue（save→getInputListData→setZoneInfo）、mixin.js（setZoneInfo/saveDetectorInputInfo），models 走 SingleZoneBasicInfo"
+      },
+      {
+        "id": "device-index",
+        "path": "src/view/device/index",
+        "role": "device_list_module",
+        "shared": false,
+        "notes": "设备树/子设备列表与批量删除：pc/deviceView.vue（batchDeleteDevices→pollingDelChildDev）、component/deviceContainer.vue、loopDelDeviceTree.vue"
+      },
+      {
+        "id": "remote-ctrl",
+        "path": "src/view/device/remoteCtrl",
+        "role": "device_config_module",
+        "shared": false,
+        "notes": "遥控器管理：pc/mobile remoteCtrlSet.vue 的联动子系统字段 + mixin.js changeAreaOption/setRemoteCtrlInfo"
+      },
+      {
+        "id": "upgrade",
+        "path": "src/view/operations/maintain/upgrade",
+        "role": "maintain_module",
+        "shared": false,
+        "notes": "升级页 pc/upgrade.vue：autoDetectionEnabled 开关、handleAutoCheckChange、getAutoUpgradeCfg/setAutoUpgradeCfg、TriggerManualDetection；upgradeConfig/pc/upgradeConfig.vue 为自动升级配置页"
+      },
+      {
+        "id": "maintain-log",
+        "path": "src/view/operations/maintain/maintainLog",
+        "role": "maintain_module",
+        "shared": false,
+        "notes": "维护日志：mixin.js 组装日志行（I18n.t(szDescribe)）、pc/maintainLog.vue exportCSVFile/excelExport、otap.js searchandDownloadLog"
+      },
+      {
+        "id": "portal-login",
+        "path": "src/view/portal/login",
+        "role": "auth_module",
+        "shared": false,
+        "notes": "登录/激活：pc/components/loginOne.vue doActive（activeBtnDisabled、Axios.activeDevice）、mobile/Login.vue active()；WebAuth.login 后跳 dashboard"
+      },
+      {
+        "id": "area",
+        "path": "src/view/area",
+        "role": "business_module",
+        "shared": false,
+        "notes": "子系统/防区联动视图：pc/index.vue + component/roomList.vue、linkageDevView.vue"
+      },
+      {
+        "id": "main-entries",
+        "path": "src/main-mixin.js",
+        "role": "app_bootstrap",
+        "shared": true,
+        "notes": "pc/mobile 共用的启动与全局混入（权限/路由/能力初始化），不含业务逻辑"
+      },
+      {
+        "id": "web-control-bridge",
+        "path": "src/common/vue/utils/utils.js",
+        "role": "native_bridge",
+        "shared": true,
+        "notes": "真实桥接为 jsWebControl（Utils.webPushNative / updateNativeData / callBackAppPage），不是名为 bridge 的目录"
+      }
+    ]
+  },
+  "conventions": {
+    "fromClaudeMd": [],
+    "fromRules": [
+      "README/.babelrc/.eslintrc.js 存在；仓库根无 CLAUDE.md，无 overlay 业务规则文件（.dwt/ 为空壳目录）",
+      "页面按 src/view/<Business>/{pc,mobile} 对分包，公共组件在 src/common/vue/components/{pc,base|integration}",
+      "协议调用统一走 common/vue/service/request/*（Axios/Otap/WebAuth），错误统一交给 Response.saveState 处理"
+    ]
+  },
+  "boundSkills": [
+    "code-cartography",
+    "electron-process-boundary",
+    "hierarchical-localization",
+    "monorepo-workspace"
+  ],
+  "specAtlas": {
+    "frameworkId": "unknown",
+    "entries": [],
+    "drDs": [],
+    "bindings": []
+  },
+  "capabilities": {
+    "codeGraph": true,
+    "runtimeVerify": false
+  },
+  "defectCodeMatches": [
+    {
+      "defectId": "BGCM2026102702747",
+      "clusterId": "PJ14PD20260423284::_unmoduled::业务安全::logic",
+      "title": "[业务安全] 偶现主机激活密码配置为hik36584后点击激活，下面激活按钮变为置灰状态后没其他反映了，既不提示成功也不提示失败",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/view/portal/login/pc/components/loginOne.vue",
+          "symbol": "doActive",
+          "why": "PC 激活页：doActive 先置 activeBtnDisabled=true，激活回包无后续分支时按钮保持置灰且不提示成功/失败",
+          "source": "codegraph"
+        },
+        {
+          "repoPath": ".",
+          "path": "src/common/vue/service/request/webAuth.js",
+          "symbol": "activeDevice",
+          "why": "激活口令组装与 StartActivate/StartActivateV3 下发，风险口令场景走同一入口，异常分支在此返回",
+          "source": "codegraph"
+        },
+        {
+          "repoPath": ".",
+          "path": "src/common/vue/service/request/axios.js",
+          "symbol": "activeDevice",
+          "why": "Axios.activeDevice 薄封装，登录激活下单链路",
+          "source": "codegraph"
+        }
+      ],
+      "confidence": "medium",
+      "gap": null
+    },
+    {
+      "defectId": "BGCM2026102711334",
+      "clusterId": "PJ14PD20260423284::_unmoduled::网络设备管理::config::web",
+      "title": "[网络设备管理] web端修改ipc-EA4811701的通道名称，会报错“operation failed”（18点45-48）",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/view/device/ipc/pc/ipcChannelSet.vue",
+          "symbol": "modifyIpcName",
+          "why": "Web 端修改 IPC 名称的专用保存分支（bSptConfigIPCName + type!=='add'），失败即 operation failed 且阻断后续保存",
+          "source": "codegraph"
+        },
+        {
+          "repoPath": ".",
+          "path": "src/view/device/ipc/otap.js",
+          "symbol": "modifyVideoChannel",
+          "why": "通道名称下发协议（ModifyVideoChannel），名称字段/childId 组装错误会返回 operation failed",
+          "source": "codegraph"
+        },
+        {
+          "repoPath": ".",
+          "path": "src/view/device/ipc/pc/component/singleChannelConfig.vue",
+          "symbol": "getAjax",
+          "why": "另一条通道名下发路径（name: form.chanName）与 modifyIpcName 并存，可能重复下发/覆盖",
+          "source": "codegraph"
+        }
+      ],
+      "confidence": "medium",
+      "gap": null
+    },
+    {
+      "defectId": "BGCM2026102808455",
+      "clusterId": "PJ14PD20260423284::_unmoduled::多语言::i18n",
+      "title": "[多语言] 多语言中存在日志内容未翻译，显示的是英语",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/view/operations/maintain/maintainLog/mixin.js",
+          "symbol": "searchLog",
+          "why": "日志行由 I18n.t(szDescribe) 直接翻译后端 minorType，缺失词条时回落英文，正是“日志内容未翻译”的组装点",
+          "source": "codegraph"
+        },
+        {
+          "repoPath": ".",
+          "path": "src/view/operations/maintain/maintainLog/pc/maintainLog.vue",
+          "symbol": "exportCSVFile",
+          "why": "导出 CSV 的表头/内容取自同一数据源，导出后仍显示英文则落在此导出拼装",
+          "source": "codegraph"
+        },
+        {
+          "repoPath": ".",
+          "path": "src/common/static/i18n/en_US/Operations.json",
+          "symbol": null,
+          "why": "日志类型词条（evenType/event 等）所在翻译资源，缺键即显示英文",
+          "source": "grep"
+        }
+      ],
+      "confidence": "medium",
+      "gap": null
+    },
+    {
+      "defectId": "BGCM2026102809314",
+      "clusterId": "PJ14PD20260423284::_unmoduled::CRA安全认证（WEB需求）::ui_layout",
+      "title": "[CRA安全认证（WEB需求）] 交互中无auto check for upgrade，实际web页面显示该按钮，请统一显示（交互提示自动更新在服务中）",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/view/operations/maintain/upgrade/pc/upgrade.vue",
+          "symbol": "handleAutoCheckChange",
+          "why": "Auto Check for Upgrades 开关字段 autoDetectionEnabled 的显示与变更在此（isShow 受 bSptOnlineUpgrade 控制）",
+          "source": "codegraph"
+        },
+        {
+          "repoPath": ".",
+          "path": "src/view/operations/maintain/upgrade/otap.js",
+          "symbol": "getAutoUpgradeCfg",
+          "why": "自动检查配置读写协议（Get/SetAutoUpgradeCfg），决定页面是否展示该开关",
+          "source": "codegraph"
+        }
+      ],
+      "confidence": "medium",
+      "gap": null
+    },
+    {
+      "defectId": "BGCM2026102809342",
+      "clusterId": "PJ14PD20260423284::_unmoduled::CRA安全认证（WEB需求）::ui_layout",
+      "title": "[CRA安全认证（WEB需求）] 交互中显示在线升级为用户点击\"检查更新“，且当前未开启自动检查时弹出提示，实际是使能自动检查时候弹出提示（其ui中提示内容也是使能自动更新的内容），ui交互内容矛盾",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/view/operations/maintain/upgrade/pc/upgrade.vue",
+          "symbol": "handleAutoCheckChange",
+          "why": "弹窗在 before-change 的 $confirm 中触发（使能自动检查时弹），与交互稿“点击检查更新且未开启自动检查时弹”矛盾",
+          "source": "codegraph"
+        },
+        {
+          "repoPath": ".",
+          "path": "src/common/static/i18n/en_US/Operations.json",
+          "symbol": null,
+          "why": "autoCheckEnableSync_msg/autoCheckDisableSync_msg 文案键：提示内容用的是“使能自动更新”文案",
+          "source": "grep"
+        }
+      ],
+      "confidence": "medium",
+      "gap": null
+    },
+    {
+      "defectId": "BGCM2026102902007",
+      "clusterId": "PJ14PD20260423284::_unmoduled::遥控器管理::perf",
+      "title": "[遥控器管理] 遥控器取消关联全部子系统的时候，界面会卡主2s，此时点其他的GROUP。就会出现把其他的按键关联给误触",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/view/device/remoteCtrl/mixin.js",
+          "symbol": "changeAreaOption",
+          "why": "取消关联全部子系统时对整个 customKey 列表逐项过滤/重建 options（同步大循环），正是卡顿 2s 的直接位置",
+          "source": "codegraph"
+        },
+        {
+          "repoPath": ".",
+          "path": "src/view/device/remoteCtrl/pc/remoteCtrlSet.vue",
+          "symbol": null,
+          "why": "linkAllSystem_name 开关 change 中调用 changeAreaOption，联动子系统字段的表单刷新点",
+          "source": "codegraph"
+        }
+      ],
+      "confidence": "medium",
+      "gap": null
+    },
+    {
+      "defectId": "BGCM2026103000881",
+      "clusterId": "PJ14PD20260423284::_unmoduled::网络设备管理::config::Onvif",
+      "title": "[网络设备管理] 主机通过Onvif协议接入IPC，进入参数界面点击保存的时候显示Operating failed.",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/view/device/ipc/pc/component/singleChannelConfig.vue",
+          "symbol": "getAjax",
+          "why": "参数界面“保存”的实际下发点：组装 setVideoCodingParams/modifyVideoChannel 并对码率类型做 ONVIF 禁用判断，保存失败提示从该 Promise 链抛出",
+          "source": "codegraph"
+        },
+        {
+          "repoPath": ".",
+          "path": "src/view/device/ipc/pc/component/ipcInfo.vue",
+          "symbol": null,
+          "why": "IPC 参数表单组件（ipcInfo）承载码率类型/分辨率/通道名等字段",
+          "source": "codegraph"
+        },
+        {
+          "repoPath": ".",
+          "path": "src/view/device/ipc/pc/ipcSet.vue",
+          "symbol": "save",
+          "why": "IPC 编辑页保存入口，聚合 basicForm/ipcInfo 校验后调用 setIpcInfo 与拓扑补通道",
+          "source": "codegraph"
+        }
+      ],
+      "confidence": "medium",
+      "gap": null
+    },
+    {
+      "defectId": "BGCM2026103007217",
+      "clusterId": "PJ14PD20260423284::_unmoduled::网络设备管理::config::NVR",
+      "title": "[网络设备管理] 添加NVR下的IPC通道，没有任何提示，但是保存就报错，等退出到设备列表，通道显示已添加",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/view/device/ipc/pc/component/multiChannelConfig.vue",
+          "symbol": "addVideoChannel",
+          "why": "多通道（NVR 下 IPC 通道）添加与 videoRecheck 数量上限判定集中于此组件",
+          "source": "codegraph"
+        },
+        {
+          "repoPath": ".",
+          "path": "src/view/device/ipc/pc/component/singleChannelConfig.vue",
+          "symbol": "getAjax",
+          "why": "通道级保存（视频复核使能/编码参数/通道名）逐通道下发，超限或失败时报错但通道已落的场景在此",
+          "source": "codegraph"
+        },
+        {
+          "repoPath": ".",
+          "path": "src/view/device/ipc/otap.js",
+          "symbol": "addVideoChannel",
+          "why": "AddVideoChannel 协议封装，添加无提示/退出后通道已存在的差异在此请求边界",
+          "source": "codegraph"
+        }
+      ],
+      "confidence": "medium",
+      "gap": null
+    },
+    {
+      "defectId": "BGCM2026103009158",
+      "clusterId": "PJ14PD20260423284::_unmoduled::网络设备管理::config::IPC",
+      "title": "[网络设备管理] 设置IPC通道的分辨率为640*480，保存会提示操作失败",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/view/device/ipc/pc/component/singleChannelConfig.vue",
+          "symbol": "getAjax",
+          "why": "子码流分辨率随 setVideoCodingParams 下发；分辨率值/码流对象组装错误直接表现为保存提示失败",
+          "source": "codegraph"
+        },
+        {
+          "repoPath": ".",
+          "path": "src/view/device/ipc/mobile/videoParameter.vue",
+          "symbol": "submit",
+          "why": "移动端同一组码流参数保存路径（若缺陷在手机调测端）",
+          "source": "codegraph"
+        }
+      ],
+      "confidence": "medium",
+      "gap": null
+    },
+    {
+      "defectId": "BGCM2026103009324",
+      "clusterId": "PJ14PD20260423284::_unmoduled::网络设备管理::config::IPC",
+      "title": "[网络设备管理] 设置IPC通道的分辨率为640*360，保存会提示操作失败，但是实际配置成功了",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/view/device/ipc/pc/component/singleChannelConfig.vue",
+          "symbol": "submit",
+          "why": "Promise.all 中任一请求 reject 即整体提示失败，但其它请求已生效——与“报失败但实际配置成功”完全对应",
+          "source": "codegraph"
+        },
+        {
+          "repoPath": ".",
+          "path": "src/view/device/ipc/mobile/videoParameter.vue",
+          "symbol": "submit",
+          "why": "移动端同类并行下发（setEventRecord + setVideoCodingParams + modifyVideoChannel）",
+          "source": "codegraph"
+        }
+      ],
+      "confidence": "medium",
+      "gap": null
+    },
+    {
+      "defectId": "BGCM2026103009932",
+      "clusterId": "PJ14PD20260423284::_unmoduled::CRA安全认证（设备需求）::config",
+      "title": "[CRA安全认证（设备需求）] portal端门磁配置为延时防区，使能input后保存，一直在加载中，无法保存成功，最终停留在原页面（15点51）",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/view/device/zone/pc/zoneSet.vue",
+          "symbol": "save",
+          "why": "防区保存：Loading.service 打开后在 setZoneInfo/校验分支外未 close 即会一直转圈；延时防区 + input 使能正是该表单组合",
+          "source": "codegraph"
+        },
+        {
+          "repoPath": ".",
+          "path": "src/view/device/zone/mixin.js",
+          "symbol": "saveDetectorInputInfo",
+          "why": "input 使能参数下发（inputList/customParam），保存链路中 input 相关的协议组装点",
+          "source": "codegraph"
+        }
+      ],
+      "confidence": "medium",
+      "gap": null
+    },
+    {
+      "defectId": "BGCM2026110300788",
+      "clusterId": null,
+      "title": "[网络设备管理] 主机添加几个IPC和NVR，生成16个IPC防区，勾选所有子设备进行删除，删除异常",
+      "candidates": [
+        {
+          "repoPath": ".",
+          "path": "src/view/device/index/pc/deviceView.vue",
+          "symbol": "pollingDelChildDev",
+          "why": "批量删除按 iMaxDelDevNum 分批轮询；中途失败即中止且不回滚已删批次，导致一处列表空、另一处仍显示",
+          "source": "codegraph"
+        },
+        {
+          "repoPath": ".",
+          "path": "src/view/device/index/pc/component/deviceContainer.vue",
+          "symbol": null,
+          "why": "设备树容器：删除后子设备/防区节点的勾选与树状态刷新点",
+          "source": "codegraph"
+        }
+      ],
+      "confidence": "medium",
+      "gap": null
+    }
+  ]
+}
