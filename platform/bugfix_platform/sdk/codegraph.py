@@ -1,12 +1,20 @@
 """Agent-2 CodeGraph ensure + MCP mount (@colbymchenry/codegraph).
 
-默认：目标仓有 ``.codegraph/`` 就用；没有就 ``codegraph init -y`` 建本地索引；
+默认：目标仓有 ``.codegraph/`` 就用；没有就 ``codegraph init`` 建本地索引；
 SDK 会话挂 ``codegraph serve --mcp``。可用 ``BUGFIX_CODEGRAPH=0`` 关掉。
+
+CLI 版本差异必须自己处理，不能让用户去读报错：
+
+- ``init -y``（非交互）**1.6.0 才加**；老版本直接 ``error: unknown option '-y'``
+- 0.9.6 的 ``init`` 默认不建索引，要补 ``-i``；0.9.9+ 起默认就建（``-i`` 变已废弃）
+
+所以先探版本、按版本选参数；版本太旧就自己升（``BUGFIX_CODEGRAPH_AUTO_UPGRADE=0`` 可关）。
 """
 
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -32,6 +40,11 @@ CODEGRAPH_MCP_TOOLS = (
 
 _DB_NAME = "codegraph.db"
 _INDEX_DIR = ".codegraph"
+_PACKAGE = "@colbymchenry/codegraph"
+# ``init -y`` 从 1.6.0 开始存在；低于它的版本会拒绝这个参数。
+MIN_CODEGRAPH_VERSION = (1, 6, 0)
+# 0.9.9 起 ``init`` 默认建索引，之前要显式 ``-i``。
+DEFAULT_INDEX_SINCE = (0, 9, 9)
 
 
 @dataclass
@@ -44,6 +57,7 @@ class CodeGraphStatus:
     initialized: list[str] = field(default_factory=list)
     """本次新跑 ``init`` 的路径。"""
     bin: Optional[str] = None
+    version: Optional[str] = None
     detail: Optional[str] = None
     disabled: bool = False
 
@@ -70,6 +84,92 @@ def codegraph_enabled() -> bool:
 def codegraph_auto_init() -> bool:
     raw = (os.environ.get("BUGFIX_CODEGRAPH_INIT") or "1").strip().lower()
     return raw not in ("0", "false", "no", "off", "disable", "disabled")
+
+
+def codegraph_auto_upgrade() -> bool:
+    raw = (os.environ.get("BUGFIX_CODEGRAPH_AUTO_UPGRADE") or "1").strip().lower()
+    return raw not in ("0", "false", "no", "off", "disable", "disabled")
+
+
+def parse_version(raw: str | None) -> tuple[int, ...]:
+    """``codegraph 0.9.6`` / ``0.9.6`` → ``(0, 9, 6)``；认不出返回 ``()``。"""
+    found = re.findall(r"\d+", str(raw or ""))
+    if not found:
+        return ()
+    return tuple(int(x) for x in found[:3])
+
+
+def probe_codegraph_version(bin_path: str, timeout_sec: int = 20) -> Optional[str]:
+    """跑 ``codegraph --version``；拿不到就 ``None``（策略上按最保守处理）。"""
+    try:
+        proc = subprocess.run(
+            [bin_path, "--version"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout_sec,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return None
+    text = ((proc.stdout or "") + " " + (proc.stderr or "")).strip()
+    match = re.search(r"\d+\.\d+(?:\.\d+)?", text)
+    return match.group(0) if match else None
+
+
+def init_args_for_version(version: str | None) -> list[str]:
+    """按 CLI 版本挑 ``init`` 参数——不知道版本时给最保守的（不传未知开关）。"""
+    parsed = parse_version(version)
+    if parsed and parsed >= MIN_CODEGRAPH_VERSION:
+        return ["init", "-y"]  # 非交互：吞掉嵌套仓 / watch 两个提问，否则子进程无 TTY 会挂
+    if parsed and parsed < DEFAULT_INDEX_SINCE:
+        return ["init", "-i"]  # 0.9.6：init 建目录但不建索引
+    return ["init"]
+
+
+def _npm_cmd(argv: Sequence[str]) -> list[str]:
+    """Windows 的 npm 是 ``npm.CMD``，不能直接 CreateProcess，要过 cmd /c。"""
+    npm = shutil.which("npm")
+    if not npm:
+        return []
+    if os.name == "nt" and npm.lower().endswith((".cmd", ".bat")):
+        return [os.environ.get("COMSPEC", "cmd.exe"), "/c", npm, *argv]
+    return [npm, *argv]
+
+
+def upgrade_codegraph(timeout_sec: int = 300) -> tuple[bool, str]:
+    """``npm i -g @colbymchenry/codegraph@latest``；返回 (成功, 说明)。"""
+    argv = _npm_cmd(["install", "-g", f"{_PACKAGE}@latest"])
+    if not argv:
+        return False, "npm not found on PATH"
+    try:
+        proc = subprocess.run(
+            argv,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout_sec,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return False, f"npm install timed out after {timeout_sec}s"
+    except OSError as err:
+        return False, f"npm install failed: {err}"
+    if proc.returncode != 0:
+        return False, _npm_error_line(proc.stderr or proc.stdout or "", proc.returncode)[:300]
+    return True, "npm install ok"
+
+
+def _npm_error_line(text: str, returncode: int) -> str:
+    """从 npm 输出里挑一行真正说明原因的（尾部往往是 "see the log"）。"""
+    lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
+    for marker in ("npm error", "npm ERR!", "EPERM", "EACCES", "ENOTFOUND"):
+        for ln in lines:
+            if marker in ln:
+                return ln
+    return lines[-1] if lines else f"npm exit {returncode}"
 
 
 def resolve_codegraph_bin() -> Optional[str]:
@@ -137,17 +237,47 @@ def init_codegraph(
     *,
     bin_path: str,
     timeout_sec: int = 600,
+    version: str | None = None,
 ) -> tuple[bool, str]:
-    """``codegraph init -y <root>``；成功或已有索引返回 True。"""
+    """``codegraph init``；成功或已有索引返回 True。
+
+    参数按 CLI 版本选（:func:`init_args_for_version`）：``-y`` 只有 1.6.0+ 认，
+    0.9.6 要 ``-i`` 才会建索引。版本未知时先不带开关，失败消息里若报
+    ``unknown option`` 再退一层重试，不把用户的版本差异变成硬错误。
+    """
     path = Path(root).resolve()
     if has_codegraph_index(path):
         return True, "already indexed"
+    tried = init_args_for_version(version)
+    ok, msg = _run_init(path, bin_path=bin_path, argv=tried, timeout_sec=timeout_sec)
+    if ok or not _rejected_option(msg):
+        return ok, msg
+    # 版本探不到 / 比预期新：退到最保守的 ``init``，再不行补 ``-i``（老版建索引）。
+    for fallback in (["init"], ["init", "-i"]):
+        if fallback == tried:
+            continue
+        ok, msg = _run_init(path, bin_path=bin_path, argv=fallback, timeout_sec=timeout_sec)
+        if ok or not _rejected_option(msg):
+            return ok, msg
+    return False, msg
+
+
+def _rejected_option(msg: str) -> bool:
+    low = (msg or "").lower()
+    return "unknown option" in low or "unknown argument" in low
+
+
+def _run_init(
+    path: Path, *, bin_path: str, argv: list[str], timeout_sec: int
+) -> tuple[bool, str]:
     try:
         proc = subprocess.run(
-            [bin_path, "init", "-y", str(path)],
+            [bin_path, *argv, str(path)],
             cwd=str(path),
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout_sec,
             env={
                 **os.environ,
@@ -158,9 +288,9 @@ def init_codegraph(
     except FileNotFoundError:
         return False, f"codegraph binary not found: {bin_path}"
     except subprocess.TimeoutExpired:
-        return False, f"codegraph init timed out after {timeout_sec}s"
+        return False, f"codegraph {' '.join(argv)} timed out after {timeout_sec}s"
     except OSError as err:
-        return False, f"codegraph init failed: {err}"
+        return False, f"codegraph {' '.join(argv)} failed: {err}"
     if has_codegraph_index(path):
         return True, (proc.stdout or proc.stderr or "init ok").strip()[:300]
     err = (proc.stderr or proc.stdout or f"exit {proc.returncode}").strip()[:300]
@@ -177,7 +307,8 @@ def ensure_codegraph(
 
     - ``BUGFIX_CODEGRAPH=0`` → disabled
     - 已有 ``.codegraph/codegraph.db`` → ready
-    - 否则若允许 init 且找到 ``codegraph`` 二进制 → ``init -y``
+    - CLI 版本低于 :data:`MIN_CODEGRAPH_VERSION` 且允许 → 自动 ``npm i -g``（同一个 bin 路径）
+    - 否则若允许 init 且找到 ``codegraph`` 二进制 → 按版本选参数的 ``init``
     - 找不到二进制 → ready=False（仍可 Grep 降级）
     """
     if not codegraph_enabled():
@@ -189,6 +320,21 @@ def ensure_codegraph(
     ready_roots: list[str] = []
     initialized: list[str] = []
     notes: list[str] = []
+    version = probe_codegraph_version(bin_path) if bin_path else None
+
+    if bin_path and _needs_upgrade(version) and do_init:
+        if not codegraph_auto_upgrade():
+            notes.append(
+                f"codegraph {version} < {_ver(MIN_CODEGRAPH_VERSION)} and "
+                "BUGFIX_CODEGRAPH_AUTO_UPGRADE off; using legacy init flags"
+            )
+        else:
+            ok, msg = upgrade_codegraph()
+            notes.append(f"upgrade {version or 'unknown'} -> latest: {msg}")
+            if ok:
+                version = probe_codegraph_version(bin_path) or version
+                if _needs_upgrade(version):
+                    notes.append(f"still {version} after upgrade; using legacy init flags")
 
     for path in roots:
         if has_codegraph_index(path):
@@ -200,7 +346,7 @@ def ensure_codegraph(
         if not bin_path:
             notes.append("codegraph binary not on PATH; set BUGFIX_CODEGRAPH_BIN or install @colbymchenry/codegraph")
             break
-        ok, msg = init_codegraph(path, bin_path=bin_path)
+        ok, msg = init_codegraph(path, bin_path=bin_path, version=version)
         if ok:
             ready_roots.append(str(path))
             initialized.append(str(path))
@@ -220,5 +366,16 @@ def ensure_codegraph(
         roots=ready_roots,
         initialized=initialized,
         bin=bin_path if ready else bin_path,
+        version=version,
         detail=detail,
     )
+
+
+def _ver(parsed: tuple[int, ...]) -> str:
+    return ".".join(str(x) for x in parsed) or "?"
+
+
+def _needs_upgrade(version: str | None) -> bool:
+    """版本未知也算需要（宁可升一次，也不要拿未知开关去试）。"""
+    parsed = parse_version(version)
+    return not parsed or parsed < MIN_CODEGRAPH_VERSION

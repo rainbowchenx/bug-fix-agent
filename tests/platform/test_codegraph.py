@@ -73,3 +73,126 @@ def test_init_creates_index(tmp_path: Path):
 def test_status_mcp_empty_when_not_ready():
     st = CodeGraphStatus(ready=False, bin="/tmp/codegraph")
     assert st.mcp_servers("/tmp/proj") == {}
+
+
+# ---------------------------------------------------------------------------
+# CLI 版本差异：`-y` 只有 1.6.0+ 认；0.9.6 的 init 要 `-i` 才建索引。
+# 老代码无条件 `init -y`，任何 0.9.x/1.5.x 机器上都直接
+# `error: unknown option '-y'`，然后静默退回纯 grep。
+# ---------------------------------------------------------------------------
+
+
+def test_init_args_follow_cli_version():
+    from bugfix_platform.sdk.codegraph import init_args_for_version
+
+    assert init_args_for_version("0.9.6") == ["init", "-i"]  # 老版不建索引
+    assert init_args_for_version("0.9.9") == ["init"]  # 起默认建索引
+    assert init_args_for_version("1.5.0") == ["init"]  # 还不认识 -y
+    assert init_args_for_version("1.6.0") == ["init", "-y"]
+    assert init_args_for_version("1.6.2") == ["init", "-y"]
+    assert init_args_for_version(None) == ["init"]  # 不知道版本就别塞开关
+
+
+def test_parse_version_tolerates_noise():
+    from bugfix_platform.sdk.codegraph import parse_version
+
+    assert parse_version("0.9.6") == (0, 9, 6)
+    assert parse_version("codegraph 1.6.2\n") == (1, 6, 2)
+    assert parse_version("") == ()
+    assert parse_version(None) == ()
+    assert parse_version("v1.6") == (1, 6)
+
+
+def test_needs_upgrade(monkeypatch):
+    from bugfix_platform.sdk.codegraph import _needs_upgrade
+
+    assert _needs_upgrade("0.9.6") is True
+    assert _needs_upgrade("1.5.0") is True
+    assert _needs_upgrade("1.6.0") is False
+    assert _needs_upgrade("1.6.2") is False
+    assert _needs_upgrade(None) is True  # 探不到版本也要升
+
+
+def test_init_retries_without_rejected_flag(tmp_path: Path, monkeypatch):
+    """版本探不到、`-y` 被拒时退到 `init`，而不是把差异变成硬错误。"""
+    from bugfix_platform.sdk import codegraph as cg
+
+    calls: list[list[str]] = []
+
+    def fake_run_init(path, *, bin_path, argv, timeout_sec):
+        calls.append(argv)
+        if "-y" in argv:
+            return False, "error: unknown option '-y'"
+        return True, "init ok"
+
+    monkeypatch.setattr(cg, "_run_init", fake_run_init)
+    ok, msg = cg.init_codegraph(tmp_path, bin_path="codegraph", version=None)
+    assert ok is True
+    assert calls[0] == ["init"]
+    assert all(c == ["init"] or "-y" not in c for c in calls)
+
+
+def test_npm_error_line_picks_the_real_reason():
+    from bugfix_platform.sdk.codegraph import _npm_error_line
+
+    out = (
+        "npm warn cleanup Failed to remove some directories\n"
+        "npm error code EPERM\n"
+        "npm error syscall unlink\n"
+        "npm error A complete log of this run can be found in: /x/_logs/y.log\n"
+    )
+    line = _npm_error_line(out, 1)
+    assert "EPERM" in line or "npm error" in line
+    assert "complete log" not in line  # 别把“去看日志”当原因报出来
+    assert _npm_error_line("", 7) == "npm exit 7"
+
+
+def test_ensure_upgrades_old_cli_before_init(tmp_path: Path, monkeypatch):
+    """0.9.6 → 自动 npm 升级 → 重新探版本 → init 带 -y。"""
+    from bugfix_platform.sdk import codegraph as cg
+
+    seen: dict[str, object] = {"versions": ["0.9.6", "1.6.2"], "init": []}
+
+    def fake_probe(bin_path, timeout_sec=20):
+        return seen["versions"].pop(0) if seen["versions"] else "1.6.2"
+
+    def fake_upgrade(timeout_sec=300):
+        seen["upgraded"] = True
+        return True, "npm install ok"
+
+    def fake_init(path, *, bin_path, timeout_sec=600, version=None):
+        seen["init"].append(version)
+        return True, "init ok"
+
+    monkeypatch.setattr(cg, "probe_codegraph_version", fake_probe)
+    monkeypatch.setattr(cg, "upgrade_codegraph", fake_upgrade)
+    monkeypatch.setattr(cg, "init_codegraph", fake_init)
+    monkeypatch.setenv("BUGFIX_CODEGRAPH_BIN", "codegraph")
+    monkeypatch.delenv("BUGFIX_CODEGRAPH", raising=False)
+    monkeypatch.delenv("BUGFIX_CODEGRAPH_AUTO_UPGRADE", raising=False)
+
+    st = cg.ensure_codegraph(tmp_path)
+    assert seen.get("upgraded") is True
+    assert seen["init"] == ["1.6.2"]  # init 用的是升级后的版本
+    assert st.version == "1.6.2"
+    assert "upgrade 0.9.6" in (st.detail or "")
+    assert st.ready is True
+
+
+def test_ensure_skips_upgrade_when_disabled(tmp_path: Path, monkeypatch):
+    """关掉自动升级时仍能跑（用老版参数），但要在 detail 里说清楚。"""
+    from bugfix_platform.sdk import codegraph as cg
+
+    def boom(*a, **k):
+        raise AssertionError("must not upgrade when disabled")
+
+    monkeypatch.setattr(cg, "probe_codegraph_version", lambda *a, **k: "0.9.6")
+    monkeypatch.setattr(cg, "upgrade_codegraph", boom)
+    monkeypatch.setattr(cg, "init_codegraph", lambda *a, **k: (False, "nope"))
+    monkeypatch.setenv("BUGFIX_CODEGRAPH_BIN", "codegraph")
+    monkeypatch.setenv("BUGFIX_CODEGRAPH_AUTO_UPGRADE", "0")
+    monkeypatch.delenv("BUGFIX_CODEGRAPH", raising=False)
+
+    st = cg.ensure_codegraph(tmp_path)
+    assert st.ready is False
+    assert "AUTO_UPGRADE off" in (st.detail or "")
