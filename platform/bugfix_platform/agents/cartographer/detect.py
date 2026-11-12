@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -103,6 +104,40 @@ def _add_container_roots(root: Path, roots: list[RepoRoot]) -> None:
             known.add(child.name)
 
 
+_TS_SCAN_SKIP = {"node_modules", "dist", "build", "coverage", "vendor", "out", "target"}
+_TS_SCAN_LIMIT = 20_000
+
+
+def _has_typescript(dir_path: Path, files: list[str] | None = None) -> bool:
+    """仓里真有 TypeScript 才算：``tsconfig.json`` 或存在 ``.ts`` / ``.tsx`` 源文件。
+
+    旧实现只看 ``package.json`` 存在就断言 TS —— transport 与 peitao 的 ``.ts``
+    文件数是 **0**，产物里却写着 ``typescript``，下游据此给一个纯 JS/Vue 仓注入
+    TS 规则。判据必须是磁盘事实，不是"用了 npm"这个前提。
+
+    ``files``（可选）：调用方已有的仓相对文件表；给了就查表，不走盘。没给才自己
+    扫（有 ``_TS_SCAN_LIMIT`` 上限并剪掉依赖/产物目录）。
+    """
+    if (dir_path / "tsconfig.json").is_file():
+        return True
+    if files is not None:
+        return any(f.endswith((".ts", ".tsx")) for f in files)
+    seen = 0
+    for base, dirs, files in os.walk(dir_path):
+        dirs[:] = [
+            d
+            for d in dirs
+            if d not in _TS_SCAN_SKIP and not d.startswith(".")
+        ]
+        for name in files:
+            if name.endswith((".ts", ".tsx")):
+                return True
+            seen += 1
+            if seen >= _TS_SCAN_LIMIT:
+                return False
+    return False
+
+
 def _readable(path: Path) -> bool:
     try:
         next(path.iterdir(), None)
@@ -168,7 +203,13 @@ def _read_json(path: Path) -> dict | None:
 def detect_cartography_profile(
     work_dir: str | Path,
     repo_roots: list[RepoRoot],
+    files_by_root: dict[str, list[str]] | None = None,
 ) -> tuple[CartographyProfile, list[str], dict]:
+    """记录技术栈与线索；**不判型**（第一个返回值恒为 ``unknown``）。
+
+    ``files_by_root``（可选）：调用方已经为 match 建好的仓相对文件表。传进来的话
+    判 TypeScript 时直接查表，不再自己走一趟盘——慢盘上那是几秒的重复开销。
+    """
     frameworks: set[str] = set()
     languages: set[str] = set()
     hints: list[str] = []
@@ -180,7 +221,9 @@ def detect_cartography_profile(
         deps = _package_deps(pkg)
 
         if pkg:
-            languages.update({"typescript", "javascript"})
+            languages.add("javascript")
+        if _has_typescript(abs_path, (files_by_root or {}).get(rr.path)):
+            languages.add("typescript")
         if "electron" in deps:
             frameworks.add("electron")
             hints.append(f"{rr.path}:electron")
@@ -232,7 +275,7 @@ def detect_cartography_profile(
 
 def read_conventions(work_dir: str | Path, repo_roots: list[RepoRoot]) -> dict:
     root = Path(work_dir)
-    from_claude: list[str] = []
+    from_claude: list[str] = []  # 契约保留字段；不再填 CLAUDE.md 截取
     from_rules: list[str] = []
     bound_skills: list[str] = []
     entries: list[SpecEntry] = []
@@ -246,8 +289,8 @@ def read_conventions(work_dir: str | Path, repo_roots: list[RepoRoot]) -> dict:
             entries.append(SpecEntry(path=f"{rr.path}/CLAUDE.md".replace("./", ""), kind="guide", source="repo_root"))
             try:
                 text = claude.read_text(encoding="utf-8")
-                lines = [ln.strip() for ln in text.splitlines() if ln.strip()][:40]
-                from_claude.extend(re.sub(r"^#+\s*", "", ln)[:200] for ln in lines)
+                # 只取判据，不抄正文：产物里带 CLAUDE.md 截取就是 30 行标题+首句的噪声，
+                # 对定位零贡献。文件本身记在 specAtlas.entries 里，要读的人按路径读原文。
                 if re.search(r"codegraph|code.?graph", text, re.I):
                     code_graph = True
                 if re.search(r"superpowers", text, re.I):

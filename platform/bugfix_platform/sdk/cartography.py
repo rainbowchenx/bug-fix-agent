@@ -481,8 +481,6 @@ def _merge_enrichment(
     if isinstance(parsed.get("conventions"), dict):
         conv = dict(data.get("conventions") or {})
         incoming = parsed["conventions"]
-        if isinstance(incoming.get("fromClaudeMd"), list) and incoming["fromClaudeMd"]:
-            conv["fromClaudeMd"] = [str(x) for x in incoming["fromClaudeMd"]][:40]
         if isinstance(incoming.get("fromRules"), list) and incoming["fromRules"]:
             conv["fromRules"] = [str(x) for x in incoming["fromRules"]][:40]
         data["conventions"] = conv
@@ -621,7 +619,7 @@ How to work:
 Return one JSON object (optionally in a ```json fence) with any of:
 secondaryHints, techStack{languages,frameworks,notes},
 architecture{summary,entryPoints,modules[{id,path,role,shared,notes}]},
-conventions{fromClaudeMd,fromRules}, boundSkills,
+conventions{fromRules}, boundSkills,
 defectCodeMatches[{defectId,candidates[{repoPath,path,symbol,why,source}],confidence}],
 partial.
 Do not change cartographyProfile.

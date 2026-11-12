@@ -13,7 +13,7 @@
 | `secondaryHints[]` | string | 含 `enrich=<sdk\|heuristic\|sdk_fallback>; <原因>`，用来判断 Agent-2 到底调用没调用 LLM |
 | `techStack` | `{ languages[], frameworks[], notes }` | |
 | `architecture` | `{ summary, entryPoints[], modules[] }` | modules: `{ id, path?, role? }` |
-| `conventions` | `{ fromClaudeMd[], fromRules[] }` | |
+| `conventions` | `{ fromClaudeMd[], fromRules[] }` | `fromClaudeMd` 是保留字段，恒为空：CLAUDE.md 只用来判 `codeGraph` / `frameworkId`，正文截取不进产物（文件路径在 `specAtlas.entries`） |
 | `boundSkills[]` | string | 本次实际绑定的 cartography skill 名（仓内 / `.bugfix` / `--skills-dir` overlay 在前，包内置在后） |
 | `specAtlas` | framework + entries + drDs | `frameworkId` 封闭集或 `unknown` |
 | `capabilities` | `{ codeGraph, runtimeVerify }` | |

@@ -13,6 +13,7 @@ from bugfix_platform.agents.cartographer.detect import (
     read_conventions,
 )
 from bugfix_platform.agents.cartographer.match import (
+    _walk_files,
     filter_existing_candidates,
     match_tickets,
     ticket_variant,
@@ -75,7 +76,13 @@ def run_cartographer(
     profile: CartographyProfile = normalize_cartography_profile(cartography_profile)
     # 1) 扫描目标 workDir 结构（支持多根 monorepo）。
     repo_roots = discover_repo_roots(work_dir)
-    _ignored, hints, tech = detect_cartography_profile(work_dir, repo_roots)
+    # 文件表只建一次：detect（判 TS）与 match（打分）共用，慢盘上少走一趟盘。
+    files_by_root = {
+        rr.path: _walk_files(Path(work_dir) / rr.path) for rr in repo_roots
+    }
+    _ignored, hints, tech = detect_cartography_profile(
+        work_dir, repo_roots, files_by_root
+    )
     if profile != "unknown":
         hints = [f"caller:{profile}", *hints]
         tech = dict(tech)

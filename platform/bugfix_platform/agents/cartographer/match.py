@@ -541,6 +541,7 @@ def match_tickets(
     profile: CartographyProfile | None = None,
     architecture: Architecture | None = None,
     bindings: list[dict] | None = None,
+    files_by_root: dict[str, list[str]] | None = None,
 ) -> list[DefectCodeMatch]:
     """Soft-localize tickets by ranked path tokens (large-repo safe).
 
@@ -550,9 +551,10 @@ def match_tickets(
     keeps the top ``MAX_CANDIDATES``. File scan soft-cap defaults to 50k.
     """
     root = Path(work_dir)
-    files_by_root = {
-        rr.path: _walk_files(root / rr.path, max_files=max_files) for rr in repo_roots
-    }
+    if files_by_root is None:
+        files_by_root = {
+            rr.path: _walk_files(root / rr.path, max_files=max_files) for rr in repo_roots
+        }
     results: list[DefectCodeMatch] = []
     for t in tickets:
         toks = _tokens(t)

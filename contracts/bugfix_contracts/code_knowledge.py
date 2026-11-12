@@ -79,6 +79,8 @@ class Architecture(BaseModel):
 
 class Conventions(BaseModel):
     fromClaudeMd: list[str] = Field(default_factory=list)
+    """保留字段，**不再填充**：CLAUDE.md 的正文截取没有任何定位价值，文件本身记在
+    ``specAtlas.entries``。留着是为了旧产物还能通过校验。"""
     fromRules: list[str] = Field(default_factory=list)
 
 
