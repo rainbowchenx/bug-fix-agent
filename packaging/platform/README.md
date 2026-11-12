@@ -50,7 +50,7 @@ enrich=heuristic                       # 没凭据/显式 heuristic，不产生�
 
 `reason=max_turns` 说明回合用尽。触顶会尝试从会话文本 / 再问一轮 salvage 收 JSON；仍没有则**保留启发式 baseline**，`partial=true`，`source` 仍是 `sdk`（不是 `sdk_fallback`）。
 
-Agent-2 默认按**进 prompt 的弱票数**定预算：`max_turns = BASE + PER × n`（默认 `6 + 3×n`，n≤8）。`BUGFIX_CARTOGRAPHY_MAX_TURNS` 设成正整数则改为绝对上限；`0`/`unlimited` 不限制。
+Agent-2 默认把匹配池票都送进 enrich（启发式 medium 也过，标 `heuristicUnverified` 并降权），按**进 prompt 的票数**定预算：`max_turns = BASE + PER × n`（默认 `6 + 2×n`，n≤16）。`BUGFIX_CARTOGRAPHY_MAX_TURNS` 设成正整数则改为绝对上限；`0`/`unlimited` 不限制。
 
 `enrich=sdk_fallback` 只表示 LLM 没跑成：缺凭据 / 没装 `claude-agent-sdk` / 进程崩溃 / 成功结束但 JSON 不合契约。
 
