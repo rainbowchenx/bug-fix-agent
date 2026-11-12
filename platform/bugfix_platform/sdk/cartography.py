@@ -15,15 +15,17 @@ from bugfix_platform.sdk.skills import skills_system_addon
 
 CartographyMode = Literal["heuristic", "sdk"]
 
-# 提示词里带给模型的弱票上限。强匹配票不进 SDK prompt。
-MAX_PROMPT_TICKETS = 8
-MAX_WEAK_PROMPT_TICKETS = 8
+# 提示词里带给模型的匹配池票上限。启发式 medium 也会进（需 SDK 浅确认）。
+MAX_PROMPT_TICKETS = 16
+# 旧名：行为已改为全匹配池，不再表示「仅弱票」。
+MAX_WEAK_PROMPT_TICKETS = MAX_PROMPT_TICKETS
+_MATCH_POOL = frozenset({"strict", "locatable_only", "needs_info"})
 # 无票数上下文时的兜底（兼容旧调用）；正常路径按票数预算。
 DEFAULT_CARTOGRAPHY_MAX_TURNS = 24
-# 地图/playbook 开销 + 每张弱票配额。实测：盲目加总 turn 不涨覆盖率，
-# 覆盖率取决于进 prompt 的弱票；配额决定这些票能不能做完。
+# 地图/playbook 开销 + 每张进 prompt 票的浅配额。
+# 覆盖率取决于进 prompt 的票；配额故意偏浅（宁可全过一遍，也不单票深挖）。
 DEFAULT_CARTOGRAPHY_BASE_TURNS = 6
-DEFAULT_CARTOGRAPHY_TURNS_PER_TICKET = 3
+DEFAULT_CARTOGRAPHY_TURNS_PER_TICKET = 2
 # ``gap`` 是机器枚举（空候选的原因码），不是给模型写解释的地方。
 _ALLOWED_GAPS = frozenset(get_args(MatchGap))
 # 候选集完全相同的票达到这个数，说明打分并列、路径 token 没区分度（假 medium）。
@@ -66,9 +68,9 @@ def _env_positive_int(name: str, default: int) -> int:
         return default
 
 
-def cartography_turns_for_tickets(weak_ticket_count: int) -> int:
-    """``base + per_ticket * n`` — n is the weak-ticket count that enters the prompt."""
-    n = max(0, int(weak_ticket_count))
+def cartography_turns_for_tickets(ticket_count: int) -> int:
+    """``base + per_ticket * n`` — n is the match-pool count that enters the prompt."""
+    n = max(0, int(ticket_count))
     base = _env_positive_int(
         "BUGFIX_CARTOGRAPHY_BASE_TURNS", DEFAULT_CARTOGRAPHY_BASE_TURNS
     )
@@ -82,6 +84,7 @@ def resolve_cartography_max_turns(
     explicit: Optional[int] = None,
     *,
     weak_ticket_count: Optional[int] = None,
+    ticket_count: Optional[int] = None,
 ) -> Optional[int]:
     """Return SDK ``max_turns`` or ``None`` for unlimited.
 
@@ -89,7 +92,7 @@ def resolve_cartography_max_turns(
     - Request explicit ``<=0`` → unlimited
     - Env ``BUGFIX_CARTOGRAPHY_MAX_TURNS`` set to a positive int → absolute override
     - Env ``0`` / ``none`` / ``unlimited`` → unlimited
-    - Env empty + ``weak_ticket_count`` given → ``base + per_ticket * n``
+    - Env empty + ``ticket_count`` / ``weak_ticket_count`` → ``base + per_ticket * n``
     - Env empty + no ticket count → ``DEFAULT_CARTOGRAPHY_MAX_TURNS`` (compat)
     """
     if explicit is not None:
@@ -103,8 +106,9 @@ def resolve_cartography_max_turns(
         except ValueError:
             n = DEFAULT_CARTOGRAPHY_MAX_TURNS
         return None if n <= 0 else n
-    if weak_ticket_count is not None:
-        return cartography_turns_for_tickets(weak_ticket_count)
+    n = ticket_count if ticket_count is not None else weak_ticket_count
+    if n is not None:
+        return cartography_turns_for_tickets(n)
     return DEFAULT_CARTOGRAPHY_MAX_TURNS
 
 
@@ -300,7 +304,7 @@ def _sdk_keep_baseline(req: CartographyRequest, billing: str) -> CartographyResu
 
 
 def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
-    """Claude Agent SDK session: thicken architecture + weak path matches."""
+    """Claude Agent SDK session: thicken architecture + shallow-pass match-pool tickets."""
     if not has_credentials():
         fallback = heuristic_cartography(req)
         fallback.source = "sdk_fallback"
@@ -319,8 +323,8 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
         fallback.detail = f"claude-agent-sdk not installed ({err}); fell back to heuristic"
         return fallback
 
-    weak_pairs = select_weak_tickets(req)
-    prompt = _build_prompt(req, weak_pairs=weak_pairs)
+    prompt_pairs = select_prompt_tickets(req)
+    prompt = _build_prompt(req, prompt_pairs=prompt_pairs)
     model = req.model or os.environ.get("ANTHROPIC_MODEL") or None
     if req.injected_skills:
         system_prompt = _SYSTEM_PROMPT + cartography_skills_addon(req.injected_skills)
@@ -334,7 +338,7 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
             )
         )
     max_turns = resolve_cartography_max_turns(
-        req.max_turns, weak_ticket_count=len(weak_pairs)
+        req.max_turns, ticket_count=len(prompt_pairs)
     )
 
     def _make_options(*, resume: str | None = None, turns: Optional[int] = None) -> Any:
@@ -698,8 +702,9 @@ def profile_reading_playbook(profile: str | None) -> str:
 
 
 _SYSTEM_PROMPT = """You are Agent-2 Code Cartographer for an automated bugfix pipeline.
-Your job is to thicken the architecture map and improve WEAK/EMPTY path matches.
-Agent-3 follows imports and names the fix locus. You do not.
+Your job is to thicken the architecture map and SHALLOW-PASS every listed match-pool
+ticket (confirm or replace heuristic candidates). Agent-3 follows imports and names
+the fix locus. You do not.
 
 Tools: Read, Glob, Grep, and Bash. Bash is for READ-ONLY exploration only
 (e.g. rg/find/git log|blame|grep|show, ls, cat/head/sed -n). NEVER mutate the repo:
@@ -712,11 +717,13 @@ How to work:
    Overlay skills have HIGHEST PRIORITY over package SOP on read order, layout, aliases.
 2) Thicken architecture (entryPoints, route/business modules, runtime shape).
    Read catalog files; do not walk the whole repo.
-3) Improve ONLY the weak/empty tickets listed in the user prompt. Cap 3 real paths
-   per ticket; 0 is valid — do not pad. Empty is better than sibling stubs
-   (mixin.js / isapi.js with no logic). candidate.why = why the path resembles
-   the title/module — not a root cause, not a call-flow.
-   Do not follow imports/callers per ticket.
+3) Cover EVERY ticket in matchPoolTickets — shallow, not deep. Cap 3 real paths
+   per ticket; 0 is valid — do not pad. Empty is better than a wrong path or
+   sibling stubs (mixin.js / isapi.js with no logic).
+   Heuristic medium/high candidates are UNVERIFIED path-token hits: confirm with
+   a quick Grep/Read, replace if wrong, or clear them. Do not copy them blindly.
+   candidate.why = why the path resembles the title/module — not a root cause,
+   not a call-flow. Do not follow imports/callers per ticket.
    Route tables, shells, hosts and entryPoints are not fix loci. If the ticket
    names web/PC, do not return /mobile/ or /h5/ exclusive files.
 4) Leave a turn to emit JSON. Incomplete is OK; set partial=true.
@@ -760,40 +767,58 @@ def _shared_signatures(matches: list[Any]) -> set[tuple[str, ...]]:
     return {sig for sig, n in counts.items() if n >= SHARED_SIGNATURE_MIN_TICKETS}
 
 
-def select_weak_tickets(
+def select_prompt_tickets(
     req: CartographyRequest,
 ) -> list[tuple[Any, Any]]:
-    """弱票选取：真弱优先，并列假 medium 填剩余名额；最多 ``MAX_WEAK_PROMPT_TICKETS``。
+    """匹配池票选取：空/弱 → 并列假 medium → 其余启发式 medium；最多 ``MAX_PROMPT_TICKETS``。
 
-    返回 ``[(ticket, match), ...]``，与进 prompt / turn 预算共用，避免两处各算一遍。
+    启发式「强」命中也进 prompt（需浅确认）；名额不够时弱票优先。
+    返回 ``[(ticket, match), ...]``，与进 prompt / turn 预算共用。
     """
     entries = list(req.baseline.architecture.entryPoints)
     by_id = {m.defectId: m for m in req.baseline.defectCodeMatches}
     shared = _shared_signatures(req.baseline.defectCodeMatches)
     genuine: list[tuple[Any, Any]] = []
     ambiguous: list[tuple[Any, Any]] = []
+    heuristic_hits: list[tuple[Any, Any]] = []
     for t in req.defect_batch.tickets:
-        if t.pool not in ("strict", "locatable_only", "needs_info"):
+        if t.pool not in _MATCH_POOL:
             continue
         match = by_id.get(t.defectId)
-        if match is not None and is_weak_match(match, entries):
+        if match is None or is_weak_match(match, entries):
             genuine.append((t, match))
-        elif match is not None and _candidate_signature(match) in shared:
+        elif _candidate_signature(match) in shared:
             ambiguous.append((t, match))
-    return (genuine + ambiguous)[:MAX_WEAK_PROMPT_TICKETS]
+        else:
+            heuristic_hits.append((t, match))
+    return (genuine + ambiguous + heuristic_hits)[:MAX_PROMPT_TICKETS]
+
+
+def select_weak_tickets(req: CartographyRequest) -> list[tuple[Any, Any]]:
+    """兼容旧名；等同 :func:`select_prompt_tickets`。"""
+    return select_prompt_tickets(req)
 
 
 def _build_prompt(
     req: CartographyRequest,
     *,
+    prompt_pairs: list[tuple[Any, Any]] | None = None,
     weak_pairs: list[tuple[Any, Any]] | None = None,
 ) -> str:
-    pairs = weak_pairs if weak_pairs is not None else select_weak_tickets(req)
-    weak_tickets = []
-    weak_matches = []
+    pairs = (
+        prompt_pairs
+        if prompt_pairs is not None
+        else weak_pairs
+        if weak_pairs is not None
+        else select_prompt_tickets(req)
+    )
+    entries = list(req.baseline.architecture.entryPoints)
+    pool_tickets = []
+    pool_matches = []
     for t, match in pairs:
         rationale = (t.intentRationale or "").strip()
-        weak_tickets.append(
+        unverified = match is not None and not is_weak_match(match, entries)
+        pool_tickets.append(
             {
                 "defectId": t.defectId,
                 "title": t.title,
@@ -802,13 +827,18 @@ def _build_prompt(
                 "titleTag": t.titleTag,
                 "intent": t.intent,
                 "intentRationale": rationale[:400] or None,
+                # 启发式 medium 路径命中 ≠ 可信定位；提示模型必须确认或清空。
+                "heuristicUnverified": unverified,
             }
         )
         if match is not None:
             payload = match.model_dump()
             # ``gap`` 是机器枚举；作为示例给出去，模型会把它当自由文本填回来。
             payload.pop("gap", None)
-            weak_matches.append(payload)
+            if unverified and payload.get("confidence") in ("medium", "high"):
+                # 进 prompt 时降权，避免模型把 baseline medium 当真理照抄。
+                payload["confidence"] = "low"
+            pool_matches.append(payload)
     budget = cartography_turns_for_tickets(len(pairs))
     baseline = {
         "cartographyProfile": req.baseline.cartographyProfile,
@@ -817,15 +847,17 @@ def _build_prompt(
         "architecture": req.baseline.architecture.model_dump(),
         "conventions": req.baseline.conventions.model_dump(),
         "boundSkills": req.baseline.boundSkills,
-        "defectCodeMatches": weak_matches,
+        "defectCodeMatches": pool_matches,
         "partial": req.baseline.partial,
     }
     playbook = profile_reading_playbook(req.baseline.cartographyProfile)
     return (
-        "Thicken architecture from the playbook, then improve ONLY the listed weak "
-        "tickets' path candidates (max 3 each; 0 is valid, do not pad). "
-        "Catalog files are not loci. Do not follow imports or name a fix "
-        "locus. Return the JSON enrich object before you run out of turns.\n\n"
+        "Thicken architecture from the playbook, then shallow-pass EVERY listed "
+        "match-pool ticket (max 3 paths each; 0 is valid, do not pad). "
+        "heuristicUnverified=true means baseline candidates are untrusted — "
+        "confirm, replace, or clear. Catalog files are not loci. Do not follow "
+        "imports or name a fix locus. Return the JSON enrich object before you "
+        "run out of turns.\n\n"
         f"productLine: {req.defect_batch.productLine}\n"
         f"workDir: {req.work_dir}\n"
         f"cartographyProfile: {req.baseline.cartographyProfile} (caller-supplied; do not change)\n"
@@ -833,8 +865,8 @@ def _build_prompt(
         f"turnBudget: {budget} "
         f"(base={_env_positive_int('BUGFIX_CARTOGRAPHY_BASE_TURNS', DEFAULT_CARTOGRAPHY_BASE_TURNS)}"
         f" + perTicket={_env_positive_int('BUGFIX_CARTOGRAPHY_TURNS_PER_TICKET', DEFAULT_CARTOGRAPHY_TURNS_PER_TICKET)}"
-        f" × weakTickets={len(pairs)})\n"
+        f" × promptTickets={len(pairs)})\n"
         f"injectedSkills: {json.dumps([s.name for s in req.injected_skills], ensure_ascii=False)}\n"
-        f"matchPoolTickets: {json.dumps(weak_tickets, ensure_ascii=False)}\n"
+        f"matchPoolTickets: {json.dumps(pool_tickets, ensure_ascii=False)}\n"
         f"baseline: {json.dumps(baseline, ensure_ascii=False)}\n"
     )

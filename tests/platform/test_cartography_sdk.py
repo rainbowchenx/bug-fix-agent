@@ -9,6 +9,7 @@ from bugfix_platform.sdk.cartography import (
     DEFAULT_CARTOGRAPHY_MAX_TURNS,
     DEFAULT_CARTOGRAPHY_TURNS_PER_TICKET,
     DISALLOWED_TOOLS,
+    MAX_PROMPT_TICKETS,
     MAX_WEAK_PROMPT_TICKETS,
     CartographyRequest,
     CartographyResult,
@@ -20,6 +21,7 @@ from bugfix_platform.sdk.cartography import (
     heuristic_cartography,
     is_weak_match,
     resolve_cartography_max_turns,
+    select_prompt_tickets,
 )
 from bugfix_platform.workflow import run_three_agent_workflow
 
@@ -204,19 +206,20 @@ def test_resolve_cartography_max_turns_defaults_to_24(monkeypatch):
     assert resolve_cartography_max_turns(0) is None
 
 
-def test_cartography_turns_scale_with_weak_ticket_count(monkeypatch):
+def test_cartography_turns_scale_with_ticket_count(monkeypatch):
     monkeypatch.delenv("BUGFIX_CARTOGRAPHY_MAX_TURNS", raising=False)
     monkeypatch.delenv("BUGFIX_CARTOGRAPHY_BASE_TURNS", raising=False)
     monkeypatch.delenv("BUGFIX_CARTOGRAPHY_TURNS_PER_TICKET", raising=False)
     assert DEFAULT_CARTOGRAPHY_BASE_TURNS == 6
-    assert DEFAULT_CARTOGRAPHY_TURNS_PER_TICKET == 3
+    assert DEFAULT_CARTOGRAPHY_TURNS_PER_TICKET == 2
     assert cartography_turns_for_tickets(0) == 6
-    assert cartography_turns_for_tickets(1) == 9
-    assert cartography_turns_for_tickets(8) == 30
-    assert resolve_cartography_max_turns(weak_ticket_count=8) == 30
+    assert cartography_turns_for_tickets(1) == 8
+    assert cartography_turns_for_tickets(8) == 22
+    assert resolve_cartography_max_turns(ticket_count=8) == 22
+    assert resolve_cartography_max_turns(weak_ticket_count=8) == 22  # alias
     # Absolute env still wins over ticket budget.
     monkeypatch.setenv("BUGFIX_CARTOGRAPHY_MAX_TURNS", "40")
-    assert resolve_cartography_max_turns(weak_ticket_count=8) == 40
+    assert resolve_cartography_max_turns(ticket_count=8) == 40
     monkeypatch.delenv("BUGFIX_CARTOGRAPHY_MAX_TURNS", raising=False)
     monkeypatch.setenv("BUGFIX_CARTOGRAPHY_BASE_TURNS", "4")
     monkeypatch.setenv("BUGFIX_CARTOGRAPHY_TURNS_PER_TICKET", "5")
@@ -236,7 +239,8 @@ def test_system_prompt_forbids_per_ticket_call_flow():
     assert "For EACH match-pool ticket" not in _SYSTEM_PROMPT
     assert "likely fix locus" not in _SYSTEM_PROMPT
     assert "Do not follow imports/callers per ticket" in _SYSTEM_PROMPT
-    assert "weak" in _SYSTEM_PROMPT.lower() or "empty" in _SYSTEM_PROMPT.lower()
+    assert "shallow" in _SYSTEM_PROMPT.lower()
+    assert "unverified" in _SYSTEM_PROMPT.lower()
     assert "0 is valid" in _SYSTEM_PROMPT.lower() or "do not pad" in _SYSTEM_PROMPT.lower()
     assert "not fix loci" in _SYSTEM_PROMPT.lower() or "catalog" in _SYSTEM_PROMPT.lower()
 
@@ -314,10 +318,12 @@ def test_is_weak_match_includes_entry_only_false_medium():
     assert is_weak_match(strong, entries) is False
     assert is_weak_match(empty, entries) is True
     assert is_weak_match(fake, entries) is True
-    assert MAX_WEAK_PROMPT_TICKETS == 8
+    assert MAX_PROMPT_TICKETS == 16
+    assert MAX_WEAK_PROMPT_TICKETS == MAX_PROMPT_TICKETS
 
 
-def test_prompt_only_includes_weak_tickets(tmp_path: Path):
+def test_prompt_includes_heuristic_medium_tickets(tmp_path: Path):
+    """启发式 medium 也要进 prompt（降权 + heuristicUnverified），不能跳过。"""
     tickets = []
     matches = []
     for i in range(12):
@@ -374,11 +380,73 @@ def test_prompt_only_includes_weak_tickets(tmp_path: Path):
         baseline=_knowledge_with_matches(tmp_path, matches),
     )
     prompt = _build_prompt(req)
-    assert "STRONG" not in prompt
+    assert '"defectId": "STRONG"' in prompt
+    assert "heuristicUnverified" in prompt
+    assert '"heuristicUnverified": true' in prompt
+    # 进 prompt 时把 baseline medium 降成 low，避免模型照抄。
+    assert '"defectId": "STRONG"' in prompt and '"confidence": "low"' in prompt
     assert '"defectId": "W7"' in prompt
-    assert '"defectId": "W8"' not in prompt
+    assert '"defectId": "W11"' in prompt  # 12 弱 + 1 强 ≤ 16，全进
     assert "OSD 拖动后消失" in prompt
-    assert "do not pad" in prompt.lower() or "0 is valid" in prompt.lower()
+    assert "shallow-pass" in prompt.lower() or "do not pad" in prompt.lower()
+
+
+def test_prompt_caps_at_max_and_prefers_weak(tmp_path: Path):
+    tickets = []
+    matches = []
+    for i in range(MAX_PROMPT_TICKETS + 4):
+        tickets.append(
+            {
+                "defectId": f"H{i}",
+                "title": f"hit {i}",
+                "pool": "strict",
+                "expectQuality": "explicit",
+            }
+        )
+        matches.append(
+            {
+                "defectId": f"H{i}",
+                "candidates": [
+                    {
+                        "path": f"src/mod{i}.vue",
+                        "why": "basename",
+                        "source": "grep",
+                    }
+                ],
+                "confidence": "medium",
+            }
+        )
+    tickets.append(
+        {
+            "defectId": "EMPTY",
+            "title": "empty last",
+            "pool": "strict",
+            "expectQuality": "explicit",
+        }
+    )
+    matches.append({"defectId": "EMPTY", "candidates": [], "confidence": "low"})
+    batch = DefectBatch.model_validate(
+        {
+            "schemaVersion": "0.1.0",
+            "productLine": "hc",
+            "posture": "alpha",
+            "generatedAt": "2026-01-01T00:00:00Z",
+            "funnel": {"total": len(tickets), "strict": len(tickets)},
+            "clusters": [],
+            "tickets": tickets,
+        }
+    )
+    req = CartographyRequest(
+        work_dir=str(tmp_path),
+        defect_batch=batch,
+        baseline=_knowledge_with_matches(tmp_path, matches),
+    )
+    pairs = select_prompt_tickets(req)
+    assert len(pairs) == MAX_PROMPT_TICKETS
+    assert pairs[0][0].defectId == "EMPTY"
+    prompt = _build_prompt(req, prompt_pairs=pairs)
+    assert '"defectId": "EMPTY"' in prompt
+    assert f'"defectId": "H{MAX_PROMPT_TICKETS + 3}"' not in prompt
 
 
 def test_merge_falls_back_to_baseline_when_sdk_candidates_all_drop(tmp_path: Path):
@@ -752,7 +820,8 @@ def test_prompt_gives_genuinely_weak_tickets_priority(tmp_path: Path):
     """并列候选票不能把空候选那张挤出名额（led 轮 2981 被挤掉）。"""
     tickets = []
     matches = []
-    for i in range(9):
+    # 超过上限：真弱仍应优先占第一席。
+    for i in range(MAX_PROMPT_TICKETS + 2):
         tickets.append(
             {
                 "defectId": f"S{i}",
@@ -797,13 +866,15 @@ def test_prompt_gives_genuinely_weak_tickets_priority(tmp_path: Path):
             "tickets": tickets,
         }
     )
-    prompt = _build_prompt(
-        CartographyRequest(
-            work_dir=str(tmp_path),
-            defect_batch=batch,
-            baseline=_knowledge_with_matches(tmp_path, matches),
-        )
+    req = CartographyRequest(
+        work_dir=str(tmp_path),
+        defect_batch=batch,
+        baseline=_knowledge_with_matches(tmp_path, matches),
     )
+    pairs = select_prompt_tickets(req)
+    assert len(pairs) == MAX_PROMPT_TICKETS
+    assert pairs[0][0].defectId == "EMPTY"
+    prompt = _build_prompt(req, prompt_pairs=pairs)
     assert '"defectId": "EMPTY"' in prompt  # 真弱票一定在
-    assert '"defectId": "S6"' in prompt  # 剩 7 个名额给并列票
-    assert '"defectId": "S7"' not in prompt
+    assert '"defectId": "S0"' in prompt
+    assert f'"defectId": "S{MAX_PROMPT_TICKETS}"' not in prompt
