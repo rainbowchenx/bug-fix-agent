@@ -212,12 +212,12 @@ def test_cartography_turns_scale_with_ticket_count(monkeypatch):
     monkeypatch.delenv("BUGFIX_CARTOGRAPHY_BASE_TURNS", raising=False)
     monkeypatch.delenv("BUGFIX_CARTOGRAPHY_TURNS_PER_TICKET", raising=False)
     assert DEFAULT_CARTOGRAPHY_BASE_TURNS == 6
-    assert DEFAULT_CARTOGRAPHY_TURNS_PER_TICKET == 2
+    assert DEFAULT_CARTOGRAPHY_TURNS_PER_TICKET == 7
     assert cartography_turns_for_tickets(0) == 6
-    assert cartography_turns_for_tickets(1) == 8
-    assert cartography_turns_for_tickets(8) == 22
-    assert resolve_cartography_max_turns(ticket_count=8) == 22
-    assert resolve_cartography_max_turns(weak_ticket_count=8) == 22  # alias
+    assert cartography_turns_for_tickets(1) == 13
+    assert cartography_turns_for_tickets(8) == 62
+    assert resolve_cartography_max_turns(ticket_count=8) == 62
+    assert resolve_cartography_max_turns(weak_ticket_count=8) == 62  # alias
     # Absolute env still wins over ticket budget.
     monkeypatch.setenv("BUGFIX_CARTOGRAPHY_MAX_TURNS", "40")
     assert resolve_cartography_max_turns(ticket_count=8) == 40

@@ -23,10 +23,11 @@ MAX_WEAK_PROMPT_TICKETS = MAX_PROMPT_TICKETS
 _MATCH_POOL = frozenset({"strict", "locatable_only", "needs_info"})
 # 无票数上下文时的兜底（兼容旧调用）；正常路径按票数预算。
 DEFAULT_CARTOGRAPHY_MAX_TURNS = 24
-# 地图/playbook 开销 + 每张进 prompt 票的浅配额。
-# 覆盖率取决于进 prompt 的票；配额故意偏浅（宁可全过一遍，也不单票深挖）。
+# 地图/playbook 开销 + 每张进 prompt 票的配额。
+# 覆盖率取决于进 prompt 的票；这是唯一能买深度的旋钮。
+# led 实测（40 票 / 16 进 prompt）：2 轮/票 = 38 轮，摸不完 16 张；7 轮/票 = 118 轮。
 DEFAULT_CARTOGRAPHY_BASE_TURNS = 6
-DEFAULT_CARTOGRAPHY_TURNS_PER_TICKET = 2
+DEFAULT_CARTOGRAPHY_TURNS_PER_TICKET = 7
 # ``gap`` 是机器枚举（空候选的原因码），不是给模型写解释的地方。
 _ALLOWED_GAPS = frozenset(get_args(MatchGap))
 # 候选集完全相同的票达到这个数，说明打分并列、路径 token 没区分度（假 medium）。
