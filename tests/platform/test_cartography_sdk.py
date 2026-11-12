@@ -506,3 +506,279 @@ def test_merge_reports_dropped_candidates(tmp_path: Path):
     )
     assert _with_drop_detail("turns=26", {}) == "turns=26"
     assert _with_drop_detail(None, {"missing": 2}) == "dropped=missing:2"
+
+
+def test_merge_keeps_sdk_answer_when_gap_is_prose(tmp_path: Path):
+    """led 13 轮的真实形状：模型答对了，却在 gap 里写了一句解释。
+
+    `gap` 是枚举 `no_path_token_overlap`，整条 `DefectCodeMatch` 校验失败后
+    以前会把这张票连 baseline 原件一起静默丢掉（40 → 39）。只丢这个字段。
+    """
+    from bugfix_platform.sdk.cartography import _merge_enrichment
+
+    rel = "web/src/layout/projectDialog/list/factorSimulationDialog.vue"
+    # 真实形状：仓在 workDir 下的子目录 calibrationtool/，模型把仓名又写进了 path
+    target = tmp_path / "calibrationtool" / rel
+    target.parent.mkdir(parents=True)
+    target.write_text("<script>export default { methods: { handlePick() {} } }</script>\n")
+    baseline = _knowledge_with_matches(
+        tmp_path,
+        [
+            {
+                "defectId": "D1",
+                "candidates": [],
+                "confidence": "low",
+                "gap": "no_path_token_overlap",
+            }
+        ],
+    )
+    stats: dict[str, int] = {}
+    merged = _merge_enrichment(
+        baseline,
+        {
+            "defectCodeMatches": [
+                {
+                    "defectId": "D1",
+                    "candidates": [
+                        {
+                            "repoPath": "calibrationtool",
+                            "path": f"calibrationtool/{rel}",
+                            "symbol": "handlePick",
+                            "why": "系数仿真弹窗本体",
+                            "source": "grep",
+                        }
+                    ],
+                    "confidence": "medium",
+                    "gap": "症状为未最大化时左侧列表不可点，可能落在布局或尺寸计算",
+                }
+            ]
+        },
+        stats=stats,
+    )
+    match = next(m for m in merged["defectCodeMatches"] if m["defectId"] == "D1")
+    assert match["candidates"][0]["path"] == f"calibrationtool/{rel}"
+    assert match["candidates"][0]["repoPath"] == "."  # 回退命中后归一，不再重复前缀
+    assert match.get("gap") is None
+    assert match["confidence"] == "medium"
+    assert stats == {"gap_coerced": 1}
+
+
+def test_merge_keeps_baseline_when_sdk_entry_is_invalid(tmp_path: Path):
+    """不合 schema 的条目不能先顶掉 baseline 那条，再自己消失。"""
+    from bugfix_platform.sdk.cartography import _merge_enrichment, _with_drop_detail
+
+    baseline = _knowledge_with_matches(
+        tmp_path,
+        [
+            {
+                "defectId": "D1",
+                "candidates": [],
+                "confidence": "low",
+                "gap": "no_path_token_overlap",
+            }
+        ],
+    )
+    stats: dict[str, int] = {}
+    merged = _merge_enrichment(
+        baseline,
+        {"defectCodeMatches": [{"defectId": "D1", "candidates": "not-a-list"}]},
+        stats=stats,
+    )
+    match = next(m for m in merged["defectCodeMatches"] if m["defectId"] == "D1")
+    assert match["gap"] == "no_path_token_overlap"
+    assert match["confidence"] == "low"
+    assert stats == {"invalid_match": 1}
+    assert "dropped=invalid_match:1" in _with_drop_detail("turns=7", stats)
+
+
+def test_merge_modules_keeps_structural_ids(tmp_path: Path):
+    """整段替换会把规则算的 controller 域 / ipc:<Prefix> 节点换成散文。"""
+    from bugfix_platform.sdk.cartography import _merge_enrichment
+
+    from bugfix_contracts import validate_code_knowledge
+
+    baseline = validate_code_knowledge(
+        {
+            "schemaVersion": "0.1.0",
+            "productLine": "hc",
+            "workDir": str(tmp_path),
+            "partial": False,
+            "generatedAt": "2026-01-01T00:00:00Z",
+            "repoRoots": [{"path": "."}],
+            "cartographyProfile": "electron_node",
+            "architecture": {
+                "summary": "electron",
+                "entryPoints": [],
+                "modules": [
+                    {"id": "camera", "path": "electron/controller/camera", "notes": "IPC 域"},
+                    {
+                        "id": "ipc:Camera",
+                        "path": "electron/controller/camera",
+                        "notes": "Camera_* → controller/camera",
+                    },
+                ],
+            },
+            "defectCodeMatches": [],
+        }
+    )
+    merged = _merge_enrichment(
+        baseline,
+        {
+            "architecture": {
+                "modules": [
+                    {"id": "camera", "path": "electron/controller/camera", "notes": "相机控制与预览"},
+                    {"id": "controller-devices", "path": "electron/controller", "notes": "设备类域汇总"},
+                ]
+            }
+        },
+    )
+    modules = {m["id"]: m for m in merged["architecture"]["modules"]}
+    assert set(modules) == {"camera", "ipc:Camera", "controller-devices"}
+    assert modules["camera"]["notes"] == "相机控制与预览"  # 同 id 覆盖 notes
+    assert modules["ipc:Camera"]["notes"] == "Camera_* → controller/camera"  # 结构节点保留
+
+
+def test_prompt_treats_shared_candidate_sets_as_weak(tmp_path: Path):
+    """多张票候选集完全相同 = 并列分，不是定位；必须进 prompt，且示例里不带 gap。"""
+    tickets = []
+    matches = []
+    for i in range(4):
+        tickets.append(
+            {
+                "defectId": f"B{i}",
+                "title": f"缺陷 {i}",
+                "pool": "strict",
+                "expectQuality": "explicit",
+                "testModule": "结构,校正工具",
+                "titleTag": "校正工具",
+                "intent": "logic",
+            }
+        )
+        matches.append(
+            {
+                "defectId": f"B{i}",
+                "candidates": [
+                    {"path": "electron/controller/camera/index.ts", "why": "x", "source": "grep"},
+                    {"path": "electron/controller/luxMeter/index.ts", "why": "x", "source": "grep"},
+                ],
+                "confidence": "medium",
+            }
+        )
+    batch = DefectBatch.model_validate(
+        {
+            "schemaVersion": "0.1.0",
+            "productLine": "hc",
+            "posture": "alpha",
+            "generatedAt": "2026-01-01T00:00:00Z",
+            "funnel": {"total": len(tickets), "strict": len(tickets)},
+            "clusters": [],
+            "tickets": tickets,
+        }
+    )
+    req = CartographyRequest(
+        work_dir=str(tmp_path),
+        defect_batch=batch,
+        baseline=_knowledge_with_matches(tmp_path, matches),
+    )
+    prompt = _build_prompt(req)
+    assert '"defectId": "B0"' in prompt
+    assert '"gap"' not in prompt
+    assert "gap" in _SYSTEM_PROMPT  # 提示词明确禁止模型自己写 gap
+
+
+def test_merge_overridden_ticket_keeps_baseline_title(tmp_path: Path):
+    """模型只回 defectId/candidates/confidence；title/clusterId 要继承 baseline。"""
+    from bugfix_platform.sdk.cartography import _merge_enrichment
+
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "cfg.vue").write_text("<script>export default {}</script>\n", encoding="utf-8")
+    baseline = _knowledge_with_matches(
+        tmp_path,
+        [
+            {
+                "defectId": "D1",
+                "title": "[校正工具] 分区配置按钮文案不一致",
+                "clusterId": "hc::结构::校正工具::ui_layout",
+                "candidates": [],
+                "confidence": "low",
+                "gap": "no_path_token_overlap",
+            }
+        ],
+    )
+    merged = _merge_enrichment(
+        baseline,
+        {
+            "defectCodeMatches": [
+                {
+                    "defectId": "D1",
+                    "candidates": [{"path": "src/cfg.vue", "why": "x", "source": "grep"}],
+                    "confidence": "medium",
+                }
+            ]
+        },
+    )
+    match = next(m for m in merged["defectCodeMatches"] if m["defectId"] == "D1")
+    assert match["title"] == "[校正工具] 分区配置按钮文案不一致"
+    assert match["clusterId"] == "hc::结构::校正工具::ui_layout"
+
+
+def test_prompt_gives_genuinely_weak_tickets_priority(tmp_path: Path):
+    """并列候选票不能把空候选那张挤出名额（led 轮 2981 被挤掉）。"""
+    tickets = []
+    matches = []
+    for i in range(9):
+        tickets.append(
+            {
+                "defectId": f"S{i}",
+                "title": f"并列 {i}",
+                "pool": "strict",
+                "expectQuality": "explicit",
+                "testModule": "结构,校正工具",
+                "titleTag": "校正工具",
+                "intent": "logic",
+            }
+        )
+        matches.append(
+            {
+                "defectId": f"S{i}",
+                "candidates": [
+                    {"path": "electron/controller/camera/index.ts", "why": "x", "source": "grep"},
+                    {"path": "electron/controller/luxMeter/index.ts", "why": "x", "source": "grep"},
+                ],
+                "confidence": "medium",
+            }
+        )
+    # 排最后的那张：真弱（空候选）
+    tickets.append(
+        {
+            "defectId": "EMPTY",
+            "title": "系数仿真界面左侧图像框无法选择",
+            "pool": "locatable_only",
+            "expectQuality": "ambiguous",
+        }
+    )
+    matches.append(
+        {"defectId": "EMPTY", "candidates": [], "confidence": "low", "gap": "no_path_token_overlap"}
+    )
+    batch = DefectBatch.model_validate(
+        {
+            "schemaVersion": "0.1.0",
+            "productLine": "hc",
+            "posture": "alpha",
+            "generatedAt": "2026-01-01T00:00:00Z",
+            "funnel": {"total": len(tickets), "strict": len(tickets)},
+            "clusters": [],
+            "tickets": tickets,
+        }
+    )
+    prompt = _build_prompt(
+        CartographyRequest(
+            work_dir=str(tmp_path),
+            defect_batch=batch,
+            baseline=_knowledge_with_matches(tmp_path, matches),
+        )
+    )
+    assert '"defectId": "EMPTY"' in prompt  # 真弱票一定在
+    assert '"defectId": "S6"' in prompt  # 剩 7 个名额给并列票
+    assert '"defectId": "S7"' not in prompt

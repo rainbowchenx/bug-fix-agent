@@ -4,9 +4,10 @@ import json
 import os
 import re
 from dataclasses import dataclass
-from typing import Any, Callable, Literal, Optional
+from typing import Any, Callable, Literal, Optional, get_args
 
 from bugfix_contracts import CodeKnowledge, DefectBatch, validate_code_knowledge
+from bugfix_contracts.code_knowledge import DefectCodeMatch, MatchGap
 from bugfix_platform.sdk.parse import parse_json_payload
 from bugfix_platform.sdk.credentials import has_credentials
 from bugfix_platform.sdk.skill_inject import InjectedSkill, cartography_skills_addon
@@ -18,6 +19,10 @@ CartographyMode = Literal["heuristic", "sdk"]
 MAX_PROMPT_TICKETS = 8
 MAX_WEAK_PROMPT_TICKETS = 8
 DEFAULT_CARTOGRAPHY_MAX_TURNS = 24
+# ``gap`` 是机器枚举（空候选的原因码），不是给模型写解释的地方。
+_ALLOWED_GAPS = frozenset(get_args(MatchGap))
+# 候选集完全相同的票达到这个数，说明打分并列、路径 token 没区分度（假 medium）。
+SHARED_SIGNATURE_MIN_TICKETS = 3
 _BUDGET_SUBTYPES = frozenset({"error_max_turns", "error_max_budget_usd"})
 _SALVAGE_PROMPT = (
     "Stop exploring. Based only on what you already observed, return the JSON "
@@ -476,7 +481,7 @@ def _merge_enrichment(
         if isinstance(incoming.get("entryPoints"), list):
             arch["entryPoints"] = [str(x) for x in incoming["entryPoints"]][:40]
         if isinstance(incoming.get("modules"), list) and incoming["modules"]:
-            arch["modules"] = incoming["modules"]
+            arch["modules"] = _merge_modules(arch.get("modules") or [], incoming["modules"])
         data["architecture"] = arch
     if isinstance(parsed.get("conventions"), dict):
         conv = dict(data.get("conventions") or {})
@@ -499,14 +504,25 @@ def _merge_enrichment(
                 continue
             did = str(item["defectId"])
             sdk_ids.add(did)
-            by_id[did] = item
+            cleaned = _coerce_sdk_match(dict(item), stats)
+            if cleaned is None:
+                # 覆盖之前先校验：以前一条不合 schema 的条目会先把 baseline 那条顶掉，
+                # 再在下面的解析循环里被静默丢弃 —— 模型答对的票在产物里直接消失（led）。
+                _bump(stats, "invalid_match")
+                continue
+            # 模型只回 defectId/candidates/confidence；标的身份字段从 baseline 继承，
+            # 否则被覆盖的票在产物里标题变成 null（下游只能看到一串 BGCM 号）。
+            orig = by_id.get(did) or {}
+            for key in ("title", "clusterId"):
+                if not cleaned.get(key) and orig.get(key):
+                    cleaned[key] = orig[key]
+            by_id[did] = cleaned
         data["defectCodeMatches"] = list(by_id.values())
     # Drop hallucinated paths (SDK or merge). Empty SDK tickets fall back to baseline.
     from bugfix_platform.agents.cartographer.match import (
         filter_existing_candidates,
         ticket_variant,
     )
-    from bugfix_contracts.code_knowledge import DefectCodeMatch
 
     parsed_matches = []
     for item in data.get("defectCodeMatches") or []:
@@ -515,6 +531,7 @@ def _merge_enrichment(
         try:
             parsed_matches.append(DefectCodeMatch.model_validate(item))
         except Exception:  # noqa: BLE001
+            _bump(stats, "invalid_match")
             continue
     baseline_by_id = {m.defectId: m for m in baseline.defectCodeMatches}
     variant_by_id = {
@@ -552,6 +569,57 @@ def _merge_enrichment(
         arch["summary"] = f"{summary}; cartography=sdk" if summary else "cartography=sdk"
     data["architecture"] = arch
     return data
+
+
+def _bump(stats: dict[str, int] | None, key: str) -> None:
+    if stats is not None:
+        stats[key] = stats.get(key, 0) + 1
+
+
+def _coerce_sdk_match(
+    item: dict[str, Any], stats: dict[str, int] | None
+) -> dict[str, Any] | None:
+    """把模型条目收成契约允许的形状；实在不可用才返回 ``None``。
+
+    ``gap`` 是空候选的原因码（枚举 ``no_path_token_overlap``）。提示词里给出的
+    baseline 示例带着 ``"gap": null``，模型会照着补一句人话解释 —— 整条
+    ``DefectCodeMatch`` 就校验失败。这一个字段不值一张票，只丢掉它。
+    """
+    gap = item.get("gap")
+    if gap is not None and gap not in _ALLOWED_GAPS:
+        item.pop("gap", None)
+        _bump(stats, "gap_coerced")
+    try:
+        DefectCodeMatch.model_validate(item)
+    except Exception:  # noqa: BLE001
+        return None
+    return item
+
+
+def _merge_modules(
+    baseline: list[Any], incoming: list[Any]
+) -> list[dict[str, Any]]:
+    """按 ``id`` 合并模块表：规则算出的结构节点不允许被模型的目录汇总盖掉。
+
+    整段替换时实测会把 11 个 ``controller`` 域与 11 个 ``ipc:<Prefix>`` 映射
+    节点换成一句散文式的 ``controller-devices``（led 轮），而这恰好是
+    electron 仓定位的主索引。模型的增量价值在 ``notes``/``role``，同名覆盖
+    这些字段即可；它新提出的模块追加在后面。
+    """
+    out: list[dict[str, Any]] = [dict(m) for m in baseline if isinstance(m, dict)]
+    index = {str(m.get("id")): i for i, m in enumerate(out)}
+    for item in incoming:
+        if not isinstance(item, dict) or not item.get("id"):
+            continue
+        mid = str(item["id"])
+        if mid in index:
+            merged = dict(out[index[mid]])
+            merged.update({k: v for k, v in item.items() if v is not None and v != ""})
+            out[index[mid]] = merged
+        else:
+            index[mid] = len(out)
+            out.append(dict(item))
+    return out
 
 
 PROFILE_READING_PLAYBOOK = {
@@ -622,7 +690,9 @@ architecture{summary,entryPoints,modules[{id,path,role,shared,notes}]},
 conventions{fromRules}, boundSkills,
 defectCodeMatches[{defectId,candidates[{repoPath,path,symbol,why,source}],confidence}],
 partial.
-Do not change cartographyProfile.
+Do not change cartographyProfile. Do not add keys that are not listed above: an
+entry that does not fit that shape is dropped before delivery, losing the whole
+ticket. ``gap`` is not yours to write.
 candidate source must be one of: codegraph, grep, heuristic, claude_md.
 repoPath = the repo root as listed in repoRoots; use "." for a single-repo workDir.
 path = the file path relative to that root. Never put the file path in both fields:
@@ -630,17 +700,51 @@ a candidate whose repoPath/path cannot be resolved is dropped before delivery.
 """
 
 
+def _candidate_signature(match: Any) -> tuple[str, ...] | None:
+    """候选集归一后的指纹（路径排序）；少于 2 个候选不值得比较。"""
+    cands = list(getattr(match, "candidates", None) or [])
+    if len(cands) < 2:
+        return None
+    return tuple(sorted(_norm_rel(getattr(c, "path", "") or "") for c in cands))
+
+
+def _shared_signatures(matches: list[Any]) -> set[tuple[str, ...]]:
+    """被至少 ``SHARED_SIGNATURE_MIN_TICKETS`` 张票共用的候选集指纹。
+
+    多个不同的缺陷拿到完全相同的候选，说明打分是并列的、路径 token 没区分度
+    （中文 testModule/标题打不中 ASCII 路径时尤其明显）。这种“有候选”并不是
+    定位，不能因为 ``len(candidates) >= 2`` 就判成不弱。
+    """
+    counts: dict[tuple[str, ...], int] = {}
+    for match in matches:
+        sig = _candidate_signature(match)
+        if sig is not None:
+            counts[sig] = counts.get(sig, 0) + 1
+    return {sig for sig, n in counts.items() if n >= SHARED_SIGNATURE_MIN_TICKETS}
+
+
 def _build_prompt(req: CartographyRequest) -> str:
     entries = list(req.baseline.architecture.entryPoints)
     by_id = {m.defectId: m for m in req.baseline.defectCodeMatches}
-    weak_tickets = []
-    weak_matches = []
+    shared = _shared_signatures(req.baseline.defectCodeMatches)
+    # 两类弱票：真弱（空候选 / low / 全是 entryPoints）优先占位，
+    # “有候选但多票并列”排后面。不分开的话，新的并列票按批次顺序把
+    # 空候选那张挤出 8 个名额（led 轮：BGCM2026060502981 被挤掉）。
+    genuine: list[tuple[Any, Any]] = []
+    ambiguous: list[tuple[Any, Any]] = []
     for t in req.defect_batch.tickets:
         if t.pool not in ("strict", "locatable_only", "needs_info"):
             continue
         match = by_id.get(t.defectId)
-        if match is not None and not is_weak_match(match, entries):
+        if match is not None and is_weak_match(match, entries):
+            genuine.append((t, match))
+        elif match is not None and _candidate_signature(match) in shared:
+            ambiguous.append((t, match))
+        else:
             continue
+    weak_tickets = []
+    weak_matches = []
+    for t, match in (genuine + ambiguous)[:MAX_WEAK_PROMPT_TICKETS]:
         rationale = (t.intentRationale or "").strip()
         weak_tickets.append(
             {
@@ -654,9 +758,10 @@ def _build_prompt(req: CartographyRequest) -> str:
             }
         )
         if match is not None:
-            weak_matches.append(match.model_dump())
-        if len(weak_tickets) >= MAX_WEAK_PROMPT_TICKETS:
-            break
+            payload = match.model_dump()
+            # ``gap`` 是机器枚举；作为示例给出去，模型会把它当自由文本填回来。
+            payload.pop("gap", None)
+            weak_matches.append(payload)
     baseline = {
         "cartographyProfile": req.baseline.cartographyProfile,
         "secondaryHints": req.baseline.secondaryHints,
