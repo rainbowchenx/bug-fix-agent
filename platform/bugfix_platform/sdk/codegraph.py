@@ -1,7 +1,7 @@
-"""Agent-2 CodeGraph ensure + MCP mount (@colbymchenry/codegraph).
+"""Agent-2 / Agent-3 CodeGraph ensure + MCP mount (@colbymchenry/codegraph).
 
 默认：目标仓有 ``.codegraph/`` 就用；没有就 ``codegraph init`` 建本地索引；
-SDK 会话挂 ``codegraph serve --mcp``。可用 ``BUGFIX_CODEGRAPH=0`` 关掉。
+两端 SDK 会话都挂 ``codegraph serve --mcp``。可用 ``BUGFIX_CODEGRAPH=0`` 关掉。
 
 CLI 版本差异必须自己处理，不能让用户去读报错：
 
@@ -49,7 +49,7 @@ DEFAULT_INDEX_SINCE = (0, 9, 9)
 
 @dataclass
 class CodeGraphStatus:
-    """一次 ensure 的结果，供 cartography 挂 MCP / 写 capabilities。"""
+    """一次 ensure 的结果，供 Agent-2/3 挂 MCP / 写 capabilities。"""
 
     ready: bool
     roots: list[str] = field(default_factory=list)
@@ -74,6 +74,17 @@ class CodeGraphStatus:
                 "env": {"CODEGRAPH_TELEMETRY": os.environ.get("CODEGRAPH_TELEMETRY", "0")},
             }
         }
+
+    def mcp_option_kwargs(self, work_dir: str) -> dict[str, Any]:
+        """Merge into ``ClaudeAgentOptions``; empty when MCP cannot be mounted.
+
+        Sets ``mcp_servers`` plus ``strict_mcp_config`` so the session only sees
+        the CodeGraph server we started, not the user's global MCP mix.
+        """
+        servers = self.mcp_servers(work_dir)
+        if not servers:
+            return {}
+        return {"mcp_servers": servers, "strict_mcp_config": True}
 
 
 def codegraph_enabled() -> bool:

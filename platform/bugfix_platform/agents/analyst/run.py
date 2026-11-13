@@ -21,6 +21,7 @@ from bugfix_platform.sdk.analyze import (
     analyze_mode_from_env,
     create_analyze_runner,
 )
+from bugfix_platform.sdk.codegraph import ensure_codegraph
 from bugfix_platform.sdk.cartography import profile_reading_playbook
 from bugfix_platform.sdk.fix import (
     FixRequest,
@@ -98,6 +99,10 @@ def run_analyst(
         fixer = fix_fn or create_fix_runner()
     remaining = analyze_limit if analyze_limit is not None else _limit_from_env()
     out_dir = str(artifact_dir) if artifact_dir is not None else None
+    cg_status = ensure_codegraph(work_dir, code_knowledge.repoRoots)
+    if cg_status.detail:
+        print(f"[agent3] codegraph={cg_status.detail[:240]}", file=sys.stderr)
+    spec_atlas = code_knowledge.specAtlas.model_dump()
 
     tickets: list[dict[str, Any]] = []
     analyze_sources: list[str] = []
@@ -126,6 +131,8 @@ def run_analyst(
                         code_knowledge.cartographyProfile
                     ),
                     apply_fix=want_fix,
+                    spec_atlas=spec_atlas,
+                    codegraph=cg_status,
                 )
             )
             entry.update(result.payload)

@@ -5,7 +5,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Sequence
 
-from bugfix_platform.agents.cartographer.architecture import map_architecture
+from bugfix_platform.agents.cartographer.architecture import (
+    attach_spec_pointers,
+    map_architecture,
+)
 from bugfix_platform.agents.cartographer.detect import (
     detect_cartography_profile,
     discover_repo_roots,
@@ -94,6 +97,7 @@ def run_cartographer(
         work_dir, conventions, injected
     )
     mapped = map_architecture(work_dir, repo_roots, profile)
+    attach_spec_pointers(mapped.modules, conventions.get("entries") or [])
     architecture = Architecture(
         summary=mapped.summary,
         entryPoints=mapped.entry_points,

@@ -73,6 +73,14 @@ def test_init_creates_index(tmp_path: Path):
 def test_status_mcp_empty_when_not_ready():
     st = CodeGraphStatus(ready=False, bin="/tmp/codegraph")
     assert st.mcp_servers("/tmp/proj") == {}
+    assert st.mcp_option_kwargs("/tmp/proj") == {}
+
+
+def test_mcp_option_kwargs_when_ready():
+    st = CodeGraphStatus(ready=True, bin="/usr/bin/codegraph")
+    kw = st.mcp_option_kwargs("/tmp/proj")
+    assert kw["mcp_servers"]["codegraph"]["args"][:2] == ["serve", "--mcp"]
+    assert kw["strict_mcp_config"] is True
 
 
 # ---------------------------------------------------------------------------

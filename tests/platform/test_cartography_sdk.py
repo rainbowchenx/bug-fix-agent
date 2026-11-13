@@ -245,6 +245,8 @@ def test_system_prompt_forbids_per_ticket_call_flow():
     assert "codegraph" in _SYSTEM_PROMPT.lower()
     assert "0 is valid" in _SYSTEM_PROMPT.lower() or "do not pad" in _SYSTEM_PROMPT.lower()
     assert "not fix loci" in _SYSTEM_PROMPT.lower() or "catalog" in _SYSTEM_PROMPT.lower()
+    assert "must" in _SYSTEM_PROMPT.lower()
+    assert "doc_ref" in _SYSTEM_PROMPT or "spec markdown" in _SYSTEM_PROMPT.lower()
 
 
 def test_prompt_mentions_codegraph_when_ready(tmp_path: Path):

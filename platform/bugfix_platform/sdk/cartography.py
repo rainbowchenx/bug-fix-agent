@@ -345,7 +345,6 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
     )
 
     cg = req.codegraph
-    mcp_servers = cg.mcp_servers(req.work_dir) if cg is not None else {}
 
     def _make_options(*, resume: str | None = None, turns: Optional[int] = None) -> Any:
         kwargs: dict[str, Any] = {
@@ -358,10 +357,8 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
             "model": model,
             "can_use_tool": _can_use_cartography_tool,
         }
-        if mcp_servers:
-            kwargs["mcp_servers"] = mcp_servers
-            # 只用我们显式挂的 CodeGraph，避免拉进用户全局杂项 MCP。
-            kwargs["strict_mcp_config"] = True
+        if cg is not None:
+            kwargs.update(cg.mcp_option_kwargs(req.work_dir))
         if resume:
             kwargs["resume"] = resume
         try:
@@ -722,10 +719,12 @@ ticket (confirm or replace heuristic candidates). Agent-3 follows imports and na
 the fix locus. You do not.
 
 Tools: CodeGraph MCP (preferred), Read, Glob, Grep, and Bash.
-When CodeGraph is available (codegraph_explore / codegraph_node), use it FIRST for
-structural / symbol / module questions — it is a pre-built local index; do not
-re-grep what it already returned. Treat CodeGraph source excerpts as already Read.
-Fall back to Grep/Read/Glob only when CodeGraph is unavailable or returns empty.
+When CodeGraph is ready (codegraph_explore / codegraph_node), the first structural,
+symbol, or ticket-confirm tool call MUST be codegraph_explore (or node/callers).
+It is a pre-built local index; do not re-grep what it already returned. Treat
+CodeGraph source excerpts as already Read. Fall back to Grep/Read/Glob only when
+CodeGraph is unavailable or returns empty. specAtlas.entries are path indexes
+(kind=doc_ref); do not copy spec markdown into entries, notes, or conventions.
 Bash is for READ-ONLY exploration only (e.g. rg/find/git log|blame|grep|show,
 ls, cat/head/sed -n, or `codegraph explore` CLI). NEVER mutate the repo:
 no edit/write tools, no git write, no install, no network, no rm/chmod.
@@ -737,12 +736,13 @@ How to work:
    Overlay skills have HIGHEST PRIORITY over package SOP on read order, layout, aliases.
 2) Thicken architecture (entryPoints, route/business modules, runtime shape).
    Prefer CodeGraph explore for module/symbol maps; catalog files next.
-   Do not walk the whole repo file-by-file.
+   Do not walk the whole repo file-by-file. Do not read trellis/spec bodies.
 3) Cover EVERY ticket in matchPoolTickets — shallow, not deep. Cap 3 real paths
    per ticket; 0 is valid — do not pad. Empty is better than a wrong path or
    sibling stubs (mixin.js / isapi.js with no logic).
-   Prefer CodeGraph for ticket localization; set candidate.source = "codegraph"
-   when the path came from CodeGraph. Heuristic medium/high candidates are
+   CodeGraph MUST be used for ticket localization when ready; set
+   candidate.source = "codegraph" when the path came from CodeGraph.
+   Heuristic medium/high candidates are
    UNVERIFIED path-token hits: confirm with CodeGraph (or Grep/Read), replace
    if wrong, or clear them. Do not copy them blindly.
    candidate.why = why the path resembles the title/module — not a root cause,
@@ -879,7 +879,7 @@ def _build_prompt(
     cg_line = (
         f"codeGraph: ready (cli {cg.version or 'unknown'}) "
         f"roots={json.dumps(cg.roots if cg else [], ensure_ascii=False)}; "
-        "prefer codegraph_explore / codegraph_node; candidate.source=codegraph when used"
+        "MUST use codegraph_explore / codegraph_node first; candidate.source=codegraph when used"
         if cg_ready
         else "codeGraph: unavailable — use Grep/Read/Glob only"
     )

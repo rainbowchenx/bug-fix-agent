@@ -108,3 +108,46 @@ def test_profile_is_never_detected_only_echoed(tmp_path: Path):
     profile, hints, _tech = detect_cartography_profile(tmp_path, discover_repo_roots(tmp_path))
     assert profile == "unknown"
     assert any(h.endswith(":single-spa") for h in hints), hints
+
+
+def test_trellis_spec_dirs_indexed_as_doc_ref_without_copying_body(tmp_path: Path):
+    """磁盘有 .trellis/spec 就建路径索引；markdown 正文不进产物。"""
+    _pkg(tmp_path)
+    for app in ("HCBVideo", "HCBSystem"):
+        d = tmp_path / ".trellis" / "spec" / "src" / app / "frontend"
+        d.mkdir(parents=True)
+        (d / "README.md").write_text("# 规范正文不该出现在产物里\n", encoding="utf-8")
+    (tmp_path / ".trellis" / "spec" / "src" / "HCBVideo" / "backend").mkdir(parents=True)
+
+    conv = read_conventions(tmp_path, discover_repo_roots(tmp_path))
+    assert conv["frameworkId"] == "trellis"
+    refs = [e.path.replace("\\", "/") for e in conv["entries"] if e.kind == "doc_ref"]
+    assert any("HCBVideo/frontend" in p for p in refs), refs
+    assert any("HCBSystem/frontend" in p for p in refs), refs
+    assert any("HCBVideo/backend" in p for p in refs), refs
+    blob = " ".join(e.path for e in conv["entries"])
+    assert "规范正文" not in blob
+
+
+def test_trellis_does_not_override_superpowers_or_drop_claude_md(tmp_path: Path):
+    """CLAUDE.md 已判 superpowers 时不改 frameworkId；原 guide 条目保留。"""
+    _pkg(tmp_path)
+    (tmp_path / "CLAUDE.md").write_text("搜索走 CodeGraph，流程走 superpowers。\n", encoding="utf-8")
+    d = tmp_path / ".trellis" / "spec" / "src" / "HCBPortal" / "frontend"
+    d.mkdir(parents=True)
+    conv = read_conventions(tmp_path, discover_repo_roots(tmp_path))
+    assert conv["frameworkId"] == "superpowers"
+    assert conv["codeGraph"] is True
+    kinds = {e.kind for e in conv["entries"]}
+    assert "guide" in kinds
+    assert "doc_ref" in kinds
+    assert any(e.path.replace("\\", "/").endswith("CLAUDE.md") for e in conv["entries"])
+    assert any(e.kind == "doc_ref" and "HCBPortal" in e.path for e in conv["entries"])
+
+
+def test_no_trellis_dir_does_not_invent_doc_refs(tmp_path: Path):
+    _pkg(tmp_path)
+    (tmp_path / "CLAUDE.md").write_text("# hi\n", encoding="utf-8")
+    conv = read_conventions(tmp_path, discover_repo_roots(tmp_path))
+    assert conv["frameworkId"] == "unknown"
+    assert all(e.kind != "doc_ref" for e in conv["entries"])

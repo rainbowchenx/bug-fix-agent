@@ -4,13 +4,16 @@ from pathlib import Path
 from bugfix_platform.agents.analyst import run_analyst
 from bugfix_contracts import CodeKnowledge, DefectBatch
 from bugfix_platform.sdk.analyze import (
+    ANALYZE_TOOLS,
     AnalyzeRequest,
     AnalyzeResult,
     _SYSTEM_PROMPT,
     _build_prompt,
+    analyze_allowed_tools,
     analyze_mode_from_env,
     heuristic_analyze,
     parse_analyze_payload,
+    select_ticket_spec_dirs,
 )
 from bugfix_platform.workflow import run_three_agent_workflow
 
@@ -47,6 +50,77 @@ def test_analyze_prompt_includes_architecture_map():
     assert "叠加位置交互" in prompt
     assert "follow" in _SYSTEM_PROMPT.lower()
     assert "soft-start" in _SYSTEM_PROMPT.lower() or "soft start" in _SYSTEM_PROMPT.lower()
+    assert ANALYZE_TOOLS == ["Read", "Glob", "Grep"]
+
+
+def test_analyze_prompt_includes_spec_atlas_and_ticket_spec_dirs():
+    from bugfix_contracts.defect_batch import BatchTicket
+
+    ticket = BatchTicket(
+        defectId="1",
+        title="回放灰屏",
+        pool="strict",
+        expectQuality="explicit",
+    )
+    req = AnalyzeRequest(
+        work_dir="/tmp",
+        ticket=ticket,
+        routed={
+            "outcome": "plan_only",
+            "localization": {
+                "candidates": [
+                    {"repoPath": ".", "path": "src/HCBVideo/player.vue", "why": "token"}
+                ]
+            },
+        },
+        architecture={
+            "summary": "mf",
+            "modules": [
+                {
+                    "id": "HCBVideo",
+                    "path": "src/HCBVideo",
+                    "notes": "回放; spec: .trellis/spec/src/HCBVideo/frontend",
+                }
+            ],
+        },
+        spec_atlas={
+            "frameworkId": "trellis",
+            "entries": [
+                {"path": ".trellis/spec/src/HCBVideo/frontend", "kind": "doc_ref"},
+                {"path": ".trellis/spec/src/HCBPortal/frontend", "kind": "doc_ref"},
+            ],
+        },
+    )
+    prompt = _build_prompt(req)
+    assert "specAtlas" in prompt
+    assert "HCBVideo/frontend" in prompt
+    assert "ticketSpecDirs" in prompt
+    dirs = select_ticket_spec_dirs(
+        req.spec_atlas, req.architecture, req.routed
+    )
+    assert dirs
+    assert any("HCBVideo/frontend" in p for p in dirs)
+    assert not any("HCBPortal" in p for p in dirs)
+
+
+def test_analyze_tools_include_codegraph_only_when_ready():
+    from bugfix_platform.sdk.codegraph import CodeGraphStatus
+
+    assert analyze_allowed_tools(None) == ["Read", "Glob", "Grep"]
+    assert "codegraph_explore" not in analyze_allowed_tools(
+        CodeGraphStatus(ready=False, bin="/usr/bin/codegraph")
+    )
+    ready = analyze_allowed_tools(CodeGraphStatus(ready=True, bin="/usr/bin/codegraph"))
+    assert ready[:3] == ["Read", "Glob", "Grep"]
+    assert "codegraph_explore" in ready
+    assert "codegraph_callers" in ready
+
+
+def test_analyze_system_prompt_uses_codegraph_first():
+    text = _SYSTEM_PROMPT.lower()
+    assert "codegraph_explore" in text
+    assert "grep" in text
+    assert "spec" in text
 
 
 def test_parse_analyze_payload_fence():
@@ -191,6 +265,123 @@ def test_analyst_uses_injected_analyze_fn(tmp_path: Path):
     assert report.tickets[0].rootCause.summary == "Race in preview player init"
     assert report.tickets[0].confidence == "high"
     assert "analyze=sdk" in (report.tickets[0].localization.notes or "")
+
+
+def test_analyst_forwards_spec_atlas_and_codegraph(tmp_path: Path, monkeypatch):
+    from bugfix_platform.sdk.codegraph import CodeGraphStatus
+
+    work = tmp_path / "repo"
+    work.mkdir()
+    (work / "package.json").write_text(json.dumps({"name": "x"}), encoding="utf-8")
+    (work / "src").mkdir()
+    (work / "src" / "HCBVideo").mkdir()
+    (work / "src" / "HCBVideo" / "player.vue").write_text("<template></template>\n", encoding="utf-8")
+
+    batch = DefectBatch.model_validate(
+        {
+            "schemaVersion": "0.1.0",
+            "productLine": "hc",
+            "posture": "alpha",
+            "generatedAt": "2026-01-01T00:00:00Z",
+            "funnel": {"total": 1, "strict": 1},
+            "clusters": [],
+            "tickets": [
+                {
+                    "defectId": "D1",
+                    "title": "回放灰屏",
+                    "pool": "strict",
+                    "expectQuality": "explicit",
+                    "intent": "logic",
+                    "observed": "grey",
+                    "expected": "ok",
+                    "steps": "play",
+                }
+            ],
+        }
+    )
+    knowledge = CodeKnowledge.model_validate(
+        {
+            "schemaVersion": "0.1.0",
+            "productLine": "hc",
+            "workDir": str(work),
+            "partial": False,
+            "generatedAt": "2026-01-01T00:00:00Z",
+            "repoRoots": [{"path": "."}],
+            "cartographyProfile": "micro_frontend",
+            "secondaryHints": [],
+            "techStack": {"languages": ["js"], "frameworks": ["vue"]},
+            "architecture": {
+                "summary": "mf",
+                "entryPoints": [],
+                "modules": [{"id": "HCBVideo", "path": "src/HCBVideo"}],
+            },
+            "conventions": {"fromClaudeMd": [], "fromRules": []},
+            "boundSkills": [],
+            "specAtlas": {
+                "frameworkId": "trellis",
+                "entries": [
+                    {
+                        "path": ".trellis/spec/src/HCBVideo/frontend",
+                        "kind": "doc_ref",
+                    }
+                ],
+            },
+            "capabilities": {"codeGraph": True, "runtimeVerify": False},
+            "defectCodeMatches": [
+                {
+                    "defectId": "D1",
+                    "candidates": [
+                        {
+                            "repoPath": ".",
+                            "path": "src/HCBVideo/player.vue",
+                            "why": "token",
+                            "source": "codegraph",
+                        }
+                    ],
+                    "confidence": "medium",
+                }
+            ],
+        }
+    )
+    ready = CodeGraphStatus(ready=True, bin="/usr/bin/codegraph", roots=[str(work)])
+    monkeypatch.setattr(
+        "bugfix_platform.agents.analyst.run.ensure_codegraph",
+        lambda *a, **k: ready,
+    )
+    seen: dict = {}
+
+    def fake_analyze(req: AnalyzeRequest) -> AnalyzeResult:
+        seen["spec"] = req.spec_atlas
+        seen["cg"] = req.codegraph
+        return AnalyzeResult(
+            ok=True,
+            source="sdk",
+            payload={
+                **req.routed,
+                "outcome": "plan_only",
+                "rootCause": {
+                    "summary": "decoder stall",
+                    "ruledOut": [],
+                    "openQuestions": [],
+                },
+                "proposedFix": {
+                    "summary": "reset decoder",
+                    "steps": [],
+                    "targetFiles": ["src/HCBVideo/player.vue"],
+                },
+                "confidence": "medium",
+            },
+        )
+
+    report = run_analyst(
+        work_dir=work,
+        defect_batch=batch,
+        code_knowledge=knowledge,
+        analyze_fn=fake_analyze,
+    )
+    assert report.tickets[0].outcome == "plan_only"
+    assert seen["spec"]["frameworkId"] == "trellis"
+    assert seen["cg"] is ready
 
 
 def test_workflow_heuristic_analyze_mode(tmp_path: Path, monkeypatch):

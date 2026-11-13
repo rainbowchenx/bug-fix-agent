@@ -338,6 +338,13 @@ def read_conventions(work_dir: str | Path, repo_roots: list[RepoRoot]) -> dict:
                     )
                 )
 
+        trellis_root = abs_path / ".trellis" / "spec"
+        if trellis_root.is_dir():
+            # 磁盘有 trellis 只补索引；CLAUDE.md 已判出的 superpowers/openspec 不覆盖。
+            if framework_id == "unknown":
+                framework_id = "trellis"
+            _append_trellis_entries(abs_path, rr, entries)
+
     return {
         "fromClaudeMd": from_claude,
         "fromRules": from_rules,
@@ -346,3 +353,49 @@ def read_conventions(work_dir: str | Path, repo_roots: list[RepoRoot]) -> dict:
         "frameworkId": framework_id,
         "entries": entries,
     }
+
+
+_TRELLIS_KINDS = ("frontend", "backend")
+_MAX_TRELLIS_ENTRIES = 80
+
+
+def _repo_rel(rr_path: str, rel: str) -> str:
+    rel = rel.replace("\\", "/").strip("/")
+    if rr_path in (".", ""):
+        return rel
+    return f"{rr_path}/{rel}"
+
+
+def _append_trellis_entries(
+    abs_path: Path, rr: RepoRoot, entries: list[SpecEntry]
+) -> None:
+    """把 ``.trellis/spec/src/<App>/{frontend,backend}/`` 记成 ``doc_ref`` 路径。
+
+    只记目录，不读 markdown。已有同 path 的条目不重复追加。
+    """
+    spec_root = abs_path / ".trellis" / "spec"
+    src = spec_root / "src"
+    search = src if src.is_dir() else spec_root
+    seen = {e.path.replace("\\", "/") for e in entries}
+    added = 0
+    try:
+        app_dirs = sorted(p for p in search.iterdir() if p.is_dir())
+    except OSError:
+        return
+    for app_dir in app_dirs:
+        for kind in _TRELLIS_KINDS:
+            kind_dir = app_dir / kind
+            if not kind_dir.is_dir():
+                continue
+            try:
+                rel = str(kind_dir.relative_to(abs_path)).replace("\\", "/")
+            except ValueError:
+                continue
+            path = _repo_rel(rr.path, rel)
+            if path in seen:
+                continue
+            seen.add(path)
+            entries.append(SpecEntry(path=path, kind="doc_ref", source="repo_root"))
+            added += 1
+            if added >= _MAX_TRELLIS_ENTRIES:
+                return

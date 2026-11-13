@@ -6,7 +6,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence
 
 from bugfix_contracts.code_knowledge import ArchModule, CartographyProfile, RepoRoot
 
@@ -103,6 +103,42 @@ def map_architecture(
                 ArchModule(id=rr.path or "root", path=rr.path or ".", role="repo_root")
             )
     return mapped
+
+
+def attach_spec_pointers(
+    modules: list[ArchModule],
+    entries: Sequence[Any],
+) -> None:
+    """把 ``spec: <dir>`` 追加到命中模块的 ``notes``；不覆盖已有摘要。
+
+    ``entries`` 是 ``specAtlas.entries``（``SpecEntry`` 或 dict）。只认
+    ``kind=doc_ref``，用模块 ``id`` 去对路径里的 ``/<id>/``。
+    """
+    refs: list[str] = []
+    for entry in entries:
+        kind = getattr(entry, "kind", None)
+        path = getattr(entry, "path", None)
+        if kind is None and isinstance(entry, dict):
+            kind = entry.get("kind")
+            path = entry.get("path")
+        if kind != "doc_ref" or not path:
+            continue
+        refs.append(str(path).replace("\\", "/").rstrip("/"))
+    if not refs:
+        return
+    for mod in modules:
+        mid = (mod.id or "").strip()
+        if not mid:
+            continue
+        hits = [p for p in refs if f"/{mid}/" in f"/{p}/"]
+        if not hits:
+            continue
+        existing = (mod.notes or "").strip()
+        missing = [h for h in hits if f"spec: {h}" not in existing]
+        if not missing:
+            continue
+        extra = "; ".join(f"spec: {h}" for h in missing)
+        mod.notes = f"{existing}; {extra}" if existing else extra
 
 
 def _map_micro_frontend(root: Path, repo_roots: list[RepoRoot]) -> MappedArchitecture:

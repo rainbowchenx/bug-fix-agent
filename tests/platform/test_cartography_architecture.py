@@ -258,3 +258,64 @@ def test_code_cartography_skill_present():
     from bugfix_platform.sdk.skills import list_package_skill_names
 
     assert "code-cartography" in list_package_skill_names()
+
+
+def test_attach_spec_pointers_appends_without_replacing_notes():
+    from bugfix_contracts.code_knowledge import ArchModule, SpecEntry
+    from bugfix_platform.agents.cartographer.architecture import attach_spec_pointers
+
+    mods = [
+        ArchModule(id="HCBVideo", path="hct/src/HCBVideo", notes="报警回放 UI"),
+        ArchModule(id="HCBPortal", path="hct/src/HCBPortal"),
+        ArchModule(id="other", path="src/other", notes="keep me"),
+    ]
+    entries = [
+        SpecEntry(path="hct/.trellis/spec/src/HCBVideo/frontend", kind="doc_ref"),
+        SpecEntry(path="hct/.trellis/spec/src/HCBPortal/frontend", kind="doc_ref"),
+        SpecEntry(path="hct/CLAUDE.md", kind="guide"),
+    ]
+    attach_spec_pointers(mods, entries)
+    assert "报警回放 UI" in (mods[0].notes or "")
+    assert "spec:" in (mods[0].notes or "")
+    assert "HCBVideo/frontend" in (mods[0].notes or "")
+    assert mods[1].notes and "HCBPortal/frontend" in mods[1].notes
+    assert mods[2].notes == "keep me"
+
+
+def test_cartographer_indexes_trellis_and_points_modules(tmp_path: Path):
+    work = tmp_path / "app"
+    (work / "src" / "HCBVideo").mkdir(parents=True)
+    (work / "src" / "HCBVideo" / "vue.app.js").write_text("export {}\n", encoding="utf-8")
+    (work / "package.json").write_text(
+        json.dumps({"name": "hct", "dependencies": {"single-spa": "5"}}),
+        encoding="utf-8",
+    )
+    spec = work / ".trellis" / "spec" / "src" / "HCBVideo" / "frontend"
+    spec.mkdir(parents=True)
+    (spec / "README.md").write_text("规范正文\n", encoding="utf-8")
+
+    knowledge = run_cartographer(
+        work_dir=work,
+        defect_batch=_batch_with_module(),
+        cartography_mode="heuristic",
+        cartography_profile="micro_frontend",
+    )
+    assert knowledge.specAtlas.frameworkId == "trellis"
+    refs = [e.path.replace("\\", "/") for e in knowledge.specAtlas.entries if e.kind == "doc_ref"]
+    assert any("HCBVideo/frontend" in p for p in refs), refs
+    video = next(m for m in knowledge.architecture.modules if m.id == "HCBVideo")
+    assert "from=" in (video.notes or "") or "entry=" in (video.notes or "") or video.notes
+    assert "spec:" in (video.notes or "")
+    assert "规范正文" not in json.dumps(knowledge.specAtlas.model_dump(), ensure_ascii=False)
+
+
+def test_attach_spec_pointers_is_idempotent():
+    from bugfix_contracts.code_knowledge import ArchModule, SpecEntry
+    from bugfix_platform.agents.cartographer.architecture import attach_spec_pointers
+
+    mods = [ArchModule(id="HCBVideo", path="src/HCBVideo", notes="ui")]
+    entries = [SpecEntry(path=".trellis/spec/src/HCBVideo/frontend", kind="doc_ref")]
+    attach_spec_pointers(mods, entries)
+    once = mods[0].notes
+    attach_spec_pointers(mods, entries)
+    assert mods[0].notes == once

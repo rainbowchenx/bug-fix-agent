@@ -11,6 +11,7 @@ from typing import Any, Callable, Literal, Optional
 from bugfix_contracts.defect_batch import BatchTicket
 from bugfix_platform.sdk.parse import parse_json_payload
 from bugfix_platform.sdk.credentials import has_credentials
+from bugfix_platform.sdk.codegraph import CODEGRAPH_MCP_TOOLS, CodeGraphStatus
 from bugfix_platform.sdk.skill_inject import InjectedSkill, analyze_skills_addon
 from bugfix_platform.sdk.skills import skills_system_addon
 
@@ -39,6 +40,8 @@ class AnalyzeRequest:
     architecture: Optional[dict[str, Any]] = None
     reading_playbook: str = ""
     apply_fix: bool = False
+    spec_atlas: Optional[dict[str, Any]] = None
+    codegraph: Optional[CodeGraphStatus] = None
 
 
 @dataclass
@@ -156,19 +159,26 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         kwargs: dict[str, Any] = {
             "cwd": req.work_dir,
             "system_prompt": system_prompt,
-            "allowed_tools": list(ANALYZE_TOOLS),
+            "allowed_tools": analyze_allowed_tools(req.codegraph),
             "disallowed_tools": list(DISALLOWED_TOOLS),
             "permission_mode": "dontAsk",
             "max_turns": turns if turns is not None else max_turns,
             "model": model,
         }
+        if req.codegraph is not None:
+            kwargs.update(req.codegraph.mcp_option_kwargs(req.work_dir))
         if resume:
             kwargs["resume"] = resume
         try:
             return ClaudeAgentOptions(**kwargs)
         except TypeError:
             kwargs.pop("resume", None)
-            return ClaudeAgentOptions(**kwargs)
+            kwargs.pop("strict_mcp_config", None)
+            try:
+                return ClaudeAgentOptions(**kwargs)
+            except TypeError:
+                kwargs.pop("mcp_servers", None)
+                return ClaudeAgentOptions(**kwargs)
 
     texts: list[str] = []
     result_text = ""
@@ -426,12 +436,19 @@ def _merge_with_routed(
 
 
 _SYSTEM_PROMPT = """You are Agent-3 defect analyst.
-Use only Read / Glob / Grep. Do NOT edit files or run shell.
+Tools: Read, Glob, Grep, and CodeGraph MCP when mounted. Do NOT edit files or run shell.
+When CodeGraph is ready (codegraph_explore / codegraph_node / callers / callees),
+the first symbol or call-flow tool call MUST be codegraph_explore (or callers/callees).
+Treat CodeGraph excerpts as already Read; do not re-Grep symbols it returned.
+Fall back to Grep/Read/Glob only when CodeGraph is unavailable or empty.
 Ground claims in code you actually read.
 Prefer Agent-2 architecture map and soft-start paths first, then follow imports/callers
 from those paths to name the likely fix locus. Do not assume Agent-2 already found
-the root cause. Heuristic-only soft-start paths are unverified token hits — re-Grep
-before trusting them; empty or weak matches mean you may Glob/Grep yourself.
+the root cause. Heuristic-only soft-start paths are unverified token hits — confirm
+with CodeGraph (or re-Grep) before trusting them; empty or weak matches mean you
+may Glob/Grep yourself.
+If ticketSpecDirs is non-empty, Read that directory's index/README (or one key md);
+do not read the whole specAtlas tree.
 Shell / host / route_table files are catalogs, not fix loci.
 Repo-specific injected skills (if attached) have HIGHEST PRIORITY over package SOP:
 follow their read order, test/dev conventions, module aliases, and product-line naming.
@@ -448,10 +465,79 @@ Set verifyStatus conceptually as skipped; suggestedVerify.executed must be false
 """
 
 
+def analyze_allowed_tools(codegraph: Optional[CodeGraphStatus] = None) -> list[str]:
+    """Always Read/Glob/Grep; append CodeGraph MCP names only when the index is ready."""
+    tools = list(ANALYZE_TOOLS)
+    if codegraph is not None and codegraph.ready:
+        tools.extend(CODEGRAPH_MCP_TOOLS)
+    return tools
+
+
+def select_ticket_spec_dirs(
+    spec_atlas: Optional[dict[str, Any]],
+    architecture: Optional[dict[str, Any]],
+    routed: dict[str, Any],
+    *,
+    limit: int = 2,
+) -> list[str]:
+    """Pick up to ``limit`` spec dirs matching this ticket's soft-start paths.
+
+    Empty is valid: no candidates, or no ``doc_ref`` that shares a module id.
+    """
+    refs: list[str] = []
+    for entry in list((spec_atlas or {}).get("entries") or []):
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("kind") != "doc_ref" or not entry.get("path"):
+            continue
+        refs.append(str(entry["path"]).replace("\\", "/").rstrip("/"))
+    if not refs:
+        return []
+    loc = routed.get("localization") or {}
+    cands = list(loc.get("candidates") or []) if isinstance(loc, dict) else []
+    modules = list((architecture or {}).get("modules") or [])
+    hit_ids: list[str] = []
+    for cand in cands:
+        if not isinstance(cand, dict):
+            continue
+        path = str(cand.get("path") or "").replace("\\", "/")
+        repo = str(cand.get("repoPath") or "")
+        full = f"{repo}/{path}" if repo not in (".", "") else path
+        blob = f"/{full.strip('/')}/"
+        for mod in modules:
+            if not isinstance(mod, dict):
+                continue
+            mid = str(mod.get("id") or "").strip()
+            mpath = str(mod.get("path") or "").replace("\\", "/").rstrip("/")
+            if mid and f"/{mid}/" in blob:
+                hit_ids.append(mid)
+            elif mid and mpath and (full.startswith(mpath) or path.startswith(mpath)):
+                hit_ids.append(mid)
+    out: list[str] = []
+    seen: set[str] = set()
+    for mid in dict.fromkeys(hit_ids):
+        for ref in refs:
+            if f"/{mid}/" in f"/{ref}/" and ref not in seen:
+                seen.add(ref)
+                out.append(ref)
+                if len(out) >= limit:
+                    return out
+    return out
+
+
 def _build_prompt(req: AnalyzeRequest) -> str:
     t = req.ticket
     soft = req.routed.get("localization") or {}
     apply_flag = "true" if req.apply_fix else "false"
+    cg = req.codegraph
+    cg_ready = bool(cg and cg.ready)
+    cg_line = (
+        f"codeGraph: ready (cli {cg.version or 'unknown'}); "
+        "MUST use codegraph_explore / callers / callees first"
+        if cg_ready
+        else "codeGraph: unavailable — use Grep/Read/Glob only"
+    )
+    ticket_specs = select_ticket_spec_dirs(req.spec_atlas, req.architecture, req.routed)
     return (
         "Analyze this defect and return the JSON object described in the system prompt.\n\n"
         f"defectId: {t.defectId}\n"
@@ -469,6 +555,9 @@ def _build_prompt(req: AnalyzeRequest) -> str:
         f"cartographyProfile: {req.cartography_profile}\n"
         f"readingPlaybook: {req.reading_playbook}\n"
         f"architectureMap: {json.dumps(req.architecture or {}, ensure_ascii=False)}\n"
+        f"specAtlas: {json.dumps(req.spec_atlas or {}, ensure_ascii=False)}\n"
+        f"ticketSpecDirs: {json.dumps(ticket_specs, ensure_ascii=False)}\n"
+        f"{cg_line}\n"
         f"softStartLocalization: {json.dumps(soft, ensure_ascii=False)}\n"
         f"matchGap: {(soft.get('notes') if isinstance(soft, dict) else '') or ''}\n"
         f"routerOutcomeHint: {req.routed.get('outcome')}\n"

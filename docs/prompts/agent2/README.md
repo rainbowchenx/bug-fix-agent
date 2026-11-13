@@ -63,7 +63,7 @@ SOP 以 `platform/skills/code-cartography/SKILL.md` 为准；本页说明「怎�
 - 采用调用方给定的 cartographyProfile（electron_node / micro_frontend / device_web / unknown；不探测），按类型读清单画 architecture，并做路径软定位。
 - 读 CLAUDE.md、.claude/rules，以及用户注入的 overlay skill（仓特异性读仓 / 开发 / 测试规则；优先级高于包内置 SOP）。
 - 只对匹配池票（strict / locatable_only / needs_info）做路径软定位，每票最多 3 个真实存在的候选。
-- 有 API key 时用只读工具加厚仓图：默认接入 CodeGraph（本地 `.codegraph/` 或自动 `init`，MCP `codegraph_explore` 优先），并对匹配池票浅过一遍（含启发式 medium：降权确认；默认 `6+2×n` 轮、prompt 最多 16 张）。调用链和根因交给后续分析。
+- 有 API key 时用只读工具加厚仓图：默认接入 CodeGraph（本地 `.codegraph/` 或自动 `init`，MCP `codegraph_explore` 必须先于 Grep），并对匹配池票浅过一遍（含启发式 medium：降权确认；默认 `6+2×n` 轮、prompt 最多 16 张）。磁盘 `.trellis/spec` 只索引 `doc_ref` 路径，不读正文。调用链和根因交给后续分析。
 
 你这样工作：
 1. 先读仓内 CLAUDE.md 和已绑定的 overlay skill，再按类型读清单画 architecture。
