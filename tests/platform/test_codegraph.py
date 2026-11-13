@@ -37,8 +37,11 @@ def test_ensure_disabled(monkeypatch, tmp_path: Path):
 
 
 def test_ensure_uses_existing_index(monkeypatch, tmp_path: Path):
+    from tests.helpers import ensure_git_repo
+
     monkeypatch.delenv("BUGFIX_CODEGRAPH", raising=False)
     monkeypatch.setenv("BUGFIX_CODEGRAPH_INIT", "0")
+    ensure_git_repo(tmp_path)
     db_dir = tmp_path / ".codegraph"
     db_dir.mkdir()
     (db_dir / "codegraph.db").write_bytes(b"x" * 64)
@@ -48,16 +51,59 @@ def test_ensure_uses_existing_index(monkeypatch, tmp_path: Path):
         bin_path = "/usr/bin/true"
     else:
         monkeypatch.setenv("BUGFIX_CODEGRAPH_BIN", bin_path)
+
+    def _fake_stats(bin_path: str, root, timeout_sec: int = 30):
+        return {"files": 3, "pending": 0}
+
+    monkeypatch.setattr(
+        "bugfix_platform.sdk.codegraph.probe_index_stats", _fake_stats
+    )
     st = ensure_codegraph(tmp_path, init_missing=False)
     assert st.ready is True
     assert str(tmp_path.resolve()) in st.roots
     mcp = st.mcp_servers(str(tmp_path))
     assert "codegraph" in mcp
     assert mcp["codegraph"]["args"][:2] == ["serve", "--mcp"]
+    assert mcp["codegraph"]["args"][3] == str(tmp_path.resolve())
+
+
+def test_ensure_skips_empty_index_and_shell_workdir(monkeypatch, tmp_path: Path):
+    """壳 workDir 不入 candidate；files=0 的索引不进 MCP。"""
+    from bugfix_contracts.code_knowledge import RepoRoot
+    from tests.helpers import ensure_git_repo
+
+    monkeypatch.delenv("BUGFIX_CODEGRAPH", raising=False)
+    shell = tmp_path / "shell"
+    shell.mkdir()
+    repo = ensure_git_repo(shell / "app")
+    db = repo / ".codegraph"
+    db.mkdir()
+    (db / "codegraph.db").write_bytes(b"x" * 64)
+    monkeypatch.setenv("BUGFIX_CODEGRAPH_BIN", "/usr/bin/true")
+    monkeypatch.setenv("BUGFIX_CODEGRAPH_INIT", "0")
+
+    def _empty_stats(bin_path: str, root, timeout_sec: int = 30):
+        return {"files": 0, "pending": 12}
+
+    monkeypatch.setattr(
+        "bugfix_platform.sdk.codegraph.probe_index_stats", _empty_stats
+    )
+    st = ensure_codegraph(
+        shell,
+        [RepoRoot(path="app", gitHead="a" * 40)],
+        init_missing=False,
+    )
+    assert st.ready is False
+    assert st.roots == []
+    assert "index-truncated" in (st.detail or "")
+    assert st.mcp_servers(str(shell)) == {}
 
 
 @pytest.mark.skipif(shutil.which("codegraph") is None, reason="codegraph CLI not installed")
 def test_init_creates_index(tmp_path: Path):
+    from tests.helpers import ensure_git_repo
+
+    ensure_git_repo(tmp_path)
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "a.ts").write_text("export const x = 1;\n", encoding="utf-8")
     (tmp_path / "package.json").write_text('{"name":"t"}\n', encoding="utf-8")
@@ -68,6 +114,7 @@ def test_init_creates_index(tmp_path: Path):
     assert has_codegraph_index(tmp_path) is True
     st = ensure_codegraph(tmp_path, init_missing=False)
     assert st.ready is True
+    assert st.root_stats[str(tmp_path.resolve())].get("files", 0) > 0
 
 
 def test_status_mcp_empty_when_not_ready():
@@ -158,7 +205,9 @@ def test_npm_error_line_picks_the_real_reason():
 def test_ensure_upgrades_old_cli_before_init(tmp_path: Path, monkeypatch):
     """0.9.6 → 自动 npm 升级 → 重新探版本 → init 带 -y。"""
     from bugfix_platform.sdk import codegraph as cg
+    from tests.helpers import ensure_git_repo
 
+    ensure_git_repo(tmp_path)
     seen: dict[str, object] = {"versions": ["0.9.6", "1.6.2"], "init": []}
 
     def fake_probe(bin_path, timeout_sec=20):
@@ -170,11 +219,14 @@ def test_ensure_upgrades_old_cli_before_init(tmp_path: Path, monkeypatch):
 
     def fake_init(path, *, bin_path, timeout_sec=600, version=None):
         seen["init"].append(version)
+        (Path(path) / ".codegraph").mkdir(exist_ok=True)
+        (Path(path) / ".codegraph" / "codegraph.db").write_bytes(b"x" * 64)
         return True, "init ok"
 
     monkeypatch.setattr(cg, "probe_codegraph_version", fake_probe)
     monkeypatch.setattr(cg, "upgrade_codegraph", fake_upgrade)
     monkeypatch.setattr(cg, "init_codegraph", fake_init)
+    monkeypatch.setattr(cg, "probe_index_stats", lambda *a, **k: {"files": 2})
     monkeypatch.setenv("BUGFIX_CODEGRAPH_BIN", "codegraph")
     monkeypatch.delenv("BUGFIX_CODEGRAPH", raising=False)
     monkeypatch.delenv("BUGFIX_CODEGRAPH_AUTO_UPGRADE", raising=False)
@@ -190,6 +242,9 @@ def test_ensure_upgrades_old_cli_before_init(tmp_path: Path, monkeypatch):
 def test_ensure_skips_upgrade_when_disabled(tmp_path: Path, monkeypatch):
     """关掉自动升级时仍能跑（用老版参数），但要在 detail 里说清楚。"""
     from bugfix_platform.sdk import codegraph as cg
+    from tests.helpers import ensure_git_repo
+
+    ensure_git_repo(tmp_path)
 
     def boom(*a, **k):
         raise AssertionError("must not upgrade when disabled")

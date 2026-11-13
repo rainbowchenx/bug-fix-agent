@@ -83,8 +83,9 @@ def test_map_architecture_device_web_capability():
 
 
 def test_auto_dependencies_fill_tech_stack(tmp_path: Path):
-    work = tmp_path / "repo"
-    work.mkdir()
+    from tests.helpers import ensure_git_repo
+
+    work = ensure_git_repo(tmp_path / "repo")
     (work / "package.json").write_text(
         json.dumps(
             {
@@ -106,7 +107,9 @@ def test_auto_dependencies_fill_tech_stack(tmp_path: Path):
 
 def test_map_architecture_device_web_nested_service_path(tmp_path: Path):
     """peitao: 能力对象埋在 src/common/vue/service/device.js（多一层 vue/）。"""
-    work = tmp_path / "repo"
+    from tests.helpers import ensure_git_repo
+
+    work = ensure_git_repo(tmp_path / "repo")
     (work / "src" / "common" / "vue" / "service").mkdir(parents=True)
     (work / "src" / "main-pc.js").write_text("export {}\n", encoding="utf-8")
     (work / "src" / "main-mobile.js").write_text("export {}\n", encoding="utf-8")
@@ -135,7 +138,9 @@ def test_map_architecture_micro_frontend_empty_shell_falls_back():
 
 
 def test_match_caps_candidates_and_confidence(tmp_path: Path):
-    work = tmp_path / "repo"
+    from tests.helpers import ensure_git_repo
+
+    work = ensure_git_repo(tmp_path / "repo")
     (work / "src").mkdir(parents=True)
     for i in range(6):
         (work / "src" / f"preview-extra-{i}.ts").write_text("export {}\n", encoding="utf-8")
@@ -283,7 +288,9 @@ def test_attach_spec_pointers_appends_without_replacing_notes():
 
 
 def test_cartographer_indexes_trellis_and_points_modules(tmp_path: Path):
-    work = tmp_path / "app"
+    from tests.helpers import ensure_git_repo
+
+    work = ensure_git_repo(tmp_path / "app")
     (work / "src" / "HCBVideo").mkdir(parents=True)
     (work / "src" / "HCBVideo" / "vue.app.js").write_text("export {}\n", encoding="utf-8")
     (work / "package.json").write_text(

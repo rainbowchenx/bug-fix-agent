@@ -875,12 +875,9 @@ def _build_prompt(
     }
     playbook = profile_reading_playbook(req.baseline.cartographyProfile)
     cg = req.codegraph
-    cg_ready = bool(cg and cg.ready)
     cg_line = (
-        f"codeGraph: ready (cli {cg.version or 'unknown'}) "
-        f"roots={json.dumps(cg.roots if cg else [], ensure_ascii=False)}; "
-        "MUST use codegraph_explore / codegraph_node first; candidate.source=codegraph when used"
-        if cg_ready
+        cg.prompt_roots_line()
+        if cg is not None
         else "codeGraph: unavailable — use Grep/Read/Glob only"
     )
     return (

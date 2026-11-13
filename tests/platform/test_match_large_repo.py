@@ -22,7 +22,9 @@ def test_max_files_default_is_large():
 
 
 def test_prefer_src_over_test_paths(tmp_path: Path):
-    work = tmp_path / "repo"
+    from tests.helpers import ensure_git_repo
+
+    work = ensure_git_repo(tmp_path / "repo")
     (work / "src" / "node" / "routes").mkdir(parents=True)
     (work / "test" / "e2e").mkdir(parents=True)
     (work / "test" / "unit").mkdir(parents=True)
@@ -49,7 +51,9 @@ def test_prefer_src_over_test_paths(tmp_path: Path):
 
 
 def test_weak_substring_loses_to_segment_match(tmp_path: Path):
-    work = tmp_path / "repo"
+    from tests.helpers import ensure_git_repo
+
+    work = ensure_git_repo(tmp_path / "repo")
     (work / "packages" / "postcss" / "src").mkdir(parents=True)
     (work / "packages" / "node" / "src").mkdir(parents=True)
     (work / "packages" / "postcss" / "src" / "index.ts").write_text("export {}\n", encoding="utf-8")
@@ -138,7 +142,9 @@ def test_go_underscore_test_files_penalized(tmp_path: Path):
 
 
 def test_scoped_package_dir_beats_generic_plugin_name(tmp_path: Path):
-    work = tmp_path / "repo"
+    from tests.helpers import ensure_git_repo
+
+    work = ensure_git_repo(tmp_path / "repo")
     (work / "packages" / "@tailwindcss-vite" / "src").mkdir(parents=True)
     (work / "packages" / "tailwindcss" / "src").mkdir(parents=True)
     (work / "packages" / "@tailwindcss-vite" / "src" / "index.ts").write_text(

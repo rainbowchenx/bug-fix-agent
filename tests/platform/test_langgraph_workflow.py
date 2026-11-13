@@ -10,8 +10,10 @@ from tests.helpers import defect_batch_from_hc1
 
 
 def _mini_work(tmp_path: Path) -> Path:
-    work = tmp_path / "mini"
-    (work / "src").mkdir(parents=True)
+    from tests.helpers import ensure_git_repo
+
+    work = ensure_git_repo(tmp_path / "mini")
+    (work / "src").mkdir(parents=True, exist_ok=True)
     (work / "package.json").write_text(
         json.dumps({"name": "mini-hc", "version": "0.0.1", "dependencies": {"electron": "30.0.0"}}),
         encoding="utf-8",

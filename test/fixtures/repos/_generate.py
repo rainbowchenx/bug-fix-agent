@@ -18,6 +18,16 @@ def _w(path: Path, text: str) -> None:
     path.write_text(text.replace("\r\n", "\n"), encoding="utf-8")
 
 
+def _plant_git(base: Path, *, head: str = "a" * 40) -> None:
+    """Fake ``.git`` so ``discover_repo_roots`` treats the fixture as a real repo.
+
+    Nested ``.git`` cannot be committed into this monorepo; regenerate (or the
+    pytest session fixture) must re-plant these markers after clone.
+    """
+    _w(base / ".git/HEAD", "ref: refs/heads/main\n")
+    _w(base / ".git/refs/heads/main", head[:40] + "\n")
+
+
 def _vue_app(module: str, el: str) -> str:
     return (
         "import singleSpaVue from 'single-spa-vue';\n"
@@ -29,6 +39,7 @@ def _vue_app(module: str, el: str) -> str:
 
 def write_micro_frontend() -> None:
     base = ROOT / "micro-frontend"
+    _plant_git(base)
     _w(
         base / "package.json",
         json.dumps(
@@ -107,6 +118,7 @@ def write_micro_frontend() -> None:
 
 def write_micro_frontend_in_repo() -> None:
     base = ROOT / "micro-frontend-in-repo"
+    _plant_git(base)
     _w(
         base / "package.json",
         json.dumps(
@@ -141,6 +153,7 @@ def write_micro_frontend_in_repo() -> None:
 
 def write_device_web() -> None:
     base = ROOT / "device-web"
+    _plant_git(base)
     _w(
         base / "package.json",
         json.dumps(
@@ -188,6 +201,7 @@ def write_device_web() -> None:
 def write_device_web_host_mf() -> None:
     """Host markers of device-web, architecture of micro-frontend (camera trap)."""
     base = ROOT / "device-web-host-mf"
+    _plant_git(base)
     _w(
         base / "package.json",
         json.dumps(
@@ -215,8 +229,7 @@ def write_device_web_host_mf() -> None:
 
 
 def _write_electron_product(base: Path) -> None:
-    _w(base / ".git/HEAD", "ref: refs/heads/main\n")
-    _w(base / ".git/refs/heads/main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n")
+    _plant_git(base, head="a" * 40)
     _w(
         base / "electron/package.json",
         json.dumps(
@@ -297,8 +310,7 @@ def write_electron_container() -> None:
         )
         + "\n",
     )
-    _w(sub / ".git/HEAD", "ref: refs/heads/main\n")
-    _w(sub / ".git/refs/heads/main", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n")
+    _plant_git(sub, head="b" * 40)
     _w(sub / "src/index.ts", "import Koa from 'koa';\nnew Koa().listen(4000);\n")
     _w(
         sub / "vite.config.ts",

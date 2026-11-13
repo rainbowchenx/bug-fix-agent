@@ -25,83 +25,74 @@ def normalize_cartography_profile(value: str | None) -> CartographyProfile:
     return text  # type: ignore[return-value]
 
 
-def discover_repo_roots(work_dir: str | Path) -> list[RepoRoot]:
-    root = Path(work_dir)
-    roots: list[RepoRoot] = []
-    if (root / "package.json").exists() or (root / ".git").exists() or (root / "pyproject.toml").exists():
-        roots.append(
-            RepoRoot(path=".", gitHead=_git_head(root), fingerprint=_fingerprint(root))
-        )
+class NoGitRepoError(ValueError):
+    """``workDir`` 及其直接子目录都没有合法 git 仓。"""
 
+
+def is_git_repo(path: str | Path) -> bool:
+    """目录是否为 git 工作树（``.git`` 目录或 gitfile）。"""
+    git = Path(path) / ".git"
+    if git.is_dir():
+        return True
+    if git.is_file():
+        try:
+            return git.read_text(encoding="utf-8", errors="ignore").lstrip().lower().startswith(
+                "gitdir:"
+            )
+        except OSError:
+            return False
+    return False
+
+
+def discover_repo_roots(work_dir: str | Path) -> list[RepoRoot]:
+    """只认 git 仓根：``workDir`` 自身，或其**直接子目录**里带 ``.git`` 的项。
+
+    - 命中 ``workDir`` 自身为仓 → 只返回 ``.``（不再把子目录升成根；微前端
+      submodule 的 ``.git`` 因此不会炸成几十个 repoRoots）。
+    - ``workDir`` 是壳、下面并列多个仓（led）→ 每个子仓一条。
+    - ``package.json`` / ``pyproject.toml`` 不再当仓的代理判据（只服务
+      techStack / fingerprint）。
+    - 一个 git 都没有 → :class:`NoGitRepoError`，禁止回落 ``['.']``。
+    """
+    root = Path(work_dir)
+    if is_git_repo(root):
+        return [
+            RepoRoot(path=".", gitHead=_git_head(root), fingerprint=_fingerprint(root))
+        ]
+
+    roots: list[RepoRoot] = []
     try:
         entries = list(root.iterdir())
-    except OSError:
-        return roots or [RepoRoot(path=".", gitHead=None, fingerprint="empty")]
+    except OSError as err:
+        raise NoGitRepoError(
+            f"cannot read workDir {root}: {err}; point workDir at a git repo "
+            "or a parent of git repos"
+        ) from err
 
     for child in entries:
-        if not child.is_dir() or child.name.startswith(".") or child.name in {"node_modules", "dist", ".venv"}:
+        if not child.is_dir() or child.name.startswith(".") or child.name in {
+            "node_modules",
+            "dist",
+            ".venv",
+        }:
             continue
-        if (child / "package.json").exists() or (child / ".git").exists() or (child / "pyproject.toml").exists():
-            roots.append(
-                RepoRoot(
-                    path=child.name,
-                    gitHead=_git_head(child),
-                    fingerprint=_fingerprint(child),
-                )
+        if not is_git_repo(child):
+            continue
+        roots.append(
+            RepoRoot(
+                path=child.name,
+                gitHead=_git_head(child),
+                fingerprint=_fingerprint(child),
             )
+        )
 
-    _add_container_roots(root, roots)
-
-    return roots or [
-        RepoRoot(path=".", gitHead=_git_head(root), fingerprint=_fingerprint(root))
-    ]
-
-
-def _add_container_roots(root: Path, roots: list[RepoRoot]) -> None:
-    """容器目录：自身不是仓、但直接子目录是仓／带清单。
-
-    仅在 ``work_dir`` 本身不是仓时启用（否则单仓里的 ``src/`` 也会被当成扫描根，
-    而它的子目录恰好都有 ``package.json``）。``led`` 就属于这种情形：
-    ``led/calibrationtool/{electron,web}/package.json``，而 ``led/calibrationtool``
-    自己没有清单——不补的话 match 完全不扫这棵树。
-    """
-    if any(r.path in (".", "") for r in roots):
-        return
-    known = {r.path for r in roots}
-    try:
-        children = [c for c in root.iterdir() if c.is_dir()]
-    except OSError:
-        return
-    for child in children:
-        if child.name.startswith(".") or child.name in {"node_modules", "dist", ".venv"}:
-            continue
-        if child.name in known:
-            continue
-        if (child / "package.json").exists() or (child / ".git").exists():
-            continue
-        if not _readable(child):
-            continue
-        nested = [
-            g
-            for g in child.iterdir()
-            if g.is_dir()
-            and not g.name.startswith(".")
-            and g.name not in {"node_modules", "dist", ".venv"}
-            and (
-                (g / "package.json").exists()
-                or (g / ".git").exists()
-                or (g / "pyproject.toml").exists()
-            )
-        ]
-        if len(nested) >= 2:
-            roots.append(
-                RepoRoot(
-                    path=child.name,
-                    gitHead=_git_head(child),
-                    fingerprint=f"{child.name}@container",
-                )
-            )
-            known.add(child.name)
+    if not roots:
+        raise NoGitRepoError(
+            f"no git repo under workDir {root}: expected {root}/.git or "
+            f"{root}/<child>/.git; point workDir at a git repo or its parent "
+            "(do not use a non-git shell as the only root)"
+        )
+    return roots
 
 
 _TS_SCAN_SKIP = {"node_modules", "dist", "build", "coverage", "vendor", "out", "target"}
@@ -146,15 +137,38 @@ def _readable(path: Path) -> bool:
         return False
 
 
+def _git_dir(dir_path: Path) -> Path | None:
+    """解析 ``.git`` 目录（含 gitfile ``gitdir: …``）；失败返回 None。"""
+    git = dir_path / ".git"
+    if git.is_dir():
+        return git
+    if git.is_file():
+        try:
+            text = git.read_text(encoding="utf-8", errors="ignore").strip()
+        except OSError:
+            return None
+        if text.lower().startswith("gitdir:"):
+            target = text.split(":", 1)[1].strip()
+            path = Path(target)
+            if not path.is_absolute():
+                path = (dir_path / path).resolve()
+            return path if path.is_dir() else None
+    return None
+
+
 def _git_head(dir_path: Path) -> str | None:
-    head = dir_path / ".git" / "HEAD"
+    """尽力读 HEAD；取不到返回 None（仓仍合法，不因此否根）。"""
+    git_dir = _git_dir(dir_path)
+    if git_dir is None:
+        return None
+    head = git_dir / "HEAD"
     try:
         text = head.read_text(encoding="utf-8").strip()
     except OSError:
         return None
     if text.startswith("ref:"):
         ref = text.split(":", 1)[1].strip()
-        ref_path = dir_path / ".git" / ref
+        ref_path = git_dir / ref
         try:
             return ref_path.read_text(encoding="utf-8").strip()[:40] or None
         except OSError:

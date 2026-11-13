@@ -13,6 +13,7 @@ CLI 版本差异必须自己处理，不能让用户去读报错：
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -53,24 +54,62 @@ class CodeGraphStatus:
 
     ready: bool
     roots: list[str] = field(default_factory=list)
-    """已有索引的绝对路径（workDir 或子仓根）。"""
+    """已有**非空**索引的绝对路径（真 git 仓根，不是壳 workDir）。"""
     initialized: list[str] = field(default_factory=list)
     """本次新跑 ``init`` 的路径。"""
+    root_stats: dict[str, dict[str, Any]] = field(default_factory=dict)
+    """``{root: {files, pending, …}}``，供 prompt / MCP 默认根挑选。"""
     bin: Optional[str] = None
     version: Optional[str] = None
     detail: Optional[str] = None
     disabled: bool = False
 
+    def mcp_default_root(self) -> Optional[str]:
+        """MCP ``-p``：第一个 ``files>0`` 的 ready 根，否则第一个 ready 根。"""
+        for path in self.roots:
+            stats = self.root_stats.get(path) or {}
+            files = stats.get("files")
+            if isinstance(files, int) and files > 0:
+                return path
+        return self.roots[0] if self.roots else None
+
+    def prompt_roots_line(self) -> str:
+        """给模型看的 projectPath 清单（含文件数）。"""
+        if not self.ready:
+            return "codeGraph: unavailable — use Grep/Read/Glob only"
+        bits: list[str] = []
+        default = self.mcp_default_root()
+        for path in self.roots:
+            stats = self.root_stats.get(path) or {}
+            files = stats.get("files")
+            pending = stats.get("pending")
+            mark = " (mcpDefault)" if path == default else ""
+            if isinstance(files, int):
+                extra = f"files={files}"
+                if isinstance(pending, int) and pending:
+                    extra += f",pending={pending}"
+                bits.append(f"{path}[{extra}]{mark}")
+            else:
+                bits.append(f"{path}{mark}")
+        return (
+            f"codeGraph: ready (cli {self.version or 'unknown'}); "
+            f"projectPaths={json.dumps(bits, ensure_ascii=False)}; "
+            "pass projectPath for the ticket's repo; MUST use codegraph_explore first"
+        )
+
     def mcp_servers(self, work_dir: str) -> dict[str, Any]:
-        """SDK ``ClaudeAgentOptions.mcp_servers`` 条目；未就绪则空。"""
+        """SDK ``ClaudeAgentOptions.mcp_servers`` 条目；未就绪则空。
+
+        ``-p`` 绑**第一个有文件的真仓根**，绝不绑非仓壳 workDir。
+        """
         if not self.ready or not self.bin:
             return {}
-        # 以 workDir 为 MCP 默认工程；子仓查询靠工具参数 projectPath。
+        default = self.mcp_default_root() or str(Path(work_dir).resolve())
         return {
             "codegraph": {
                 "type": "stdio",
                 "command": self.bin,
-                "args": ["serve", "--mcp", "-p", str(Path(work_dir).resolve())],
+                "args": ["serve", "--mcp", "-p", default],
                 "env": {"CODEGRAPH_TELEMETRY": os.environ.get("CODEGRAPH_TELEMETRY", "0")},
             }
         }
@@ -226,20 +265,81 @@ def detect_codegraph_signal(root: str | Path) -> bool:
     return False
 
 
+def _path_is_git_repo(path: Path) -> bool:
+    git = path / ".git"
+    if git.is_dir():
+        return True
+    if git.is_file():
+        try:
+            return git.read_text(encoding="utf-8", errors="ignore").lstrip().lower().startswith(
+                "gitdir:"
+            )
+        except OSError:
+            return False
+    return False
+
+
 def _candidate_roots(
     work_dir: str | Path, repo_roots: Sequence[Any] | None = None
 ) -> list[Path]:
+    """索引目标 = ``repoRoots`` 解析出的绝对路径；**绝不**无条件塞壳 workDir。
+
+    ``repo_roots is None``（单测裸调）：仅当 workDir 自身是 git 仓才索引。
+    """
     root = Path(work_dir).resolve()
-    out: list[Path] = [root]
-    for rr in repo_roots or []:
+    if repo_roots is None:
+        return [root] if _path_is_git_repo(root) else []
+    out: list[Path] = []
+    for rr in repo_roots:
         rel = getattr(rr, "path", None)
         if rel is None and isinstance(rr, dict):
             rel = rr.get("path")
-        if not rel or rel in (".", "./"):
+        if rel is None:
             continue
-        cand = (root / str(rel)).resolve()
+        text = str(rel).strip() or "."
+        cand = root if text in (".", "./") else (root / text).resolve()
         if cand.is_dir() and cand not in out:
             out.append(cand)
+    return out
+
+
+def probe_index_stats(
+    bin_path: str, root: str | Path, timeout_sec: int = 30
+) -> dict[str, Any]:
+    """``codegraph status --json`` → ``{files, pending, ...}``；失败返回空 dict。"""
+    try:
+        proc = subprocess.run(
+            [bin_path, "status", "--json", str(Path(root).resolve())],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout_sec,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return {}
+    text = (proc.stdout or "").strip()
+    if not text:
+        return {}
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    files = data.get("fileCount")
+    pending = data.get("pendingChanges")
+    pending_n = None
+    if isinstance(pending, dict):
+        pending_n = int(pending.get("added") or 0) + int(pending.get("modified") or 0) + int(
+            pending.get("removed") or 0
+        )
+    out: dict[str, Any] = {}
+    if isinstance(files, int):
+        out["files"] = files
+    if pending_n is not None:
+        out["pending"] = pending_n
     return out
 
 
@@ -347,27 +447,48 @@ def ensure_codegraph(
                 if _needs_upgrade(version):
                     notes.append(f"still {version} after upgrade; using legacy init flags")
 
+    if not roots:
+        notes.append(
+            "no git repoRoots to index (shell workDir without child repos?); "
+            "CodeGraph not mounted"
+        )
+
+    root_stats: dict[str, dict[str, Any]] = {}
     for path in roots:
-        if has_codegraph_index(path):
-            ready_roots.append(str(path))
-            continue
-        if not do_init:
-            notes.append(f"skip init (disabled): {path}")
-            continue
-        if not bin_path:
-            notes.append("codegraph binary not on PATH; set BUGFIX_CODEGRAPH_BIN or install @colbymchenry/codegraph")
-            break
-        ok, msg = init_codegraph(path, bin_path=bin_path, version=version)
-        if ok:
-            ready_roots.append(str(path))
-            initialized.append(str(path))
+        path_s = str(path)
+        if not has_codegraph_index(path):
+            if not do_init:
+                notes.append(f"skip init (disabled): {path}")
+                continue
+            if not bin_path:
+                notes.append(
+                    "codegraph binary not on PATH; set BUGFIX_CODEGRAPH_BIN or "
+                    "install @colbymchenry/codegraph"
+                )
+                break
+            ok, msg = init_codegraph(path, bin_path=bin_path, version=version)
+            if not ok:
+                notes.append(f"init failed {path}: {msg}")
+                continue
+            initialized.append(path_s)
             notes.append(f"init {path}: {msg}")
-        else:
-            notes.append(f"init failed {path}: {msg}")
+
+        stats = probe_index_stats(bin_path, path) if bin_path else {}
+        root_stats[path_s] = stats
+        files = stats.get("files")
+        if isinstance(files, int) and files <= 0:
+            # 壳目录上 init 出的空库：不算 ready，避免 MCP 默认挂上空索引。
+            pending = stats.get("pending")
+            notes.append(
+                f"index-truncated({path}:files={files}"
+                + (f",pending={pending}" if pending else "")
+                + ") — skipped for MCP"
+            )
+            continue
+        ready_roots.append(path_s)
 
     ready = bool(ready_roots) and bool(bin_path)
     if ready_roots and not bin_path:
-        # 索引在、但没 CLI：MCP 挂不上，Bash/`codegraph` 也不可用。
         notes.append("index present but codegraph binary missing; MCP not mounted")
         ready = False
 
@@ -376,6 +497,7 @@ def ensure_codegraph(
         ready=ready,
         roots=ready_roots,
         initialized=initialized,
+        root_stats=root_stats,
         bin=bin_path if ready else bin_path,
         version=version,
         detail=detail,

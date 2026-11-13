@@ -6,6 +6,9 @@
 
     python test/fixtures/repos/_generate.py
 
+每个产品仓根会写假 ``.git``（``discover_repo_roots`` 只认 git）。嵌套
+``.git`` 无法入库；pytest session 也会再种一遍。
+
 评测入口：`pytest tests/platform/test_cartography_eval.py -q`
 
 | 夹具 | 当作 | 钉住什么 |

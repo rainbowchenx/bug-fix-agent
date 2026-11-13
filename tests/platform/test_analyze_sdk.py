@@ -385,9 +385,11 @@ def test_analyst_forwards_spec_atlas_and_codegraph(tmp_path: Path, monkeypatch):
 
 
 def test_workflow_heuristic_analyze_mode(tmp_path: Path, monkeypatch):
+    from tests.helpers import ensure_git_repo
+
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    work = tmp_path / "mini"
-    (work / "src").mkdir(parents=True)
+    work = ensure_git_repo(tmp_path / "mini")
+    (work / "src").mkdir(parents=True, exist_ok=True)
     (work / "package.json").write_text(
         json.dumps({"name": "mini-hc", "version": "0.0.1", "dependencies": {"electron": "30.0.0"}}),
         encoding="utf-8",

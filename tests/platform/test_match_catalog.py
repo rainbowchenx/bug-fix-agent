@@ -189,6 +189,9 @@ def test_nested_router_is_route_table_and_not_a_locus():
 
 
 def test_static_path_ranks_below_src(tmp_path: Path):
+    from tests.helpers import ensure_git_repo
+
+    ensure_git_repo(tmp_path)
     (tmp_path / "src").mkdir()
     (tmp_path / "static").mkdir()
     (tmp_path / "src" / "overlay.js").write_text(

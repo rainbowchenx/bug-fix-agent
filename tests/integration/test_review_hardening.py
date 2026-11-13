@@ -106,6 +106,9 @@ def test_filter_existing_candidates_drops_missing(tmp_path: Path):
 
 
 def test_match_tickets_only_existing_paths(tmp_path: Path):
+    from tests.helpers import ensure_git_repo
+
+    ensure_git_repo(tmp_path)
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "preview-player.ts").write_text("export const preview = 1;\n", encoding="utf-8")
     tickets = [

@@ -57,12 +57,13 @@ def _batch() -> DefectBatch:
 
 
 def test_heuristic_cartography_annotates(monkeypatch, tmp_path: Path):
+    from tests.helpers import ensure_git_repo
+
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("BUGFIX_CARTOGRAPHY_MODE", raising=False)
     assert cartography_mode_from_env() == "heuristic"
 
-    work = tmp_path / "repo"
-    work.mkdir()
+    work = ensure_git_repo(tmp_path / "repo")
     (work / "package.json").write_text(
         json.dumps({"name": "x", "dependencies": {"electron": "1"}}), encoding="utf-8"
     )
@@ -80,8 +81,9 @@ def test_heuristic_cartography_annotates(monkeypatch, tmp_path: Path):
 
 
 def test_cartographer_uses_injected_enricher(tmp_path: Path):
-    work = tmp_path / "repo"
-    work.mkdir()
+    from tests.helpers import ensure_git_repo
+
+    work = ensure_git_repo(tmp_path / "repo")
     (work / "package.json").write_text(
         json.dumps({"name": "x", "dependencies": {"electron": "1"}}), encoding="utf-8"
     )
@@ -132,9 +134,11 @@ def test_cartographer_uses_injected_enricher(tmp_path: Path):
 
 
 def test_workflow_cartography_heuristic(tmp_path: Path, monkeypatch):
+    from tests.helpers import ensure_git_repo
+
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    work = tmp_path / "mini"
-    (work / "src").mkdir(parents=True)
+    work = ensure_git_repo(tmp_path / "mini")
+    (work / "src").mkdir(parents=True, exist_ok=True)
     (work / "package.json").write_text(
         json.dumps({"name": "mini-hc", "version": "0.0.1", "dependencies": {"electron": "30.0.0"}}),
         encoding="utf-8",
