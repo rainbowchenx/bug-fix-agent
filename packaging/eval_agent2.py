@@ -11,9 +11,12 @@
     python packaging/eval_agent2.py \\
         --repo /path/to/repo --profile device_web \\
         --batch /path/to/defect-batch.json \\
-        --cases field-eval/agent2/<run>/cases.json \\
+        --cases <eval-dir>/cases.json \\
         --mode sdk --max-turns 60 \\
-        --out field-eval/agent2/<run>/sdk.json
+        --out <eval-dir>/sdk.json
+
+评测数据不入库：``cases.json`` 与跑批产物在各业务侧 ``bug-fix-测试专用/agent2开发评测/``
+（transport 2026-11-10 实场评测、2026-11-12 三仓基线）。仓里只留可复跑的脚本与测试。
 """
 
 from __future__ import annotations

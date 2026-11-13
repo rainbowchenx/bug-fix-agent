@@ -6,8 +6,10 @@
 
     python packaging/eval_agent3.py \\
         --report analysis-report.json \\
-        --cases field-eval/agent3/<run>/cases.json \\
-        --out field-eval/agent3/<run>/score.json
+        --cases <eval-dir>/cases.json \\
+        --out <eval-dir>/score.json
+
+评测数据不入库，放 ``bug-fix-测试专用/agent3开发评测/``。
 """
 
 from __future__ import annotations

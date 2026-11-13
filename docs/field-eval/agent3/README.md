@@ -47,7 +47,8 @@ python packaging/eval_agent3.py \
 可修票不要把 `unlocalized` 放进 `expectOutcomes`，除非你故意标「当前仓确实找不到」。  
 缺信息票：`expectOutcomes: ["needs_ticket_info"]`，且不应要求路径命中。
 
-模板：`field-eval/agent3/cases.example.json`。transport 三张票的路径真值可直接复用 Agent-2 的 `field-eval/agent2/2026-11-10-transport/cases.json`。
+模板与跑批产物不入库，统一放仓外 `bug-fix-测试专用/agent3开发评测/`（模板 `cases.example.json`）。
+transport 三张票的路径真值可直接复用 Agent-2 的 `bug-fix-测试专用/agent2开发评测/2026-11-10-transport-实场评测/cases.json`。
 
 ---
 
