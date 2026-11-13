@@ -149,10 +149,11 @@ def test_env_skills_dir_is_merged(tmp_path: Path, monkeypatch):
 
 
 def test_run_cartographer_records_injected_bound_skills(tmp_path: Path, monkeypatch):
+    from tests.helpers import ensure_git_repo
+
     monkeypatch.delenv("BUGFIX_SKILLS_DIR", raising=False)
-    work = tmp_path / "repo"
+    work = ensure_git_repo(tmp_path / "repo")
     extra = tmp_path / "injected"
-    work.mkdir()
     (work / "package.json").write_text(
         '{"name":"x","dependencies":{"electron":"1"}}', encoding="utf-8"
     )

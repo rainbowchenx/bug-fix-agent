@@ -10,6 +10,7 @@ from bugfix_platform.agents.cartographer.detect import (
     discover_repo_roots,
     read_conventions,
 )
+from tests.helpers import ensure_git_repo
 
 
 def _pkg(repo: Path, deps: dict | None = None, *, auto: dict | None = None) -> None:
@@ -22,6 +23,7 @@ def _pkg(repo: Path, deps: dict | None = None, *, auto: dict | None = None) -> N
     if auto:
         payload["autoDependencies"] = auto
     (repo / "package.json").write_text(json.dumps(payload), encoding="utf-8")
+    ensure_git_repo(repo)
 
 
 def test_typescript_needs_evidence_not_just_a_manifest(tmp_path: Path):

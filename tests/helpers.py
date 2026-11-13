@@ -11,6 +11,19 @@ ROOT = Path(__file__).resolve().parents[1]
 HC1 = ROOT / "test" / "fixtures" / "defect-batch" / "hc1-raw.json"
 
 
+def ensure_git_repo(path: Path, *, head: str = "a" * 40) -> Path:
+    """Plant a minimal ``.git`` so ``discover_repo_roots`` accepts the path."""
+    path.mkdir(parents=True, exist_ok=True)
+    git = path / ".git"
+    if not git.exists():
+        git.mkdir()
+        (git / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+        ref = git / "refs" / "heads"
+        ref.mkdir(parents=True, exist_ok=True)
+        (ref / "main").write_text(head[:40] + "\n", encoding="utf-8")
+    return path
+
+
 def defect_batch_from_hc1(*, posture: str = "alpha") -> DefectBatch:
     return run_defect_batch_prepare(
         product_line="hc",

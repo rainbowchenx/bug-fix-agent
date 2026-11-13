@@ -530,11 +530,9 @@ def _build_prompt(req: AnalyzeRequest) -> str:
     soft = req.routed.get("localization") or {}
     apply_flag = "true" if req.apply_fix else "false"
     cg = req.codegraph
-    cg_ready = bool(cg and cg.ready)
     cg_line = (
-        f"codeGraph: ready (cli {cg.version or 'unknown'}); "
-        "MUST use codegraph_explore / callers / callees first"
-        if cg_ready
+        cg.prompt_roots_line()
+        if cg is not None
         else "codeGraph: unavailable — use Grep/Read/Glob only"
     )
     ticket_specs = select_ticket_spec_dirs(req.spec_atlas, req.architecture, req.routed)

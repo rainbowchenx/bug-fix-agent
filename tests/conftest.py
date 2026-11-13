@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 _LEAKY = (
@@ -24,6 +26,26 @@ _LEAKY = (
     "BUGFIX_APPLY_FIX",
     "BUGFIX_ANALYZE_MAX_TURNS",
 )
+
+# Nested fixture ``.git`` markers cannot be committed; re-plant once per session.
+_FIXTURE_GIT_ROOTS = (
+    "micro-frontend",
+    "micro-frontend-in-repo",
+    "device-web",
+    "device-web-host-mf",
+    "electron",
+    "electron-container/calibrationtool",
+    "electron-container/calibration-subsystem",
+)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _plant_fixture_git_markers() -> None:
+    from tests.helpers import ensure_git_repo
+
+    root = Path(__file__).resolve().parents[1] / "test" / "fixtures" / "repos"
+    for rel in _FIXTURE_GIT_ROOTS:
+        ensure_git_repo(root / rel)
 
 
 @pytest.fixture(autouse=True)
