@@ -413,12 +413,11 @@ def _with_live_snippet(work_dir: str, cand: dict[str, Any]) -> dict[str, Any]:
     if path is None or not path.is_file():
         return out
     body = path.read_text(encoding="utf-8", errors="replace")
-    if cited and cited not in body:
-        return out
     symbol = str(out.get("symbol") or "").strip()
     frag = _fragment_around(body, symbol) if symbol else ""
     if frag:
         out["snippet"] = frag
+        out["snippetSource"] = "extracted"
     return out
 
 
@@ -525,7 +524,9 @@ End with a single JSON object (optionally in a ```json fence) with keys:
 outcome, rootCause{summary,ruledOut,openQuestions}, proposedFix{summary,steps,targetFiles},
 localization{candidates,notes}, blockers, confidence, suggestedVerify{steps,executed}.
 Each localization.candidates[] item MUST include path and a snippet (verbatim 1-8
-lines from a file you Read) of the failing fragment. Optional: symbol, why, excerpt.
+lines from a file you Read) of the failing fragment, plus why that fragment causes
+the reported failure. Optional: symbol, excerpt. Omitting snippet is a locator only
+and is not enough to authorize an edit.
 outcome must be one of:
 patch_ready, plan_only, needs_test_env, needs_ticket_info, needs_design_input,
 not_code, config_or_dependency, unlocalized, other_blocked.

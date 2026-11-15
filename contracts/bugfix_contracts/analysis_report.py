@@ -53,6 +53,7 @@ class LocCandidate(BaseModel):
     source: Optional[str] = None
     snippet: Optional[str] = None
     excerpt: Optional[str] = None
+    snippetSource: Optional[str] = None
 
 
 class Localization(BaseModel):

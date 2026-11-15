@@ -11,6 +11,7 @@ from typing import Any, Callable, Literal, Optional
 
 from bugfix_contracts.defect_batch import BatchTicket
 from bugfix_platform.sdk.credentials import has_credentials
+from bugfix_platform.sdk.parse import parse_json_payload
 from bugfix_platform.sdk.skill_inject import InjectedSkill, fix_skills_addon
 from bugfix_platform.sdk.skills import skills_system_addon
 
@@ -157,12 +158,17 @@ def run_claude_fix(req: FixRequest) -> FixResult:
         model=model,
     )
 
+    texts: list[str] = []
+
     async def _run() -> None:
         async for message in query(prompt=prompt, options=options):
-            if isinstance(message, ResultMessage) and message.is_error:
-                raise RuntimeError(
-                    "; ".join(message.errors or []) or message.result or "fix SDK error"
-                )
+            if isinstance(message, ResultMessage):
+                if message.is_error:
+                    raise RuntimeError(
+                        "; ".join(message.errors or []) or message.result or "fix SDK error"
+                    )
+                if isinstance(message.result, str) and message.result.strip():
+                    texts.append(message.result)
 
     try:
         anyio.run(_run)
@@ -189,13 +195,17 @@ def run_claude_fix(req: FixRequest) -> FixResult:
         artifact_dir=req.artifact_dir,
     )
     summary = ((req.analysis.get("proposedFix") or {}) or {}).get("summary") or "apply proposed fix"
+    review = _parse_semantic_review(texts)
+    payload: dict[str, Any] = {
+        "outcome": "patch_ready",
+        "patch": {"path": str(path), "summary": str(summary)[:240]},
+    }
+    if review:
+        payload["semanticReview"] = review
     return FixResult(
         ok=True,
         source="sdk",
-        payload={
-            "outcome": "patch_ready",
-            "patch": {"path": str(path), "summary": str(summary)[:240]},
-        },
+        payload=payload,
     )
 
 
@@ -205,14 +215,37 @@ Use Edit/Write only. Minimal diff. Do not expand scope.
 Stay inside proposedFix.targetFiles unless a file you read proves another file is required.
 Do not commit, push, or run tests. Do not invent extra features.
 IRON LAW: if the analysis has no real root cause, make no edits.
+After editing, Read the files you changed. End with a JSON object that includes
+semanticReview: how THIS diff restores the expected behavior, whether success /
+fail / retry paths remain, and which changed lines are the basis. Judge the actual
+edits, not the analysis plan. If you cannot judge the diff, set semanticReview to
+"" and semanticReviewExecuted to false. Do not emit a generic template.
 """
+
+
+def _parse_semantic_review(texts: list[str]) -> str:
+    for text in reversed(texts):
+        parsed = parse_json_payload(text)
+        if not isinstance(parsed, dict):
+            continue
+        review = str(parsed.get("semanticReview") or parsed.get("reviewConclusion") or "").strip()
+        executed = parsed.get("semanticReviewExecuted")
+        if executed is False:
+            return ""
+        if review:
+            return review
+    return ""
 
 
 def _build_fix_prompt(req: FixRequest) -> str:
     t = req.ticket
+    expected = t.expected or ""
     return (
         "Apply the proposed fix for this ticket in the current worktree.\n\n"
         f"defectId: {t.defectId}\n"
         f"title: {t.title}\n"
+        f"expected: {expected}\n"
         f"analysis: {req.analysis}\n"
+        "After the edits, Read the changed files and return JSON with semanticReview "
+        "judging those exact lines.\n"
     )

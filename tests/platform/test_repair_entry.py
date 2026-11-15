@@ -1198,7 +1198,7 @@ def _loc(*extra: dict) -> dict:
     }
 
 
-def test_sdk_json_without_snippet_survives_parse_and_enters_fix(tmp_path: Path):
+def test_sdk_json_without_snippet_survives_parse_as_locator(tmp_path: Path):
     from bugfix_platform.sdk.analyze import _merge_with_routed, parse_analyze_payload
 
     work = tmp_path / "repo"
@@ -1240,9 +1240,10 @@ def test_sdk_json_without_snippet_survives_parse_and_enters_fix(tmp_path: Path):
         apply_fix=True,
         artifact_dir=tmp_path / "art",
     )
-    assert called["n"] == 1
+    assert called["n"] == 0
     loc = report.tickets[0].localization.candidates
     assert loc and (loc[0].snippet or "") and _SNIPPET.split("{")[0].strip() in (loc[0].snippet or "")
+    assert report.tickets[0].outcome != "patch_ready"
 
 
 def test_cited_snippet_missing_from_file_does_not_enter_fix(tmp_path: Path):
@@ -1732,14 +1733,12 @@ def test_report_records_semantic_review_conclusion(tmp_path: Path):
         artifact_dir=tmp_path / "art",
     )
     notes = report.tickets[0].localization.notes or ""
-    blob = notes + " " + (report.tickets[0].proposedFix.summary if report.tickets[0].proposedFix else "")
     latest = json.loads((tmp_path / "art" / "defects" / "D1" / "latest.json").read_text(encoding="utf-8"))
     attempt = json.loads(Path(latest["path"]).read_text(encoding="utf-8"))
     premise = str((attempt.get("editDecision") or {}).get("executionPremise") or "")
-    combined = blob + " " + premise
-    assert "expected" in combined.lower() or "出画" in combined
-    assert "fail" in combined.lower() or "path" in combined.lower() or "rethrow" in combined.lower()
-    assert "basis" in combined.lower() or "handleFail" in combined
+    combined = f"{notes} {premise}"
+    assert "not executed" in combined.lower() or "未执行" in combined
+    assert "keep the error visible" not in combined.lower()
 
 
 def test_check_log_uses_saved_attempt_id(tmp_path: Path):
@@ -1793,3 +1792,149 @@ def test_check_log_uses_saved_attempt_id(tmp_path: Path):
     refs = [c.get("logRef") for c in (attempt.get("checks") or []) if c.get("logRef")]
     assert refs
     assert attempt_id and attempt_id in str(refs[0]).replace("\\", "/")
+
+
+def _patch_attempt(*, digest: str, checks: list) -> object:
+    from bugfix_contracts.repair import (
+        REPAIR_SCHEMA_VERSION,
+        AttemptRecord,
+        PatchFile,
+        PatchSet,
+        VerificationRun,
+    )
+
+    return AttemptRecord(
+        schemaVersion=REPAIR_SCHEMA_VERSION,
+        attemptId="a1",
+        defectId="D1",
+        execution="completed",
+        resolution="patch_produced",
+        patchDelivery="candidate",
+        patchSet=PatchSet(
+            patchSetId="p-final",
+            delivery="candidate",
+            patches=[
+                PatchFile(
+                    path="src/a.ts",
+                    kind="modify",
+                    digest=digest,
+                    archivePath="archive/a.diff",
+                )
+            ],
+        ),
+        checks=[
+            item if isinstance(item, VerificationRun) else VerificationRun.model_validate(item)
+            for item in checks
+        ],
+    )
+
+
+def test_final_candidate_mixed_checks_are_not_passed():
+    from bugfix_platform.agents.analyst.run import _attach_checks_to_entry
+
+    attempt = _patch_attempt(
+        digest="final-digest",
+        checks=[
+            {
+                "command": ["compile"],
+                "result": "failed",
+                "exitCode": 1,
+                "coverage": "build",
+                "candidateDigest": "aabbccddeeff0011",
+            },
+            {
+                "command": ["pytest"],
+                "result": "passed",
+                "exitCode": 0,
+                "coverage": "unit",
+                "candidateDigest": "aabbccddeeff0011",
+            },
+        ],
+    )
+    # digest of the PatchSet is computed from path+digest+kind, not the literal above;
+    # stamp both checks with the real final digest after construction.
+    from bugfix_platform.agents.analyst.run import _patchset_digest
+
+    digest = _patchset_digest(attempt.patchSet)
+    attempt = attempt.model_copy(
+        update={
+            "checks": [
+                run.model_copy(update={"candidateDigest": digest}) for run in attempt.checks
+            ]
+        }
+    )
+    entry = _attach_checks_to_entry(
+        {"suggestedVerify": {"steps": [], "executed": False}, "verifyStatus": "skipped"},
+        attempt,
+    )
+    assert entry["verifyStatus"] != "passed"
+    assert entry["verifyStatus"] == "failed"
+
+
+def test_unmatched_final_candidate_does_not_reuse_old_checks():
+    from bugfix_platform.agents.analyst.run import _attach_checks_to_entry, _patchset_digest
+
+    attempt = _patch_attempt(
+        digest="new-file",
+        checks=[
+            {
+                "command": ["pytest"],
+                "result": "passed",
+                "exitCode": 0,
+                "coverage": "unit",
+                "candidateDigest": "old-candidate",
+            }
+        ],
+    )
+    assert _patchset_digest(attempt.patchSet) != "old-candidate"
+    entry = _attach_checks_to_entry(
+        {"suggestedVerify": {"steps": [], "executed": False}, "verifyStatus": "skipped"},
+        attempt,
+    )
+    assert entry["verifyStatus"] != "passed"
+    assert entry["verifyStatus"] == "skipped"
+
+
+def test_extracted_snippet_with_wrong_root_cause_does_not_enter_fix(tmp_path: Path):
+    from bugfix_platform.sdk.analyze import _merge_with_routed, parse_analyze_payload
+
+    work = tmp_path / "repo"
+    (work / "src").mkdir(parents=True)
+    (work / "src" / "a.ts").write_text(_SNIPPET + "\n", encoding="utf-8")
+    called = {"n": 0}
+    raw = (
+        "```json\n"
+        '{"outcome":"plan_only","rootCause":{"summary":"WebSocket heartbeat timeout in gateway",'
+        '"ruledOut":[],"openQuestions":[]},"proposedFix":{"summary":"increase ping interval","steps":[],'
+        '"targetFiles":["src/a.ts"]},"localization":{"candidates":[{"repoPath":".","path":"src/a.ts",'
+        '"symbol":"handleFail","why":"name hit","source":"sdk"}],"notes":""},"confidence":"medium"}\n'
+        "```"
+    )
+
+    def fake_analyze(req: AnalyzeRequest) -> AnalyzeResult:
+        parsed = parse_analyze_payload(raw)
+        payload = _merge_with_routed(
+            req.routed,
+            parsed or {},
+            work_dir=req.work_dir,
+            apply_fix=True,
+        )
+        cand = (payload.get("localization") or {}).get("candidates") or []
+        assert cand and (cand[0].get("snippet") or ""), "auto-extract may locate the symbol"
+        return AnalyzeResult(ok=True, source="sdk", payload=payload)
+
+    def fake_fix(_req: FixRequest) -> FixResult:
+        called["n"] += 1
+        return FixResult(ok=True, source="sdk", payload={"outcome": "patch_ready"})
+
+    report = run_analyst(
+        work_dir=work,
+        defect_batch=_batch(),
+        code_knowledge=_knowledge(work),
+        analyze_fn=fake_analyze,
+        fix_fn=fake_fix,
+        apply_fix=True,
+        artifact_dir=tmp_path / "art",
+    )
+    assert called["n"] == 0
+    assert report.tickets[0].outcome != "patch_ready"

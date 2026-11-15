@@ -472,9 +472,10 @@ def _verify_current_code(
         )
         mechanical = bool(symbol and symbol in body) or any(tok in body for tok in tokens)
         cited = str(cand.get("snippet") or cand.get("excerpt") or "").strip()
+        extracted = str(cand.get("snippetSource") or "").strip().lower() == "extracted"
         why = str(cand.get("why") or "").strip()
-        causal = bool(cited and cited in body) or bool(why and len(why) >= 16 and why in body)
-        snippet = body[:240]
+        confirmed = bool(cited and cited in body and not extracted)
+        causal = confirmed or bool(why and len(why) >= 16 and why in body)
         extra.append(
             Evidence(
                 evidenceId=eid,
@@ -642,12 +643,20 @@ def _run_fix_loop(
             runs.append(run)
         return runs
 
+    def review(_diff: str, _ctx: TaskContext, _decision: EditDecision) -> str:
+        return str(
+            last_payload.get("semanticReview")
+            or last_payload.get("reviewConclusion")
+            or ""
+        ).strip()
+
     attempt = run_ticket(
         context,
         {
             "analyze": lambda _ctx: decision,
             "edit": edit,
             "check": check,
+            "review": review,
         },
         attempt_id=attempt_id,
     )
@@ -806,12 +815,18 @@ def _attach_checks_to_entry(entry: dict[str, Any], attempt: AttemptRecord) -> di
         c
         for c in commands
         if final_digest and c.get("candidateDigest") == final_digest
-    ] or commands[-1:]
-    last = current[-1] if current else None
-    if last and last.get("result") == "passed":
-        entry["verifyStatus"] = "passed"
-    elif last and last.get("result") in {"failed", "blocked"}:
+    ]
+    applicable = [
+        c for c in current if c.get("result") in {"passed", "failed", "blocked"}
+    ]
+    if not applicable:
+        entry["verifyStatus"] = "skipped"
+    elif any(c.get("result") in {"failed", "blocked"} for c in applicable):
         entry["verifyStatus"] = "failed"
+    elif all(c.get("result") == "passed" for c in applicable):
+        entry["verifyStatus"] = "passed"
+    else:
+        entry["verifyStatus"] = "skipped"
     return entry
 
 
@@ -842,6 +857,7 @@ def _persist_candidate_snippets(work_dir: Path, entry: dict[str, Any]) -> dict[s
             frag = _fragment_around_symbol(body, symbol)
             if frag:
                 item["snippet"] = frag
+                item["snippetSource"] = "extracted"
         elif cited:
             item["snippet"] = cited
         filled.append(item)

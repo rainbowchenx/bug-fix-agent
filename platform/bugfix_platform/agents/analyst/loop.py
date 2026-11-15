@@ -75,18 +75,16 @@ def review_conclusion(
     diff: str,
     context: TaskContext,
     decision: EditDecision,
+    *,
+    model_text: str | None = None,
 ) -> str:
-    """写出复核结论：如何恢复预期、正常/失败路径、依据。"""
-    expected = ""
-    if context.revision is not None:
-        expected = context.revision.expected or ""
-    expected = expected or decision.behaviorTarget or "ticket expected"
-    basis = decision.mechanism or "cited code fragment"
-    return (
-        f"Restores expected: {expected} via {decision.editRationale or 'the edited fragment'}. "
-        f"Failure/retry path: keep the error visible on the named fail path. "
-        f"Basis: {basis}; files {decision.codeAssociation or 'associated locus'}."
-    )
+    """记录模型对最终 diff 的复核；未执行则如实标记。"""
+    judged = str(model_text or "").strip()
+    if judged:
+        return judged
+    if not (diff or "").strip():
+        return "semantic review not executed"
+    return "semantic review not executed"
 
 
 def _has_edits(diff: str) -> bool:
@@ -214,8 +212,16 @@ def run_ticket(
         delivery = "none"
         produced = False
     if produced:
+        review = services.get("review")
+        judged = ""
+        if review is not None:
+            judged = str(review(last_diff, context, decision) or "").strip()
         decision = decision.model_copy(
-            update={"executionPremise": review_conclusion(last_diff, context, decision)}
+            update={
+                "executionPremise": review_conclusion(
+                    last_diff, context, decision, model_text=judged
+                ),
+            }
         )
     if save is not None:
         save(context, decision)
