@@ -178,3 +178,7 @@ transport 三张票的路径真值可直接复用 Agent-2 的 `bug-fix-测试专
 3. 故意不可定位或非代码（确认 `unlocalized` / `not_code`，不要编修复）
 
 目录建议：`field-eval/agent3/<日期>-<仓>/`，放入 `cases.json`、`analysis-report.json`、`score.json`、`score.tsv`（G3 人分）。
+
+## 真实项目人工评测（2026-11-15）
+
+实项目首轮测试与后续对照使用[评测方法](2026-11-15-real-project-evaluation.md)、[逐票评审表](templates/ticket-review.md)、[汇总CSV](templates/ticket-review-summary.csv)和[批次评测报告](templates/batch-evaluation-report.md)。复制模板到实际评测目录填写；已关联修订方案与实施计划。未验收、原样解决和人工辅助解决分别统计，模板不包含虚构成绩。
