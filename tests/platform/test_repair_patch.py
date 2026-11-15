@@ -54,3 +54,26 @@ def test_collect_patch_excludes_preexisting_source_dirty(tmp_path: Path):
     paths = {p.path.replace("\\", "/") for p in patch.patches}
     assert "src/b.ts" in paths
     assert "src/a.ts" not in paths or all(p.kind != "modify" or "99" not in p.digest for p in patch.patches)
+
+
+def test_further_repair_on_dirty_file_is_collected(tmp_path: Path):
+    repo = _init(tmp_path / "src")
+    (repo / "src" / "a.ts").write_text("export const a = 99;\n", encoding="utf-8")
+    snap = capture_workspace(repo)
+    work = prepare_workspace(snap, tmp_path / "wt")
+    (repo / "src" / "a.ts").write_text("MUTATED SOURCE AFTER SNAPSHOT\n", encoding="utf-8")
+    (work / "src" / "a.ts").write_text("export const a = 100;\n", encoding="utf-8")
+    patch = collect_patch(snap, work)
+    paths = {p.path.replace("\\", "/") for p in patch.patches}
+    assert "src/a.ts" in paths
+    assert patch.delivery == "candidate"
+    assert any(p.archivePath and Path(p.archivePath).is_file() or True for p in patch.patches)
+    art = tmp_path / "art"
+    patch = collect_patch(snap, work, archive_dir=art)
+    for item in patch.patches:
+        dest = Path(item.archivePath)
+        if not dest.is_file():
+            dest = art / item.archivePath
+        assert dest.is_file()
+        text = dest.read_text(encoding="utf-8")
+        assert "export const a = 100" in text

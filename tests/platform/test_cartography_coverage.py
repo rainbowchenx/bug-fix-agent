@@ -17,6 +17,25 @@ def test_overflow_tickets_are_not_investigated():
     assert by_id["D19"].investigationStatus == "not_investigated"
 
 
+def test_only_model_returned_tickets_count_as_investigated():
+    from bugfix_platform.sdk.cartography import investigated_ids_from_parsed
+
+    parsed = {"defectCodeMatches": [{"defectId": "D1", "candidates": [{"path": "a.ts"}]}]}
+    ids = investigated_ids_from_parsed(parsed)
+    assert ids == ["D1"]
+    out = annotate_investigation_coverage(
+        [
+            DefectCodeMatch(defectId="D1", candidates=[], confidence="low"),
+            DefectCodeMatch(defectId="D2", candidates=[], confidence="low"),
+        ],
+        prompt_ids=["D1", "D2"],
+        investigated_ids=ids,
+    )
+    by_id = {m.defectId: m for m in out}
+    assert by_id["D1"].investigationStatus in ("partial", "complete")
+    assert by_id["D2"].investigationStatus != "complete"
+
+
 def test_zero_candidates_remain_legal():
     matches = [DefectCodeMatch(defectId="D1", candidates=[], confidence="low")]
     out = annotate_investigation_coverage(matches, prompt_ids=["D1"], investigated_ids=["D1"])

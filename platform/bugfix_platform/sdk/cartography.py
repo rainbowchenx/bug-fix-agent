@@ -487,7 +487,7 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
                     "defectCodeMatches": annotate_investigation_coverage(
                         list(knowledge.defectCodeMatches),
                         prompt_ids=prompt_ids,
-                        investigated_ids=prompt_ids,
+                        investigated_ids=investigated_ids_from_parsed(parsed),
                     )
                 }
             )
@@ -809,6 +809,15 @@ def _shared_signatures(matches: list[Any]) -> set[tuple[str, ...]]:
         if sig is not None:
             counts[sig] = counts.get(sig, 0) + 1
     return {sig for sig, n in counts.items() if n >= SHARED_SIGNATURE_MIN_TICKETS}
+
+
+def investigated_ids_from_parsed(parsed: dict[str, Any] | None) -> list[str]:
+    """只把模型实际返回的票算作已调查，不把 prompt 列表整批记 complete。"""
+    out: list[str] = []
+    for item in list((parsed or {}).get("defectCodeMatches") or []):
+        if isinstance(item, dict) and item.get("defectId"):
+            out.append(str(item["defectId"]))
+    return out
 
 
 def annotate_investigation_coverage(

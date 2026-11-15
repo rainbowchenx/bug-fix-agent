@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -134,3 +135,8 @@ def test_run_analyst_persists_all_tickets_including_excluded(tmp_path: Path):
     assert md.is_file()
     text = md.read_text(encoding="utf-8")
     assert "D1" in text and "D2" in text
+    assert "init race" in text
+    latest = json.loads((art / "defects" / "D1" / "latest.json").read_text(encoding="utf-8"))
+    attempt = json.loads(Path(latest["path"]).read_text(encoding="utf-8"))
+    assert attempt.get("evidence") or attempt.get("revisionId")
+    assert attempt.get("editDecision") is not None or attempt.get("resolution") == "analysis_only"

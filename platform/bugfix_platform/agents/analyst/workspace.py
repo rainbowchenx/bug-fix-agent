@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import difflib
 import hashlib
 import os
 import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Optional
 from uuid import uuid4
 
 from bugfix_contracts.repair import PatchFile, PatchSet, WorkspaceSnapshot
@@ -68,32 +69,49 @@ def prepare_workspace(snapshot: WorkspaceSnapshot, destination: Path) -> Path:
         # dirty 文件按源内容再写一遍，保证与捕获时一致。
         for rel in snapshot.dirty + snapshot.untracked:
             _copy_file(src / rel, dest / rel)
+    baseline = _input_baseline_path(dest)
+    if baseline.exists():
+        shutil.rmtree(baseline)
+    baseline.mkdir(parents=True)
+    _copytree(dest, baseline)
     return dest
 
 
-def collect_patch(snapshot: WorkspaceSnapshot, worktree: Path) -> PatchSet:
-    """从隔离输入快照到最终内容的差异；不含源仓预存 dirty。"""
+def collect_patch(
+    snapshot: WorkspaceSnapshot,
+    worktree: Path,
+    archive_dir: Optional[str | Path] = None,
+) -> PatchSet:
+    """隔离副本输入基线 → 最终内容。含对捕获时已 dirty 文件的后续修复。
+
+    不回读用户源仓（快照后源仓可能又变）。
+    """
     work = Path(worktree)
-    src = Path(snapshot.repoId)
-    baseline_files = _list_source_files(src)
+    baseline = _input_baseline_path(work)
+    if not baseline.is_dir():
+        baseline = work
+    archive_root = Path(archive_dir) if archive_dir is not None else work / ".bugfix" / "patches"
+    baseline_files = _list_source_files(baseline)
     work_files = _list_source_files(work)
-    preexisting = set(p.replace("\\", "/") for p in snapshot.dirty)
     patches: list[PatchFile] = []
     all_rel = sorted(set(baseline_files) | set(work_files))
     for rel in all_rel:
-        if rel in preexisting:
-            continue
-        left = src / rel
+        left = baseline / rel
         right = work / rel
         left_ok = left.is_file()
         right_ok = right.is_file()
         if left_ok and not right_ok:
-            patches.append(_file("delete", rel, right if right_ok else left, snapshot.head))
+            item = _file("delete", rel, b"", snapshot.head, left, right, archive_root)
+            patches.append(item)
         elif not left_ok and right_ok:
-            patches.append(_file("add", rel, right, snapshot.head))
+            item = _file("add", rel, right.read_bytes(), snapshot.head, left, right, archive_root)
+            patches.append(item)
         elif left_ok and right_ok:
-            if left.read_bytes() != right.read_bytes():
-                patches.append(_file("modify", rel, right, snapshot.head))
+            before = left.read_bytes()
+            after = right.read_bytes()
+            if before != after:
+                item = _file("modify", rel, after, snapshot.head, left, right, archive_root)
+                patches.append(item)
     delivery = "candidate" if patches else "none"
     return PatchSet(
         patchSetId=uuid4().hex[:12],
@@ -103,15 +121,40 @@ def collect_patch(snapshot: WorkspaceSnapshot, worktree: Path) -> PatchSet:
     )
 
 
-def _file(kind: str, rel: str, path: Path, head: str | None) -> PatchFile:
-    data = path.read_bytes() if path.is_file() else b""
-    digest = hashlib.sha256(data).hexdigest()[:16]
+def _input_baseline_path(worktree: Path) -> Path:
+    return Path(str(Path(worktree).resolve()) + ".input")
+
+
+def _file(
+    kind: str,
+    rel: str,
+    after: bytes,
+    head: str | None,
+    left: Path,
+    right: Path,
+    archive_root: Path,
+) -> PatchFile:
+    digest = hashlib.sha256(after).hexdigest()[:16]
+    rel_arch = f"patches/{rel.replace('/', '__')}.diff"
+    dest = archive_root / rel_arch
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    left_text = left.read_text(encoding="utf-8", errors="replace") if left.is_file() else ""
+    right_text = right.read_text(encoding="utf-8", errors="replace") if right.is_file() else ""
+    diff = "".join(
+        difflib.unified_diff(
+            left_text.splitlines(True),
+            right_text.splitlines(True),
+            fromfile=f"a/{rel}",
+            tofile=f"b/{rel}",
+        )
+    )
+    dest.write_text(diff or right_text, encoding="utf-8")
     return PatchFile(
         repoId=".",
         path=rel.replace("\\", "/"),
         kind=kind,  # type: ignore[arg-type]
         digest=digest,
-        archivePath=f"patches/{rel.replace('/', '__')}.diff",
+        archivePath=str(dest),
     )
 
 

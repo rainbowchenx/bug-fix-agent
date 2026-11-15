@@ -32,11 +32,21 @@ def _cmd_feedback(root: str, file: str) -> int:
     return 0
 
 
-def _cmd_resume(root: str, defect_id: str, revision_id: str | None) -> int:
-    """写出 session-decision.json，不猜 cwd 最近会话。"""
-    from bugfix_platform.agents.analyst.sessions import resume_from_store
+def _cmd_resume(
+    root: str,
+    defect_id: str,
+    revision_id: str | None,
+    apply_fix: bool = False,
+) -> int:
+    """写出 session-decision.json；``--apply-fix`` 时跑下一轮分析/编辑。"""
+    from bugfix_contracts.analysis_report import validate_analysis_report
+    from bugfix_contracts.code_knowledge import validate_code_knowledge
+    from bugfix_contracts.defect_batch import load_defect_batch
+    from bugfix_platform.agents.analyst.run import run_analyst
+    from bugfix_platform.agents.analyst.sessions import load_revision, resume_from_store
 
-    decision = resume_from_store(Path(root), defect_id, revision_id)
+    base = Path(root)
+    decision = resume_from_store(base, defect_id, revision_id)
     print(
         json.dumps(
             {
@@ -47,6 +57,37 @@ def _cmd_resume(root: str, defect_id: str, revision_id: str | None) -> int:
             ensure_ascii=False,
             indent=2,
         )
+    )
+    if not apply_fix:
+        return 0
+    batch_path = base / "defect-batch.json"
+    knowledge_path = base / "code-knowledge.json"
+    if not batch_path.is_file() or not knowledge_path.is_file():
+        print("resume --apply-fix needs defect-batch.json and code-knowledge.json", file=sys.stderr)
+        return 1
+    batch = load_defect_batch(batch_path)
+    knowledge = validate_code_knowledge(json.loads(knowledge_path.read_text(encoding="utf-8")))
+    report_path = base / "analysis-report.json"
+    work_dir = knowledge.workDir
+    if report_path.is_file():
+        previous = json.loads(report_path.read_text(encoding="utf-8"))
+        work_dir = str(previous.get("workDir") or work_dir)
+    revision = load_revision(base, defect_id, revision_id)
+    revisions = {defect_id: revision} if revision is not None else {}
+    session_ids = {defect_id: decision.sessionId} if decision.sessionId else {}
+    report = run_analyst(
+        work_dir=work_dir,
+        defect_batch=batch,
+        code_knowledge=knowledge,
+        apply_fix=True,
+        ticket_ids=[defect_id],
+        revisions=revisions,
+        session_ids=session_ids,
+        artifact_dir=base,
+    )
+    report_path.write_text(
+        validate_analysis_report(report.model_dump()).model_dump_json(indent=2),
+        encoding="utf-8",
     )
     return 0
 
@@ -134,6 +175,11 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Imported InputRevision id; omit to use the latest feedback file",
     )
+    resume_p.add_argument(
+        "--apply-fix",
+        action="store_true",
+        help="Run the next analyze/edit/check turn after writing the session decision",
+    )
 
     serve_p = sub.add_parser("serve", help="HTTP API (S4 FastAPI): POST/GET /v1/runs")
     serve_p.add_argument("--host", default="127.0.0.1")
@@ -159,7 +205,12 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_feedback(args.root, args.file)
 
     if args.cmd == "resume":
-        return _cmd_resume(args.root, args.defect_id, args.revision_id)
+        return _cmd_resume(
+            args.root,
+            args.defect_id,
+            args.revision_id,
+            apply_fix=bool(getattr(args, "apply_fix", False)),
+        )
 
     if args.cmd != "run":  # pragma: no cover
         raise SystemExit(f"unknown command: {args.cmd}")

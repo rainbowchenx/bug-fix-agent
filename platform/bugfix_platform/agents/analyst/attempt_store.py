@@ -1,9 +1,11 @@
-"""逐票 attempt 落盘：先写文件再提交；已有锁则 busy。"""
+"""逐票 attempt 落盘：目录锁覆盖整段写入；已有锁则 busy。"""
 
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 from bugfix_contracts.repair import AttemptRecord
 
@@ -14,15 +16,31 @@ class AttemptStoreBusy(RuntimeError):
     """同一产物目录已有写入者。"""
 
 
-def save_attempt(root: Path, attempt: AttemptRecord) -> Path:
-    """原子写入 ``defects/<id>/attempts/<attemptId>/attempt.json``。"""
+@contextmanager
+def store_lock(root: Path) -> Iterator[Path]:
+    """用 mkdir 占锁，避免先检查再写的窗口。"""
     base = Path(root)
     base.mkdir(parents=True, exist_ok=True)
     lock = base / _LOCK_NAME
-    if lock.is_file():
+    if lock.exists():
         raise AttemptStoreBusy("artifact root is busy")
-    lock.write_text("1", encoding="utf-8")
     try:
+        lock.mkdir()
+    except FileExistsError as err:
+        raise AttemptStoreBusy("artifact root is busy") from err
+    try:
+        yield base
+    finally:
+        if lock.is_dir():
+            lock.rmdir()
+        elif lock.is_file():
+            lock.unlink()
+
+
+def save_attempt(root: Path, attempt: AttemptRecord, *, already_locked: bool = False) -> Path:
+    """原子写入 ``defects/<id>/attempts/<attemptId>/attempt.json``。"""
+
+    def _write(base: Path) -> Path:
         dest = (
             base
             / "defects"
@@ -44,9 +62,11 @@ def save_attempt(root: Path, attempt: AttemptRecord) -> Path:
             encoding="utf-8",
         )
         return dest
-    finally:
-        if lock.is_file():
-            lock.unlink()
+
+    if already_locked:
+        return _write(Path(root))
+    with store_lock(root) as base:
+        return _write(base)
 
 
 def load_attempt(path: Path) -> AttemptRecord:

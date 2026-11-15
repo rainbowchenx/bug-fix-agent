@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -36,26 +37,40 @@ def import_feedback(root: Path, feedback: Feedback) -> InputRevision:
     return revision
 
 
-def classify_patch_state(patch: PatchSet, snapshot: WorkspaceSnapshot) -> dict[str, Any]:
-    """HEAD 相同但文件集合对不上 → 部分应用 / 未知，不盲目全信。"""
-    paths = {p.path.replace("\\", "/") for p in patch.patches}
-    dirty = {p.replace("\\", "/") for p in snapshot.dirty + snapshot.untracked}
+def classify_patch_state(
+    patch: PatchSet,
+    snapshot: WorkspaceSnapshot,
+    worktree: Path | None = None,
+) -> dict[str, Any]:
+    """比较当前文件内容与补丁后镜像。无法确认则 unknown，不用 dirty 冒充已应用。"""
     if snapshot.head and patch.baselineHead and snapshot.head != patch.baselineHead:
         return {
             "application": "unknown",
             "reason": "HEAD changed; re-check file contents before replay",
         }
-    overlap = paths & dirty
-    if overlap and overlap < paths:
-        return {
-            "application": "partially_applied",
-            "reason": f"same HEAD, dirty subset {sorted(overlap)}",
-        }
-    if overlap == paths and paths:
-        return {"application": "applied", "reason": "all patch paths dirty on same HEAD"}
-    if not overlap:
+    if worktree is None:
         return {
             "application": "unknown",
-            "reason": "same HEAD but patch paths not in dirty list",
+            "reason": "no current files to compare",
         }
-    return {"application": "unknown", "reason": "ambiguous patch vs workspace"}
+    work = Path(worktree)
+    marks: list[str] = []
+    for item in patch.patches:
+        current = work / item.path
+        data = current.read_bytes() if current.is_file() else b""
+        digest = hashlib.sha256(data).hexdigest()[:16]
+        if item.digest and digest == item.digest[:16]:
+            marks.append("applied")
+        else:
+            marks.append("mismatch")
+    if marks and all(m == "applied" for m in marks):
+        return {"application": "applied", "reason": "current content matches patch digest"}
+    if marks and any(m == "applied" for m in marks):
+        return {
+            "application": "partially_applied",
+            "reason": "some patch paths match digest, others do not",
+        }
+    return {
+        "application": "unknown",
+        "reason": "current content does not match patch; unrelated edits possible",
+    }
