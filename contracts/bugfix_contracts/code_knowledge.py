@@ -40,6 +40,12 @@ class DefectCodeMatch(BaseModel):
     confidence: Confidence = "low"
     gap: Optional[MatchGap] = None
     """空候选原因。``no_path_token_overlap`` = 票面词与路径词表不重合，不是检索失败。"""
+    investigationStatus: Optional[
+        Literal["not_investigated", "search_draft", "partial", "complete", "failed"]
+    ] = None
+    """Agent-2 逐票覆盖。缺省表示旧产物未声明，不能当成已调查。"""
+    searchedScopes: list[str] = Field(default_factory=list)
+    openQuestions: list[str] = Field(default_factory=list)
 
 
 class SpecEntry(BaseModel):

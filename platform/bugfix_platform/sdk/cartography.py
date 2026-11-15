@@ -181,9 +181,20 @@ def heuristic_cartography(req: CartographyRequest) -> CartographyResult:
     if note not in summary:
         arch["summary"] = f"{summary}; {note}" if summary else note
     data["architecture"] = arch
+    knowledge = validate_code_knowledge(data)
+    all_ids = [m.defectId for m in knowledge.defectCodeMatches]
+    knowledge = knowledge.model_copy(
+        update={
+            "defectCodeMatches": annotate_investigation_coverage(
+                knowledge.defectCodeMatches,
+                prompt_ids=all_ids,
+                investigated_ids=(),
+            )
+        }
+    )
     return CartographyResult(
         ok=True,
-        knowledge=validate_code_knowledge(data),
+        knowledge=knowledge,
         source="heuristic",
     )
 
@@ -470,6 +481,16 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
             if budget_stop:
                 merged["partial"] = True
             knowledge = validate_code_knowledge(merged)
+            prompt_ids = [t.defectId for t, _ in select_prompt_tickets(req)]
+            knowledge = knowledge.model_copy(
+                update={
+                    "defectCodeMatches": annotate_investigation_coverage(
+                        list(knowledge.defectCodeMatches),
+                        prompt_ids=prompt_ids,
+                        investigated_ids=prompt_ids,
+                    )
+                }
+            )
         except Exception as err:  # noqa: BLE001
             if budget_stop:
                 return _sdk_keep_baseline(req, billing)
@@ -788,6 +809,28 @@ def _shared_signatures(matches: list[Any]) -> set[tuple[str, ...]]:
         if sig is not None:
             counts[sig] = counts.get(sig, 0) + 1
     return {sig for sig, n in counts.items() if n >= SHARED_SIGNATURE_MIN_TICKETS}
+
+
+def annotate_investigation_coverage(
+    matches: list[DefectCodeMatch],
+    *,
+    prompt_ids: list[str],
+    investigated_ids: list[str] | tuple[str, ...] = (),
+) -> list[DefectCodeMatch]:
+    """未进 prompt 的票显式 ``not_investigated``，禁止整批假完成。"""
+    in_prompt = {str(x) for x in prompt_ids}
+    investigated = {str(x) for x in investigated_ids}
+    out: list[DefectCodeMatch] = []
+    for match in matches:
+        did = match.defectId
+        if did not in in_prompt:
+            status = "not_investigated"
+        elif did in investigated:
+            status = "complete" if match.candidates else "partial"
+        else:
+            status = "search_draft" if match.candidates else "not_investigated"
+        out.append(match.model_copy(update={"investigationStatus": status}))
+    return out
 
 
 def select_prompt_tickets(

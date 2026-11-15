@@ -115,6 +115,11 @@ def cluster_screened(
                 createdAt=dig.createdAt,
                 duplicate=dig.duplicate,
                 semanticFree=dig.semanticFree,
+                revisionId=f"{dig.defectId}:v0",
+                sourceObserved=dig.observed or None,
+                sourceExpected=dig.expected or None,
+                sourceSteps=dig.steps or None,
+                attachmentRefs=list(getattr(dig, "attachments", None) or []) or None,
             )
         )
 

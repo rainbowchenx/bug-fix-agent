@@ -92,9 +92,8 @@ def score_ticket(case: dict[str, Any], ticket: dict[str, Any] | None) -> dict[st
         return _row(case, None, cands, source, g0, False, False, False)
 
     if pool == "needs_info":
-        if source == "sdk":
-            g0.append("needs_info_ran_sdk")
-        if outcome != "needs_ticket_info":
+        # 有限补证允许跑 SDK；不再把 needs_info+sdk 当过程错误。
+        if outcome not in ("needs_ticket_info", "plan_only", "unlocalized"):
             g0.append("needs_info_wrong_outcome")
     elif expect_outcomes and "needs_ticket_info" not in expect_outcomes:
         if source != "sdk":
@@ -212,11 +211,21 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def score_report(report: dict[str, Any], cases: list[dict[str, Any]]) -> dict[str, Any]:
+    if not cases:
+        raise ValueError("empty cases")
     validated = validate_analysis_report(report)
     dumped = validated.model_dump()
     by_id = {t["defectId"]: t for t in dumped["tickets"]}
     rows = [score_ticket(case, by_id.get(case["defectId"])) for case in cases]
-    return {"summary": summarize(rows), "applyFix": dumped.get("applyFix"), "rows": rows}
+    summary = summarize(rows)
+    from bugfix_platform.agents.analyst.baseline import repair_success_metrics
+
+    accepted = sum(1 for c in cases if c.get("accepted") is True)
+    resolved = sum(1 for c in cases if c.get("accepted") is True and c.get("resolved") is True)
+    summary["repair"] = repair_success_metrics(
+        accepted=accepted, resolved=resolved, reported=len(cases)
+    )
+    return {"summary": summary, "applyFix": dumped.get("applyFix"), "rows": rows}
 
 
 def main(argv: list[str] | None = None) -> int:

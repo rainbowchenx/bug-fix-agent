@@ -39,6 +39,20 @@ from bugfix_contracts.analysis_report import (
     safe_validate_analysis_report,
     validate_analysis_report,
 )
+from bugfix_contracts.repair import (
+    REPAIR_SCHEMA_VERSION,
+    AttemptRecord,
+    EditDecision,
+    Evidence,
+    Feedback,
+    InputRevision,
+    PatchSet,
+    TaskContext,
+    VerificationRun,
+    WorkspaceSnapshot,
+    safe_validate_attempt,
+    validate_attempt,
+)
 
 __all__ = [
     "CONTRACT_SCHEMA_VERSION",
@@ -71,4 +85,16 @@ __all__ = [
     "TicketBlockers",
     "validate_analysis_report",
     "safe_validate_analysis_report",
+    "REPAIR_SCHEMA_VERSION",
+    "AttemptRecord",
+    "EditDecision",
+    "Evidence",
+    "Feedback",
+    "InputRevision",
+    "PatchSet",
+    "TaskContext",
+    "VerificationRun",
+    "WorkspaceSnapshot",
+    "validate_attempt",
+    "safe_validate_attempt",
 ]

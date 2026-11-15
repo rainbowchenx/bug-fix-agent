@@ -3,6 +3,8 @@
 子命令
 ------
 - ``run``：LangGraph Agent-2→3（需要已有 ``--defect-batch``）。
+- ``feedback``：把用户反馈 JSON 导入产物根（不自动开下一轮）。
+- ``resume``：按已落盘 attempt / revision 决定续接或新开。
 - ``serve``：回环上的 FastAPI S4 壳。
 - ``version``：打印包版本。
 
@@ -17,6 +19,36 @@ import argparse
 import json
 import sys
 from pathlib import Path
+
+
+def _cmd_feedback(root: str, file: str) -> int:
+    """导入一份反馈 JSON，按 feedbackId 幂等。"""
+    from bugfix_contracts.repair import Feedback
+    from bugfix_platform.agents.analyst.feedback import import_feedback
+
+    payload = json.loads(Path(file).read_text(encoding="utf-8"))
+    revision = import_feedback(Path(root), Feedback.model_validate(payload))
+    print(json.dumps(revision.model_dump(), ensure_ascii=False, indent=2))
+    return 0
+
+
+def _cmd_resume(root: str, defect_id: str, revision_id: str | None) -> int:
+    """写出 session-decision.json，不猜 cwd 最近会话。"""
+    from bugfix_platform.agents.analyst.sessions import resume_from_store
+
+    decision = resume_from_store(Path(root), defect_id, revision_id)
+    print(
+        json.dumps(
+            {
+                "action": decision.action,
+                "sessionId": decision.sessionId,
+                "reason": decision.reason,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -84,6 +116,25 @@ def main(argv: list[str] | None = None) -> int:
     )
     run_p.add_argument("--out-dir", default=None, help="Write artifacts JSON here")
 
+    fb_p = sub.add_parser(
+        "feedback",
+        help="Import a feedback JSON file into an artifact root (no auto-run)",
+    )
+    fb_p.add_argument("--root", required=True, help="Artifact / report root")
+    fb_p.add_argument("--file", required=True, help="Feedback JSON file")
+
+    resume_p = sub.add_parser(
+        "resume",
+        help="Choose resume/new for one defect from stored attempt + imported revision",
+    )
+    resume_p.add_argument("--root", required=True, help="Artifact / report root")
+    resume_p.add_argument("--defect-id", required=True)
+    resume_p.add_argument(
+        "--revision-id",
+        default=None,
+        help="Imported InputRevision id; omit to use the latest feedback file",
+    )
+
     serve_p = sub.add_parser("serve", help="HTTP API (S4 FastAPI): POST/GET /v1/runs")
     serve_p.add_argument("--host", default="127.0.0.1")
     serve_p.add_argument("--port", type=int, default=8787)
@@ -103,6 +154,12 @@ def main(argv: list[str] | None = None) -> int:
 
         run_server(host=args.host, port=args.port)
         return 0
+
+    if args.cmd == "feedback":
+        return _cmd_feedback(args.root, args.file)
+
+    if args.cmd == "resume":
+        return _cmd_resume(args.root, args.defect_id, args.revision_id)
 
     if args.cmd != "run":  # pragma: no cover
         raise SystemExit(f"unknown command: {args.cmd}")

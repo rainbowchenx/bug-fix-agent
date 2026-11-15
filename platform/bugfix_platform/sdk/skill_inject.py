@@ -54,7 +54,6 @@ PACKAGE_FIX_SKILLS = (
     "electron-process-boundary",
     "monorepo-workspace",
 )
-_MAX_BODY_CHARS = 2400
 _SOURCE_RANK = {"explicit": 0, "bugfix": 1, "claude_dir": 2, "package": 3}
 SkillSource = Literal["package", "claude_dir", "bugfix", "explicit"]
 
@@ -69,6 +68,7 @@ class InjectedSkill:
     description: str
     body: str
     profiles: tuple[str, ...]
+    repoId: str = "."
 
 
 def extra_skill_dirs_from_env() -> list[Path]:
@@ -141,11 +141,11 @@ def discover_injected_skills(
     """
     root = Path(work_dir)
     match_profiles = frozenset({profile, BUGFIX_PROFILE})
-    by_name: dict[str, InjectedSkill] = {}
+    by_key: dict[tuple[str, str], InjectedSkill] = {}
 
     def absorb(skills: Iterable[InjectedSkill]) -> None:
         for skill in skills:
-            by_name[skill.name] = skill
+            by_key[(skill.repoId, skill.name)] = skill
 
     absorb(_package_skills(match_profiles))
     roots = list(repo_roots) if repo_roots else []
@@ -153,12 +153,14 @@ def discover_injected_skills(
         roots = [RepoRoot(path=".")]
     for rr in roots:
         abs_path = root if rr.path in (".", "") else root / rr.path
+        repo_id = "." if rr.path in (".", "") else rr.path
         absorb(
             _skills_in_dir(
                 abs_path / ".claude" / "skills",
                 source="claude_dir",
                 match_profiles=match_profiles,
                 allow_unprofiled=False,
+                repo_id=repo_id,
             )
         )
     absorb(
@@ -167,6 +169,7 @@ def discover_injected_skills(
             source="bugfix",
             match_profiles=match_profiles,
             allow_unprofiled=True,
+            repo_id=".",
         )
     )
     for extra in list(extra_dirs or []) + extra_skill_dirs_from_env():
@@ -176,9 +179,15 @@ def discover_injected_skills(
                 source="explicit",
                 match_profiles=match_profiles,
                 allow_unprofiled=True,
+                repo_id=".",
             )
         )
-    return _priority_order(by_name.values())
+    overlay_names = {name for (_rid, name), skill in by_key.items() if skill.source != "package"}
+    for key in list(by_key):
+        repo_id, name = key
+        if repo_id == "package" and name in overlay_names:
+            del by_key[key]
+    return _priority_order(by_key.values())
 
 
 def injected_skills_addon(
@@ -262,10 +271,7 @@ def _skill_excerpt(skill: InjectedSkill, *, include_body: bool) -> list[str]:
     if skill.description:
         lines.append(skill.description.strip())
     if include_body and skill.body.strip():
-        excerpt = skill.body.strip()
-        if len(excerpt) > _MAX_BODY_CHARS:
-            excerpt = excerpt[:_MAX_BODY_CHARS] + "\n…"
-        lines.append(excerpt)
+        lines.append(skill.body.strip())
     else:
         lines.append("When this skill matches, follow its SKILL.md procedure.")
     return lines
@@ -284,7 +290,7 @@ def _package_skills(match_profiles: frozenset[str]) -> list[InjectedSkill]:
         allow.update(PACKAGE_FIX_SKILLS)
     found: dict[str, InjectedSkill] = {}
     for child in sorted(root.iterdir()):
-        skill = _load_skill(child / "SKILL.md", source="package")
+        skill = _load_skill(child / "SKILL.md", source="package", repo_id="package")
         if skill is None:
             continue
         profiles = set(skill.profiles)
@@ -299,6 +305,7 @@ def _skills_in_dir(
     source: SkillSource,
     match_profiles: frozenset[str],
     allow_unprofiled: bool,
+    repo_id: str = ".",
 ) -> list[InjectedSkill]:
     if not directory.is_dir():
         return []
@@ -314,7 +321,7 @@ def _skills_in_dir(
             skill_md = child / "SKILL.md"
         else:
             continue
-        skill = _load_skill(skill_md, source=source)
+        skill = _load_skill(skill_md, source=source, repo_id=repo_id)
         if skill is None:
             continue
         if not _matches_agent(skill, match_profiles, allow_unprofiled=allow_unprofiled):
@@ -337,7 +344,9 @@ def _matches_agent(
     return False
 
 
-def _load_skill(skill_md: Path, *, source: SkillSource) -> Optional[InjectedSkill]:
+def _load_skill(
+    skill_md: Path, *, source: SkillSource, repo_id: str = "."
+) -> Optional[InjectedSkill]:
     try:
         text = skill_md.read_text(encoding="utf-8")
     except OSError:
@@ -353,6 +362,7 @@ def _load_skill(skill_md: Path, *, source: SkillSource) -> Optional[InjectedSkil
         description=_frontmatter_scalar(fm, "description"),
         body=body,
         profiles=_frontmatter_profiles(fm),
+        repoId=repo_id or ".",
     )
 
 
@@ -367,13 +377,31 @@ def _split_frontmatter(text: str) -> tuple[str, str]:
 
 
 def _frontmatter_scalar(fm: str, key: str) -> str:
-    m = re.search(rf"(?m)^{re.escape(key)}:\s*(.+)$", fm)
-    if not m:
-        return ""
-    raw = m.group(1).strip()
-    if raw in {">", ">-", "|", "|-"}:
-        return ""
-    return raw.strip("\"'")
+    lines = fm.splitlines()
+    i = 0
+    while i < len(lines):
+        m = re.match(rf"^{re.escape(key)}:\s*(.*)$", lines[i])
+        if not m:
+            i += 1
+            continue
+        raw = m.group(1).strip()
+        if raw in {">", ">-", "|", "|-"}:
+            collected: list[str] = []
+            i += 1
+            while i < len(lines):
+                nxt = lines[i]
+                if nxt.startswith(" ") or nxt.startswith("\t"):
+                    collected.append(nxt.strip())
+                    i += 1
+                    continue
+                if nxt.strip() == "":
+                    collected.append("")
+                    i += 1
+                    continue
+                break
+            return "\n".join(collected).strip()
+        return raw.strip("\"'")
+    return ""
 
 
 def _frontmatter_profiles(fm: str) -> tuple[str, ...]:

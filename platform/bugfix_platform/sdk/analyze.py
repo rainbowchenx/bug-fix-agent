@@ -439,9 +439,11 @@ _SYSTEM_PROMPT = """You are Agent-3 defect analyst.
 Tools: Read, Glob, Grep, and CodeGraph MCP when mounted. Do NOT edit files or run shell.
 When CodeGraph is ready (codegraph_explore / codegraph_node / callers / callees),
 the first symbol or call-flow tool call MUST be codegraph_explore (or callers/callees).
-Treat CodeGraph excerpts as already Read; do not re-Grep symbols it returned.
-Fall back to Grep/Read/Glob only when CodeGraph is unavailable or empty.
-Ground claims in code you actually read.
+CodeGraph is navigation, not source of truth. After it returns a path or symbol you
+MUST Read the current file in the worktree before citing it as evidence. Do not treat
+graph excerpts as the live source. Fall back to Grep/Read/Glob only when CodeGraph is
+unavailable or empty.
+Ground claims in files you actually Read after graph navigation.
 Prefer Agent-2 architecture map and soft-start paths first, then follow imports/callers
 from those paths to name the likely fix locus. Do not assume Agent-2 already found
 the root cause. Heuristic-only soft-start paths are unverified token hits — confirm
@@ -545,9 +547,9 @@ def _build_prompt(req: AnalyzeRequest) -> str:
         f"titleTag: {t.titleTag}\n"
         f"intent: {t.intent}\n"
         f"intentRationale: {(t.intentRationale or '')[:400]}\n"
-        f"observed: {t.observed}\n"
-        f"expected: {t.expected}\n"
-        f"steps: {t.steps}\n"
+        f"observed: {t.sourceObserved or t.observed}\n"
+        f"expected: {t.sourceExpected or t.expected}\n"
+        f"steps: {t.sourceSteps or t.steps}\n"
         f"expectQuality: {t.expectQuality}\n"
         f"injectedSkills: {json.dumps([s.name for s in req.injected_skills], ensure_ascii=False)}\n"
         f"cartographyProfile: {req.cartography_profile}\n"

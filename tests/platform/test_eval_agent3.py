@@ -80,13 +80,13 @@ def test_g0_fails_on_patch_ready_and_entry_noise():
     assert noisy["locAt3"] is False
 
 
-def test_needs_info_must_not_run_sdk():
+def test_needs_info_may_run_limited_sdk():
     case = {
         "defectId": "N1",
         "pool": "needs_info",
         "expectOutcomes": ["needs_ticket_info"],
     }
-    bad = score_ticket(
+    row = score_ticket(
         case,
         _ticket(
             defectId="N1",
@@ -96,8 +96,14 @@ def test_needs_info_must_not_run_sdk():
             blockers={"kind": "needs_ticket_info", "detail": "missing steps"},
         ),
     )
-    assert bad["g0Pass"] is False
-    assert "needs_info_ran_sdk" in bad["g0"]
+    assert "needs_info_ran_sdk" not in row["g0"]
+
+
+def test_score_report_rejects_empty_cases():
+    import pytest
+
+    with pytest.raises(ValueError, match="empty cases"):
+        score_report(_report([_ticket()]), [])
 
 
 def test_score_report_usable_when_loc_and_outcome_hit(tmp_path: Path):
@@ -118,6 +124,8 @@ def test_score_report_usable_when_loc_and_outcome_hit(tmp_path: Path):
     assert scored["summary"]["outcome"] == "1/1"
     assert scored["summary"]["verdict"] == "usable_pending_g3"
     assert scored["rows"][0]["rootCauseWeakOk"] is True
+    assert scored["summary"]["repair"]["successRate"] is None
+    assert scored["summary"]["repair"]["reason"] == "no_acceptance_data"
 
     # 落盘形状稳定，方便实场对照。
     out = tmp_path / "score.json"

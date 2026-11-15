@@ -51,6 +51,29 @@ def test_analyze_prompt_includes_architecture_map():
     assert "follow" in _SYSTEM_PROMPT.lower()
     assert "soft-start" in _SYSTEM_PROMPT.lower() or "soft start" in _SYSTEM_PROMPT.lower()
     assert ANALYZE_TOOLS == ["Read", "Glob", "Grep"]
+    assert "MUST Read" in _SYSTEM_PROMPT
+    assert "already Read" not in _SYSTEM_PROMPT
+
+
+def test_analyze_prompt_uses_source_observed():
+    from bugfix_contracts.defect_batch import BatchTicket
+
+    ticket = BatchTicket(
+        defectId="1",
+        title="osd overlay",
+        pool="strict",
+        expectQuality="explicit",
+        observed="蒸馏后的现象",
+        sourceObserved="原始现象全文XYZ",
+    )
+    prompt = _build_prompt(
+        AnalyzeRequest(
+            work_dir="/tmp",
+            ticket=ticket,
+            routed={"outcome": "plan_only", "localization": {"candidates": []}},
+        )
+    )
+    assert "原始现象全文XYZ" in prompt
 
 
 def test_analyze_prompt_includes_spec_atlas_and_ticket_spec_dirs():

@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from bugfix_platform.http import create_app
 from bugfix_platform.workflow import ThreeAgentWorkflowResult, WorkflowArtifacts
-from tests.helpers import defect_batch_from_hc1, minimal_defect_batch
+from tests.helpers import defect_batch_from_hc1, ensure_git_repo, minimal_defect_batch
 
 
 def test_health():
@@ -23,7 +23,7 @@ def test_health():
 
 def test_create_and_get_run_sync(tmp_path: Path):
     work = tmp_path / "repos"
-    work.mkdir()
+    ensure_git_repo(work)
     (work / "package.json").write_text(
         json.dumps({"name": "mini", "dependencies": {"electron": "1"}}), encoding="utf-8"
     )

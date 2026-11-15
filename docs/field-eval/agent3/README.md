@@ -146,7 +146,19 @@ transport 三张票的路径真值可直接复用 Agent-2 的 `bug-fix-测试专
 
 ---
 
-## 5. `--apply-fix`（默认不评）
+## 5. 修复闭环（无验收不算成功）
+
+`packaging/eval_agent3.py` 的 `summary.repair.successRate` **只在有用户验收数据时**才有数字；未反馈一律 `null`，原因 `no_acceptance_data`。不要把 `patch_ready` 或检查通过当成修复成功。
+
+分析路径与 generate-patch 分开打分。端到端最小集：
+
+1. 缺信息补足（反馈写入 `InputRevision` 后再跑）
+2. 拒绝候选纠正（`acceptance=rejected` 不得记成功）
+3. 应用后追加（同文字不同 `feedbackId` 仍是新一轮）
+
+---
+
+## 6. `--apply-fix`（默认不评）
 
 只有 G1+G2+G3 已「可用」才打开。额外只看：
 
@@ -157,7 +169,7 @@ transport 三张票的路径真值可直接复用 Agent-2 的 `bug-fix-测试专
 
 ---
 
-## 6. 建议最小集
+## 7. 建议最小集
 
 10 张以内即可，三类都要有：
 

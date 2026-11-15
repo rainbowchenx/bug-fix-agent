@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from bugfix_contracts.defect_batch import RawDefect
@@ -90,6 +90,7 @@ class DefectDigest:
     steps: str
     fullText: str
     emptyTemplate: bool = False
+    attachments: list[str] = field(default_factory=list)
 
 
 def strip_end_side(s: str) -> str:
@@ -217,6 +218,11 @@ def distill_defect(raw: RawDefect) -> DefectDigest:
 
     test_module, semantic_free = normalize_test_module(raw.testModule)
     full_text = "\n".join(x for x in [title, description] if x)
+    attachments: list[str] = []
+    meta = raw.metadata or {}
+    raw_atts = meta.get("attachments") or meta.get("attachmentRefs") or []
+    if isinstance(raw_atts, list):
+        attachments = [str(item).strip() for item in raw_atts if str(item).strip()]
     return DefectDigest(
         defectId=raw.defectId,
         title=title,
@@ -237,6 +243,7 @@ def distill_defect(raw: RawDefect) -> DefectDigest:
         steps=steps,
         fullText=full_text,
         emptyTemplate=empty_template,
+        attachments=attachments,
     )
 
 

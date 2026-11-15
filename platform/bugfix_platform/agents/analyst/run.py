@@ -4,7 +4,10 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional, Sequence
+from uuid import uuid4
 
+from bugfix_platform.agents.analyst.attempt_store import AttemptStoreBusy, save_attempt
+from bugfix_platform.agents.analyst.report import render_report
 from bugfix_platform.agents.analyst.route import route_ticket, slice_ticket
 from bugfix_contracts import (
     ANALYSIS_REPORT_SCHEMA_VERSION,
@@ -15,6 +18,7 @@ from bugfix_contracts import (
     validate_analysis_report,
 )
 from bugfix_contracts.analysis_report import TicketReport
+from bugfix_contracts.repair import REPAIR_SCHEMA_VERSION, AttemptRecord
 from bugfix_platform.sdk.analyze import (
     AnalyzeRequest,
     AnalyzeRunner,
@@ -58,7 +62,7 @@ def run_analyst(
     - 空候选仍进 analyze（软起点；D4）。
     - ``apply_fix`` 默认关：可修票也是 ``plan_only``。
     - 单票校验失败 → ``other_blocked``，整份报告仍继续。
-    - 当前 ``open_mr`` 只改报告标志，不会真推 GitLab。
+    - ``open_mr`` 只记录请求标志；没有真实 ``mrUrl`` 时 ``integrateMode`` 仍为 ``none``。
 
     Args:
         work_dir: 目标代码根。
@@ -108,6 +112,7 @@ def run_analyst(
     analyze_sources: list[str] = []
     for t in defect_batch.tickets:
         if not is_match_pool(t.pool):
+            tickets.append(_persist_ticket_entry(out_dir, _sideline_entry(t)))
             continue
         routed = route_ticket(t, match_by_id.get(t.defectId))
         entry: dict[str, Any] = {
@@ -210,7 +215,7 @@ def run_analyst(
                         entry["patch"] = None
                         entry["blockers"] = None
 
-        tickets.append(_coerce_ticket_entry(entry))
+        tickets.append(_persist_ticket_entry(out_dir, entry))
 
     if analyze_sources:
         tally: dict[str, int] = {}
@@ -231,12 +236,109 @@ def run_analyst(
         "openMr": open_mr,
         "applyFix": want_fix,
         "mrUrl": None,
-        "integrateMode": "single_mr" if open_mr else "none",
+        "integrateMode": "none",
         "summary": {"total": len(tickets), "byOutcome": by_outcome},
         "boundSkills": bound_skills,
         "tickets": tickets,
     }
+    if out_dir:
+        _write_markdown_report(out_dir, defect_batch.productLine, tickets)
     return validate_analysis_report(report)
+
+
+_SIDELINE_OUTCOME = {
+    "duplicate": ("other_blocked", "duplicate"),
+    "excluded": ("other_blocked", "excluded"),
+    "security": ("not_code", "security"),
+    "hard_reject": ("not_code", "hard_reject"),
+}
+
+_OUTCOME_RESOLUTION = {
+    "plan_only": "analysis_only",
+    "patch_ready": "patch_produced",
+    "needs_ticket_info": "needs_information",
+    "needs_test_env": "needs_environment",
+    "needs_design_input": "needs_business_decision",
+    "not_code": "external_component",
+    "config_or_dependency": "external_component",
+    "unlocalized": "unlocalized",
+    "other_blocked": "incomplete",
+}
+
+
+def _sideline_entry(ticket: Any) -> dict[str, Any]:
+    """匹配池外的票仍进报告，不假装已调查。"""
+    outcome, kind = _SIDELINE_OUTCOME.get(ticket.pool, ("other_blocked", ticket.pool))
+    detail = ticket.reasonDetail or f"pool={ticket.pool}"
+    return {
+        "defectId": ticket.defectId,
+        "ticket": slice_ticket(ticket),
+        "outcome": outcome,
+        "proposedFix": None,
+        "patch": None,
+        "blockers": {"kind": kind, "detail": detail},
+        "rootCause": {
+            "summary": f"Ticket not in match pool ({ticket.pool})",
+            "ruledOut": [],
+            "openQuestions": [],
+        },
+        "localization": {"candidates": [], "notes": f"pool={ticket.pool}"},
+        "suggestedVerify": {"steps": [], "executed": False},
+        "confidence": "low",
+        "verifyStatus": "skipped",
+    }
+
+
+def _attempt_from_entry(entry: dict[str, Any]) -> AttemptRecord:
+    outcome = str(entry.get("outcome") or "other_blocked")
+    kind = str((entry.get("blockers") or {}).get("kind") or "")
+    resolution = "excluded" if kind in {"excluded", "duplicate"} else _OUTCOME_RESOLUTION.get(
+        outcome, "incomplete"
+    )
+    return AttemptRecord(
+        schemaVersion=REPAIR_SCHEMA_VERSION,
+        attemptId=uuid4().hex[:12],
+        defectId=str(entry.get("defectId") or "unknown"),
+        execution="completed",
+        resolution=resolution,  # type: ignore[arg-type]
+        patchDelivery="candidate" if outcome == "patch_ready" else "none",
+    )
+
+
+def _persist_ticket_entry(out_dir: Optional[str], entry: dict[str, Any]) -> dict[str, Any]:
+    coerced = _coerce_ticket_entry(entry)
+    if not out_dir:
+        return coerced
+    try:
+        save_attempt(Path(out_dir), _attempt_from_entry(coerced))
+        return coerced
+    except (AttemptStoreBusy, OSError) as err:
+        failed = dict(entry)
+        failed["outcome"] = "other_blocked"
+        failed["proposedFix"] = None
+        failed["patch"] = None
+        failed["blockers"] = {
+            "kind": "other_blocked",
+            "detail": f"persist failed: {err}",
+        }
+        return _coerce_ticket_entry(failed)
+
+
+def _write_markdown_report(out_dir: str, product_line: str, tickets: list[dict[str, Any]]) -> None:
+    path = Path(out_dir) / "analysis-report.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        render_report(
+            {
+                "batchId": product_line,
+                "tickets": [
+                    {"defectId": t.get("defectId"), "outcome": t.get("outcome")}
+                    for t in tickets
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def _actionable_for_fix(entry: dict[str, Any]) -> bool:

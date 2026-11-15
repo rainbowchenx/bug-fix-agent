@@ -89,6 +89,12 @@ class BatchTicket(BaseModel):
     duplicate: Optional[bool] = None
     semanticFree: Optional[bool] = None
     priority: Optional[float] = None
+    revisionId: Optional[str] = None
+    """指向 ``InputRevision``；缺省表示本票尚未做保真修订。"""
+    sourceObserved: Optional[str] = None
+    sourceExpected: Optional[str] = None
+    sourceSteps: Optional[str] = None
+    attachmentRefs: Optional[list[str]] = None
 
 
 class BatchCluster(BaseModel):
