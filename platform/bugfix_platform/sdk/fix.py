@@ -88,40 +88,12 @@ def ensure_ticket_worktree(work_dir: str | Path, defect_id: str) -> tuple[Path |
     return dest, None
 
 
-def collect_worktree_diff(worktree: str | Path) -> str:
-    """Return ``git diff`` inside the worktree (deterministic; not model Bash)."""
-    proc = subprocess.run(
-        ["git", "-C", str(worktree), "diff", "--binary"],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    return proc.stdout or ""
-
-
-def write_patch_file(
-    *,
-    work_dir: str | Path,
-    defect_id: str,
-    diff: str,
-    artifact_dir: Optional[str] = None,
-) -> Path:
-    """Write ``{artifactDir|workDir/.bugfix/patches}/{id}.patch``."""
-    slug = ticket_worktree_slug(defect_id)
-    base = Path(artifact_dir) if artifact_dir else Path(work_dir) / ".bugfix" / "patches"
-    base.mkdir(parents=True, exist_ok=True)
-    path = base / f"{slug}.patch"
-    path.write_text(diff, encoding="utf-8")
-    return path
-
-
 def create_fix_runner() -> FixRunner:
     return run_claude_fix
 
 
 def run_claude_fix(req: FixRequest) -> FixResult:
-    """Edit inside the worktree, then collect a git diff as the patch artifact."""
+    """Edit inside the worktree; PatchSet collection judges the actual files."""
     if not has_credentials():
         return FixResult(
             ok=False,
@@ -180,28 +152,13 @@ def run_claude_fix(req: FixRequest) -> FixResult:
             payload={},
         )
 
-    diff = collect_worktree_diff(req.worktree_path)
-    if not diff.strip():
-        return FixResult(
-            ok=True,
-            source="sdk",
-            detail="fix session produced empty diff",
-            payload={},
-        )
-    path = write_patch_file(
-        work_dir=req.work_dir,
-        defect_id=req.ticket.defectId,
-        diff=diff,
-        artifact_dir=req.artifact_dir,
-    )
-    summary = ((req.analysis.get("proposedFix") or {}) or {}).get("summary") or "apply proposed fix"
     review = _parse_semantic_review(texts)
     payload: dict[str, Any] = {
-        "outcome": "patch_ready",
-        "patch": {"path": str(path), "summary": str(summary)[:240]},
+        "outcome": "plan_only",
+        "semanticReview": review["text"],
+        "semanticReviewStatus": review["status"],
+        "semanticReviewExecuted": review["status"] != "not_executed",
     }
-    if review:
-        payload["semanticReview"] = review
     return FixResult(
         ok=True,
         source="sdk",
@@ -215,26 +172,32 @@ Use Edit/Write only. Minimal diff. Do not expand scope.
 Stay inside proposedFix.targetFiles unless a file you read proves another file is required.
 Do not commit, push, or run tests. Do not invent extra features.
 IRON LAW: if the analysis has no real root cause, make no edits.
-After editing, Read the files you changed. End with a JSON object that includes
-semanticReview: how THIS diff restores the expected behavior, whether success /
-fail / retry paths remain, and which changed lines are the basis. Judge the actual
-edits, not the analysis plan. If you cannot judge the diff, set semanticReview to
-"" and semanticReviewExecuted to false. Do not emit a generic template.
+After editing, Read the files you changed. End with a JSON object:
+semanticReviewStatus: passed | failed | not_executed
+semanticReviewExecuted: true only if you judged the actual edited lines
+semanticReview: how THIS diff restores expected behavior, whether success /
+fail / retry paths remain, and which changed lines are the basis.
+Judge the actual edits, not the analysis plan. Use failed if the change does
+not restore the expected behavior or breaks a success/fail/retry path.
+Do not emit a generic template. If you cannot judge, status=not_executed.
 """
 
 
-def _parse_semantic_review(texts: list[str]) -> str:
+def _parse_semantic_review(texts: list[str]) -> dict[str, str]:
     for text in reversed(texts):
         parsed = parse_json_payload(text)
         if not isinstance(parsed, dict):
             continue
         review = str(parsed.get("semanticReview") or parsed.get("reviewConclusion") or "").strip()
         executed = parsed.get("semanticReviewExecuted")
-        if executed is False:
-            return ""
-        if review:
-            return review
-    return ""
+        status = str(parsed.get("semanticReviewStatus") or parsed.get("reviewStatus") or "").strip().lower()
+        if executed is False or status in {"not_executed", "skipped"}:
+            return {"status": "not_executed", "text": review or "semantic review not executed"}
+        if status in {"failed", "fail"}:
+            return {"status": "failed", "text": review or "semantic review failed"}
+        if status in {"passed", "pass"} or review:
+            return {"status": "passed" if status in {"passed", "pass", ""} else status, "text": review}
+    return {"status": "not_executed", "text": "semantic review not executed"}
 
 
 def _build_fix_prompt(req: FixRequest) -> str:
@@ -246,6 +209,6 @@ def _build_fix_prompt(req: FixRequest) -> str:
         f"title: {t.title}\n"
         f"expected: {expected}\n"
         f"analysis: {req.analysis}\n"
-        "After the edits, Read the changed files and return JSON with semanticReview "
-        "judging those exact lines.\n"
+        "After the edits, Read the changed files and return JSON with "
+        "semanticReviewStatus and semanticReview judging those exact lines.\n"
     )

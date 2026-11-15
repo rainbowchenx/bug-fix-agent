@@ -1938,3 +1938,61 @@ def test_extracted_snippet_with_wrong_root_cause_does_not_enter_fix(tmp_path: Pa
     )
     assert called["n"] == 0
     assert report.tickets[0].outcome != "patch_ready"
+
+
+def test_passed_checks_with_failed_review_are_not_candidate(tmp_path: Path):
+    work = tmp_path / "repo"
+    (work / "src").mkdir(parents=True)
+    (work / "src" / "a.ts").write_text(_SNIPPET + "\n", encoding="utf-8")
+    n = {"fix": 0}
+
+    def fake_analyze(req: AnalyzeRequest) -> AnalyzeResult:
+        return AnalyzeResult(
+            ok=True,
+            source="sdk",
+            payload={
+                **req.routed,
+                "outcome": "plan_only",
+                "rootCause": {
+                    "summary": "handleFail swallows camera errors",
+                    "ruledOut": [],
+                    "openQuestions": [],
+                },
+                "proposedFix": {"summary": "rethrow so toast can show", "steps": [], "targetFiles": ["src/a.ts"]},
+                "localization": _loc(),
+            },
+        )
+
+    def fake_fix(req: FixRequest) -> FixResult:
+        n["fix"] += 1
+        Path(req.worktree_path, "src", "a.ts").write_text(
+            "function handleFail() { throw e; }\n", encoding="utf-8"
+        )
+        return FixResult(
+            ok=True,
+            source="sdk",
+            payload={
+                "outcome": "patch_ready",
+                "semanticReview": "change does not restore toast; retry path still swallowed",
+                "semanticReviewStatus": "failed",
+                "semanticReviewExecuted": True,
+            },
+        )
+
+    report = run_analyst(
+        work_dir=work,
+        defect_batch=_batch(),
+        code_knowledge=_knowledge(work),
+        analyze_fn=fake_analyze,
+        fix_fn=fake_fix,
+        apply_fix=True,
+        artifact_dir=tmp_path / "art",
+    )
+    assert n["fix"] >= 1
+    assert report.tickets[0].outcome != "patch_ready"
+    latest = json.loads((tmp_path / "art" / "defects" / "D1" / "latest.json").read_text(encoding="utf-8"))
+    attempt = json.loads(Path(latest["path"]).read_text(encoding="utf-8"))
+    assert attempt.get("patchDelivery") != "candidate"
+    premise = str((attempt.get("editDecision") or {}).get("executionPremise") or "")
+    notes = report.tickets[0].localization.notes or ""
+    assert "retry path still swallowed" in f"{premise} {notes}"

@@ -77,14 +77,16 @@ def review_conclusion(
     decision: EditDecision,
     *,
     model_text: str | None = None,
+    status: str | None = None,
 ) -> str:
     """记录模型对最终 diff 的复核；未执行则如实标记。"""
     judged = str(model_text or "").strip()
-    if judged:
-        return judged
-    if not (diff or "").strip():
-        return "semantic review not executed"
-    return "semantic review not executed"
+    st = str(status or "").strip().lower()
+    if st == "failed":
+        return judged or "semantic review failed"
+    if st == "passed":
+        return judged or "semantic review passed"
+    return judged if judged and "not executed" in judged.lower() else "semantic review not executed"
 
 
 def _has_edits(diff: str) -> bool:
@@ -147,10 +149,12 @@ def run_ticket(
     edit = services.get("edit")
     check = services.get("check")
     save = services.get("save")
+    review_fn = services.get("review")
     last_diff = ""
     last_patch: PatchSet | None = None
     checks: list[VerificationRun] = []
     produced = False
+    last_review = {"status": "not_executed", "text": ""}
     for _ in range(3):
         produced_edit = edit(context, decision) if edit is not None else None
         last_diff, last_patch = _unpack_edit(produced_edit)
@@ -167,32 +171,58 @@ def run_ticket(
             )
             produced = False
             continue
-        if check is None:
-            produced = True
-            break
-        raw = check(context, decision, last_patch)
-        runs = _as_checks(raw)
-        checks.extend(runs)
-        if not runs or _checks_failed(runs):
+        if check is not None:
+            raw = check(context, decision, last_patch)
+            runs = _as_checks(raw)
+            checks.extend(runs)
+            if not runs or _checks_failed(runs):
+                produced = False
+                feedback: list[Hypothesis] = []
+                for item in runs or [
+                    VerificationRun(command=["check"], result="blocked", coverage="no_runs")
+                ]:
+                    claim = " ".join(
+                        part
+                        for part in [
+                            f"check {item.result}",
+                            " ".join(item.command),
+                            _log_excerpt(item),
+                        ]
+                        if part
+                    )
+                    feedback.append(
+                        Hypothesis(claim=claim[:240] or "check failed", status="refuted")
+                    )
+                context = context.model_copy(
+                    update={"hypotheses": list(context.hypotheses) + feedback}
+                )
+                continue
+        last_review = _as_review(
+            review_fn(last_diff, context, decision) if review_fn is not None else None
+        )
+        decision = decision.model_copy(
+            update={
+                "executionPremise": review_conclusion(
+                    last_diff,
+                    context,
+                    decision,
+                    model_text=last_review.get("text"),
+                    status=last_review.get("status"),
+                ),
+            }
+        )
+        if last_review.get("status") == "failed":
             produced = False
-            feedback: list[Hypothesis] = []
-            for item in runs or [
-                VerificationRun(command=["check"], result="blocked", coverage="no_runs")
-            ]:
-                claim = " ".join(
-                    part
-                    for part in [
-                        f"check {item.result}",
-                        " ".join(item.command),
-                        _log_excerpt(item),
-                    ]
-                    if part
-                )
-                feedback.append(
-                    Hypothesis(claim=claim[:240] or "check failed", status="refuted")
-                )
             context = context.model_copy(
-                update={"hypotheses": list(context.hypotheses) + feedback}
+                update={
+                    "hypotheses": list(context.hypotheses)
+                    + [
+                        Hypothesis(
+                            claim=f"semantic review failed: {last_review.get('text') or ''}"[:240],
+                            status="refuted",
+                        )
+                    ]
+                }
             )
             continue
         produced = True
@@ -206,23 +236,16 @@ def run_ticket(
             resolution = "patch_produced"
         else:
             resolution = "analysis_only"
+    elif last_patch is not None and last_patch.patches and last_review.get("status") == "failed":
+        last_patch = last_patch.model_copy(update={"delivery": "diagnostic"})
+        resolution = "analysis_only"
+        delivery = "diagnostic"
+        produced = False
     else:
         last_patch = None
         resolution = "analysis_only"
         delivery = "none"
         produced = False
-    if produced:
-        review = services.get("review")
-        judged = ""
-        if review is not None:
-            judged = str(review(last_diff, context, decision) or "").strip()
-        decision = decision.model_copy(
-            update={
-                "executionPremise": review_conclusion(
-                    last_diff, context, decision, model_text=judged
-                ),
-            }
-        )
     if save is not None:
         save(context, decision)
     return AttemptRecord(
@@ -254,6 +277,30 @@ def _unpack_edit(produced: Any) -> tuple[str, PatchSet | None]:
             return diff or ("x" if patch.patches else ""), patch
         return diff, None
     return "", None
+
+
+def _as_review(raw: Any) -> dict[str, str]:
+    if raw is None:
+        return {"status": "not_executed", "text": ""}
+    if isinstance(raw, str):
+        text = raw.strip()
+        low = text.lower()
+        if not text or "not executed" in low or "未执行" in text:
+            return {"status": "not_executed", "text": text or "semantic review not executed"}
+        return {"status": "passed", "text": text}
+    if isinstance(raw, dict):
+        text = str(raw.get("text") or raw.get("semanticReview") or "").strip()
+        status = str(raw.get("status") or raw.get("semanticReviewStatus") or "").strip().lower()
+        if status in {"failed", "fail"}:
+            return {"status": "failed", "text": text}
+        if status in {"not_executed", "skipped"}:
+            return {"status": "not_executed", "text": text}
+        if status in {"passed", "pass"}:
+            return {"status": "passed", "text": text}
+        if not text:
+            return {"status": "not_executed", "text": ""}
+        return {"status": "passed", "text": text}
+    return {"status": "not_executed", "text": ""}
 
 
 def _as_checks(raw: Any) -> list[VerificationRun]:

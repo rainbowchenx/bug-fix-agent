@@ -643,12 +643,19 @@ def _run_fix_loop(
             runs.append(run)
         return runs
 
-    def review(_diff: str, _ctx: TaskContext, _decision: EditDecision) -> str:
-        return str(
+    def review(_diff: str, _ctx: TaskContext, _decision: EditDecision) -> dict[str, str]:
+        text = str(
             last_payload.get("semanticReview")
             or last_payload.get("reviewConclusion")
             or ""
         ).strip()
+        status = str(last_payload.get("semanticReviewStatus") or "").strip().lower()
+        executed = last_payload.get("semanticReviewExecuted")
+        if executed is False:
+            status = "not_executed"
+        elif not status:
+            status = "not_executed" if not text else "passed"
+        return {"status": status, "text": text}
 
     attempt = run_ticket(
         context,
