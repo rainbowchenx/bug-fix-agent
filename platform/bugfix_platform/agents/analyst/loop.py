@@ -86,7 +86,7 @@ def review_conclusion(
         return judged or "semantic review failed"
     if st == "passed":
         return judged or "semantic review passed"
-    return judged if judged and "not executed" in judged.lower() else "semantic review not executed"
+    return judged or "semantic review not executed"
 
 
 def _has_edits(diff: str) -> bool:
@@ -279,28 +279,53 @@ def _unpack_edit(produced: Any) -> tuple[str, PatchSet | None]:
     return "", None
 
 
+_REVIEW_STATUSES = frozenset({"passed", "failed", "not_executed"})
+
+
 def _as_review(raw: Any) -> dict[str, str]:
     if raw is None:
-        return {"status": "not_executed", "text": ""}
+        return {"status": "not_executed", "text": "missing semantic review result"}
     if isinstance(raw, str):
         text = raw.strip()
-        low = text.lower()
-        if not text or "not executed" in low or "未执行" in text:
-            return {"status": "not_executed", "text": text or "semantic review not executed"}
-        return {"status": "passed", "text": text}
+        return {
+            "status": "not_executed",
+            "text": _annotate_review_status(
+                text,
+                "semantic review not executed (unstructured review text; missing semanticReviewStatus)",
+            ),
+        }
     if isinstance(raw, dict):
         text = str(raw.get("text") or raw.get("semanticReview") or "").strip()
-        status = str(raw.get("status") or raw.get("semanticReviewStatus") or "").strip().lower()
-        if status in {"failed", "fail"}:
-            return {"status": "failed", "text": text}
-        if status in {"not_executed", "skipped"}:
-            return {"status": "not_executed", "text": text}
-        if status in {"passed", "pass"}:
-            return {"status": "passed", "text": text}
-        if not text:
-            return {"status": "not_executed", "text": ""}
-        return {"status": "passed", "text": text}
-    return {"status": "not_executed", "text": ""}
+        raw_status = raw.get("status")
+        if raw_status is None:
+            raw_status = raw.get("semanticReviewStatus")
+        status = str(raw_status or "").strip().lower()
+        if status in _REVIEW_STATUSES:
+            if text:
+                return {"status": status, "text": text}
+            if status == "not_executed":
+                return {"status": status, "text": "semantic review not executed"}
+            return {"status": status, "text": f"semantic review {status}"}
+        if not status:
+            return {
+                "status": "not_executed",
+                "text": _annotate_review_status(
+                    text, "semantic review not executed (missing semanticReviewStatus)"
+                ),
+            }
+        return {
+            "status": "not_executed",
+            "text": _annotate_review_status(
+                text, f"semantic review not executed (unknown semanticReviewStatus={status})"
+            ),
+        }
+    return {"status": "not_executed", "text": "unparsed semantic review result"}
+
+
+def _annotate_review_status(text: str, reason: str) -> str:
+    if text:
+        return f"{reason}: {text}"
+    return reason
 
 
 def _as_checks(raw: Any) -> list[VerificationRun]:

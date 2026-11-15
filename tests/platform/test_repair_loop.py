@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from bugfix_contracts.repair import EditDecision, Evidence, InputRevision, TaskContext, VerificationRun
-from bugfix_platform.agents.analyst.loop import run_ticket, semantic_review
+from bugfix_platform.agents.analyst.loop import _as_review, run_ticket, semantic_review
 
 
 def _ctx() -> TaskContext:
@@ -288,3 +288,16 @@ def test_run_ticket_uses_injected_services(tmp_path):
     assert calls["n"] == 1
     assert record.resolution != "patch_produced"
     assert record.schemaVersion
+
+
+def test_as_review_negative_text_without_status_is_not_executed():
+    got = _as_review({"semanticReview": "修改仍未解决问题"})
+    assert got["status"] == "not_executed"
+    assert "修改仍未解决问题" in (got.get("text") or "")
+    assert "missing" in (got.get("text") or "").lower() or "status" in (got.get("text") or "").lower()
+
+
+def test_as_review_unknown_status_is_not_executed():
+    got = _as_review({"status": "ok", "text": "looks fine"})
+    assert got["status"] == "not_executed"
+    assert "ok" in (got.get("text") or "").lower() or "unknown" in (got.get("text") or "").lower()

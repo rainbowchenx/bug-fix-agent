@@ -649,12 +649,24 @@ def _run_fix_loop(
             or last_payload.get("reviewConclusion")
             or ""
         ).strip()
-        status = str(last_payload.get("semanticReviewStatus") or "").strip().lower()
+        raw_status = last_payload.get("semanticReviewStatus")
+        status = str(raw_status or "").strip().lower()
         executed = last_payload.get("semanticReviewExecuted")
         if executed is False:
             status = "not_executed"
-        elif not status:
-            status = "not_executed" if not text else "passed"
+            if "semanticReviewExecuted=false" not in text:
+                text = (
+                    f"semanticReviewExecuted=false: {text}" if text else "semanticReviewExecuted=false"
+                )
+        elif status not in {"passed", "failed", "not_executed"}:
+            reason = (
+                "semantic review not executed (missing semanticReviewStatus)"
+                if not status
+                else f"semantic review not executed (unknown semanticReviewStatus={status})"
+            )
+            status = "not_executed"
+            if reason not in text:
+                text = f"{reason}: {text}" if text else reason
         return {"status": status, "text": text}
 
     attempt = run_ticket(

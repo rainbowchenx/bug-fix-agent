@@ -183,6 +183,15 @@ Do not emit a generic template. If you cannot judge, status=not_executed.
 """
 
 
+_REVIEW_STATUSES = frozenset({"passed", "failed", "not_executed"})
+
+
+def _annotate_review(review: str, reason: str) -> str:
+    if review:
+        return f"{reason}: {review}"
+    return reason
+
+
 def _parse_semantic_review(texts: list[str]) -> dict[str, str]:
     for text in reversed(texts):
         parsed = parse_json_payload(text)
@@ -190,13 +199,32 @@ def _parse_semantic_review(texts: list[str]) -> dict[str, str]:
             continue
         review = str(parsed.get("semanticReview") or parsed.get("reviewConclusion") or "").strip()
         executed = parsed.get("semanticReviewExecuted")
-        status = str(parsed.get("semanticReviewStatus") or parsed.get("reviewStatus") or "").strip().lower()
-        if executed is False or status in {"not_executed", "skipped"}:
-            return {"status": "not_executed", "text": review or "semantic review not executed"}
-        if status in {"failed", "fail"}:
-            return {"status": "failed", "text": review or "semantic review failed"}
-        if status in {"passed", "pass"} or review:
-            return {"status": "passed" if status in {"passed", "pass", ""} else status, "text": review}
+        raw_status = parsed.get("semanticReviewStatus")
+        if raw_status is None:
+            raw_status = parsed.get("reviewStatus")
+        status = str(raw_status or "").strip().lower()
+        if executed is False:
+            return {
+                "status": "not_executed",
+                "text": _annotate_review(review, "semanticReviewExecuted=false"),
+            }
+        if status in _REVIEW_STATUSES:
+            if review:
+                return {"status": status, "text": review}
+            if status == "not_executed":
+                return {"status": status, "text": "semantic review not executed"}
+            return {"status": status, "text": f"semantic review {status}"}
+        if not status:
+            return {
+                "status": "not_executed",
+                "text": _annotate_review(review, "semantic review not executed (missing semanticReviewStatus)"),
+            }
+        return {
+            "status": "not_executed",
+            "text": _annotate_review(
+                review, f"semantic review not executed (unknown semanticReviewStatus={status})"
+            ),
+        }
     return {"status": "not_executed", "text": "semantic review not executed"}
 
 

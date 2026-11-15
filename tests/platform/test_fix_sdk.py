@@ -79,3 +79,67 @@ def test_run_claude_fix_keeps_edits_and_review_without_git(tmp_path: Path, monke
     assert result.payload.get("semanticReviewStatus") == "passed"
     assert "throw e" in (work / "src" / "a.ts").read_text(encoding="utf-8")
     assert result.payload, "git-less work copy must not drop the SDK payload"
+
+
+def _run_fix_with_review(tmp_path: Path, monkeypatch, review: dict) -> object:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    work = tmp_path / "copy"
+    (work / "src").mkdir(parents=True)
+    (work / "src" / "a.ts").write_text("function handleFail() { return; }\n", encoding="utf-8")
+
+    class ResultMessage:
+        pass
+
+    class Result(ResultMessage):
+        is_error = False
+        result = json.dumps(review)
+        errors: list[str] = []
+
+    class Opts:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+            self.cwd = kwargs.get("cwd")
+
+    async def fake_query(*, prompt, options):
+        Path(options.cwd, "src", "a.ts").write_text(
+            "function handleFail() { throw e; }\n", encoding="utf-8"
+        )
+        yield Result()
+
+    _install_fake_sdk(monkeypatch, Opts, fake_query, ResultMessage)
+    return run_claude_fix(
+        FixRequest(
+            work_dir=str(tmp_path / "repo"),
+            ticket=_ticket(),
+            analysis={"proposedFix": {"summary": "rethrow"}},
+            worktree_path=str(work),
+            artifact_dir=str(tmp_path / "art"),
+        )
+    )
+
+
+def test_negative_review_without_status_is_not_executed(tmp_path: Path, monkeypatch):
+    result = _run_fix_with_review(
+        tmp_path,
+        monkeypatch,
+        {"semanticReview": "修改仍未解决问题"},
+    )
+    assert result.payload.get("semanticReviewStatus") == "not_executed"
+    blob = str(result.payload.get("semanticReview") or "")
+    assert "修改仍未解决问题" in blob
+    assert "missing" in blob.lower() or "status" in blob.lower()
+
+
+def test_unknown_review_status_is_not_executed(tmp_path: Path, monkeypatch):
+    result = _run_fix_with_review(
+        tmp_path,
+        monkeypatch,
+        {
+            "semanticReview": "looks fine",
+            "semanticReviewStatus": "ok",
+            "semanticReviewExecuted": True,
+        },
+    )
+    assert result.payload.get("semanticReviewStatus") == "not_executed"
+    blob = str(result.payload.get("semanticReview") or "")
+    assert "ok" in blob.lower() or "unknown" in blob.lower()
