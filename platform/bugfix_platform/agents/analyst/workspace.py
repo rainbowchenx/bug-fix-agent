@@ -7,6 +7,7 @@ import hashlib
 import os
 import shutil
 import subprocess
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Optional
@@ -27,21 +28,25 @@ _SKIP_COPY = {
 
 
 def capture_workspace(repo_root: Path) -> WorkspaceSnapshot:
-    """采集 HEAD、dirty 和内容摘要。源目录只读。"""
+    """采集 HEAD、dirty 和内容摘要。源目录只读；同时冻结一份输入副本。"""
     root = Path(repo_root)
-    head = _git_out(root, "rev-parse", "HEAD") or None
+    head = (_git_out(root, "rev-parse", "HEAD") or "").strip() or None
     porcelain = _git_out(root, "status", "--porcelain") or ""
     dirty: list[str] = []
     untracked: list[str] = []
     for line in porcelain.splitlines():
         if len(line) < 4:
             continue
-        path = line[3:].strip().replace("\\", "/")
+        path = line[3:].replace("\\", "/")
+        if path.startswith('"') and path.endswith('"'):
+            path = path[1:-1]
         if line.startswith("??"):
             untracked.append(path)
         else:
             dirty.append(path)
     digest = _content_digest(root, dirty + untracked)
+    freeze = Path(tempfile.mkdtemp(prefix="bugfix-freeze-"))
+    _copytree(root, freeze)
     return WorkspaceSnapshot(
         repoId=str(root.resolve()),
         head=head,
@@ -49,26 +54,23 @@ def capture_workspace(repo_root: Path) -> WorkspaceSnapshot:
         untracked=untracked,
         contentDigest=digest,
         capturedAt=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        freezeRoot=str(freeze),
     )
 
 
 def prepare_workspace(snapshot: WorkspaceSnapshot, destination: Path) -> Path:
-    """把已登记基线重放到隔离目录并校验，不改源仓。"""
-    src = Path(snapshot.repoId)
+    """把已登记基线重放到隔离目录并校验，不改源仓、不回读捕获后的源目录。"""
+    src = Path(snapshot.freezeRoot) if snapshot.freezeRoot else Path(snapshot.repoId)
+    if not src.is_dir():
+        raise RuntimeError("frozen snapshot missing; refuse live recopy")
     dest = Path(destination)
     if dest.exists():
         shutil.rmtree(dest)
     dest.mkdir(parents=True)
     _copytree(src, dest)
-    copied = capture_workspace(dest) if (dest / ".git").exists() else None
-    if copied is not None and snapshot.contentDigest and copied.contentDigest != snapshot.contentDigest:
-        # 无 git 的副本用文件摘要再核一次。
-        pass
     dest_digest = _content_digest(dest, snapshot.dirty + snapshot.untracked)
     if snapshot.contentDigest and dest_digest and dest_digest != snapshot.contentDigest:
-        # dirty 文件按源内容再写一遍，保证与捕获时一致。
-        for rel in snapshot.dirty + snapshot.untracked:
-            _copy_file(src / rel, dest / rel)
+        raise RuntimeError("workspace copy does not match captured baseline")
     baseline = _input_baseline_path(dest)
     if baseline.exists():
         shutil.rmtree(baseline)
@@ -81,6 +83,7 @@ def collect_patch(
     snapshot: WorkspaceSnapshot,
     worktree: Path,
     archive_dir: Optional[str | Path] = None,
+    namespace: Optional[str] = None,
 ) -> PatchSet:
     """隔离副本输入基线 → 最终内容。含对捕获时已 dirty 文件的后续修复。
 
@@ -91,6 +94,7 @@ def collect_patch(
     if not baseline.is_dir():
         baseline = work
     archive_root = Path(archive_dir) if archive_dir is not None else work / ".bugfix" / "patches"
+    archive_root = archive_root / (namespace or uuid4().hex[:12])
     baseline_files = _list_source_files(baseline)
     work_files = _list_source_files(work)
     patches: list[PatchFile] = []
@@ -220,4 +224,4 @@ def _git_out(root: Path, *args: str) -> str:
         return ""
     if proc.returncode != 0:
         return ""
-    return (proc.stdout or "").strip()
+    return proc.stdout or ""

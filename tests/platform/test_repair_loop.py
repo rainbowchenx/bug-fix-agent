@@ -132,6 +132,40 @@ def test_check_fail_then_pass_is_candidate():
     assert record.patchDelivery == "candidate"
 
 
+def test_failed_check_is_visible_on_next_edit():
+    ctx = _ctx()
+    seen: list[str] = []
+
+    def analyze(_context):
+        return EditDecision(
+            behaviorTarget="btn",
+            codeAssociation="src/a.ts",
+            mechanism="null check missing",
+            editRationale="guard",
+            evidenceRefs=["e1"],
+            allowed=True,
+        )
+
+    def edit(context, _decision):
+        seen.append(" ".join(h.claim for h in context.hypotheses))
+        return "diff --git a/src/a.ts b/src/a.ts\n+return x;\n"
+
+    def check(_context, _decision, *_rest):
+        result = "failed" if len(seen) == 1 else "passed"
+        return VerificationRun(
+            command=["pytest"],
+            result=result,
+            exitCode=0 if result == "passed" else 1,
+            coverage="unit",
+            logRef="assertion failed on camera path",
+        )
+
+    record = run_ticket(ctx, {"analyze": analyze, "edit": edit, "check": check})
+    assert len(seen) == 2
+    assert "fail" in seen[1].lower() or "camera" in seen[1].lower()
+    assert record.resolution == "patch_produced"
+
+
 def test_run_ticket_uses_injected_services(tmp_path):
     ctx = TaskContext(defectId="D1", generatePatch=False)
     calls = {"n": 0}

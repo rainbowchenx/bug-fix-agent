@@ -24,6 +24,8 @@ def validate_edit_decision(context: TaskContext, decision: EditDecision) -> list
         decision.editRationale or ""
     ):
         errors.append("placeholder analysis")
+    if decision.openQuestions:
+        errors.append("open questions unresolved")
     if not decision.evidenceRefs:
         errors.append("missing evidenceRefs")
     by_id = {e.evidenceId: e for e in context.evidence}
@@ -34,8 +36,8 @@ def validate_edit_decision(context: TaskContext, decision: EditDecision) -> list
             continue
         if ev.validity in ("invalid", "historical"):
             errors.append(f"invalid evidence {ref}")
-        if ev.validity == "pending_review" and ev.category == "model_inference":
-            errors.append(f"unverified inference {ref}")
+        if ev.validity == "pending_review":
+            errors.append(f"unverified evidence {ref}")
     if context.unreadAttachments and "screenshot" in (decision.mechanism or "").lower():
         errors.append("unread attachment cannot support visual claim")
     return errors

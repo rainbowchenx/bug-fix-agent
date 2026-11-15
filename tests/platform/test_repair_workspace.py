@@ -53,3 +53,20 @@ def test_prepare_workspace_does_not_mutate_source(tmp_path: Path):
     assert (repo / "src" / "a.ts").read_text(encoding="utf-8") == before
     (out / "src" / "a.ts").write_text("changed in copy\n", encoding="utf-8")
     assert (repo / "src" / "a.ts").read_text(encoding="utf-8") == before
+
+
+def test_porcelain_keeps_full_path_for_space_prefixed_modified(tmp_path: Path):
+    repo = _init_repo(tmp_path / "src")
+    (repo / "src" / "a.ts").write_text("export const a = 2;\n", encoding="utf-8")
+    snap = capture_workspace(repo)
+    assert "src/a.ts" in snap.dirty
+    assert "rc/a.ts" not in snap.dirty
+
+
+def test_prepare_keeps_captured_bytes_if_source_mutates(tmp_path: Path):
+    repo = _init_repo(tmp_path / "src")
+    (repo / "src" / "a.ts").write_text("CAPTURED\n", encoding="utf-8")
+    snap = capture_workspace(repo)
+    (repo / "src" / "a.ts").write_text("MUTATED AFTER SNAPSHOT\n", encoding="utf-8")
+    out = prepare_workspace(snap, tmp_path / "copy")
+    assert (out / "src" / "a.ts").read_text(encoding="utf-8") == "CAPTURED\n"

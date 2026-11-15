@@ -11,6 +11,7 @@ from bugfix_contracts.repair import (
     REPAIR_SCHEMA_VERSION,
     AttemptRecord,
     EditDecision,
+    Hypothesis,
     PatchFile,
     PatchSet,
     TaskContext,
@@ -98,6 +99,25 @@ def run_ticket(
         checks.extend(runs)
         if not runs or _checks_failed(runs):
             produced = False
+            feedback: list[Hypothesis] = []
+            for item in runs or [
+                VerificationRun(command=["check"], result="blocked", coverage="no_runs")
+            ]:
+                claim = " ".join(
+                    part
+                    for part in [
+                        f"check {item.result}",
+                        " ".join(item.command),
+                        item.logRef or item.coverage,
+                    ]
+                    if part
+                )
+                feedback.append(
+                    Hypothesis(claim=claim[:240] or "check failed", status="refuted")
+                )
+            context = context.model_copy(
+                update={"hypotheses": list(context.hypotheses) + feedback}
+            )
             continue
         produced = True
         break

@@ -75,8 +75,11 @@ class PatchInfo(BaseModel):
 
 
 class SuggestedVerify(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     steps: list[str] = Field(default_factory=list)
     executed: bool = False
+    commands: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class TicketReport(BaseModel):

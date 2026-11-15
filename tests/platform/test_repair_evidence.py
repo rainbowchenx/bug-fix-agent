@@ -78,3 +78,22 @@ def test_new_file_caller_check_can_pass():
 
 def test_valid_static_decision_is_allowed():
     assert validate_edit_decision(_ctx(), _decision()) == []
+
+
+def test_pending_review_code_observation_cannot_edit():
+    ctx = _ctx(
+        evidence=[
+            {
+                "evidenceId": "e1",
+                "category": "code_observation",
+                "summary": "path exists",
+                "path": "src/a.ts",
+                "validity": "pending_review",
+            }
+        ]
+    )
+    assert validate_edit_decision(ctx, _decision())
+
+
+def test_open_questions_cannot_edit():
+    assert validate_edit_decision(_ctx(), _decision(openQuestions=["which device model"]))

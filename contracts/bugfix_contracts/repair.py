@@ -95,6 +95,7 @@ class WorkspaceSnapshot(BaseModel):
     untracked: list[str] = Field(default_factory=list)
     contentDigest: Optional[str] = None
     capturedAt: str = ""
+    freezeRoot: Optional[str] = None
 
 
 class PatchFile(BaseModel):

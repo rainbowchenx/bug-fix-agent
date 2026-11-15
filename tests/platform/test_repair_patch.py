@@ -77,3 +77,27 @@ def test_further_repair_on_dirty_file_is_collected(tmp_path: Path):
         assert dest.is_file()
         text = dest.read_text(encoding="utf-8")
         assert "export const a = 100" in text
+
+
+def test_two_collect_patch_rounds_keep_separate_archives(tmp_path: Path):
+    repo = _init(tmp_path / "src")
+    snap = capture_workspace(repo)
+    work = prepare_workspace(snap, tmp_path / "wt")
+    (work / "src" / "a.ts").write_text("ROUND1\n", encoding="utf-8")
+    art = tmp_path / "art"
+    first = collect_patch(snap, work, archive_dir=art, namespace="attempt-a1")
+    first_path = Path(first.patches[0].archivePath)
+    first_text = first_path.read_text(encoding="utf-8")
+    assert "ROUND1" in first_text
+    (work / "src" / "a.ts").write_text("ROUND2\n", encoding="utf-8")
+    second = collect_patch(snap, work, archive_dir=art, namespace="attempt-a2")
+    second_path = Path(second.patches[0].archivePath)
+    assert first_path != second_path
+    assert first_path.is_file()
+    assert "ROUND1" in first_path.read_text(encoding="utf-8")
+    assert "ROUND2" not in first_path.read_text(encoding="utf-8")
+    assert "ROUND2" in second_path.read_text(encoding="utf-8")
+    after = (work / "src" / "a.ts").read_bytes()
+    import hashlib
+
+    assert second.patches[0].digest == hashlib.sha256(after).hexdigest()[:16]

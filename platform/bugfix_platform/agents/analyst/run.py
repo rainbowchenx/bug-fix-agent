@@ -145,6 +145,7 @@ def run_analyst(
                 continue
             revision = rev_map.get(t.defectId)
             ticket = _ticket_with_revision(t, revision)
+            ticket = _promote_after_revision(ticket, revision)
             if not is_match_pool(ticket.pool):
                 entry = _sideline_entry(ticket)
                 tickets.append(
@@ -163,6 +164,7 @@ def run_analyst(
                 **routed,
             }
 
+            analyze_session: Optional[str] = None
             if routed["outcome"] != "needs_ticket_info" and (
                 remaining is None or remaining > 0
             ):
@@ -180,10 +182,12 @@ def run_analyst(
                         apply_fix=want_fix,
                         spec_atlas=spec_atlas,
                         codegraph=cg_status,
+                        resume_session_id=sess_map.get(ticket.defectId),
                     )
                 )
                 entry.update(result.payload)
                 analyze_sources.append(result.source)
+                analyze_session = result.session_id
                 _note = " ".join(str(result.detail or "").split())
                 if _note:
                     print(
@@ -210,14 +214,18 @@ def run_analyst(
                 entry["blockers"] = None
 
             snapshot = capture_workspace(Path(work_dir))
-            ctx = _context_with_analysis(
-                build_task_context(
-                    ticket,
-                    code_knowledge,
-                    revision=revision,
-                    snapshot=snapshot,
-                    generate_patch=want_fix,
+            ctx = _verify_current_code(
+                _context_with_analysis(
+                    build_task_context(
+                        ticket,
+                        code_knowledge,
+                        revision=revision,
+                        snapshot=snapshot,
+                        generate_patch=want_fix,
+                    ),
+                    entry,
                 ),
+                Path(work_dir),
                 entry,
             )
             decision = _decision_from_entry(entry, ctx)
@@ -230,7 +238,11 @@ def run_analyst(
                         "reason": "; ".join(gate_errors),
                     }
                 )
-            session_id = sess_map.get(ticket.defectId) or uuid4().hex[:12]
+            else:
+                decision = EditDecision.model_validate(
+                    {**decision.model_dump(), "allowed": True}
+                )
+            session_id = analyze_session or sess_map.get(ticket.defectId)
             attempt: AttemptRecord
             if want_fix and fixer is not None and decision.allowed and entry.get("outcome") in (
                 "plan_only",
@@ -341,6 +353,23 @@ def _ticket_with_revision(ticket: BatchTicket, revision: Optional[InputRevision]
     return ticket.model_copy(update=updates) if updates else ticket
 
 
+def _promote_after_revision(
+    ticket: BatchTicket, revision: Optional[InputRevision]
+) -> BatchTicket:
+    """用户补充后重新评估 needs_info，不再用原 pool 永久阻断分析。"""
+    if revision is None or ticket.pool != "needs_info":
+        return ticket
+    filled = bool(
+        (ticket.observed or "").strip()
+        or (ticket.expected or "").strip()
+        or (ticket.steps or "").strip()
+        or (revision.observed or "").strip()
+    )
+    if not filled:
+        return ticket
+    return ticket.model_copy(update={"pool": "strict"})
+
+
 def _context_with_analysis(context: TaskContext, entry: dict[str, Any]) -> TaskContext:
     extra = list(context.evidence)
     seen = {e.evidenceId for e in extra}
@@ -360,6 +389,37 @@ def _context_with_analysis(context: TaskContext, entry: dict[str, Any]) -> TaskC
                 path=str(cand["path"]),
                 repoId=str(cand.get("repoPath") or "."),
                 validity="pending_review",
+            )
+        )
+        seen.add(eid)
+    return context.model_copy(update={"evidence": extra})
+
+
+def _verify_current_code(
+    context: TaskContext, work_dir: Path, entry: dict[str, Any]
+) -> TaskContext:
+    """读取当前文件，把已核实片段记为 valid code_observation。"""
+    extra = list(context.evidence)
+    seen = {e.evidenceId for e in extra}
+    loc = entry.get("localization") or {}
+    for i, cand in enumerate(loc.get("candidates") or [], start=1):
+        if not isinstance(cand, dict) or not cand.get("path"):
+            continue
+        path = Path(work_dir) / str(cand["path"])
+        if not path.is_file():
+            continue
+        snippet = path.read_text(encoding="utf-8", errors="replace")[:240]
+        eid = f"read-{entry.get('defectId')}-{i}"
+        if eid in seen:
+            continue
+        extra.append(
+            Evidence(
+                evidenceId=eid,
+                category="code_observation",
+                source="read",
+                summary=f"read {cand['path']}: {snippet[:80]}",
+                path=str(cand["path"]),
+                validity="valid",
             )
         )
         seen.add(eid)
@@ -387,12 +447,12 @@ def _decision_from_entry(entry: dict[str, Any], context: TaskContext) -> EditDec
         or "defect behavior"
     )
     return EditDecision(
-        allowed=True,
+        allowed=False,
         behaviorTarget=behavior,
         codeAssociation=association,
         mechanism=summary or "unspecified",
         editRationale=rationale,
-        evidenceRefs=[e.evidenceId for e in context.evidence],
+        evidenceRefs=[e.evidenceId for e in context.evidence if e.validity == "valid"],
         openQuestions=list(root.get("openQuestions") or []),
     )
 
@@ -410,21 +470,26 @@ def _run_fix_loop(
     out_dir: Optional[str],
     snapshot: Any,
     revision: Optional[InputRevision],
-    session_id: str,
+    session_id: Optional[str],
 ) -> tuple[AttemptRecord, dict[str, Any]]:
     last_payload: dict[str, Any] = {}
+    attempt_id = uuid4().hex[:12]
+    state: dict[str, Any] = {"wt": None, "n": 0}
 
-    def edit(_ctx: TaskContext, _decision: EditDecision) -> dict[str, Any]:
-        if fix_fn is not None:
-            wt = Path(work_dir)
-        else:
+    def edit(ctx: TaskContext, _decision: EditDecision) -> dict[str, Any]:
+        if state["wt"] is None:
             dest = Path(out_dir or work_dir) / ".bugfix" / "worktrees" / ticket.defectId
-            wt = prepare_workspace(snapshot, dest)
+            state["wt"] = prepare_workspace(snapshot, dest)
+        wt = Path(state["wt"])
+        state["n"] += 1
+        analysis = dict(entry)
+        if ctx.hypotheses:
+            analysis["retryFeedback"] = [h.claim for h in ctx.hypotheses]
         result = fixer(
             FixRequest(
                 work_dir=work_dir,
                 ticket=ticket,
-                analysis=dict(entry),
+                analysis=analysis,
                 worktree_path=str(wt),
                 artifact_dir=out_dir,
                 injected_skills=fix_skills,
@@ -435,7 +500,12 @@ def _run_fix_loop(
         last_payload["_source"] = result.source
         last_payload["_detail"] = result.detail
         archive_root = Path(out_dir) if out_dir else wt / ".bugfix"
-        collected = collect_patch(snapshot, wt, archive_dir=archive_root)
+        collected = collect_patch(
+            snapshot,
+            wt,
+            archive_dir=archive_root,
+            namespace=f"{ticket.defectId}/{attempt_id}/{state['n']}",
+        )
         diffs: list[str] = []
         for item in collected.patches:
             path = Path(item.archivePath)
@@ -466,15 +536,35 @@ def _run_fix_loop(
                     )
         return {"diff": "\n".join(diffs), "patchSet": collected}
 
-    def check(_ctx: TaskContext, _decision: EditDecision, _patch: Any) -> VerificationRun:
-        specs = list((entry.get("suggestedVerify") or {}).get("commands") or [])
-        if specs and isinstance(specs[0], dict) and specs[0].get("command"):
-            return run_check(specs[0], Path(work_dir))
-        return VerificationRun(
-            command=["suggested-verify"],
-            result="not_run",
-            coverage="suggested_only",
-        )
+    def check(_ctx: TaskContext, _decision: EditDecision, patch: Any) -> list[VerificationRun]:
+        specs = [
+            spec
+            for spec in list((entry.get("suggestedVerify") or {}).get("commands") or [])
+            if isinstance(spec, dict) and spec.get("command")
+        ]
+        wt = Path(state["wt"] or work_dir)
+        digest = None
+        if patch is not None and getattr(patch, "patches", None):
+            digest = patch.patches[0].digest
+        if not specs:
+            return [
+                VerificationRun(
+                    command=["suggested-verify"],
+                    cwd=str(wt),
+                    result="not_run",
+                    coverage="suggested_only",
+                    candidateDigest=digest,
+                )
+            ]
+        runs: list[VerificationRun] = []
+        for spec in specs:
+            run = run_check(spec, wt)
+            if digest:
+                run = run.model_copy(update={"candidateDigest": digest, "cwd": str(wt)})
+            else:
+                run = run.model_copy(update={"cwd": str(wt)})
+            runs.append(run)
+        return runs
 
     attempt = run_ticket(
         context,

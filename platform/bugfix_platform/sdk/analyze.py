@@ -42,6 +42,7 @@ class AnalyzeRequest:
     apply_fix: bool = False
     spec_atlas: Optional[dict[str, Any]] = None
     codegraph: Optional[CodeGraphStatus] = None
+    resume_session_id: Optional[str] = None
 
 
 @dataclass
@@ -51,6 +52,7 @@ class AnalyzeResult:
     """Fields to merge onto the ticket report (outcome/rootCause/…)."""
     source: Literal["heuristic", "sdk", "sdk_fallback"]
     detail: Optional[str] = None
+    session_id: Optional[str] = None
 
 
 AnalyzeRunner = Callable[[AnalyzeRequest], AnalyzeResult]
@@ -167,8 +169,9 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         }
         if req.codegraph is not None:
             kwargs.update(req.codegraph.mcp_option_kwargs(req.work_dir))
-        if resume:
-            kwargs["resume"] = resume
+        resume_id = resume if resume is not None else req.resume_session_id
+        if resume_id:
+            kwargs["resume"] = resume_id
         try:
             return ClaudeAgentOptions(**kwargs)
         except TypeError:
@@ -252,7 +255,9 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         apply_fix=req.apply_fix,
     )
     detail = "partial=true; reason=max_turns" if budget_stop else None
-    return AnalyzeResult(ok=True, payload=merged, source="sdk", detail=detail)
+    return AnalyzeResult(
+        ok=True, payload=merged, source="sdk", detail=detail, session_id=session_id
+    )
 
 
 def parse_analyze_payload(raw: Any) -> Optional[dict[str, Any]]:
