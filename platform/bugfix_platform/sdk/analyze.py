@@ -157,7 +157,14 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         )
     max_turns = resolve_analyze_max_turns(req.max_turns)
 
-    def _make_options(*, resume: str | None = None, turns: Optional[int] = None) -> Any:
+    option_notes: list[str] = []
+
+    def _make_options(
+        *,
+        resume: str | None = None,
+        turns: Optional[int] = None,
+        allow_resume: bool = True,
+    ) -> Any:
         kwargs: dict[str, Any] = {
             "cwd": req.work_dir,
             "system_prompt": system_prompt,
@@ -170,11 +177,13 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         if req.codegraph is not None:
             kwargs.update(req.codegraph.mcp_option_kwargs(req.work_dir))
         resume_id = resume if resume is not None else req.resume_session_id
-        if resume_id:
+        if resume_id and allow_resume:
             kwargs["resume"] = resume_id
         try:
             return ClaudeAgentOptions(**kwargs)
         except TypeError:
+            if "resume" in kwargs:
+                option_notes.append("resume unsupported, starting new session")
             kwargs.pop("resume", None)
             kwargs.pop("strict_mcp_config", None)
             try:
@@ -211,7 +220,14 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
     try:
         anyio.run(_drive, prompt, _make_options())
     except Exception as err:  # noqa: BLE001
-        if not budget_stop:
+        if req.resume_session_id and not budget_stop:
+            option_notes.append(f"session inaccessible: {err}; starting new session")
+            try:
+                anyio.run(_drive, prompt, _make_options(allow_resume=False))
+            except Exception as err2:  # noqa: BLE001
+                if not budget_stop:
+                    return _blocked_analyze(req, f"sdk analyze failed: {err2}")
+        elif not budget_stop:
             return _blocked_analyze(req, f"sdk analyze failed: {err}")
 
     parsed = _parse_session_json(structured, texts + [result_text])
@@ -254,7 +270,11 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         architecture=req.architecture,
         apply_fix=req.apply_fix,
     )
-    detail = "partial=true; reason=max_turns" if budget_stop else None
+    detail_bits = []
+    if budget_stop:
+        detail_bits.append("partial=true; reason=max_turns")
+    detail_bits.extend(option_notes)
+    detail = "; ".join(detail_bits) or None
     return AnalyzeResult(
         ok=True, payload=merged, source="sdk", detail=detail, session_id=session_id
     )

@@ -13,6 +13,7 @@ from bugfix_platform.sdk.analyze import (
     analyze_mode_from_env,
     heuristic_analyze,
     parse_analyze_payload,
+    run_claude_analyze,
     select_ticket_spec_dirs,
 )
 from bugfix_platform.workflow import run_three_agent_workflow
@@ -436,3 +437,136 @@ def test_workflow_heuristic_analyze_mode(tmp_path: Path, monkeypatch):
     planish = [t for t in result.artifacts.analysis_report.tickets if t.outcome == "plan_only"]
     assert planish
     assert any("heuristic" in (t.localization.notes or "") for t in planish)
+
+
+def _sdk_ticket():
+    from bugfix_contracts.defect_batch import BatchTicket
+
+    return BatchTicket(
+        defectId="D1",
+        title="t",
+        pool="strict",
+        expectQuality="explicit",
+        observed="preview glitch",
+    )
+
+
+def _sdk_routed() -> dict:
+    return {
+        "outcome": "plan_only",
+        "proposedFix": {"summary": "inspect", "steps": [], "targetFiles": []},
+        "rootCause": {"summary": "pending", "ruledOut": [], "openQuestions": []},
+        "localization": {"candidates": [], "notes": ""},
+        "confidence": "low",
+        "verifyStatus": "skipped",
+        "suggestedVerify": {"steps": [], "executed": False},
+        "blockers": None,
+        "patch": None,
+    }
+
+
+def _install_fake_sdk(monkeypatch, options_cls, query_fn, result_message_cls):
+    import sys
+    import types
+
+    fake = types.ModuleType("claude_agent_sdk")
+    fake.ClaudeAgentOptions = options_cls
+    fake.ResultMessage = result_message_cls
+    fake.query = query_fn
+    monkeypatch.setitem(sys.modules, "claude_agent_sdk", fake)
+
+
+def test_resume_unsupported_records_degrade_and_starts_new(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    payload = {
+        "outcome": "plan_only",
+        "rootCause": {"summary": "race in preview", "ruledOut": [], "openQuestions": []},
+        "proposedFix": {"summary": "serialize init", "steps": [], "targetFiles": []},
+        "localization": {"candidates": []},
+    }
+
+    class ResultMessage:
+        pass
+
+    class Result(ResultMessage):
+        session_id = "new-sess"
+        structured_output = payload
+        result = json.dumps(payload)
+        is_error = False
+        errors: list[str] = []
+        subtype = ""
+        terminal_reason = ""
+
+    class Opts:
+        def __init__(self, **kwargs):
+            if "resume" in kwargs:
+                raise TypeError("resume not supported")
+            self.kwargs = kwargs
+
+    async def fake_query(*, prompt, options):
+        assert "resume" not in getattr(options, "kwargs", {})
+        yield Result()
+
+    _install_fake_sdk(monkeypatch, Opts, fake_query, ResultMessage)
+    result = run_claude_analyze(
+        AnalyzeRequest(
+            work_dir=str(tmp_path),
+            ticket=_sdk_ticket(),
+            routed=_sdk_routed(),
+            resume_session_id="old-sess",
+        )
+    )
+    assert result.source == "sdk"
+    assert result.detail and "resume unsupported" in result.detail
+    assert "starting new session" in (result.detail or "")
+    assert result.payload.get("rootCause", {}).get("summary") == "race in preview"
+
+
+def test_inaccessible_session_starts_new_with_ticket_state(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    payload = {
+        "outcome": "plan_only",
+        "rootCause": {"summary": "loaded current defect", "ruledOut": [], "openQuestions": []},
+        "proposedFix": {"summary": "retry path", "steps": [], "targetFiles": []},
+        "localization": {"candidates": []},
+    }
+    seen_resume: list[bool] = []
+
+    class ResultMessage:
+        pass
+
+    class Result(ResultMessage):
+        session_id = "fresh-sess"
+        structured_output = payload
+        result = json.dumps(payload)
+        is_error = False
+        errors: list[str] = []
+        subtype = ""
+        terminal_reason = ""
+
+    class Opts:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+    async def fake_query(*, prompt, options):
+        resumed = bool((getattr(options, "kwargs", {}) or {}).get("resume"))
+        seen_resume.append(resumed)
+        if resumed:
+            raise RuntimeError("session not found")
+        assert "preview glitch" in prompt
+        yield Result()
+
+    _install_fake_sdk(monkeypatch, Opts, fake_query, ResultMessage)
+    result = run_claude_analyze(
+        AnalyzeRequest(
+            work_dir=str(tmp_path),
+            ticket=_sdk_ticket(),
+            routed=_sdk_routed(),
+            resume_session_id="dead-sess",
+        )
+    )
+    assert seen_resume == [True, False]
+    assert result.source == "sdk"
+    assert result.detail and "session inaccessible" in result.detail
+    assert "starting new session" in (result.detail or "")
+    assert result.payload.get("rootCause", {}).get("summary") == "loaded current defect"

@@ -70,3 +70,16 @@ def test_prepare_keeps_captured_bytes_if_source_mutates(tmp_path: Path):
     (repo / "src" / "a.ts").write_text("MUTATED AFTER SNAPSHOT\n", encoding="utf-8")
     out = prepare_workspace(snap, tmp_path / "copy")
     assert (out / "src" / "a.ts").read_text(encoding="utf-8") == "CAPTURED\n"
+
+
+def test_capture_digest_includes_clean_tracked_files(tmp_path: Path):
+    repo = _init_repo(tmp_path / "src")
+    (repo / "src" / "b.ts").write_text("export const b = 1;\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-m", "b"], check=True, capture_output=True)
+    first = capture_workspace(repo)
+    (repo / "src" / "b.ts").write_text("export const b = 99;\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-m", "b2"], check=True, capture_output=True)
+    second = capture_workspace(repo)
+    assert first.contentDigest != second.contentDigest

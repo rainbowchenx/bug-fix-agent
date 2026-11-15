@@ -24,6 +24,7 @@ _SKIP_COPY = {
     "__pycache__",
     ".bugfix",
     ".bugfix-runs",
+    ".codegraph",
 }
 
 
@@ -44,9 +45,13 @@ def capture_workspace(repo_root: Path) -> WorkspaceSnapshot:
             untracked.append(path)
         else:
             dirty.append(path)
-    digest = _content_digest(root, dirty + untracked)
+    digest = workspace_digest(root)
     freeze = Path(tempfile.mkdtemp(prefix="bugfix-freeze-"))
     _copytree(root, freeze)
+    freeze_digest = workspace_digest(freeze)
+    if digest and freeze_digest != digest:
+        shutil.rmtree(freeze, ignore_errors=True)
+        raise RuntimeError("source changed while freezing snapshot")
     return WorkspaceSnapshot(
         repoId=str(root.resolve()),
         head=head,
@@ -68,7 +73,7 @@ def prepare_workspace(snapshot: WorkspaceSnapshot, destination: Path) -> Path:
         shutil.rmtree(dest)
     dest.mkdir(parents=True)
     _copytree(src, dest)
-    dest_digest = _content_digest(dest, snapshot.dirty + snapshot.untracked)
+    dest_digest = workspace_digest(dest)
     if snapshot.contentDigest and dest_digest and dest_digest != snapshot.contentDigest:
         raise RuntimeError("workspace copy does not match captured baseline")
     baseline = _input_baseline_path(dest)
@@ -117,10 +122,17 @@ def collect_patch(
                 item = _file("modify", rel, after, snapshot.head, left, right, archive_root)
                 patches.append(item)
     delivery = "candidate" if patches else "none"
+    if patches and not _patches_apply(baseline, patches):
+        delivery = "diagnostic"
+    bundle_path = _write_bundle(archive_root, patches) if patches else None
+    if delivery == "candidate" and bundle_path and not _bundle_applies(baseline, Path(bundle_path)):
+        delivery = "diagnostic"
     return PatchSet(
         patchSetId=uuid4().hex[:12],
         delivery=delivery,
         baselineHead=snapshot.head,
+        baselineDigest=workspace_digest(baseline),
+        bundlePath=bundle_path,
         patches=patches,
     )
 
@@ -142,17 +154,8 @@ def _file(
     rel_arch = f"patches/{rel.replace('/', '__')}.diff"
     dest = archive_root / rel_arch
     dest.parent.mkdir(parents=True, exist_ok=True)
-    left_text = left.read_text(encoding="utf-8", errors="replace") if left.is_file() else ""
-    right_text = right.read_text(encoding="utf-8", errors="replace") if right.is_file() else ""
-    diff = "".join(
-        difflib.unified_diff(
-            left_text.splitlines(True),
-            right_text.splitlines(True),
-            fromfile=f"a/{rel}",
-            tofile=f"b/{rel}",
-        )
-    )
-    dest.write_text(diff or right_text, encoding="utf-8")
+    diff = _unified_diff(left, right, rel)
+    dest.write_bytes(diff.replace("\r\n", "\n").encode("utf-8"))
     return PatchFile(
         repoId=".",
         path=rel.replace("\\", "/"),
@@ -190,6 +193,11 @@ def _list_source_files(root: Path) -> list[str]:
     return out
 
 
+def workspace_digest(root: Path) -> str:
+    """所有普通源文件的内容摘要，不只 dirty / 首个文件。"""
+    return _content_digest(root, _list_source_files(root))
+
+
 def _content_digest(root: Path, rels: Iterable[str]) -> str:
     h = hashlib.sha256()
     for rel in sorted(rels):
@@ -197,18 +205,154 @@ def _content_digest(root: Path, rels: Iterable[str]) -> str:
         h.update(rel.encode("utf-8"))
         if path.is_file():
             h.update(path.read_bytes())
-    if not list(rels):
-        a = root / "src" / "a.ts"
-        if a.is_file():
-            h.update(a.read_bytes())
-        else:
-            for rel in _list_source_files(root)[:20]:
-                p = root / rel
-                if p.is_file():
-                    h.update(rel.encode("utf-8"))
-                    h.update(p.read_bytes())
-                    break
     return h.hexdigest()[:16]
+
+
+def _unified_diff(left: Path, right: Path, rel: str) -> str:
+    left_arg = str(left.resolve()) if left.is_file() else os.devnull
+    right_arg = str(right.resolve()) if right.is_file() else os.devnull
+    try:
+        proc = subprocess.run(
+            ["git", "diff", "--no-index", "--", left_arg, right_arg],
+            capture_output=True,
+        )
+        text = (proc.stdout or b"").decode("utf-8", errors="replace").replace("\r\n", "\n")
+        if text.strip():
+            return _rewrite_diff_paths(text, rel, left.is_file(), right.is_file())
+    except OSError:
+        text = ""
+    return _difflib_patch(left, right, rel)
+
+
+def _rewrite_diff_paths(text: str, rel: str, left_exists: bool, right_exists: bool) -> str:
+    lines: list[str] = []
+    for line in text.splitlines(True):
+        if line.startswith("diff --git "):
+            line = f"diff --git a/{rel} b/{rel}\n"
+        elif line.startswith("--- "):
+            line = "--- /dev/null\n" if not left_exists else f"--- a/{rel}\n"
+        elif line.startswith("+++ "):
+            line = "+++ /dev/null\n" if not right_exists else f"+++ b/{rel}\n"
+        lines.append(line)
+    return "".join(lines)
+
+
+def _difflib_patch(left: Path, right: Path, rel: str) -> str:
+    left_text = left.read_text(encoding="utf-8", errors="replace") if left.is_file() else ""
+    right_text = right.read_text(encoding="utf-8", errors="replace") if right.is_file() else ""
+    left_lines = _lines_for_diff(left_text)
+    right_lines = _lines_for_diff(right_text)
+    body = "".join(
+        difflib.unified_diff(
+            left_lines,
+            right_lines,
+            fromfile=f"a/{rel}",
+            tofile=f"b/{rel}",
+            lineterm="\n",
+        )
+    )
+    if not body:
+        if not left.is_file() and right.is_file():
+            numbered = "".join(f"+{line}" for line in right_lines) or "+\n"
+            nl = "\\ No newline at end of file\n" if right_text and not right_text.endswith("\n") else ""
+            return (
+                f"diff --git a/{rel} b/{rel}\n"
+                f"new file mode 100644\n"
+                f"--- /dev/null\n"
+                f"+++ b/{rel}\n"
+                f"@@ -0,0 +1,{max(len(right_lines), 1)} @@\n"
+                f"{numbered}{nl}"
+            )
+        return ""
+    if left_text and not left_text.endswith("\n"):
+        last = left_text.splitlines()[-1]
+        body = body.replace(f"-{last}\n", f"-{last}\n\\ No newline at end of file\n", 1)
+    if right_text and not right_text.endswith("\n"):
+        last = right_text.splitlines()[-1]
+        needle = f"+{last}\n"
+        if needle in body:
+            body = body.replace(needle, needle + "\\ No newline at end of file\n", 1)
+    if not left.is_file():
+        body = body.replace(f"--- a/{rel}\n", "--- /dev/null\n", 1)
+        if "new file mode" not in body:
+            body = body.replace(
+                f"diff --git a/{rel} b/{rel}\n",
+                f"diff --git a/{rel} b/{rel}\nnew file mode 100644\n",
+                1,
+            )
+    if not right.is_file():
+        body = body.replace(f"+++ b/{rel}\n", "+++ /dev/null\n", 1)
+    return body
+
+
+def _lines_for_diff(text: str) -> list[str]:
+    if not text:
+        return []
+    lines = text.splitlines(True)
+    if not text.endswith("\n"):
+        lines[-1] = lines[-1] + "\n"
+    return lines
+
+
+def _write_bundle(archive_root: Path, patches: list[PatchFile]) -> str | None:
+    chunks: list[str] = []
+    for item in patches:
+        src = Path(item.archivePath)
+        if not src.is_file():
+            continue
+        chunk = src.read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n")
+        if chunk and not chunk.endswith("\n"):
+            chunk += "\n"
+        chunks.append(chunk)
+    if not chunks:
+        return None
+    dest = Path(archive_root) / "bundle.diff"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes("".join(chunks).encode("utf-8"))
+    return str(dest)
+
+
+def _bundle_applies(baseline: Path, bundle: Path) -> bool:
+    check = Path(tempfile.mkdtemp(prefix="bugfix-bundle-"))
+    try:
+        _copytree(baseline, check)
+        proc = subprocess.run(
+            ["git", "apply", "--check", str(bundle)],
+            cwd=check,
+            capture_output=True,
+        )
+        return proc.returncode == 0
+    except OSError:
+        return False
+    finally:
+        shutil.rmtree(check, ignore_errors=True)
+
+
+def _patches_apply(baseline: Path, patches: list[PatchFile]) -> bool:
+    if not patches:
+        return True
+    check = Path(tempfile.mkdtemp(prefix="bugfix-apply-"))
+    try:
+        _copytree(baseline, check)
+        for item in patches:
+            src = Path(item.archivePath)
+            if not src.is_file():
+                return False
+            proc = subprocess.run(
+                ["git", "apply", "--check", str(src)],
+                cwd=check,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            if proc.returncode != 0:
+                return False
+        return True
+    except OSError:
+        return False
+    finally:
+        shutil.rmtree(check, ignore_errors=True)
 
 
 def _git_out(root: Path, *args: str) -> str:

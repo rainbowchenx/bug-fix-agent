@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from pathlib import Path
 from typing import Any, Callable, Mapping
 from uuid import uuid4
 
@@ -31,12 +32,38 @@ def semantic_review(
     context: TaskContext,
     decision: EditDecision,
 ) -> list[str]:
-    """最终 diff 的机制复核。命中则不能作为合格候选。"""
+    """对照行为目标、机制和正常/失败路径复核最终 diff。"""
     issues: list[str] = []
-    if _HIDE.search(diff or ""):
+    blob = diff or ""
+    if _HIDE.search(blob):
         issues.append("hides error")
-    if _DROP_ASSERT.search(diff or ""):
+    if _DROP_ASSERT.search(blob):
         issues.append("deleted assertion")
+    expected = ""
+    if context.revision is not None:
+        expected = context.revision.expected or ""
+    haystack = " ".join(
+        part
+        for part in [
+            decision.codeAssociation,
+            decision.mechanism,
+            decision.behaviorTarget,
+            expected,
+        ]
+        if part
+    )
+    paths = re.findall(r"[\w./\\]+\.\w+", decision.codeAssociation or "")
+    blob_norm = blob.replace("\\", "/")
+    if paths and not any(p.replace("\\", "/") in blob_norm for p in paths):
+        issues.append("patch does not touch associated code")
+    skip = {"error", "errors", "after", "before", "using", "with", "from", "this", "that", "other"}
+    idents = [
+        tok
+        for tok in re.findall(r"[A-Za-z_][A-Za-z0-9_]{4,}", haystack)
+        if tok.lower() not in skip
+    ]
+    if idents and not any(tok in blob for tok in idents):
+        issues.append("patch does not address mechanism")
     return issues
 
 
@@ -108,7 +135,7 @@ def run_ticket(
                     for part in [
                         f"check {item.result}",
                         " ".join(item.command),
-                        item.logRef or item.coverage,
+                        _log_excerpt(item),
                     ]
                     if part
                 )
@@ -124,9 +151,12 @@ def run_ticket(
     if produced and last_patch is None and last_diff.strip():
         last_patch = _synthetic_patch(last_diff)
     if produced and last_patch is not None and last_patch.patches:
-        last_patch = last_patch.model_copy(update={"delivery": "candidate"})
-        resolution = "patch_produced"
-        delivery = "candidate"
+        delivery = last_patch.delivery if last_patch.delivery != "none" else "candidate"
+        if delivery == "candidate":
+            last_patch = last_patch.model_copy(update={"delivery": "candidate"})
+            resolution = "patch_produced"
+        else:
+            resolution = "analysis_only"
     else:
         last_patch = None
         resolution = "analysis_only"
@@ -180,6 +210,16 @@ def _as_checks(raw: Any) -> list[VerificationRun]:
 
 def _checks_failed(runs: list[VerificationRun]) -> bool:
     return any(item.result in {"failed", "blocked"} for item in runs)
+
+
+def _log_excerpt(item: VerificationRun) -> str:
+    ref = item.logRef or ""
+    if not ref:
+        return item.coverage or ""
+    path = Path(ref)
+    if path.is_file():
+        return path.read_text(encoding="utf-8", errors="replace")[:400]
+    return ref
 
 
 def _synthetic_patch(diff: str) -> PatchSet:

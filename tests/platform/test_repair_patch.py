@@ -101,3 +101,37 @@ def test_two_collect_patch_rounds_keep_separate_archives(tmp_path: Path):
     import hashlib
 
     assert second.patches[0].digest == hashlib.sha256(after).hexdigest()[:16]
+
+
+def test_collect_patch_without_trailing_newline_is_git_applyable(tmp_path: Path):
+    repo = _init(tmp_path / "src")
+    (repo / "src" / "a.ts").write_bytes(b"export const a = 1;")
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-m", "no nl"], check=True, capture_output=True)
+    snap = capture_workspace(repo)
+    work = prepare_workspace(snap, tmp_path / "wt")
+    (work / "src" / "a.ts").write_bytes(b"export const a = 2;")
+    patch = collect_patch(snap, work, archive_dir=tmp_path / "art", namespace="nl")
+    assert patch.delivery == "candidate"
+    diff_path = Path(patch.patches[0].archivePath)
+    check = tmp_path / "apply"
+    check.mkdir()
+    (check / "src").mkdir()
+    (check / "src" / "a.ts").write_bytes(b"export const a = 1;")
+    proc = subprocess.run(
+        ["git", "-C", str(check), "apply", "--check", str(diff_path)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if proc.returncode != 0:
+        proc = subprocess.run(
+            ["git", "apply", "--check", str(diff_path)],
+            cwd=check,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+    assert proc.returncode == 0, proc.stderr or proc.stdout

@@ -118,6 +118,8 @@ class PatchSet(BaseModel):
     summary: str = ""
     patches: list[PatchFile] = Field(default_factory=list)
     replaces: Optional[str] = None
+    bundlePath: Optional[str] = None
+    baselineDigest: Optional[str] = None
 
     @model_validator(mode="after")
     def _candidate_complete(self) -> PatchSet:

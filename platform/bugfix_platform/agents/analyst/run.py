@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-import hashlib
+import json
+import re
 import sys
 from contextlib import nullcontext
 from datetime import datetime, timezone
@@ -12,10 +13,17 @@ from bugfix_platform.agents.analyst.attempt_store import AttemptStoreBusy, save_
 from bugfix_platform.agents.analyst.checks import run_check
 from bugfix_platform.agents.analyst.context import build_task_context
 from bugfix_platform.agents.analyst.evidence import validate_edit_decision
+from bugfix_platform.agents.analyst.feedback import classify_patch_state
 from bugfix_platform.agents.analyst.loop import run_ticket
 from bugfix_platform.agents.analyst.report import render_report
 from bugfix_platform.agents.analyst.route import route_ticket, slice_ticket
-from bugfix_platform.agents.analyst.workspace import capture_workspace, collect_patch, prepare_workspace
+from bugfix_platform.agents.analyst.sessions import load_latest_attempt
+from bugfix_platform.agents.analyst.workspace import (
+    capture_workspace,
+    collect_patch,
+    prepare_workspace,
+    workspace_digest,
+)
 from bugfix_contracts import (
     ANALYSIS_REPORT_SCHEMA_VERSION,
     AnalysisReport,
@@ -32,7 +40,6 @@ from bugfix_contracts.repair import (
     EditDecision,
     Evidence,
     InputRevision,
-    PatchFile,
     PatchSet,
     TaskContext,
     VerificationRun,
@@ -140,30 +147,28 @@ def run_analyst(
     with lock_cm:
         tickets: list[dict[str, Any]] = []
         analyze_sources: list[str] = []
-        for t in defect_batch.tickets:
-            if wanted is not None and t.defectId not in wanted:
-                continue
-            revision = rev_map.get(t.defectId)
-            ticket = _ticket_with_revision(t, revision)
-            ticket = _promote_after_revision(ticket, revision)
+
+        def _one(raw: BatchTicket) -> dict[str, Any]:
+            nonlocal remaining
+            revision = rev_map.get(raw.defectId)
+            ticket = _promote_after_revision(_ticket_with_revision(raw, revision), revision)
             if not is_match_pool(ticket.pool):
                 entry = _sideline_entry(ticket)
-                tickets.append(
-                    _persist_ticket_entry(
-                        out_dir,
-                        entry,
-                        _attempt_from_entry(entry, revision=revision, session_id=sess_map.get(ticket.defectId)),
-                        already_locked=locked,
-                    )
+                return _persist_ticket_entry(
+                    out_dir,
+                    entry,
+                    _attempt_from_entry(
+                        entry, revision=revision, session_id=sess_map.get(ticket.defectId)
+                    ),
+                    already_locked=locked,
                 )
-                continue
             routed = route_ticket(ticket, match_by_id.get(ticket.defectId))
             entry: dict[str, Any] = {
                 "defectId": ticket.defectId,
                 "ticket": slice_ticket(ticket),
                 **routed,
             }
-
+            snapshot = capture_workspace(Path(work_dir))
             analyze_session: Optional[str] = None
             if routed["outcome"] != "needs_ticket_info" and (
                 remaining is None or remaining > 0
@@ -213,7 +218,18 @@ def run_analyst(
                     }
                 entry["blockers"] = None
 
-            snapshot = capture_workspace(Path(work_dir))
+            drifted = bool(
+                snapshot.contentDigest
+                and workspace_digest(Path(work_dir)) != snapshot.contentDigest
+            )
+            if drifted:
+                loc = dict(entry.get("localization") or {})
+                loc["notes"] = "; ".join(
+                    x
+                    for x in [loc.get("notes"), "source changed after analyze; refuse edit"]
+                    if x
+                )
+                entry["localization"] = loc
             ctx = _verify_current_code(
                 _context_with_analysis(
                     build_task_context(
@@ -230,6 +246,8 @@ def run_analyst(
             )
             decision = _decision_from_entry(entry, ctx)
             gate_errors = validate_edit_decision(ctx, decision)
+            if drifted:
+                gate_errors = list(gate_errors) + ["source changed after analyze"]
             if gate_errors:
                 decision = EditDecision.model_validate(
                     {
@@ -243,7 +261,6 @@ def run_analyst(
                     {**decision.model_dump(), "allowed": True}
                 )
             session_id = analyze_session or sess_map.get(ticket.defectId)
-            attempt: AttemptRecord
             if want_fix and fixer is not None and decision.allowed and entry.get("outcome") in (
                 "plan_only",
                 "patch_ready",
@@ -285,10 +302,27 @@ def run_analyst(
                     decision=decision,
                     evidence=list(ctx.evidence),
                 )
+            return _persist_ticket_entry(out_dir, entry, attempt, already_locked=locked)
 
-            tickets.append(
-                _persist_ticket_entry(out_dir, entry, attempt, already_locked=locked)
-            )
+        for t in defect_batch.tickets:
+            if wanted is not None and t.defectId not in wanted:
+                continue
+            try:
+                tickets.append(_one(t))
+            except Exception as err:  # noqa: BLE001
+                failed = _exception_entry(t, err)
+                tickets.append(
+                    _persist_ticket_entry(
+                        out_dir,
+                        failed,
+                        _attempt_from_entry(
+                            failed,
+                            revision=rev_map.get(t.defectId),
+                            session_id=sess_map.get(t.defectId),
+                        ),
+                        already_locked=locked,
+                    )
+                )
 
         if analyze_sources:
             tally: dict[str, int] = {}
@@ -398,32 +432,80 @@ def _context_with_analysis(context: TaskContext, entry: dict[str, Any]) -> TaskC
 def _verify_current_code(
     context: TaskContext, work_dir: Path, entry: dict[str, Any]
 ) -> TaskContext:
-    """读取当前文件，把已核实片段记为 valid code_observation。"""
+    """按 repoPath 读候选文件；仅当机制/符号出现在正文中才记 valid。"""
     extra = list(context.evidence)
     seen = {e.evidenceId for e in extra}
     loc = entry.get("localization") or {}
+    root = entry.get("rootCause") or {}
+    proposed = entry.get("proposedFix") or {}
     for i, cand in enumerate(loc.get("candidates") or [], start=1):
         if not isinstance(cand, dict) or not cand.get("path"):
             continue
-        path = Path(work_dir) / str(cand["path"])
-        if not path.is_file():
-            continue
-        snippet = path.read_text(encoding="utf-8", errors="replace")[:240]
+        path = _resolve_candidate_file(work_dir, cand)
         eid = f"read-{entry.get('defectId')}-{i}"
         if eid in seen:
             continue
+        if not path.is_file():
+            extra.append(
+                Evidence(
+                    evidenceId=eid,
+                    category="code_observation",
+                    source="read",
+                    summary=f"missing {cand.get('repoPath') or '.'}/{cand['path']}",
+                    path=str(cand["path"]),
+                    repoId=str(cand.get("repoPath") or "."),
+                    validity="invalid",
+                )
+            )
+            seen.add(eid)
+            continue
+        body = path.read_text(encoding="utf-8", errors="replace")
+        symbol = str(cand.get("symbol") or "").strip()
+        tokens = _mechanism_tokens(
+            " ".join(
+                part
+                for part in [symbol, str(root.get("summary") or ""), str(proposed.get("summary") or "")]
+                if part
+            )
+        )
+        mechanical = bool(symbol and symbol in body) or any(tok in body for tok in tokens)
+        cited = str(cand.get("snippet") or cand.get("excerpt") or "").strip()
+        why = str(cand.get("why") or "").strip()
+        causal = bool(cited and cited in body) or bool(why and len(why) >= 16 and why in body)
+        snippet = body[:240]
         extra.append(
             Evidence(
                 evidenceId=eid,
                 category="code_observation",
                 source="read",
-                summary=f"read {cand['path']}: {snippet[:80]}",
+                summary=(
+                    f"mechanism fragment in {path.as_posix()}: {cited[:80] or why[:80]}"
+                    if causal
+                    else (
+                        f"locator {symbol or ' '.join(tokens[:3])} in {cand['path']}"
+                        if mechanical
+                        else f"file exists but mechanism not in {cand['path']}"
+                    )
+                ),
                 path=str(cand["path"]),
-                validity="valid",
+                repoId=str(cand.get("repoPath") or "."),
+                validity="valid" if causal else "pending_review",
             )
         )
         seen.add(eid)
     return context.model_copy(update={"evidence": extra})
+
+
+def _resolve_candidate_file(work_dir: Path, cand: dict[str, Any]) -> Path:
+    rel = str(cand.get("path") or "").replace("\\", "/").lstrip("/")
+    repo = str(cand.get("repoPath") or ".").replace("\\", "/").strip() or "."
+    if repo in {".", ""}:
+        return Path(work_dir) / rel
+    return Path(work_dir) / repo / rel
+
+
+def _mechanism_tokens(text: str) -> list[str]:
+    return [tok for tok in re.findall(r"[A-Za-z_][A-Za-z0-9_]{4,}", text or "")]
 
 
 def _decision_from_entry(entry: dict[str, Any], context: TaskContext) -> EditDecision:
@@ -475,6 +557,7 @@ def _run_fix_loop(
     last_payload: dict[str, Any] = {}
     attempt_id = uuid4().hex[:12]
     state: dict[str, Any] = {"wt": None, "n": 0}
+    previous = load_latest_attempt(Path(out_dir), ticket.defectId) if out_dir else None
 
     def edit(ctx: TaskContext, _decision: EditDecision) -> dict[str, Any]:
         if state["wt"] is None:
@@ -506,34 +589,19 @@ def _run_fix_loop(
             archive_dir=archive_root,
             namespace=f"{ticket.defectId}/{attempt_id}/{state['n']}",
         )
+        collected = _bind_previous_patch(
+            collected,
+            previous,
+            snapshot,
+            Path(work_dir),
+            revision,
+            out_dir=out_dir,
+        )
         diffs: list[str] = []
         for item in collected.patches:
             path = Path(item.archivePath)
             if path.is_file():
                 diffs.append(path.read_text(encoding="utf-8", errors="replace"))
-        report_patch = last_payload.get("patch") or {}
-        patch_path = report_patch.get("path") if isinstance(report_patch, dict) else None
-        if patch_path:
-            file_path = Path(str(patch_path))
-            if file_path.is_file():
-                text = file_path.read_text(encoding="utf-8", errors="replace")
-                diffs.append(text)
-                if not collected.patches:
-                    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
-                    collected = PatchSet(
-                        patchSetId=uuid4().hex[:12],
-                        delivery="candidate",
-                        baselineHead=getattr(snapshot, "head", None),
-                        summary=str(report_patch.get("summary") or file_path.name),
-                        patches=[
-                            PatchFile(
-                                path=file_path.name,
-                                kind="modify",
-                                digest=digest,
-                                archivePath=str(file_path),
-                            )
-                        ],
-                    )
         return {"diff": "\n".join(diffs), "patchSet": collected}
 
     def check(_ctx: TaskContext, _decision: EditDecision, patch: Any) -> list[VerificationRun]:
@@ -556,13 +624,21 @@ def _run_fix_loop(
                     candidateDigest=digest,
                 )
             ]
+        log_dir = None
+        if out_dir:
+            log_dir = (
+                Path(out_dir)
+                / "defects"
+                / ticket.defectId
+                / "attempts"
+                / attempt_id
+                / "checks"
+            )
         runs: list[VerificationRun] = []
         for spec in specs:
-            run = run_check(spec, wt)
+            run = run_check(spec, wt, log_dir=log_dir)
             if digest:
-                run = run.model_copy(update={"candidateDigest": digest, "cwd": str(wt)})
-            else:
-                run = run.model_copy(update={"cwd": str(wt)})
+                run = run.model_copy(update={"candidateDigest": digest})
             runs.append(run)
         return runs
 
@@ -596,22 +672,26 @@ def _run_fix_loop(
     entry["localization"] = loc
     if attempt.resolution == "patch_produced" and attempt.patchSet and attempt.patchSet.patches:
         entry["outcome"] = "patch_ready"
-        payload_patch = last_payload.get("patch")
-        if isinstance(payload_patch, dict) and payload_patch.get("path"):
-            entry["patch"] = payload_patch
-        else:
-            first = attempt.patchSet.patches[0]
-            entry["patch"] = {
-                "path": first.archivePath,
-                "summary": attempt.patchSet.summary or first.path,
-            }
+        files = [p.path for p in attempt.patchSet.patches]
+        bundle = attempt.patchSet.bundlePath or attempt.patchSet.patches[0].archivePath
+        entry["patch"] = {
+            "path": bundle,
+            "summary": "; ".join(
+                x
+                for x in [
+                    attempt.patchSet.summary,
+                    "apply order: " + ", ".join(files),
+                ]
+                if x
+            ),
+        }
         entry["blockers"] = None
-        if not (entry.get("proposedFix") or {}).get("summary"):
-            entry["proposedFix"] = {
-                "summary": entry["patch"].get("summary") or "candidate patch",
-                "steps": [],
-                "targetFiles": [p.path for p in attempt.patchSet.patches],
-            }
+        proposed = dict(entry.get("proposedFix") or {})
+        if not proposed.get("summary"):
+            proposed["summary"] = entry["patch"].get("summary") or "candidate patch"
+        proposed["targetFiles"] = files
+        proposed.setdefault("steps", [])
+        entry["proposedFix"] = proposed
     else:
         if entry.get("outcome") == "patch_ready":
             entry["outcome"] = "plan_only"
@@ -623,7 +703,130 @@ def _run_fix_loop(
                     "steps": [],
                     "targetFiles": [],
                 }
+    entry = _attach_checks_to_entry(entry, attempt)
     return attempt, entry
+
+
+def _bind_previous_patch(
+    collected: PatchSet,
+    previous: Optional[AttemptRecord],
+    snapshot: Any,
+    work_dir: Path,
+    revision: Optional[InputRevision],
+    out_dir: Optional[str] = None,
+) -> PatchSet:
+    """未应用且内容确认无关时才标替代；部分应用/未知只记录当前快照基线。"""
+    digest = collected.baselineDigest or getattr(snapshot, "contentDigest", None)
+    if digest and not collected.baselineDigest:
+        collected = collected.model_copy(update={"baselineDigest": digest})
+    if previous is None or previous.patchSet is None:
+        return collected
+    old_id = previous.patchSet.patchSetId
+    state = classify_patch_state(previous.patchSet, snapshot, work_dir)
+    application = str(state.get("application") or "unknown")
+    feedback_app = _feedback_application(out_dir, previous.defectId, revision)
+    if application == "applied":
+        note = "; ".join(
+            x
+            for x in [
+                collected.summary,
+                f"incremental on applied {old_id}",
+                f"snapshot {digest}" if digest else "",
+            ]
+            if x
+        )
+        return collected.model_copy(update={"summary": note, "replaces": None})
+    if feedback_app == "not_applied" and application == "unknown":
+        note = "; ".join(x for x in [collected.summary, f"replacement of unused {old_id}"] if x)
+        return collected.model_copy(update={"replaces": old_id, "summary": note})
+    note = "; ".join(
+        x
+        for x in [
+            collected.summary,
+            f"relative to current snapshot {digest}" if digest else "relative to current tree",
+            f"prior {old_id} is {application}; not a full replacement",
+        ]
+        if x
+    )
+    return collected.model_copy(update={"replaces": None, "summary": note})
+
+
+def _feedback_application(
+    out_dir: Optional[str],
+    defect_id: str,
+    revision: Optional[InputRevision],
+) -> str | None:
+    if not out_dir:
+        return None
+    folder = Path(out_dir) / "defects" / defect_id / "feedback"
+    if not folder.is_dir():
+        return None
+    wanted = revision.revisionId if revision is not None else None
+    chosen: dict[str, Any] | None = None
+    for path in sorted(folder.glob("*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        rid = str((payload.get("revision") or {}).get("revisionId") or "")
+        if wanted and rid == wanted:
+            chosen = payload
+            break
+        chosen = payload
+    if not chosen:
+        return None
+    raw = (chosen.get("feedback") or {}).get("application")
+    return str(raw) if raw else None
+
+
+def _attach_checks_to_entry(entry: dict[str, Any], attempt: AttemptRecord) -> dict[str, Any]:
+    verify = dict(entry.get("suggestedVerify") or {})
+    commands = []
+    for run in attempt.checks:
+        commands.append(
+            {
+                "command": list(run.command),
+                "result": run.result,
+                "coverage": run.coverage,
+                "logRef": run.logRef,
+                "cwd": run.cwd,
+                "exitCode": run.exitCode,
+            }
+        )
+    if commands:
+        verify["commands"] = commands
+        verify["executed"] = any(c.get("result") in {"passed", "failed", "blocked"} for c in commands)
+    verify.setdefault("steps", [])
+    entry["suggestedVerify"] = verify
+    failed = any(c.get("result") == "failed" for c in commands)
+    blocked = any(c.get("result") == "blocked" for c in commands)
+    passed = any(c.get("result") == "passed" for c in commands)
+    if failed or blocked:
+        entry["verifyStatus"] = "failed"
+    elif passed:
+        entry["verifyStatus"] = "passed"
+    return entry
+
+
+def _exception_entry(ticket: BatchTicket, err: BaseException) -> dict[str, Any]:
+    detail = f"{type(err).__name__}: {err}"
+    return {
+        "defectId": ticket.defectId,
+        "ticket": slice_ticket(ticket),
+        "outcome": "other_blocked",
+        "proposedFix": None,
+        "patch": None,
+        "blockers": {"kind": "other_blocked", "detail": detail},
+        "rootCause": {
+            "summary": "Agent-3 ticket failed in isolation",
+            "ruledOut": [],
+            "openQuestions": [detail],
+        },
+        "localization": {"candidates": [], "notes": detail},
+        "suggestedVerify": {"steps": [], "executed": False},
+        "confidence": "low",
+        "verifyStatus": "skipped",
+    }
 
 
 def _sideline_entry(ticket: Any) -> dict[str, Any]:

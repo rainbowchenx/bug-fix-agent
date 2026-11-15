@@ -18,6 +18,7 @@ from bugfix_contracts.env import load_env_file
 import argparse
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -85,8 +86,43 @@ def _cmd_resume(
         session_ids=session_ids,
         artifact_dir=base,
     )
+    dumped = report.model_dump()
+    round_dir = base / "rounds"
+    round_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    (round_dir / f"{defect_id}-{stamp}.json").write_text(
+        json.dumps(dumped, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    by_id: dict[str, object] = {}
+    if report_path.is_file():
+        try:
+            previous = json.loads(report_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            previous = {}
+        for item in previous.get("tickets") or []:
+            if isinstance(item, dict) and item.get("defectId"):
+                by_id[str(item["defectId"])] = item
+    for item in dumped.get("tickets") or []:
+        if isinstance(item, dict) and item.get("defectId"):
+            by_id[str(item["defectId"])] = item
+    merged_tickets = list(by_id.values())
+    by_outcome: dict[str, int] = {}
+    for item in merged_tickets:
+        if not isinstance(item, dict):
+            continue
+        oc = str(item.get("outcome") or "other_blocked")
+        by_outcome[oc] = by_outcome.get(oc, 0) + 1
+    dumped["tickets"] = merged_tickets
+    dumped["summary"] = {"total": len(merged_tickets), "byOutcome": by_outcome}
     report_path.write_text(
-        validate_analysis_report(report.model_dump()).model_dump_json(indent=2),
+        validate_analysis_report(dumped).model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+    from bugfix_platform.agents.analyst.report import render_report
+
+    (base / "analysis-report.md").write_text(
+        render_report({"batchId": dumped.get("productLine"), "tickets": merged_tickets}),
         encoding="utf-8",
     )
     return 0

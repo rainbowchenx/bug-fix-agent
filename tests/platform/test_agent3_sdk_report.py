@@ -126,7 +126,13 @@ def _plan_payload(req: AnalyzeRequest, **overrides) -> AnalyzeResult:
         },
         "localization": {
             "candidates": [
-                {"repoPath": ".", "path": "src/preview-player.ts", "why": "sdk", "source": "grep"}
+                {
+                    "repoPath": ".",
+                    "path": "src/preview-player.ts",
+                    "why": "sdk",
+                    "snippet": "export const preview = 1;",
+                    "source": "grep",
+                }
             ],
             "notes": "followed imports",
         },
@@ -320,6 +326,9 @@ def test_apply_fix_on_calls_fix_and_sets_patch_ready(tmp_path: Path):
     def fake_fix(req: FixRequest) -> FixResult:
         calls["n"] += 1
         assert req.ticket.defectId == "D1"
+        Path(req.worktree_path, "src", "preview-player.ts").write_text(
+            "export const preview = 2;\n", encoding="utf-8"
+        )
         return FixResult(
             ok=True,
             source="sdk",
@@ -351,7 +360,10 @@ def test_apply_fix_on_calls_fix_and_sets_patch_ready(tmp_path: Path):
     assert report.applyFix is True
     assert report.tickets[0].outcome == "patch_ready"
     assert report.tickets[0].patch is not None
-    assert report.tickets[0].patch.path == str(patch_path)
+    delivered = Path(str(report.tickets[0].patch.path))
+    assert delivered.is_file()
+    assert delivered.name != "D1.patch"
+    assert "OLD-SDK-PATCH" not in delivered.read_text(encoding="utf-8", errors="replace")
 
 
 def test_open_mr_without_apply_fix_fails(tmp_path: Path):

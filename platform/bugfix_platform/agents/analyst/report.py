@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 
@@ -28,6 +29,9 @@ def render_report(report: dict[str, Any]) -> str:
         patch_path = (patch or {}).get("path")
         if patch_path:
             lines.append(f"  patch: {patch_path}")
+        summary = (patch or {}).get("summary") or ""
+        if summary:
+            lines.append(f"  patchFiles: {summary}")
         blockers = item.get("blockers") if isinstance(item.get("blockers"), dict) else {}
         detail = (blockers or {}).get("detail")
         if detail:
@@ -35,4 +39,33 @@ def render_report(report: dict[str, Any]) -> str:
         missing = (blockers or {}).get("missingInfo") or []
         if missing:
             lines.append(f"  need: {', '.join(str(x) for x in missing)}")
+        verify = item.get("suggestedVerify") if isinstance(item.get("suggestedVerify"), dict) else {}
+        for cmd in (verify or {}).get("commands") or []:
+            if not isinstance(cmd, dict):
+                continue
+            result = str(cmd.get("result") or "")
+            coverage = str(cmd.get("coverage") or "")
+            argv = " ".join(str(x) for x in (cmd.get("command") or [])[:6])
+            lines.append(f"  check: {result} {coverage} {argv}".strip())
+            log_ref = cmd.get("logRef")
+            if log_ref:
+                lines.append(f"  log: {log_ref}")
+                excerpt = _log_excerpt(str(log_ref))
+                if excerpt:
+                    lines.append(f"  logExcerpt: {excerpt}")
+        for step in (verify or {}).get("steps") or []:
+            lines.append(f"  remaining: {step}")
     return "\n".join(lines).strip() + "\n"
+
+
+def _log_excerpt(ref: str) -> str:
+    path = Path(ref)
+    if not path.is_file():
+        return ""
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return ""
+    if not text:
+        return ""
+    return text.splitlines()[0][:200]
