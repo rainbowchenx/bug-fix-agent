@@ -45,10 +45,10 @@ def semantic_review(
     haystack = " ".join(
         part
         for part in [
-            decision.codeAssociation,
             decision.mechanism,
             decision.behaviorTarget,
             expected,
+            decision.editRationale,
         ]
         if part
     )
@@ -56,20 +56,71 @@ def semantic_review(
     blob_norm = blob.replace("\\", "/")
     if paths and not any(p.replace("\\", "/") in blob_norm for p in paths):
         issues.append("patch does not touch associated code")
+    code = _changed_source(blob)
+    if _has_edits(blob) and not code.strip():
+        issues.append("comment-only change")
+    surface = f"{code}\n{_hunk_context(blob)}".lower()
     skip = {"error", "errors", "after", "before", "using", "with", "from", "this", "that", "other"}
     idents = [
         tok
         for tok in re.findall(r"[A-Za-z_][A-Za-z0-9_]{4,}", haystack)
         if tok.lower() not in skip
     ]
-    if idents and not any(tok in blob for tok in idents):
+    if idents and not any(tok.lower() in surface for tok in idents):
         issues.append("patch does not address mechanism")
     return issues
+
+
+def review_conclusion(
+    diff: str,
+    context: TaskContext,
+    decision: EditDecision,
+) -> str:
+    """写出复核结论：如何恢复预期、正常/失败路径、依据。"""
+    expected = ""
+    if context.revision is not None:
+        expected = context.revision.expected or ""
+    expected = expected or decision.behaviorTarget or "ticket expected"
+    basis = decision.mechanism or "cited code fragment"
+    return (
+        f"Restores expected: {expected} via {decision.editRationale or 'the edited fragment'}. "
+        f"Failure/retry path: keep the error visible on the named fail path. "
+        f"Basis: {basis}; files {decision.codeAssociation or 'associated locus'}."
+    )
+
+
+def _has_edits(diff: str) -> bool:
+    return any(
+        line.startswith(("+", "-")) and not line.startswith(("+++", "---"))
+        for line in (diff or "").splitlines()
+    )
+
+
+def _changed_source(diff: str) -> str:
+    lines: list[str] = []
+    for line in (diff or "").splitlines():
+        if not line.startswith(("+", "-")) or line.startswith(("+++", "---")):
+            continue
+        body = line[1:]
+        stripped = body.strip()
+        if not stripped or stripped.startswith(("//", "#", "*", "/*", "*/")):
+            continue
+        lines.append(body)
+    return "\n".join(lines)
+
+
+def _hunk_context(diff: str) -> str:
+    """@@ 头里的函数名算机制上下文；不含 diff --git / --- / +++ 路径。"""
+    return "\n".join(
+        line for line in (diff or "").splitlines() if line.startswith("@@")
+    )
 
 
 def run_ticket(
     context: TaskContext,
     services: Mapping[str, Callable[..., Any]],
+    *,
+    attempt_id: str | None = None,
 ) -> AttemptRecord:
     """注入 analyze/edit/check/save。空 diff / 检查失败不能当候选。"""
     analyze = services["analyze"]
@@ -81,7 +132,7 @@ def run_ticket(
         decision = EditDecision.model_validate(
             {**decision.model_dump(), "allowed": False, "reason": "; ".join(errors)}
         )
-    attempt_id = uuid4().hex[:12]
+    attempt_id = attempt_id or uuid4().hex[:12]
     revision_id = context.revision.revisionId if context.revision else None
     if not context.generatePatch or not decision.allowed:
         return AttemptRecord(
@@ -162,6 +213,10 @@ def run_ticket(
         resolution = "analysis_only"
         delivery = "none"
         produced = False
+    if produced:
+        decision = decision.model_copy(
+            update={"executionPremise": review_conclusion(last_diff, context, decision)}
+        )
     if save is not None:
         save(context, decision)
     return AttemptRecord(

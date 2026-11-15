@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -206,6 +207,7 @@ def run_analyst(
                 entry["localization"] = loc
                 if remaining is not None:
                     remaining -= 1
+            entry = _persist_candidate_snippets(Path(work_dir), entry)
 
             if not want_fix and entry.get("outcome") == "patch_ready":
                 entry["outcome"] = "plan_only"
@@ -611,9 +613,7 @@ def _run_fix_loop(
             if isinstance(spec, dict) and spec.get("command")
         ]
         wt = Path(state["wt"] or work_dir)
-        digest = None
-        if patch is not None and getattr(patch, "patches", None):
-            digest = patch.patches[0].digest
+        digest = _patchset_digest(patch)
         if not specs:
             return [
                 VerificationRun(
@@ -649,6 +649,7 @@ def _run_fix_loop(
             "edit": edit,
             "check": check,
         },
+        attempt_id=attempt_id,
     )
     attempt = attempt.model_copy(
         update={
@@ -666,6 +667,7 @@ def _run_fix_loop(
             f"fix={last_payload.get('_source')}",
             last_payload.get("_detail"),
             None if attempt.editDecision is None else attempt.editDecision.reason,
+            None if attempt.editDecision is None else attempt.editDecision.executionPremise,
         ]
         if x
     )
@@ -791,6 +793,7 @@ def _attach_checks_to_entry(entry: dict[str, Any], attempt: AttemptRecord) -> di
                 "logRef": run.logRef,
                 "cwd": run.cwd,
                 "exitCode": run.exitCode,
+                "candidateDigest": run.candidateDigest,
             }
         )
     if commands:
@@ -798,14 +801,65 @@ def _attach_checks_to_entry(entry: dict[str, Any], attempt: AttemptRecord) -> di
         verify["executed"] = any(c.get("result") in {"passed", "failed", "blocked"} for c in commands)
     verify.setdefault("steps", [])
     entry["suggestedVerify"] = verify
-    failed = any(c.get("result") == "failed" for c in commands)
-    blocked = any(c.get("result") == "blocked" for c in commands)
-    passed = any(c.get("result") == "passed" for c in commands)
-    if failed or blocked:
-        entry["verifyStatus"] = "failed"
-    elif passed:
+    final_digest = _patchset_digest(attempt.patchSet)
+    current = [
+        c
+        for c in commands
+        if final_digest and c.get("candidateDigest") == final_digest
+    ] or commands[-1:]
+    last = current[-1] if current else None
+    if last and last.get("result") == "passed":
         entry["verifyStatus"] = "passed"
+    elif last and last.get("result") in {"failed", "blocked"}:
+        entry["verifyStatus"] = "failed"
     return entry
+
+
+def _patchset_digest(patch: Any) -> str | None:
+    items = list(getattr(patch, "patches", None) or [])
+    if not items:
+        return None
+    h = hashlib.sha256()
+    for item in sorted(items, key=lambda p: getattr(p, "path", "") or ""):
+        h.update(str(getattr(item, "path", "")).encode("utf-8"))
+        h.update(str(getattr(item, "digest", "")).encode("utf-8"))
+        h.update(str(getattr(item, "kind", "")).encode("utf-8"))
+    return h.hexdigest()[:16]
+
+
+def _persist_candidate_snippets(work_dir: Path, entry: dict[str, Any]) -> dict[str, Any]:
+    loc = dict(entry.get("localization") or {})
+    filled: list[dict[str, Any]] = []
+    for cand in loc.get("candidates") or []:
+        if not isinstance(cand, dict):
+            continue
+        item = dict(cand)
+        cited = str(item.get("snippet") or item.get("excerpt") or "").strip()
+        path = _resolve_candidate_file(work_dir, item)
+        if not cited and path.is_file():
+            body = path.read_text(encoding="utf-8", errors="replace")
+            symbol = str(item.get("symbol") or "").strip()
+            frag = _fragment_around_symbol(body, symbol)
+            if frag:
+                item["snippet"] = frag
+        elif cited:
+            item["snippet"] = cited
+        filled.append(item)
+    loc["candidates"] = filled
+    entry["localization"] = loc
+    return entry
+
+
+def _fragment_around_symbol(body: str, symbol: str, window: int = 8) -> str:
+    if not symbol:
+        return ""
+    lines = body.splitlines()
+    for i, line in enumerate(lines):
+        if symbol not in line:
+            continue
+        chunk = [ln for ln in lines[i : i + window] if ln.strip()]
+        return "\n".join(chunk).strip()[:400]
+    return ""
 
 
 def _exception_entry(ticket: BatchTicket, err: BaseException) -> dict[str, Any]:

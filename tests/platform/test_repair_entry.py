@@ -1198,10 +1198,57 @@ def _loc(*extra: dict) -> dict:
     }
 
 
-def test_symbol_without_cited_snippet_does_not_enter_fix(tmp_path: Path):
+def test_sdk_json_without_snippet_survives_parse_and_enters_fix(tmp_path: Path):
+    from bugfix_platform.sdk.analyze import _merge_with_routed, parse_analyze_payload
+
     work = tmp_path / "repo"
     (work / "src").mkdir(parents=True)
-    (work / "src" / "a.ts").write_text("function handleFail() { return; }\n", encoding="utf-8")
+    (work / "src" / "a.ts").write_text(_SNIPPET + "\n", encoding="utf-8")
+    called = {"n": 0}
+    raw = (
+        "```json\n"
+        '{"outcome":"plan_only","rootCause":{"summary":"handleFail swallows camera errors",'
+        '"ruledOut":[],"openQuestions":[]},"proposedFix":{"summary":"rethrow","steps":[],'
+        '"targetFiles":["src/a.ts"]},"localization":{"candidates":[{"repoPath":".","path":"src/a.ts",'
+        '"symbol":"handleFail","why":"empty catch","source":"sdk"}],"notes":""},"confidence":"medium"}\n'
+        "```"
+    )
+
+    def fake_analyze(req: AnalyzeRequest) -> AnalyzeResult:
+        parsed = parse_analyze_payload(raw)
+        payload = _merge_with_routed(
+            req.routed,
+            parsed or {},
+            work_dir=req.work_dir,
+            apply_fix=True,
+        )
+        return AnalyzeResult(ok=True, source="sdk", payload=payload)
+
+    def fake_fix(req: FixRequest) -> FixResult:
+        called["n"] += 1
+        Path(req.worktree_path, "src", "a.ts").write_text(
+            "function handleFail() { throw e; }\n", encoding="utf-8"
+        )
+        return FixResult(ok=True, source="sdk", payload={"outcome": "patch_ready"})
+
+    report = run_analyst(
+        work_dir=work,
+        defect_batch=_batch(),
+        code_knowledge=_knowledge(work),
+        analyze_fn=fake_analyze,
+        fix_fn=fake_fix,
+        apply_fix=True,
+        artifact_dir=tmp_path / "art",
+    )
+    assert called["n"] == 1
+    loc = report.tickets[0].localization.candidates
+    assert loc and (loc[0].snippet or "") and _SNIPPET.split("{")[0].strip() in (loc[0].snippet or "")
+
+
+def test_cited_snippet_missing_from_file_does_not_enter_fix(tmp_path: Path):
+    work = tmp_path / "repo"
+    (work / "src").mkdir(parents=True)
+    (work / "src" / "a.ts").write_text("export const preview = 1;\n", encoding="utf-8")
     called = {"n": 0}
 
     def fake_analyze(req: AnalyzeRequest) -> AnalyzeResult:
@@ -1222,9 +1269,10 @@ def test_symbol_without_cited_snippet_does_not_enter_fix(tmp_path: Path):
                         {
                             "repoPath": ".",
                             "path": "src/a.ts",
-                            "symbol": "handleFail",
-                            "why": "name",
-                            "source": "grep",
+                            "symbol": "preview",
+                            "why": "wrong fragment",
+                            "snippet": "function handleFail() { return; }",
+                            "source": "sdk",
                         }
                     ],
                     "notes": "",
@@ -1234,7 +1282,7 @@ def test_symbol_without_cited_snippet_does_not_enter_fix(tmp_path: Path):
 
     def fake_fix(_req: FixRequest) -> FixResult:
         called["n"] += 1
-        return FixResult(ok=True, payload={"outcome": "patch_ready", "patch": {"path": "x"}})
+        return FixResult(ok=True, payload={"outcome": "patch_ready"})
 
     run_analyst(
         work_dir=work,
@@ -1575,3 +1623,173 @@ def test_report_includes_checks_logs_and_remaining_steps(tmp_path: Path):
     assert "camera_disconnected" in md or "failed" in md.lower()
     assert "replay on device" in md or "confirm toast" in md
     assert "log" in md.lower() or any(c.get("logRef") and str(c.get("logRef")) in md for c in commands)
+
+
+def test_retry_pass_sets_verify_status_from_final_candidate(tmp_path: Path):
+    work = tmp_path / "repo"
+    (work / "src").mkdir(parents=True)
+    (work / "src" / "a.ts").write_text(_SNIPPET + "\n", encoding="utf-8")
+    art = tmp_path / "art"
+    flag = tmp_path / "round.txt"
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        "from pathlib import Path\n"
+        f"flag = Path({str(flag)!r})\n"
+        "if not flag.exists():\n"
+        "    flag.write_text('1', encoding='utf-8')\n"
+        "    raise SystemExit(1)\n",
+        encoding="utf-8",
+    )
+    n = {"fix": 0}
+
+    def fake_analyze(req: AnalyzeRequest) -> AnalyzeResult:
+        return AnalyzeResult(
+            ok=True,
+            source="sdk",
+            payload={
+                **req.routed,
+                "outcome": "plan_only",
+                "rootCause": {
+                    "summary": "handleFail swallows camera errors",
+                    "ruledOut": [],
+                    "openQuestions": [],
+                },
+                "proposedFix": {"summary": "rethrow", "steps": [], "targetFiles": ["src/a.ts"]},
+                "localization": _loc(),
+                "suggestedVerify": {
+                    "steps": ["replay"],
+                    "executed": False,
+                    "commands": [{"command": [sys.executable, str(probe)]}],
+                },
+            },
+        )
+
+    def fake_fix(req: FixRequest) -> FixResult:
+        n["fix"] += 1
+        Path(req.worktree_path, "src", "a.ts").write_text(
+            "function handleFail() { throw e; }\n", encoding="utf-8"
+        )
+        if n["fix"] >= 2:
+            Path(req.worktree_path, "src", "helper.ts").write_text(
+                "export function report(e) { return e; }\n", encoding="utf-8"
+            )
+        return FixResult(ok=True, source="sdk", payload={"outcome": "patch_ready"})
+
+    report = run_analyst(
+        work_dir=work,
+        defect_batch=_batch(),
+        code_knowledge=_knowledge(work),
+        analyze_fn=fake_analyze,
+        fix_fn=fake_fix,
+        apply_fix=True,
+        artifact_dir=art,
+    )
+    assert n["fix"] == 2
+    assert report.tickets[0].outcome == "patch_ready"
+    assert report.tickets[0].verifyStatus == "passed"
+    commands = report.tickets[0].suggestedVerify.commands or []
+    assert any(c.get("result") == "failed" for c in commands)
+    assert any(c.get("result") == "passed" for c in commands)
+    digests = {c.get("candidateDigest") for c in commands if c.get("candidateDigest")}
+    assert len(digests) >= 2
+
+
+def test_report_records_semantic_review_conclusion(tmp_path: Path):
+    work = tmp_path / "repo"
+    (work / "src").mkdir(parents=True)
+    (work / "src" / "a.ts").write_text(_SNIPPET + "\n", encoding="utf-8")
+
+    def fake_analyze(req: AnalyzeRequest) -> AnalyzeResult:
+        return AnalyzeResult(
+            ok=True,
+            source="sdk",
+            payload={
+                **req.routed,
+                "outcome": "plan_only",
+                "rootCause": {
+                    "summary": "handleFail swallows camera errors",
+                    "ruledOut": [],
+                    "openQuestions": [],
+                },
+                "proposedFix": {"summary": "rethrow so toast can show", "steps": [], "targetFiles": ["src/a.ts"]},
+                "localization": _loc(),
+            },
+        )
+
+    def fake_fix(req: FixRequest) -> FixResult:
+        Path(req.worktree_path, "src", "a.ts").write_text(
+            "function handleFail() { throw e; }\n", encoding="utf-8"
+        )
+        return FixResult(ok=True, source="sdk", payload={"outcome": "patch_ready"})
+
+    report = run_analyst(
+        work_dir=work,
+        defect_batch=_batch(),
+        code_knowledge=_knowledge(work),
+        analyze_fn=fake_analyze,
+        fix_fn=fake_fix,
+        apply_fix=True,
+        artifact_dir=tmp_path / "art",
+    )
+    notes = report.tickets[0].localization.notes or ""
+    blob = notes + " " + (report.tickets[0].proposedFix.summary if report.tickets[0].proposedFix else "")
+    latest = json.loads((tmp_path / "art" / "defects" / "D1" / "latest.json").read_text(encoding="utf-8"))
+    attempt = json.loads(Path(latest["path"]).read_text(encoding="utf-8"))
+    premise = str((attempt.get("editDecision") or {}).get("executionPremise") or "")
+    combined = blob + " " + premise
+    assert "expected" in combined.lower() or "出画" in combined
+    assert "fail" in combined.lower() or "path" in combined.lower() or "rethrow" in combined.lower()
+    assert "basis" in combined.lower() or "handleFail" in combined
+
+
+def test_check_log_uses_saved_attempt_id(tmp_path: Path):
+    work = tmp_path / "repo"
+    (work / "src").mkdir(parents=True)
+    (work / "src" / "a.ts").write_text(_SNIPPET + "\n", encoding="utf-8")
+    probe = tmp_path / "probe.py"
+    probe.write_text("import sys; sys.stderr.write('x\\n'); sys.exit(1)\n", encoding="utf-8")
+
+    def fake_analyze(req: AnalyzeRequest) -> AnalyzeResult:
+        return AnalyzeResult(
+            ok=True,
+            source="sdk",
+            payload={
+                **req.routed,
+                "outcome": "plan_only",
+                "rootCause": {
+                    "summary": "handleFail swallows camera errors",
+                    "ruledOut": [],
+                    "openQuestions": [],
+                },
+                "proposedFix": {"summary": "rethrow", "steps": [], "targetFiles": ["src/a.ts"]},
+                "localization": _loc(),
+                "suggestedVerify": {
+                    "steps": [],
+                    "executed": False,
+                    "commands": [{"command": [sys.executable, str(probe)]}],
+                },
+            },
+        )
+
+    def fake_fix(req: FixRequest) -> FixResult:
+        Path(req.worktree_path, "src", "a.ts").write_text(
+            "function handleFail() { throw e; }\n", encoding="utf-8"
+        )
+        return FixResult(ok=True, source="sdk", payload={"outcome": "patch_ready"})
+
+    run_analyst(
+        work_dir=work,
+        defect_batch=_batch(),
+        code_knowledge=_knowledge(work),
+        analyze_fn=fake_analyze,
+        fix_fn=fake_fix,
+        apply_fix=True,
+        artifact_dir=tmp_path / "art",
+    )
+    latest = json.loads((tmp_path / "art" / "defects" / "D1" / "latest.json").read_text(encoding="utf-8"))
+    attempt_id = str(latest.get("attemptId") or "")
+    attempt = json.loads(Path(latest["path"]).read_text(encoding="utf-8"))
+    assert attempt.get("attemptId") == attempt_id
+    refs = [c.get("logRef") for c in (attempt.get("checks") or []) if c.get("logRef")]
+    assert refs
+    assert attempt_id and attempt_id in str(refs[0]).replace("\\", "/")

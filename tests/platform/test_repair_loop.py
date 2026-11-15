@@ -73,6 +73,17 @@ def test_semantic_review_uses_behavior_target_and_mechanism():
         decision,
     )
     assert path_only, "touching the associated file is not enough without the cited mechanism"
+    comment_only = semantic_review(
+        "diff --git a/src/a.ts b/src/a.ts\n"
+        "--- a/src/a.ts\n"
+        "+++ b/src/a.ts\n"
+        "@@ handleFail\n"
+        " function handleFail() { return; }\n"
+        "+// handleFail swallows the error\n",
+        ctx,
+        decision,
+    )
+    assert comment_only, "comment-only edits must not pass semantic review"
 
 
 def test_baseline_already_passing_is_not_repair_evidence():

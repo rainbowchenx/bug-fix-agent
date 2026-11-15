@@ -159,6 +159,27 @@ def test_parse_analyze_payload_fence():
     assert parsed["proposedFix"]["summary"] == "guard null"
 
 
+def test_parse_keeps_candidate_snippet_and_prompt_requires_it():
+    from bugfix_contracts.analysis_report import LocCandidate
+    from bugfix_platform.sdk.analyze import _merge_with_routed
+
+    assert "snippet" in _SYSTEM_PROMPT.lower() or "excerpt" in _SYSTEM_PROMPT.lower()
+    text = """```json
+{"outcome":"plan_only","rootCause":{"summary":"handleFail swallows","ruledOut":[],"openQuestions":[]},"proposedFix":{"summary":"rethrow","steps":[],"targetFiles":["src/a.ts"]},"localization":{"candidates":[{"repoPath":".","path":"src/a.ts","symbol":"handleFail","why":"empty catch","snippet":"function handleFail() { return; }"}],"notes":""},"confidence":"medium"}
+```"""
+    parsed = parse_analyze_payload(text)
+    assert parsed is not None
+    cand = parsed["localization"]["candidates"][0]
+    assert cand.get("snippet") == "function handleFail() { return; }"
+    merged = _merge_with_routed(
+        {"outcome": "plan_only", "localization": {"candidates": []}},
+        parsed,
+        apply_fix=True,
+    )
+    kept = LocCandidate.model_validate(merged["localization"]["candidates"][0])
+    assert kept.snippet == "function handleFail() { return; }"
+
+
 def test_heuristic_analyze_annotates(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     assert analyze_mode_from_env() == "heuristic"

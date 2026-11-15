@@ -44,11 +44,15 @@ class TicketSlice(BaseModel):
 
 
 class LocCandidate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     repoPath: str = "."
     path: str
     symbol: Optional[str] = None
     why: Optional[str] = None
     source: Optional[str] = None
+    snippet: Optional[str] = None
+    excerpt: Optional[str] = None
 
 
 class Localization(BaseModel):

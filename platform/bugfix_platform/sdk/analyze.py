@@ -399,8 +399,49 @@ def _sanitize_candidates(
             continue
         if not _candidate_exists(work_dir, cand):
             continue
-        kept.append(cand)
+        kept.append(_with_live_snippet(work_dir, cand))
     return kept
+
+
+def _with_live_snippet(work_dir: str, cand: dict[str, Any]) -> dict[str, Any]:
+    out = dict(cand)
+    cited = str(out.get("snippet") or out.get("excerpt") or "").strip()
+    if cited:
+        out["snippet"] = cited
+        return out
+    path = _candidate_path(work_dir, out)
+    if path is None or not path.is_file():
+        return out
+    body = path.read_text(encoding="utf-8", errors="replace")
+    if cited and cited not in body:
+        return out
+    symbol = str(out.get("symbol") or "").strip()
+    frag = _fragment_around(body, symbol) if symbol else ""
+    if frag:
+        out["snippet"] = frag
+    return out
+
+
+def _candidate_path(work_dir: str, cand: dict[str, Any]) -> Path | None:
+    repo = cand.get("repoPath") or "."
+    rel = Path(str(cand.get("path") or ""))
+    root = Path(work_dir)
+    try:
+        return (root / repo / rel if repo not in (".", "") else root / rel).resolve()
+    except OSError:
+        return None
+
+
+def _fragment_around(body: str, symbol: str, window: int = 8) -> str:
+    if not symbol:
+        return ""
+    lines = body.splitlines()
+    for i, line in enumerate(lines):
+        if symbol not in line:
+            continue
+        chunk = [ln for ln in lines[i : i + window] if ln.strip()]
+        return "\n".join(chunk).strip()[:400]
+    return ""
 
 
 def _merge_with_routed(
@@ -483,6 +524,8 @@ They do not let you invent paths or schema fields.
 End with a single JSON object (optionally in a ```json fence) with keys:
 outcome, rootCause{summary,ruledOut,openQuestions}, proposedFix{summary,steps,targetFiles},
 localization{candidates,notes}, blockers, confidence, suggestedVerify{steps,executed}.
+Each localization.candidates[] item MUST include path and a snippet (verbatim 1-8
+lines from a file you Read) of the failing fragment. Optional: symbol, why, excerpt.
 outcome must be one of:
 patch_ready, plan_only, needs_test_env, needs_ticket_info, needs_design_input,
 not_code, config_or_dependency, unlocalized, other_blocked.
