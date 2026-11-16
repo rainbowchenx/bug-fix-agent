@@ -43,6 +43,18 @@ BUILD = ROOT / "build"
 
 AGENT1_SKILL = "defect-batch-prepare"
 
+# 宿主 site-packages 里的可选依赖不得进 onefile。openpyxl.compat.numbers /
+# pydantic 会 import numpy，Windows wheel 带着 ~20 MB OpenBLAS。
+AGENT1_PYINSTALLER_EXCLUDES = (
+    "setuptools", "pkg_resources", "packaging",
+    "pydoc_data", "ssl", "_ssl", "_hashlib",
+    "asyncio", "tkinter", "unittest", "lib2to3", "distutils", "xmlrpc",
+    "langgraph", "bugfix_platform",
+    "numpy", "pandas", "scipy", "PIL", "matplotlib",
+    "yaml", "chardet", "pygments",
+)
+AGENT1_EXE_MAX_BYTES = 16 * 1024 * 1024
+
 # SKILL.md 会引用其中的产物契约；不随包走的话 skill 装到 agent 里就是个死链。
 # 单一真源仍在 docs/contracts/，构建时复制进 references/。
 SKILL_BUNDLED_DOCS = {
@@ -152,28 +164,14 @@ def build_agent1(skip_exe: bool = False) -> Path:
         log("agent1: running PyInstaller (30-60s)")
         stamp = BUILD / "pyinstaller"
         env = dict(os.environ, PYTHONPATH=str(vendor))
-        excludes: list[str] = []
-        for mod in (
-            "setuptools", "pkg_resources", "packaging",
-            "pydoc_data", "ssl", "_ssl", "_hashlib",
-            "asyncio", "tkinter", "unittest", "lib2to3", "distutils", "xmlrpc",
-            "langgraph", "bugfix_platform",
-        ):
-            excludes += ["--exclude-module", mod]
         subprocess.run(
-            [
-                sys.executable, "-m", "PyInstaller", "--onefile", "--name", "agent1",
-                "--noconfirm", "--clean",
-                "--add-data", f"{vendor / 'VENDOR.json'}{os.pathsep}.",
-                "--hidden-import", "openpyxl",
-                "--hidden-import", "bugfix_contracts",
-                "--hidden-import", "bugfix_agent1",
-                *excludes,
-                "--distpath", str(stamp / "dist"),
-                "--workpath", str(stamp / "work"),
-                "--specpath", str(stamp),
-                str(scripts / "entry.py"),
-            ],
+            agent1_pyinstaller_args(
+                entry=scripts / "entry.py",
+                vendor_json=vendor / "VENDOR.json",
+                dist=stamp / "dist",
+                work=stamp / "work",
+                spec=stamp,
+            ),
             cwd=scripts, env=env, check=True,
             stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
         )
@@ -246,6 +244,44 @@ def _verify_skill_docs(stage: Path) -> None:
     log("agent1: skill docs self-contained (all relative links resolve)")
 
 
+def agent1_pyinstaller_args(
+    *,
+    entry: Path,
+    vendor_json: Path,
+    dist: Path,
+    work: Path,
+    spec: Path,
+) -> list[str]:
+    """拼 Agent-1 的 PyInstaller 命令行（测试钉住 --exclude-module）。"""
+    excludes: list[str] = []
+    for mod in AGENT1_PYINSTALLER_EXCLUDES:
+        excludes += ["--exclude-module", mod]
+    return [
+        sys.executable, "-m", "PyInstaller", "--onefile", "--name", "agent1",
+        "--noconfirm", "--clean",
+        "--add-data", f"{vendor_json}{os.pathsep}.",
+        "--hidden-import", "openpyxl",
+        "--hidden-import", "bugfix_contracts",
+        "--hidden-import", "bugfix_agent1",
+        *excludes,
+        "--distpath", str(dist),
+        "--workpath", str(work),
+        "--specpath", str(spec),
+        str(entry),
+    ]
+
+
+def _check_agent1_exe_size(exe: Path) -> None:
+    """拒绝把 numpy/OpenBLAS 打进去的超大 onefile。"""
+    size = exe.stat().st_size
+    if size > AGENT1_EXE_MAX_BYTES:
+        raise SystemExit(
+            f"agent1: {exe.name} is {size / 1e6:.1f} MB, too large "
+            f"(cap {AGENT1_EXE_MAX_BYTES / 1e6:.0f} MB). "
+            "numpy/OpenBLAS likely leaked; check AGENT1_PYINSTALLER_EXCLUDES."
+        )
+
+
 def _require_pyinstaller() -> None:
     """编译 exe 前先确认 PyInstaller 在：缺了就给能直接粘的命令，而不是 traceback。”"""
     probe = subprocess.run(
@@ -282,6 +318,7 @@ def _verify_agent1(scripts: Path) -> None:
     subprocess.run([sys.executable, "-B", "-c", code], check=True, cwd=ROOT, env=env)
     exe = scripts / ("agent1.exe" if os.name == "nt" else "agent1")
     if exe.exists():
+        _check_agent1_exe_size(exe)
         subprocess.run([str(exe), "self-check"], check=True)
 
 
