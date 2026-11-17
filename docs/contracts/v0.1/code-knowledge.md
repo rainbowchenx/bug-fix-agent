@@ -1,10 +1,12 @@
+> 当前生产契约：0.3.0（2026-11-16）。目录保留原文档路径；旧 Agent 产物版本明确拒绝，请重新生成。
+
 # code-knowledge v0.1
 
 **Producer:** Agent-2 (cartographer) · **Consumer:** Agent-3 only
 
 | Field | Type | Notes |
 |---|---|---|
-| `schemaVersion` | string | `"0.1.0"` |
+| `schemaVersion` | string | `"0.3.0"` |
 | `productLine` / `workDir` | string | |
 | `partial` | boolean | 探测/匹配不完整仍可校验通过 |
 | `generatedAt` | ISO string | |
@@ -32,3 +34,7 @@
 `source`: `codegraph` \| `grep` \| `heuristic` \| `claude_md`
 
 默认只为 pool ∈ {strict, locatable_only, needs_info} 写匹配。
+
+## 0.3.0 逐票调查交接
+
+defectCodeMatches 每票保存 investigationStatus、searchedScopes、facts、hypotheses、ruledOut、openQuestions、nextChecks、investigationSource。SDK 自述来源固定 model_reported；complete 只代表本轮调查返回且有事实/搜索范围，不代表根因已证明。investigationRuns 保留组范围、来源、缓存键、预算及账单 detail；首组建图与调查，后续组复用地图。runtimeProfile 和 skillDiscovery 不把声明能力/技能选择冒充实测执行。

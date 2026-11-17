@@ -106,6 +106,16 @@ def row_to_raw_dict(row: Mapping[str, Any]) -> dict[str, Any] | None:
         "title": title,
         "description": pick_field(row, FIELD_ALIASES["description"]),
     }
+    aliases = FIELD_ALIASES["description"]
+    lower_keys = {str(key).lower(): key for key in row}
+    keys = list(dict.fromkeys(
+        [key for key in aliases if key in row]
+        + [lower_keys[key.lower()] for key in aliases if key.lower() in lower_keys]
+    ))
+    present = [key for key in keys if row[key] is not None]
+    chosen = next((key for key in present if _cell(row[key])), present[0] if present else None)
+    if chosen is not None:
+        out["description"] = str(row[chosen])
     for key in (
         "status",
         "flowStatus",
@@ -120,6 +130,9 @@ def row_to_raw_dict(row: Mapping[str, Any]) -> dict[str, Any] | None:
             out[key] = val
 
     meta: dict[str, Any] = {}
+    for key in ("测试环境", "版本", "版本号", "产品版本", "产品型号", "出现概率", "测试数据", "前置条件", "问题"):
+        if key in row and _cell(row[key]):
+            meta[key] = str(row[key])
     for mk in METADATA_KEYS:
         if mk in row:
             val = _cell(row.get(mk))

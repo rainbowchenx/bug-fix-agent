@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-CONTRACT_SCHEMA_VERSION = "0.1.0"
+CONTRACT_SCHEMA_VERSION = "0.3.0"
 
 Confidence = Literal["high", "medium", "low"]
 

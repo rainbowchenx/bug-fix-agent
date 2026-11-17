@@ -89,6 +89,7 @@ class DefectDigest:
     expected: str
     steps: str
     fullText: str
+    sourceDocument: object = None
     emptyTemplate: bool = False
     attachments: list[str] = field(default_factory=list)
 
@@ -202,6 +203,7 @@ def distill_defect(raw: RawDefect) -> DefectDigest:
     Returns:
         供筛选与分簇使用的 ``DefectDigest``。
     """
+    from bugfix_agent1.defect_batch.source_quality import build_source_document
     description = raw.description or ""
     observed, expected, steps = split_description(description)
     title = raw.title.strip()
@@ -227,6 +229,7 @@ def distill_defect(raw: RawDefect) -> DefectDigest:
         defectId=raw.defectId,
         title=title,
         description=description,
+        sourceDocument=build_source_document(raw),
         status=raw.status,
         flowStatus=raw.flowStatus,
         testModuleRaw=raw.testModule,

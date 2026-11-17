@@ -182,3 +182,9 @@ transport 三张票的路径真值可直接复用 Agent-2 的 `bug-fix-测试专
 ## 真实项目人工评测（2026-11-15）
 
 实项目首轮测试与后续对照使用[评测方法](2026-11-15-real-project-evaluation.md)、[逐票评审表](templates/ticket-review.md)、[汇总CSV](templates/ticket-review-summary.csv)和[批次评测报告](templates/batch-evaluation-report.md)。复制模板到实际评测目录填写；已关联修订方案与实施计划。未验收、原样解决和人工辅助解决分别统计，模板不包含虚构成绩。
+
+## 2026-11-16 四产品线产物复评
+
+见[独立分析报告](reviews/2026-11-16-three-agent-real-project-assessment.md)、[24票复评表](reviews/2026-11-16-ticket-reassessment.csv)和[可复算统计](reviews/2026-11-16-artifact-statistics.json)。本批全程只出分析报告，不包含实际补丁与业务验收；独立复评纠正了部分汇总归因和陈旧评语。
+
+2026-11-16 用户补充：本批约256K非多模态模型为运行配置，Agent3只出报告为明确要求。边界已更新到复评报告，后续见[优化方案](../../superpowers/specs/2026-11-16-three-agent-evidence-quality-design.md)与[实施计划](../../superpowers/plans/2026-11-16-three-agent-evidence-quality-implementation-plan.md)。工程实现与验收记录见[执行自查](../../superpowers/execution/2026-11-16-three-agent-quality-ledger.md)，真实模型及业务复评单列待验。

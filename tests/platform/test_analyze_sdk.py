@@ -1,4 +1,5 @@
 import json
+import pytest
 from pathlib import Path
 
 from bugfix_platform.agents.analyst import run_analyst
@@ -56,7 +57,7 @@ def test_analyze_prompt_includes_architecture_map():
     assert "already Read" not in _SYSTEM_PROMPT
 
 
-def test_analyze_prompt_uses_source_observed():
+def test_analyze_prompt_uses_effective_observed_not_legacy_duplicate():
     from bugfix_contracts.defect_batch import BatchTicket
 
     ticket = BatchTicket(
@@ -74,7 +75,9 @@ def test_analyze_prompt_uses_source_observed():
             routed={"outcome": "plan_only", "localization": {"candidates": []}},
         )
     )
-    assert "原始现象全文XYZ" in prompt
+    assert "蒸馏后的现象" in prompt
+    assert "sourceDocument:" in prompt
+    assert "原始现象全文XYZ" not in prompt
 
 
 def test_analyze_prompt_includes_spec_atlas_and_ticket_spec_dirs():
@@ -150,7 +153,7 @@ def test_analyze_system_prompt_uses_codegraph_first():
 def test_parse_analyze_payload_fence():
     text = """Here is the analysis:
 ```json
-{"outcome":"plan_only","rootCause":{"summary":"null deref","ruledOut":[],"openQuestions":[]},"proposedFix":{"summary":"guard null","steps":["add check"],"targetFiles":["a.ts"]},"confidence":"medium"}
+{"outcome":"plan_only","rootCause":{"summary":"null deref","ruledOut":[],"openQuestions":[],"questions":[],"claims":[]},"proposedFix":{"summary":"guard null","steps":["add check"],"targetFiles":["a.ts"]},"confidence":"medium"}
 ```
 """
     parsed = parse_analyze_payload(text)
@@ -165,7 +168,7 @@ def test_parse_keeps_candidate_snippet_and_prompt_requires_it():
 
     assert "snippet" in _SYSTEM_PROMPT.lower() or "excerpt" in _SYSTEM_PROMPT.lower()
     text = """```json
-{"outcome":"plan_only","rootCause":{"summary":"handleFail swallows","ruledOut":[],"openQuestions":[]},"proposedFix":{"summary":"rethrow","steps":[],"targetFiles":["src/a.ts"]},"localization":{"candidates":[{"repoPath":".","path":"src/a.ts","symbol":"handleFail","why":"empty catch","snippet":"function handleFail() { return; }"}],"notes":""},"confidence":"medium"}
+{"outcome":"plan_only","rootCause":{"summary":"handleFail swallows","ruledOut":[],"openQuestions":[],"questions":[],"claims":[]},"proposedFix":{"summary":"rethrow","steps":[],"targetFiles":["src/a.ts"]},"localization":{"candidates":[{"repoPath":".","path":"src/a.ts","symbol":"handleFail","why":"empty catch","snippet":"function handleFail() { return; }"}],"notes":""},"confidence":"medium"}
 ```"""
     parsed = parse_analyze_payload(text)
     assert parsed is not None
@@ -195,7 +198,7 @@ def test_heuristic_analyze_annotates(monkeypatch):
     routed = {
         "outcome": "plan_only",
         "proposedFix": {"summary": "s", "steps": [], "targetFiles": ["a.ts"]},
-        "rootCause": {"summary": "pending", "ruledOut": [], "openQuestions": []},
+        "rootCause": {"summary": "pending", "ruledOut": [], "openQuestions": [], "questions": [], "claims": []},
         "localization": {"candidates": [{"repoPath": ".", "path": "a.ts"}]},
         "confidence": "medium",
         "verifyStatus": "skipped",
@@ -219,7 +222,7 @@ def test_analyst_uses_injected_analyze_fn(tmp_path: Path):
 
     batch = DefectBatch.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",
@@ -243,7 +246,7 @@ def test_analyst_uses_injected_analyze_fn(tmp_path: Path):
     )
     knowledge = CodeKnowledge.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "workDir": str(work),
             "partial": False,
@@ -289,7 +292,7 @@ def test_analyst_uses_injected_analyze_fn(tmp_path: Path):
                 "rootCause": {
                     "summary": "Race in preview player init",
                     "ruledOut": ["network"],
-                    "openQuestions": [],
+                    "openQuestions": [], "questions": [], "claims": [],
                 },
                 "proposedFix": {
                     "summary": "Serialize init before play()",
@@ -324,7 +327,7 @@ def test_analyst_forwards_spec_atlas_and_codegraph(tmp_path: Path, monkeypatch):
 
     batch = DefectBatch.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",
@@ -346,7 +349,7 @@ def test_analyst_forwards_spec_atlas_and_codegraph(tmp_path: Path, monkeypatch):
     )
     knowledge = CodeKnowledge.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "workDir": str(work),
             "partial": False,
@@ -407,7 +410,7 @@ def test_analyst_forwards_spec_atlas_and_codegraph(tmp_path: Path, monkeypatch):
                 "rootCause": {
                     "summary": "decoder stall",
                     "ruledOut": [],
-                    "openQuestions": [],
+                    "openQuestions": [], "questions": [], "claims": [],
                 },
                 "proposedFix": {
                     "summary": "reset decoder",
@@ -476,7 +479,7 @@ def _sdk_routed() -> dict:
     return {
         "outcome": "plan_only",
         "proposedFix": {"summary": "inspect", "steps": [], "targetFiles": []},
-        "rootCause": {"summary": "pending", "ruledOut": [], "openQuestions": []},
+        "rootCause": {"summary": "pending", "ruledOut": [], "openQuestions": [], "questions": [], "claims": []},
         "localization": {"candidates": [], "notes": ""},
         "confidence": "low",
         "verifyStatus": "skipped",
@@ -501,7 +504,7 @@ def test_resume_unsupported_records_degrade_and_starts_new(tmp_path: Path, monke
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     payload = {
         "outcome": "plan_only",
-        "rootCause": {"summary": "race in preview", "ruledOut": [], "openQuestions": []},
+        "rootCause": {"summary": "race in preview", "ruledOut": [], "openQuestions": [], "questions": [], "claims": []},
         "proposedFix": {"summary": "serialize init", "steps": [], "targetFiles": []},
         "localization": {"candidates": []},
     }
@@ -547,7 +550,7 @@ def test_inaccessible_session_starts_new_with_ticket_state(tmp_path: Path, monke
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     payload = {
         "outcome": "plan_only",
-        "rootCause": {"summary": "loaded current defect", "ruledOut": [], "openQuestions": []},
+        "rootCause": {"summary": "loaded current defect", "ruledOut": [], "openQuestions": [], "questions": [], "claims": []},
         "proposedFix": {"summary": "retry path", "steps": [], "targetFiles": []},
         "localization": {"candidates": []},
     }
@@ -591,3 +594,65 @@ def test_inaccessible_session_starts_new_with_ticket_state(tmp_path: Path, monke
     assert result.detail and "session inaccessible" in result.detail
     assert "starting new session" in (result.detail or "")
     assert result.payload.get("rootCause", {}).get("summary") == "loaded current defect"
+
+
+def test_missing_claims_gets_one_format_repair_then_incomplete(tmp_path,monkeypatch):
+    monkeypatch.setenv('ANTHROPIC_API_KEY','test-key')
+    payload={'outcome':'plan_only','rootCause':{'summary':'known partial fact','questions':[]},
+        'proposedFix':{'summary':'investigate'},'localization':{'candidates':[]}}
+    calls=[]
+    class ResultMessage: pass
+    class Result(ResultMessage):
+        session_id='s';structured_output=payload;result='';is_error=False;errors=[];subtype='';terminal_reason=''
+    class Opts:
+        def __init__(self,**kwargs): self.kwargs=kwargs
+    async def query(*,prompt,options):
+        calls.append(prompt);yield Result()
+    _install_fake_sdk(monkeypatch,Opts,query,ResultMessage)
+    result=run_claude_analyze(AnalyzeRequest(str(tmp_path),_sdk_ticket(),_sdk_routed()))
+    assert len(calls)==2 and result.payload['outcome']=='other_blocked'
+    assert 'incomplete' in result.detail
+    assert 'known partial fact' in result.payload['rootCause']['summary']
+
+
+def test_image_configuration_error_not_retried_as_budget_or_session_failure(tmp_path,monkeypatch):
+    monkeypatch.setenv('ANTHROPIC_API_KEY','test-key')
+    calls=[]
+    class ResultMessage: pass
+    class Opts:
+        def __init__(self,**kwargs): self.kwargs=kwargs
+    async def query(*,prompt,options):
+        calls.append(prompt)
+        raise RuntimeError('model only supports text; image input is unsupported')
+        yield
+    _install_fake_sdk(monkeypatch,Opts,query,ResultMessage)
+    result=run_claude_analyze(AnalyzeRequest(str(tmp_path),_sdk_ticket(),_sdk_routed(),resume_session_id='old'))
+    assert len(calls)==1 and 'modality configuration' in result.detail
+    assert 'max_turns' not in result.detail
+
+
+@pytest.mark.parametrize("relative", [False, True])
+@pytest.mark.parametrize("complete", [False, True])
+def test_skill_read_requires_successful_tool_result(tmp_path,monkeypatch,relative,complete):
+    from types import SimpleNamespace
+    from bugfix_platform.sdk.skill_inject import InjectedSkill
+    monkeypatch.setenv('ANTHROPIC_API_KEY','test-key')
+    skill_path=tmp_path/'SKILL.md';skill_path.write_text('Read business setup.')
+    skill=InjectedSkill('business',skill_path,'explicit','setup','Read business setup.',('analyze',))
+    payload={'outcome':'plan_only','rootCause':{'summary':'hypothesis','questions':[],'claims':[]},
+        'proposedFix':{'summary':'investigate'},'localization':{'candidates':[]}}
+    class ResultMessage: pass
+    class Result(ResultMessage):
+        session_id='s';structured_output=payload if complete else None;result='';is_error=False;errors=[];subtype='';terminal_reason=''
+    class Opts:
+        def __init__(self,**kwargs): self.kwargs=kwargs
+    failed=[True]
+    async def query(*,prompt,options):
+        yield SimpleNamespace(content=[SimpleNamespace(name='Read',id='r1',input={'file_path':'SKILL.md' if relative else str(skill_path)})])
+        yield SimpleNamespace(content=[SimpleNamespace(tool_use_id='r1',is_error=failed[0],content='tool response')])
+        yield Result()
+    _install_fake_sdk(monkeypatch,Opts,query,ResultMessage)
+    req=AnalyzeRequest(str(tmp_path),_sdk_ticket(),_sdk_routed(),injected_skills=(skill,))
+    assert run_claude_analyze(req).skill_reads==[]
+    failed[0]=False
+    assert run_claude_analyze(req).skill_reads==[str(skill_path.resolve())]

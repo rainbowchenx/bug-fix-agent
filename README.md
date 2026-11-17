@@ -351,3 +351,11 @@ raw-defects  ──Agent-1──►  defect-batch  ──Agent-2──►  code-
 ## License
 
 MIT
+
+## 2026-11-16 证据质量优化
+
+三 Agent 生产产物契约升级至 `0.3.0`，请从原始票重新生成 Agent1/2/3 产物。完整原文与质量标签、Agent2 分组调查、结构化 claims/questions、完整反馈继承及报告模式二次执行见[执行自查](docs/superpowers/execution/2026-11-16-three-agent-quality-ledger.md)。
+
+只出报告续跑：`bugfix-platform feedback --root <产物目录> --file feedback.json`，再执行 `bugfix-platform resume --root <产物目录> --defect-id <票号> --execute`。未加 execute/apply-fix 时只预览；`--execute` 不授权改码。
+
+配置参见 `.env.example`：模型窗口/模态均是声明，不自动当已验证能力；Agent2 默认每组8票，支持整批新组数/时间预算及可选完成组缓存（缓存目录放在业务工作区外）。业务技能可通过显式目录或 `BUGFIX_SKILL_ALLOWLIST` 选择。真实模型 smoke 与业务效果须另行实测。

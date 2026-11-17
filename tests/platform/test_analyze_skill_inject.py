@@ -26,7 +26,7 @@ def _write_skill(folder: Path, name: str, *, profiles: str | None, body: str) ->
 def _batch() -> DefectBatch:
     return DefectBatch.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",
@@ -50,7 +50,7 @@ def _batch() -> DefectBatch:
 def _knowledge(work: Path) -> CodeKnowledge:
     return CodeKnowledge.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "workDir": str(work),
             "partial": False,

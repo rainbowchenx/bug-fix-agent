@@ -35,7 +35,7 @@ def _ticket(**kw):
 
 def _report(tickets: list[dict]) -> dict:
     return {
-        "schemaVersion": "0.1.0",
+        "schemaVersion": "0.3.0",
         "productLine": "hc",
         "workDir": "/tmp/repo",
         "generatedAt": "2026-01-01T00:00:00Z",

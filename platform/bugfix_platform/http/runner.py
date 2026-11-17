@@ -94,7 +94,7 @@ def enqueue_run(
                 "defect_batch": request.defectBatch,
                 "posture": request.posture,
                 "open_mr": opts.openMr,
-                "apply_fix": True if opts.applyFix else None,
+                "apply_fix": opts.applyFix,
                 "skip_agent2": opts.skipAgent2,
                 "skip_agent3": opts.skipAgent3,
                 "analyze_mode": opts.analyzeMode,
@@ -114,14 +114,7 @@ def enqueue_run(
                         "on_update": _on_update,
                     }
                 )
-            try:
-                result = fn(**call_kwargs)
-            except TypeError:
-                call_kwargs.pop("artifact_dir", None)
-                call_kwargs.pop("thread_id", None)
-                call_kwargs.pop("on_update", None)
-                call_kwargs.pop("extra_skill_dirs", None)
-                result = fn(**call_kwargs)
+            result = fn(**call_kwargs)
             # 即便跳过了渐进落盘（注入桩 / 旧路径），收尾也要保证产物在盘上。
             if result.artifacts.defect_batch:
                 (art_dir / "defect-batch.json").write_text(

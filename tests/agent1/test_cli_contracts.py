@@ -88,7 +88,7 @@ def test_validate_reports_errors_and_fails(tmp_path, capsys):
     bad.write_text(
         json.dumps(
             {
-                "schemaVersion": "0.1.0",
+                "schemaVersion": "0.3.0",
                 "productLine": "x",
                 "posture": "beta",
                 "generatedAt": "2026-11-10T00:00:00Z",

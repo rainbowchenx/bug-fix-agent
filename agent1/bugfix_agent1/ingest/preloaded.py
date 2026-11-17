@@ -72,7 +72,12 @@ def _coerce_item(item: Any) -> RawDefect:
         raise TypeError(f"defect item must be dict, got {type(item)}")
     # Fast path: already canonical
     if "title" in item and "defectId" in item:
-        return RawDefect.model_validate(item)
+        from bugfix_agent1.defect_batch.source_quality import BUSINESS_FIELDS
+        data=dict(item)
+        metadata=dict(data.get("metadata") or {})
+        metadata.update({k:v for k,v in data.items() if k in BUSINESS_FIELDS})
+        data["metadata"]=metadata
+        return RawDefect.model_validate(data)
     from bugfix_agent1.ingest.field_map import row_to_raw_dict
 
     mapped = row_to_raw_dict(item)

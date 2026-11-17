@@ -1,4 +1,4 @@
-"""Agent-3 修复闭环契约（schema 0.2.0）。旧 0.1.0 attempt 明确拒绝，不静默填充证据。"""
+"""Agent-3 修复闭环契约（schema 0.3.0）。旧 0.1.0 attempt 明确拒绝，不静默填充证据。"""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-REPAIR_SCHEMA_VERSION = "0.2.0"
+REPAIR_SCHEMA_VERSION = "0.3.0"
 
 ExecutionStatus = Literal[
     "queued", "running", "completed", "failed", "interrupted", "skipped"
@@ -70,6 +70,21 @@ class Hypothesis(BaseModel):
     changeReason: Optional[str] = None
 
 
+class Claim(BaseModel):
+    claimId: str
+    statement: str
+    role: Literal["fact", "hypothesis", "conclusion"] = "hypothesis"
+    status: Literal["supported", "conditional", "unverified", "refuted"] = "unverified"
+    evidenceRefs: list[str] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
+
+class Question(BaseModel):
+    id: str
+    kind: Literal["blocking", "choice", "verification", "follow_up"]
+    reason: str
+    relatedClaimIds: list[str] = Field(default_factory=list)
+    requestedEvidence: str = ""
+
 class EditDecision(BaseModel):
     """第 5 节门槛结论。程序只校验结构；因果由模型解释。"""
 
@@ -82,6 +97,7 @@ class EditDecision(BaseModel):
     executionPremise: str = ""
     evidenceRefs: list[str] = Field(default_factory=list)
     openQuestions: list[str] = Field(default_factory=list)
+    questions: list[Question] | None = None
     allowed: bool = False
     reason: str = ""
 
@@ -171,6 +187,8 @@ class InputRevision(BaseModel):
     revisionId: str = Field(min_length=1)
     defectId: str = Field(min_length=1)
     parentId: Optional[str] = None
+    parentRevisionId: Optional[str] = None
+    feedbackText: str = ""
     observed: Optional[str] = None
     expected: Optional[str] = None
     steps: Optional[str] = None
@@ -187,6 +205,13 @@ class Feedback(BaseModel):
     patchSetId: Optional[str] = None
     application: UserApplication = "unknown"
     acceptance: UserAcceptance = "pending"
+    kind: Literal["supplement_fact", "change_expected", "acceptance", "reject_hypothesis", "unknown"] = "unknown"
+    parentRevisionId: Optional[str] = None
+    observed: Optional[str] = None
+    expected: Optional[str] = None
+    steps: Optional[str] = None
+    clearFields: list[Literal["observed", "expected", "steps"]] = Field(default_factory=list)
+    removeAttachmentIds: list[str] = Field(default_factory=list)
     text: str = ""
     attachments: list[str] = Field(default_factory=list)
 
@@ -205,6 +230,10 @@ class TaskContext(BaseModel):
     conventions: list[str] = Field(default_factory=list)
     specDirs: list[str] = Field(default_factory=list)
     unreadAttachments: list[str] = Field(default_factory=list)
+    investigation: dict[str, Any] = Field(default_factory=dict)
+    sourceDocument: dict[str, Any] = Field(default_factory=dict)
+    currentTarget: str = ""
+    claims: list[Claim] = Field(default_factory=list)
     generatePatch: bool = False
 
 

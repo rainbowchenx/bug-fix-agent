@@ -339,8 +339,10 @@ def _matches_agent(
     profiles = set(skill.profiles)
     if profiles & match_profiles:
         return True
-    if allow_unprofiled and not profiles:
-        return True
+    if not profiles:
+        selected = {x.strip() for x in os.environ.get("BUGFIX_SKILL_ALLOWLIST", "").split(",") if x.strip()}
+        if allow_unprofiled or skill.name in selected or f"{skill.repoId}:{skill.name}" in selected:
+            return True
     return False
 
 

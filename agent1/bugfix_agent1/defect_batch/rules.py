@@ -152,7 +152,8 @@ def match_vague(d: DefectDigest, profile: Optional[ScreenProfile] = None) -> Opt
     sig = f"{d.title}\n{d.observed}"
     if VAGUE_ADJ.search(sig):
         exempt = (
-            CRASH_RE.search(sig)
+            re.search(r"没有错误提示|无错误提示|排序相反|顺序相反|顺序.*相反|top.*bottom|bottom.*top|排行.*(?:升序|降序|反向|倒序)", sig, re.I)
+            or CRASH_RE.search(sig)
             or re.search(r"应统一|应一致|保持一致|与.+一致|与.+不一样", sig)
             or re.search(r"未翻译|没有翻译|翻译显示|显示为中文|词条", sig)
             or re.search(r"增加.+提示|缺少提示|没报错|未做校验", sig)
@@ -165,7 +166,7 @@ def match_vague(d: DefectDigest, profile: Optional[ScreenProfile] = None) -> Opt
     if SLOW_RE.search(sig) and not re.search(r"\d+\s*(?:ms|毫秒|秒|s)\b", sig, re.I) and not re.search(r"\d+%", sig):
         return RuleHit("C1d", "slowness without quantification")
 
-    if re.search(r"报错|报了错|有错误", sig) and not CONCRETE_DETAIL.search(sig) and len(d.observed.strip()) < 20:
+    if not re.search(r"没有错误提示|无错误提示|未提示错误", sig) and re.search(r"报错|报了错|有错误", sig) and not CONCRETE_DETAIL.search(sig) and len(d.observed.strip()) < 20:
         return RuleHit("C1e", "error mentioned without detail")
 
     return None

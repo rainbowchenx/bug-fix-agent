@@ -43,7 +43,7 @@ def test_needs_info_then_supplement(tmp_path: Path):
         ),
     )
     decision = choose_session(TaskContext(defectId="D1", revision=rev), first)
-    assert rev.observed and "camera_disconnected" in rev.observed
+    assert "camera_disconnected" in rev.feedbackText
     assert decision.action in ("resume", "new")
 
 

@@ -62,8 +62,13 @@ def load_revision(
     """从已导入反馈里取 revision；未指定则取该票最新一份。"""
     folder = Path(root) / "defects" / defect_id / "feedback"
     if not folder.is_dir():
+        if revision_id:
+            raise ValueError(f"unknown revision: {revision_id}")
         return None
-    files = sorted(folder.glob("*.json"))
+    pointer = folder.parent / "feedback-latest.json"
+    if revision_id is None and pointer.is_file():
+        revision_id = str(json.loads(pointer.read_text(encoding="utf-8"))["revisionId"])
+    files = sorted(folder.glob("*.json"), key=lambda p: (p.stat().st_mtime_ns, p.name))
     chosen: Optional[Path] = None
     for path in files:
         try:
@@ -78,6 +83,8 @@ def load_revision(
         if revision_id is None:
             chosen = path
     if chosen is None:
+        if revision_id:
+            raise ValueError(f"unknown revision: {revision_id}")
         return None
     payload = json.loads(chosen.read_text(encoding="utf-8"))
     return InputRevision.model_validate(payload["revision"])

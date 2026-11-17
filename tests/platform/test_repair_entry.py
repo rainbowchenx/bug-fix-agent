@@ -17,7 +17,7 @@ from bugfix_platform.sdk.fix import FixRequest, FixResult
 def _batch(*, pool: str = "strict", observed: str = "黑屏") -> DefectBatch:
     return DefectBatch.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",
@@ -41,7 +41,7 @@ def _batch(*, pool: str = "strict", observed: str = "黑屏") -> DefectBatch:
 def _knowledge(work: Path) -> CodeKnowledge:
     return CodeKnowledge.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "workDir": str(work),
             "partial": False,
@@ -118,7 +118,7 @@ def test_resume_cli_runs_second_analyst(tmp_path: Path, monkeypatch):
     knowledge = _knowledge(work)
     (root / "defects" / "D1" / "feedback").mkdir(parents=True)
     report = {
-        "schemaVersion": "0.1.0",
+        "schemaVersion": "0.3.0",
         "productLine": "hc",
         "workDir": str(work),
         "generatedAt": "2026-01-01T00:00:00Z",
@@ -170,7 +170,7 @@ def test_resume_cli_runs_second_analyst(tmp_path: Path, monkeypatch):
         seen.update(kwargs)
         return AnalysisReport.model_validate(
             {
-                "schemaVersion": "0.1.0",
+                "schemaVersion": "0.3.0",
                 "productLine": "hc",
                 "workDir": str(work),
                 "generatedAt": "2026-01-01T00:00:00Z",
@@ -228,7 +228,7 @@ def test_resume_cli_executes_analyze_and_fix(tmp_path: Path, monkeypatch):
     (root / "analysis-report.json").write_text(
         json.dumps(
             {
-                "schemaVersion": "0.1.0",
+                "schemaVersion": "0.3.0",
                 "productLine": "hc",
                 "workDir": str(work),
                 "generatedAt": "2026-01-01T00:00:00Z",
@@ -854,7 +854,7 @@ def test_one_ticket_exception_does_not_stop_batch(tmp_path: Path):
     (work / "src" / "a.ts").write_text("function handleFail() { return; }\n", encoding="utf-8")
     batch = DefectBatch.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",
@@ -884,7 +884,7 @@ def test_one_ticket_exception_does_not_stop_batch(tmp_path: Path):
     )
     knowledge = CodeKnowledge.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "workDir": str(work),
             "partial": False,
@@ -949,7 +949,7 @@ def test_resume_keeps_other_tickets_and_round_report(tmp_path: Path, monkeypatch
     (root / "defects" / "D1" / "feedback").mkdir(parents=True)
     batch = DefectBatch.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",
@@ -979,7 +979,7 @@ def test_resume_keeps_other_tickets_and_round_report(tmp_path: Path, monkeypatch
     )
     knowledge = _knowledge(work)
     previous = {
-        "schemaVersion": "0.1.0",
+        "schemaVersion": "0.3.0",
         "productLine": "hc",
         "workDir": str(work),
         "generatedAt": "2026-01-01T00:00:00Z",

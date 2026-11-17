@@ -46,6 +46,11 @@ class DefectCodeMatch(BaseModel):
     """Agent-2 逐票覆盖。缺省表示旧产物未声明，不能当成已调查。"""
     searchedScopes: list[str] = Field(default_factory=list)
     openQuestions: list[str] = Field(default_factory=list)
+    facts: list[dict[str, Any]] = Field(default_factory=list)
+    hypotheses: list[str] = Field(default_factory=list)
+    ruledOut: list[str] = Field(default_factory=list)
+    nextChecks: list[str] = Field(default_factory=list)
+    investigationSource: Literal["model_reported", "tool_observed"] = "model_reported"
 
 
 class SpecEntry(BaseModel):
@@ -96,11 +101,14 @@ class Capabilities(BaseModel):
 
 
 class CodeKnowledge(BaseModel):
+    runtimeProfile: dict[str, Any] = Field(default_factory=dict)
+    skillDiscovery: list[dict[str, Any]] = Field(default_factory=list)
     model_config = ConfigDict(extra="ignore")
 
-    schemaVersion: str
+    schemaVersion: Literal["0.3.0"]
     productLine: str = Field(min_length=1)
     workDir: str = Field(min_length=1)
+    investigationRuns: list[dict[str, Any]] = Field(default_factory=list)
     partial: bool = False
     generatedAt: str = Field(min_length=1)
     repoRoots: list[RepoRoot] = Field(default_factory=list)

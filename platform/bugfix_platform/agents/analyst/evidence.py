@@ -24,8 +24,11 @@ def validate_edit_decision(context: TaskContext, decision: EditDecision) -> list
         decision.editRationale or ""
     ):
         errors.append("placeholder analysis")
-    if decision.openQuestions:
-        errors.append("open questions unresolved")
+    if decision.questions is None:
+        if decision.openQuestions:
+            errors.append("open questions unresolved")
+    elif any(q.kind in {"blocking", "choice"} for q in decision.questions):
+        errors.append("blocking question unresolved")
     if not decision.evidenceRefs:
         errors.append("missing evidenceRefs")
     by_id = {e.evidenceId: e for e in context.evidence}

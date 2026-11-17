@@ -175,19 +175,31 @@ def run_cartographer(
     runner = cartography_fn or create_cartography_runner(
         cartography_mode_from_env(cartography_mode)
     )
-    result = runner(
-        CartographyRequest(
+    request = CartographyRequest(
             work_dir=work_dir,
             defect_batch=defect_batch,
             baseline=baseline,
             injected_skills=tuple(injected),
             codegraph=cg_status,
         )
-    )
+    import os
+    if cartography_fn is None and cartography_mode_from_env(cartography_mode) == "sdk":
+        from bugfix_platform.agents.cartographer.investigation import investigate_groups
+        result = investigate_groups(request, runner,
+            group_size=int(os.environ.get("BUGFIX_INVESTIGATION_GROUP_SIZE", "8")),
+            max_groups=int(os.environ["BUGFIX_INVESTIGATION_MAX_GROUPS"]) if os.environ.get("BUGFIX_INVESTIGATION_MAX_GROUPS") else None,
+            cache_dir=os.environ.get("BUGFIX_INVESTIGATION_CACHE_DIR"))
+    else:
+        result = runner(request)
     # 有没真的调用 LLM，必须能从产物读出来：否则 heuristic 与
     # sdk_fallback（缺 key / 缺 SDK / 输出不可解析）在 JSON 上完全同形。
     print(_enrich_line(result.source, result.detail), file=sys.stderr)
-    return _with_enrich_hint(result.knowledge, result.source, result.detail)
+    from bugfix_platform.sdk.runtime_profile import runtime_profile, skill_discovery
+    knowledge = result.knowledge.model_copy(update={
+        "runtimeProfile": runtime_profile().model_dump(),
+        "skillDiscovery": skill_discovery(work_dir, result.knowledge.repoRoots, injected, result.skill_reads, profile="cartography"),
+    })
+    return _with_enrich_hint(knowledge, result.source, result.detail)
 
 
 def _one_line(text: object) -> str:

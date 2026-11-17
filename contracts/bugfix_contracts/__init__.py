@@ -12,6 +12,9 @@ from bugfix_contracts.defect_batch import (
     DEFECT_BATCH_SCHEMA_VERSION,
     BatchCluster,
     BatchTicket,
+    SourceDocument,
+    SourceSection,
+    InputQuality,
     DefectBatch,
     ExpectQuality,
     Intent,
@@ -42,6 +45,8 @@ from bugfix_contracts.analysis_report import (
 from bugfix_contracts.repair import (
     REPAIR_SCHEMA_VERSION,
     AttemptRecord,
+    Claim,
+    Question,
     EditDecision,
     Evidence,
     Feedback,
@@ -55,6 +60,7 @@ from bugfix_contracts.repair import (
 )
 
 __all__ = [
+    "SourceDocument", "SourceSection", "InputQuality", "Claim", "Question",
     "CONTRACT_SCHEMA_VERSION",
     "MATCH_POOLS",
     "Confidence",

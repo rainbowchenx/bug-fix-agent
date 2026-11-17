@@ -1,0 +1,41 @@
+{
+  "date": "2026-11-16",
+  "archive": "runs-2026-11-16/bugfix-runs-2026-11-16-交付包.zip",
+  "sha256": "f0e2398b1a5e23a2e906761724ce36e65f7ed4b9a8a13176535e8a9857fb44c1",
+  "reviewedCommit": "d668185",
+  "caseSources": [
+    "peitao04188 source truncation",
+    "peitao09314 explicit remove-switch target",
+    "LED01340 image modality error",
+    "transport06318 stale human rating"
+  ],
+  "scope": "Minimal synthetic regressions grounded in review; no business source code and no model quality ground truth",
+  "historicalAccounting": {
+    "newAgent1Tickets": 93,
+    "selectedTickets": 24,
+    "primaryPathHits": 17,
+    "primaryOrAlternatePathHits": 18
+  },
+  "reportSources": [
+    {
+      "product": "hcp",
+      "path": "hcp/02-agent3报告/analysis-report.json",
+      "sha256Bytes": "9909cc02d1daa60595817f7f49ba4d614d2f356364a60a702dc4ab884bb8a2d4"
+    },
+    {
+      "product": "led",
+      "path": "led/02-agent3报告/analysis-report.json",
+      "sha256Bytes": "fa5279b45d47c057c94e7e9b0bca3f3cce8e56556842e030112501cdf382f530"
+    },
+    {
+      "product": "peitao",
+      "path": "peitao/02-agent3报告/analysis-report.json",
+      "sha256Bytes": "25c7d4beba0289597c6ab527787aa6b227ebb8c2a0215152504bc6610d5617aa"
+    },
+    {
+      "product": "transport",
+      "path": "transport/02-agent3报告/analysis-report.json",
+      "sha256Bytes": "f60eded5991b5d2b4652b687d01acf468abf77bbaa7c251148c69a0a7d06fe62"
+    }
+  ]
+}

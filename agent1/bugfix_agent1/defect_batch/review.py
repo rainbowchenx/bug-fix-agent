@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from bugfix_contracts.common import MATCH_POOLS, Confidence
 from bugfix_contracts.defect_batch import (
     DefectBatch,
+    InputQuality,
     ExpectQuality,
     Intent,
     Pool,
@@ -32,10 +33,11 @@ class IntentOverride(BaseModel):
     intentConfidence: Optional[Confidence] = None
     pool: Optional[Pool] = None
     expectQuality: Optional[ExpectQuality] = None
+    inputQuality: Optional[InputQuality] = None
 
     @model_validator(mode="after")
     def _at_least_one_change(self) -> IntentOverride:
-        if self.intent is None and self.pool is None and self.expectQuality is None:
+        if self.intent is None and self.pool is None and self.expectQuality is None and self.inputQuality is None:
             raise ValueError("adjustment needs intent, pool, or expectQuality")
         return self
 
@@ -95,6 +97,8 @@ def apply_intent_review(
                 ticket.reasonCode = None
                 ticket.reasonDetail = None
             ticket.pool = item.pool
+        if item.inputQuality is not None:
+            ticket.inputQuality = item.inputQuality
         if item.expectQuality is not None:
             ticket.expectQuality = item.expectQuality
         if ticket.pool == "strict" and ticket.expectQuality not in STRICT_EXPECT:

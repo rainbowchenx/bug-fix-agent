@@ -1,10 +1,12 @@
+> 当前生产契约：0.3.0（2026-11-16）。目录保留原文档路径；旧 Agent 产物版本明确拒绝，请重新生成。
+
 # analysis-report v0.1
 
 **Producer:** Agent-3 (analyst) · **Consumer:** 人 / 下游
 
 | Field | Type | Notes |
 |---|---|---|
-| `schemaVersion` | string | `"0.1.0"` |
+| `schemaVersion` | string | `"0.3.0"` |
 | `productLine` / `workDir` | string | |
 | `generatedAt` | ISO string | |
 | `openMr` | boolean | 默认 false；没有 `applyFix` 时禁止开启 |
@@ -44,3 +46,11 @@
 | `suggestedVerify` | steps + executed（默认 false） |
 | `confidence` | high/medium/low |
 | `verifyStatus` | passed/failed/**skipped**（默认 skipped；非 GREEN 门禁） |
+
+## 0.3.0 主张、问题及反馈
+
+rootCause.claims：claimId、statement、role、status、evidenceRefs、assumptions。supported 引用须能解析至本轮有效 Evidence；片段匹配仅证明引用，运行因果仍需真实观测。rootCause.questions：id、kind、reason、relatedClaimIds、requestedEvidence；blocking/choice 阻断整票编辑，verification/follow_up 保留但不一律阻断。openQuestions 从 questions 派生。
+
+SDK 缺少 claims/questions 时一次有界格式修复；仍失败标 incomplete，保留可解析事实。报告含 attemptId、analysisStatus、actionability、附件读取状态，以及 TicketSlice 的当前 revisionId/sourceDocument/inputQuality。applyFix=false 仍可展示行动资格，但不会执行编辑器。
+
+`feedback` 导入显式字段并继承父版本；`resume --execute` 实际运行报告模式续分析；`--apply-fix` 才允许编辑。expected/steps 未提供则继承，clearFields 显式清空，removeAttachmentIds 撤销附件；父版本未知或损坏拒绝静默回退。feedbackText 累积原文，单次反馈文件保留主要 kind 与来源。

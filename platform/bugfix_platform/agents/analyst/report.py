@@ -19,12 +19,22 @@ def render_report(report: dict[str, Any]) -> str:
         did = item.get("defectId") or ""
         resolution = item.get("resolution") or item.get("outcome") or ""
         lines.append(f"- {did}: {resolution}")
+        lines.append(f"  analysis: {item.get('analysisStatus', 'not_executed')}; actionability: {item.get('actionability') or {}}")
+        target=(item.get('ticket') or {}).get('expected')
+        if target:
+            lines.append(f"  currentTarget: {target}")
+        for attachment in item.get('attachments') or []:
+            lines.append(f"  attachment: {attachment.get('ref')} available={attachment.get('availability')} read={attachment.get('read')}")
         cause = ""
         root = item.get("rootCause")
         if isinstance(root, dict):
             cause = str(root.get("summary") or "")
         if cause:
             lines.append(f"  cause: {cause}")
+        for claim in (root or {}).get("claims") or []:
+            lines.append(f"  claim [{claim.get('status')}]: {claim.get('statement')}")
+        for question in (root or {}).get("questions") or []:
+            lines.append(f"  question [{question.get('kind')}]: {question.get('reason')}; need {question.get('requestedEvidence', '')}")
         patch = item.get("patch") if isinstance(item.get("patch"), dict) else {}
         patch_path = (patch or {}).get("path")
         if patch_path:

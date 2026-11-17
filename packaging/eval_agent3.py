@@ -78,6 +78,7 @@ def _analyze_source(notes: str | None) -> str | None:
 def score_ticket(case: dict[str, Any], ticket: dict[str, Any] | None) -> dict[str, Any]:
     """Score one gold case against one report ticket."""
     g0: list[str] = []
+    execution_issues: list[str] = []
     loc = ticket.get("localization") or {} if ticket else {}
     cands = list(loc.get("candidates") or [])
     notes = loc.get("notes") or ""
@@ -97,7 +98,7 @@ def score_ticket(case: dict[str, Any], ticket: dict[str, Any] | None) -> dict[st
             g0.append("needs_info_wrong_outcome")
     elif expect_outcomes and "needs_ticket_info" not in expect_outcomes:
         if source != "sdk":
-            g0.append(f"analyze_source={source or 'missing'}")
+            execution_issues.append(f"analyze_source={source or 'missing'}")
 
     if outcome == "patch_ready":
         g0.append("patch_ready_on_report_path")
@@ -119,12 +120,22 @@ def score_ticket(case: dict[str, Any], ticket: dict[str, Any] | None) -> dict[st
 
     hit1 = loc_hit(cands, prefix, 1) if prefix else None
     hit3 = loc_hit(cands, prefix, 3) if prefix else None
+    alternatives = case.get("expectPathPrefixAlt") or []
+    alternatives = [alternatives] if isinstance(alternatives, str) else alternatives
+    alt_hit = bool(hit3 or any(loc_hit(cands, str(x), 3) for x in alternatives))
     if prefix and pool != "needs_info" and not cands:
         hit1 = False
         hit3 = False
     outcome_ok = outcome in expect_outcomes if expect_outcomes else None
 
-    return _row(case, ticket, cands, source, g0, hit1, hit3, outcome_ok, weak_ok and keyword_ok)
+    row = _row(case, ticket, cands, source, g0, hit1, hit3, outcome_ok, weak_ok and keyword_ok)
+    row["locAt3WithAlternatives"] = alt_hit
+    row["analysisCompleted"] = (ticket.get("analysisStatus") == "completed" if "analysisStatus" in ticket else source == "sdk" and outcome != "other_blocked")
+    row["executionIssues"] = execution_issues
+    row["inheritedLocalizationOnly"] = bool(cands) and not row["analysisCompleted"]
+    row["completedAnalysisLocAt3"] = bool(hit3) and row["analysisCompleted"]
+    row["evidenceScope"] = "path match; not causal verification"
+    return row
 
 
 def _row(
@@ -213,19 +224,53 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
 def score_report(report: dict[str, Any], cases: list[dict[str, Any]]) -> dict[str, Any]:
     if not cases:
         raise ValueError("empty cases")
+    ids = [c["defectId"] for c in cases]
+    if len(ids) != len(set(ids)):
+        raise ValueError("duplicate defectId in cases")
     validated = validate_analysis_report(report)
     dumped = validated.model_dump()
     by_id = {t["defectId"]: t for t in dumped["tickets"]}
     rows = [score_ticket(case, by_id.get(case["defectId"])) for case in cases]
-    summary = summarize(rows)
+    from bugfix_platform.agents.analyst.ratings import RatingBinding, report_digest, rating_stale
+    digest = report_digest(report)
+    eligible = []
+    for case, row in zip(cases, rows):
+        binding_raw = case.get("ratingBinding")
+        stale = False
+        if binding_raw:
+            binding = RatingBinding.model_validate(binding_raw)
+            ticket = by_id.get(case["defectId"]) or {}
+            claim_ids = {c["claimId"] for c in (ticket.get("rootCause") or {}).get("claims", [])}
+            stale = (rating_stale(binding, report) or binding.defectId != case["defectId"]
+                     or binding.product != dumped["productLine"]
+                     or bool(binding.attemptId and binding.attemptId != ticket.get("attemptId"))
+                     or not set(binding.claimIds).issubset(claim_ids))
+        row["ratingStatus"] = "stale" if stale else "bound" if binding_raw else "unbound"
+        row["ratingBindingLevel"] = "attempt" if binding_raw and binding_raw.get("attemptId") else "report"
+        if stale:
+            row["staleScores"]={k:row.get(k) for k in ("g0","locAt1","locAt3","locAt3WithAlternatives","outcomeOk","rootCauseWeakOk")}
+            row.update(g0=[], g0Pass=True, locAt1=None, locAt3=None, locAt3WithAlternatives=None, outcomeOk=None, rootCauseWeakOk=None)
+        if binding_raw and not stale:
+            eligible.append(case)
+    active_rows=[r for r in rows if r["ratingStatus"] != "stale"]
+    summary = summarize(active_rows)
+    if not active_rows:
+        summary["verdict"]="needs_current_ratings"
+    summary["analysisCompleted"] = sum(bool(r.get("analysisCompleted")) for r in rows)
+    summary["reported"] = len(cases)
+    summary["completedAnalysisLocAt3"] = sum(bool(r.get("completedAnalysisLocAt3")) for r in active_rows)
+    summary["staleRatings"] = sum(r["ratingStatus"] == "stale" for r in rows)
+    summary["honesty"] = "requires trajectory review; SDK failure alone is not dishonesty"
+    summary["locAt3WithAlternatives"] = f"{sum(bool(r.get('locAt3WithAlternatives')) for r in rows if r['locAt3'] is not None)}/{sum(r['locAt3'] is not None for r in rows)}"
+
     from bugfix_platform.agents.analyst.baseline import repair_success_metrics
 
-    accepted = sum(1 for c in cases if c.get("accepted") is True)
-    resolved = sum(1 for c in cases if c.get("accepted") is True and c.get("resolved") is True)
+    accepted = sum(1 for c in eligible if c.get("accepted") is True)
+    resolved = sum(1 for c in eligible if c.get("accepted") is True and c.get("resolved") is True)
     summary["repair"] = repair_success_metrics(
         accepted=accepted, resolved=resolved, reported=len(cases)
     )
-    return {"summary": summary, "applyFix": dumped.get("applyFix"), "rows": rows}
+    return {"summary": summary, "reportDigest": digest, "applyFix": dumped.get("applyFix"), "rows": rows}
 
 
 def main(argv: list[str] | None = None) -> int:

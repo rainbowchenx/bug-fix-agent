@@ -32,7 +32,7 @@ def test_feedback_cli_imports_file(tmp_path: Path):
     dest = root / "defects" / "D1" / "feedback" / "f1.json"
     assert dest.is_file()
     payload = json.loads(dest.read_text(encoding="utf-8"))
-    assert "camera_disconnected" in payload["revision"]["observed"]
+    assert "camera_disconnected" in payload["revision"]["feedbackText"]
 
 
 def test_resume_cli_writes_decision_without_cwd_guess(tmp_path: Path):

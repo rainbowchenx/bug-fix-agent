@@ -83,3 +83,21 @@ def test_capture_digest_includes_clean_tracked_files(tmp_path: Path):
     subprocess.run(["git", "-C", str(repo), "commit", "-m", "b2"], check=True, capture_output=True)
     second = capture_workspace(repo)
     assert first.contentDigest != second.contentDigest
+
+
+def test_snapshot_uses_same_exclusions_as_frozen_copy(tmp_path):
+    import shutil
+    from bugfix_platform.agents.analyst.workspace import workspace_digest
+    repo=_init_repo(tmp_path/'repo')
+    (repo/'.env').write_text('TEST_ONLY=dummy\n')
+    (repo/'src'/'credentials.json').write_text('{"testOnly":true}')
+    snapshot=capture_workspace(repo)
+    frozen=Path(snapshot.freezeRoot)
+    try:
+        assert not (frozen/'.env').exists()
+        assert not (frozen/'src'/'credentials.json').exists()
+        assert workspace_digest(repo)==workspace_digest(frozen)==snapshot.contentDigest
+        prepare_workspace(snapshot,tmp_path/'candidate')
+        assert (repo/'.env').read_text()=='TEST_ONLY=dummy\n'
+    finally:
+        shutil.rmtree(frozen,ignore_errors=True)

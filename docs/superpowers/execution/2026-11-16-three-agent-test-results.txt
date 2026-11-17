@@ -1,0 +1,6 @@
+Plan date: 2026-11-16; delivery date: 2026-11-17
+Command: py -3.12 -m pytest tests -q --tb=short -rs
+420 passed, 5 skipped in 140.45s (0:02:20)
+Exit: 0
+Skipped: 4 external historical CSV cases; 1 unavailable peitao repository case.
+Live model calls: none. CodeGraph tests included.

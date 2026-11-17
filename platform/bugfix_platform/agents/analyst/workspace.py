@@ -15,17 +15,7 @@ from uuid import uuid4
 
 from bugfix_contracts.repair import PatchFile, PatchSet, WorkspaceSnapshot
 
-_SKIP_COPY = {
-    "node_modules",
-    ".git",
-    "dist",
-    "build",
-    ".venv",
-    "__pycache__",
-    ".bugfix",
-    ".bugfix-runs",
-    ".codegraph",
-}
+from bugfix_platform.workspace_fingerprint import _SKIP_COPY, _SKIP_FILES, _list_source_files, workspace_digest
 
 
 def capture_workspace(repo_root: Path) -> WorkspaceSnapshot:
@@ -172,7 +162,7 @@ def _copytree(src: Path, dest: Path) -> None:
         target_dir = dest / rel_dir
         target_dir.mkdir(parents=True, exist_ok=True)
         for name in filenames:
-            if name in {".env", "credentials.json"}:
+            if name in _SKIP_FILES:
                 continue
             shutil.copy2(Path(dirpath) / name, target_dir / name)
 
@@ -181,31 +171,6 @@ def _copy_file(src: Path, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     if src.is_file():
         shutil.copy2(src, dest)
-
-
-def _list_source_files(root: Path) -> list[str]:
-    out: list[str] = []
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in _SKIP_COPY]
-        for name in filenames:
-            rel = (Path(dirpath) / name).relative_to(root).as_posix()
-            out.append(rel)
-    return out
-
-
-def workspace_digest(root: Path) -> str:
-    """所有普通源文件的内容摘要，不只 dirty / 首个文件。"""
-    return _content_digest(root, _list_source_files(root))
-
-
-def _content_digest(root: Path, rels: Iterable[str]) -> str:
-    h = hashlib.sha256()
-    for rel in sorted(rels):
-        path = root / rel
-        h.update(rel.encode("utf-8"))
-        if path.is_file():
-            h.update(path.read_bytes())
-    return h.hexdigest()[:16]
 
 
 def _unified_diff(left: Path, right: Path, rel: str) -> str:

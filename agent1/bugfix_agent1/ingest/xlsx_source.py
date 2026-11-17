@@ -121,7 +121,7 @@ def main(argv: list[str] | None = None) -> None:
     defects = load_xlsx_defects(args.xlsx, sheet=args.sheet, limit=args.limit)
     product_line, provenance = resolve_product_line(args.xlsx, args.product_line)
     payload = {
-        "schemaVersion": "0.1.0",
+        "schemaVersion": "0.3.0",
         "productLine": product_line,
         "defects": [d.model_dump(exclude_none=True) for d in defects],
     }

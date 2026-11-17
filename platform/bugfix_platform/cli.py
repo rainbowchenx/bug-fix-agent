@@ -38,8 +38,9 @@ def _cmd_resume(
     defect_id: str,
     revision_id: str | None,
     apply_fix: bool = False,
+    execute: bool = False,
 ) -> int:
-    """写出 session-decision.json；``--apply-fix`` 时跑下一轮分析/编辑。"""
+    """预览会话决策；execute 只分析，apply-fix 显式授权编辑。"""
     from bugfix_contracts.analysis_report import validate_analysis_report
     from bugfix_contracts.code_knowledge import validate_code_knowledge
     from bugfix_contracts.defect_batch import load_defect_batch
@@ -47,32 +48,27 @@ def _cmd_resume(
     from bugfix_platform.agents.analyst.sessions import load_revision, resume_from_store
 
     base = Path(root)
-    decision = resume_from_store(base, defect_id, revision_id)
-    print(
-        json.dumps(
-            {
-                "action": decision.action,
-                "sessionId": decision.sessionId,
-                "reason": decision.reason,
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-    )
-    if not apply_fix:
-        return 0
     batch_path = base / "defect-batch.json"
     knowledge_path = base / "code-knowledge.json"
-    if not batch_path.is_file() or not knowledge_path.is_file():
-        print("resume --apply-fix needs defect-batch.json and code-knowledge.json", file=sys.stderr)
-        return 1
-    batch = load_defect_batch(batch_path)
-    knowledge = validate_code_knowledge(json.loads(knowledge_path.read_text(encoding="utf-8")))
     report_path = base / "analysis-report.json"
-    work_dir = knowledge.workDir
-    if report_path.is_file():
-        previous = json.loads(report_path.read_text(encoding="utf-8"))
-        work_dir = str(previous.get("workDir") or work_dir)
+    batch = load_defect_batch(batch_path) if batch_path.is_file() else None
+    if batch is not None and not any(t.defectId == defect_id for t in batch.tickets):
+        print(f"unknown defect: {defect_id}", file=sys.stderr)
+        return 1
+    previous = None
+    if apply_fix or execute:
+        if batch is None or not knowledge_path.is_file():
+            print("resume execution needs defect-batch.json and code-knowledge.json", file=sys.stderr)
+            return 1
+        knowledge = validate_code_knowledge(json.loads(knowledge_path.read_text(encoding="utf-8")))
+        if report_path.is_file():
+            previous = validate_analysis_report(json.loads(report_path.read_text(encoding="utf-8")))
+    decision = resume_from_store(base, defect_id, revision_id)
+    print(json.dumps({"action": decision.action, "sessionId": decision.sessionId,
+                      "reason": decision.reason}, ensure_ascii=False, indent=2))
+    if not apply_fix and not execute:
+        return 0
+    work_dir = previous.workDir if previous is not None else knowledge.workDir
     revision = load_revision(base, defect_id, revision_id)
     revisions = {defect_id: revision} if revision is not None else {}
     session_ids = {defect_id: decision.sessionId} if decision.sessionId else {}
@@ -80,7 +76,7 @@ def _cmd_resume(
         work_dir=work_dir,
         defect_batch=batch,
         code_knowledge=knowledge,
-        apply_fix=True,
+        apply_fix=apply_fix,
         ticket_ids=[defect_id],
         revisions=revisions,
         session_ids=session_ids,
@@ -89,20 +85,15 @@ def _cmd_resume(
     dumped = report.model_dump()
     round_dir = base / "rounds"
     round_dir.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     (round_dir / f"{defect_id}-{stamp}.json").write_text(
         json.dumps(dumped, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     by_id: dict[str, object] = {}
-    if report_path.is_file():
-        try:
-            previous = json.loads(report_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            previous = {}
-        for item in previous.get("tickets") or []:
-            if isinstance(item, dict) and item.get("defectId"):
-                by_id[str(item["defectId"])] = item
+    if previous is not None:
+        for item in previous.model_dump()["tickets"]:
+            by_id[item["defectId"]] = item
     for item in dumped.get("tickets") or []:
         if isinstance(item, dict) and item.get("defectId"):
             by_id[str(item["defectId"])] = item
@@ -204,6 +195,7 @@ def main(argv: list[str] | None = None) -> int:
         "resume",
         help="Choose resume/new for one defect from stored attempt + imported revision",
     )
+    resume_p.add_argument("--execute", action="store_true", help="Run another report-only analysis")
     resume_p.add_argument("--root", required=True, help="Artifact / report root")
     resume_p.add_argument("--defect-id", required=True)
     resume_p.add_argument(
@@ -246,6 +238,7 @@ def main(argv: list[str] | None = None) -> int:
             args.defect_id,
             args.revision_id,
             apply_fix=bool(getattr(args, "apply_fix", False)),
+            execute=bool(args.execute),
         )
 
     if args.cmd != "run":  # pragma: no cover

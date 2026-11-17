@@ -28,7 +28,7 @@ def main() -> None:
     args = ap.parse_args()
     defects = load_platform_csv(args.csv, limit=args.limit)
     payload = {
-        "schemaVersion": "0.1.0",
+        "schemaVersion": "0.3.0",
         "productLine": args.product_line,
         "defects": [d.model_dump(exclude_none=True) for d in defects],
     }

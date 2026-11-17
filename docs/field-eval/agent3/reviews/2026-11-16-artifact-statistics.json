@@ -1,0 +1,140 @@
+{
+  "date": "2026-11-16",
+  "reviewed_commit": "d668185",
+  "run_commit_declared": "90e4744",
+  "archive": "runs-2026-11-16/bugfix-runs-2026-11-16-交付包.zip",
+  "archive_sha256": "f0e2398b1a5e23a2e906761724ce36e65f7ed4b9a8a13176535e8a9857fb44c1",
+  "evidence_limits": [
+    "No business source repositories in package",
+    "No patches or business acceptance; applyFix=false",
+    "03 dossiers are final attempt extracts, not full tool trajectories",
+    "LED Agent1/2 are reused 2026-11-12 outputs"
+  ],
+  "projects": {
+    "peitao": {
+      "raw_csv_rows": 19,
+      "batch_tickets": 19,
+      "batch_generated_at": "2026-11-16T04:52:11.709461Z",
+      "pools": {
+        "strict": 18,
+        "locatable_only": 1
+      },
+      "agent2_with_candidates": 19,
+      "agent2_status": {
+        "complete": 16,
+        "not_investigated": 3
+      },
+      "agent2_partial": false,
+      "report_tickets": 6,
+      "outcomes": {
+        "plan_only": 5,
+        "other_blocked": 1
+      },
+      "apply_fix": false,
+      "confidence": {
+        "high": 1,
+        "medium": 4,
+        "low": 1
+      },
+      "loc1_main": 6,
+      "loc3_main": 6,
+      "loc3_with_declared_alt": 6,
+      "edit_allowed": 0
+    },
+    "transport": {
+      "raw_csv_rows": 37,
+      "batch_tickets": 37,
+      "batch_generated_at": "2026-11-16T04:53:05.733145Z",
+      "pools": {
+        "strict": 34,
+        "needs_info": 3
+      },
+      "agent2_with_candidates": 26,
+      "agent2_status": {
+        "not_investigated": 21,
+        "complete": 15,
+        "partial": 1
+      },
+      "agent2_partial": false,
+      "report_tickets": 6,
+      "outcomes": {
+        "plan_only": 6
+      },
+      "apply_fix": false,
+      "confidence": {
+        "medium": 6
+      },
+      "loc1_main": 2,
+      "loc3_main": 2,
+      "loc3_with_declared_alt": 3,
+      "edit_allowed": 0
+    },
+    "hcp": {
+      "raw_csv_rows": 37,
+      "batch_tickets": 37,
+      "batch_generated_at": "2026-11-16T04:53:28.231305Z",
+      "pools": {
+        "strict": 25,
+        "needs_info": 8,
+        "locatable_only": 4
+      },
+      "agent2_with_candidates": 27,
+      "agent2_status": {
+        "complete": 15,
+        "not_investigated": 21,
+        "partial": 1
+      },
+      "agent2_partial": true,
+      "report_tickets": 6,
+      "outcomes": {
+        "plan_only": 6
+      },
+      "apply_fix": false,
+      "confidence": {
+        "medium": 6
+      },
+      "loc1_main": 4,
+      "loc3_main": 4,
+      "loc3_with_declared_alt": 4,
+      "edit_allowed": 0
+    },
+    "led": {
+      "raw_csv_rows": 137,
+      "batch_tickets": 40,
+      "batch_generated_at": "2026-11-12T05:49:41.778740Z",
+      "pools": {
+        "strict": 37,
+        "locatable_only": 2,
+        "needs_info": 1
+      },
+      "agent2_with_candidates": 39,
+      "agent2_status": {
+        "missing": 40
+      },
+      "agent2_partial": true,
+      "report_tickets": 6,
+      "outcomes": {
+        "plan_only": 5,
+        "other_blocked": 1
+      },
+      "apply_fix": false,
+      "confidence": {
+        "high": 3,
+        "medium": 2,
+        "low": 1
+      },
+      "loc1_main": 2,
+      "loc3_main": 5,
+      "loc3_with_declared_alt": 5,
+      "edit_allowed": 0
+    }
+  },
+  "user_clarification": {
+    "recorded_date": "2026-11-16",
+    "run_model_context_approx": "256K",
+    "run_model_multimodal": false,
+    "next_run_preference": "approximately 1M context, multimodal; exact capabilities to verify",
+    "report_only_explicitly_required": true,
+    "evaluation_scope": "report quality, not patch generation or repair success"
+  }
+}

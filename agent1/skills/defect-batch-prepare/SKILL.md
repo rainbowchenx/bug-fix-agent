@@ -166,3 +166,7 @@ Before handing off, run `agent1 validate --batch <file>`. It re-checks the JSON 
 
 Command variants: [references/examples.md](references/examples.md). Output artifact shape:
 `references/defect-batch-guide.md` (repo: `docs/contracts/v0.1/defect-batch-guide.md`).
+
+### Source quality review (schema 0.3.0)
+
+Review `sourceDocument` alongside distilled fields. Nonempty expected text is not proof that it applies to the observed defect. In the existing intent review, optionally emit `inputQuality` with expectedOrigin (explicit/inferred/absent), expectedRelevance (consistent/conflicting/uncertain), and issues. Preserve uncertain when evidence is insufficient; do not promote every needs_info ticket. Never replace the source text.

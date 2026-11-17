@@ -4,6 +4,8 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from bugfix_contracts.repair import Claim, Question
+from bugfix_contracts.defect_batch import SourceDocument, InputQuality
 from bugfix_contracts.common import CONTRACT_SCHEMA_VERSION, Confidence
 
 ANALYSIS_REPORT_SCHEMA_VERSION = CONTRACT_SCHEMA_VERSION
@@ -29,6 +31,10 @@ class TicketBlockers(BaseModel):
 
 
 class TicketSlice(BaseModel):
+    sourceDocument: Optional[SourceDocument] = None
+    inputQuality: Optional[InputQuality] = None
+    revisionId: Optional[str] = None
+    attachmentRefs: list[str] = Field(default_factory=list)
     title: Optional[str] = None
     testModule: Optional[str] = None
     titleTag: Optional[str] = None
@@ -63,6 +69,8 @@ class Localization(BaseModel):
 
 
 class RootCause(BaseModel):
+    claims: list[Claim] = Field(default_factory=list)
+    questions: list[Question] | None = None
     summary: str = ""
     ruledOut: list[str] = Field(default_factory=list)
     openQuestions: list[str] = Field(default_factory=list)
@@ -88,6 +96,10 @@ class SuggestedVerify(BaseModel):
 
 
 class TicketReport(BaseModel):
+    attemptId: Optional[str] = None
+    analysisStatus: Literal["completed", "incomplete", "not_executed"] = "not_executed"
+    actionability: dict[str, Any] = Field(default_factory=dict)
+    attachments: list[dict[str, Any]] = Field(default_factory=list)
     model_config = ConfigDict(extra="ignore")
 
     defectId: str = Field(min_length=1)
@@ -120,7 +132,9 @@ class ReportSummary(BaseModel):
 class AnalysisReport(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    schemaVersion: str
+    runtimeProfile: dict[str, Any] = Field(default_factory=dict)
+    skillDiscovery: list[dict[str, Any]] = Field(default_factory=list)
+    schemaVersion: Literal["0.3.0"]
     productLine: str = Field(min_length=1)
     workDir: str = Field(min_length=1)
     generatedAt: str = Field(min_length=1)

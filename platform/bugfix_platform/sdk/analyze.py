@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional
 
@@ -42,6 +42,7 @@ class AnalyzeRequest:
     apply_fix: bool = False
     spec_atlas: Optional[dict[str, Any]] = None
     codegraph: Optional[CodeGraphStatus] = None
+    investigation: Optional[dict[str, Any]] = None
     resume_session_id: Optional[str] = None
 
 
@@ -53,6 +54,8 @@ class AnalyzeResult:
     source: Literal["heuristic", "sdk", "sdk_fallback"]
     detail: Optional[str] = None
     session_id: Optional[str] = None
+    skill_reads: list[str] = field(default_factory=list)
+    read_paths: list[str] = field(default_factory=list)
 
 
 AnalyzeRunner = Callable[[AnalyzeRequest], AnalyzeResult]
@@ -197,10 +200,39 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
     structured: Any = None
     session_id: str | None = None
     budget_stop = False
+    skill_reads: list[str] = []
+    pending_skill_reads: dict[str, str] = {}
+    read_paths: list[str] = []
+    pending_reads: dict[str, str] = {}
+
+    def finish(result: AnalyzeResult) -> AnalyzeResult:
+        result.skill_reads = list(dict.fromkeys(skill_reads))
+        result.read_paths = list(dict.fromkeys(read_paths))
+        return result
+
+    def observe_reads(message: Any) -> None:
+        for block in getattr(message, "content", []) or []:
+            if getattr(block, "name", None) == "Read":
+                params = getattr(block, "input", {}) or {}
+                ref = params.get("file_path")
+                if ref:
+                    path = Path(ref)
+                    if not path.is_absolute():
+                        path = Path(req.work_dir) / path
+                    resolved = str(path.resolve())
+                    pending_reads[str(getattr(block, "id", ""))] = resolved
+                    if any(resolved == str(s.skill_md.resolve()) for s in req.injected_skills):
+                        pending_skill_reads[str(getattr(block, "id", ""))] = resolved
+            use_id = str(getattr(block, "tool_use_id", ""))
+            if use_id in pending_reads and not getattr(block, "is_error", False) and getattr(block, "content", None):
+                read_paths.append(pending_reads.pop(use_id))
+            if use_id in pending_skill_reads and not getattr(block, "is_error", False) and getattr(block, "content", None):
+                skill_reads.append(pending_skill_reads.pop(use_id))
 
     async def _drive(prompt_text: str, opts: Any) -> None:
         nonlocal result_text, structured, session_id, budget_stop
         async for message in query(prompt=prompt_text, options=opts):
+            observe_reads(message)
             text = _message_text(message)
             if text.strip():
                 texts.append(text)
@@ -220,15 +252,18 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
     try:
         anyio.run(_drive, prompt, _make_options())
     except Exception as err:  # noqa: BLE001
+        from bugfix_platform.sdk.runtime_profile import modality_error
+        if modality_error(str(err)):
+            return finish(_blocked_analyze(req, "model modality configuration mismatch; image not analyzed; " + str(err)))
         if req.resume_session_id and not budget_stop:
             option_notes.append(f"session inaccessible: {err}; starting new session")
             try:
                 anyio.run(_drive, prompt, _make_options(allow_resume=False))
             except Exception as err2:  # noqa: BLE001
                 if not budget_stop:
-                    return _blocked_analyze(req, f"sdk analyze failed: {err2}")
+                    return finish(_blocked_analyze(req, f"sdk analyze failed: {err2}"))
         elif not budget_stop:
-            return _blocked_analyze(req, f"sdk analyze failed: {err}")
+            return finish(_blocked_analyze(req, f"sdk analyze failed: {err}"))
 
     parsed = _parse_session_json(structured, texts + [result_text])
     if parsed is None and budget_stop and session_id:
@@ -240,6 +275,7 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
                 prompt=_SALVAGE_PROMPT,
                 options=_make_options(resume=session_id, turns=2),
             ):
+                observe_reads(message)
                 text = _message_text(message)
                 if text.strip():
                     salvage_texts.append(text)
@@ -261,7 +297,32 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         parsed = _parse_session_json(structured, texts + salvage_texts + [result_text])
 
     if parsed is None:
-        return _blocked_analyze(req, "sdk returned no parseable JSON analysis")
+        return finish(_blocked_analyze(req, "sdk returned no parseable JSON analysis"))
+
+    root_shape = (parsed or {}).get("rootCause") or {}
+    if not isinstance(root_shape.get("questions"), list) or not isinstance(root_shape.get("claims"), list):
+        option_notes.append("quality fields missing; bounded format repair")
+        try:
+            anyio.run(_drive,
+                "Return the same analysis with rootCause.claims and rootCause.questions arrays. "
+                "Do not invent certainty. Classify unresolved blockers and preserve user target. "
+                + json.dumps(parsed, ensure_ascii=False),
+                _make_options(resume=session_id, turns=2))
+            parsed = _parse_session_json(structured, texts + [result_text])
+        except Exception:
+            pass
+        root_shape = (parsed or {}).get("rootCause") or {}
+        if not isinstance(root_shape.get("questions"), list) or not isinstance(root_shape.get("claims"), list):
+            blocked = _blocked_analyze(req, "analysis incomplete: missing structured claims/questions after format repair")
+            if parsed and isinstance(parsed.get("rootCause"), dict):
+                partial_root=dict(parsed["rootCause"])
+                partial_root["summary"]="[Incomplete] " + str(partial_root.get("summary") or "")
+                partial_root["claims"]=partial_root.get("claims") or []
+                partial_root["questions"]=(partial_root.get("questions") or []) + [{
+                    "id":"analysis-incomplete", "kind":"blocking", "reason":"Structured analysis incomplete; retry required"}]
+                from bugfix_platform.agents.analyst.claims import normalize_root
+                blocked.payload["rootCause"]=normalize_root(partial_root)
+            return finish(blocked)
 
     merged = _merge_with_routed(
         req.routed,
@@ -276,7 +337,7 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
     detail_bits.extend(option_notes)
     detail = "; ".join(detail_bits) or None
     return AnalyzeResult(
-        ok=True, payload=merged, source="sdk", detail=detail, session_id=session_id
+        ok=True, payload=merged, source="sdk", detail=detail, session_id=session_id, skill_reads=list(dict.fromkeys(skill_reads)), read_paths=list(dict.fromkeys(read_paths))
     )
 
 
@@ -284,7 +345,10 @@ def parse_analyze_payload(raw: Any) -> Optional[dict[str, Any]]:
     parsed = parse_json_payload(raw)
     if parsed is None:
         return None
-    return _normalize_payload(parsed)
+    try:
+        return _normalize_payload(parsed)
+    except (ValueError, TypeError):
+        return None
 
 
 def _parse_session_json(structured: Any, texts: list[str]) -> Optional[dict[str, Any]]:
@@ -328,7 +392,20 @@ def _normalize_payload(data: dict[str, Any]) -> dict[str, Any]:
     if "outcome" in data and isinstance(data["outcome"], str):
         out["outcome"] = data["outcome"]
     if isinstance(data.get("rootCause"), dict):
-        out["rootCause"] = data["rootCause"]
+        from bugfix_platform.agents.analyst.claims import normalize_root
+        root = dict(data["rootCause"])
+        candidates = (data.get("localization") or {}).get("candidates") or []
+        allowed_refs = {f"candidate:{i}" for i in range(1, len(candidates)+1)}
+        allowed_refs.update(str(c.get("path")) for c in candidates if c.get("path"))
+        claims=[]
+        for original in root.get("claims") or []:
+            claim=dict(original)
+            if claim.get("status") == "supported" and not all(str(ref).split(":",1)[0] in allowed_refs or str(ref) in allowed_refs for ref in claim.get("evidenceRefs") or []):
+                claim["status"]="unverified"
+            claims.append(claim)
+        if "claims" in root:
+            root["claims"]=claims
+        out["rootCause"] = normalize_root(root)
     if isinstance(data.get("proposedFix"), dict):
         out["proposedFix"] = data["proposedFix"]
     if isinstance(data.get("localization"), dict):
@@ -521,8 +598,20 @@ Repo-specific injected skills (if attached) have HIGHEST PRIORITY over package S
 follow their read order, test/dev conventions, module aliases, and product-line naming.
 They do not let you invent paths or schema fields.
 End with a single JSON object (optionally in a ```json fence) with keys:
-outcome, rootCause{summary,ruledOut,openQuestions}, proposedFix{summary,steps,targetFiles},
+outcome, rootCause{summary,ruledOut,openQuestions,claims,questions}, proposedFix{summary,steps,targetFiles},
 localization{candidates,notes}, blockers, confidence, suggestedVerify{steps,executed}.
+rootCause.claims is an array of {claimId,statement,role:fact|hypothesis|conclusion,
+status:supported|conditional|unverified|refuted,evidenceRefs,assumptions}.
+Use evidenceRefs candidate:1, candidate:2, etc. pointing to localization candidates, or their exact path. A reference identifies supporting material; it does not by itself prove runtime causation.
+rootCause.questions is an array (possibly empty) of {id,kind:blocking|choice|verification|follow_up,
+reason,relatedClaimIds,requestedEvidence}. openQuestions is its human-readable projection.
+Only questions that change THIS repair target or mechanism are blocking/choice.
+Evidence snippets prove quotation accuracy, not causality. External device effects,
+measured latency and runtime CSS behavior remain conditional without observation.
+Respect the current expected behavior, especially user-confirmed changes. Do not
+replace a confirmed removal requirement by fixing a different behavior. Separate
+incidental robustness findings from this ticket's causal claims. If requirements
+conflict, explain the conflict rather than changing the target.
 Each localization.candidates[] item MUST include path and a snippet (verbatim 1-8
 lines from a file you Read) of the failing fragment, plus why that fragment causes
 the reported failure. Optional: symbol, excerpt. Omitting snippet is a locator only
@@ -616,9 +705,12 @@ def _build_prompt(req: AnalyzeRequest) -> str:
         f"titleTag: {t.titleTag}\n"
         f"intent: {t.intent}\n"
         f"intentRationale: {(t.intentRationale or '')[:400]}\n"
-        f"observed: {t.sourceObserved or t.observed}\n"
-        f"expected: {t.sourceExpected or t.expected}\n"
-        f"steps: {t.sourceSteps or t.steps}\n"
+        f"sourceDocument: {t.sourceDocument.model_dump_json() if t.sourceDocument else None}\n"
+        f"inputQuality: {t.inputQuality.model_dump_json()}\n"
+        f"observed: {t.observed}\n"
+        f"CURRENT ACCEPTANCE TARGET: {t.expected}\n"
+        f"expected: {t.expected}\n"
+        f"steps: {t.steps}\n"
         f"expectQuality: {t.expectQuality}\n"
         f"injectedSkills: {json.dumps([s.name for s in req.injected_skills], ensure_ascii=False)}\n"
         f"cartographyProfile: {req.cartography_profile}\n"
@@ -627,6 +719,7 @@ def _build_prompt(req: AnalyzeRequest) -> str:
         f"specAtlas: {json.dumps(req.spec_atlas or {}, ensure_ascii=False)}\n"
         f"ticketSpecDirs: {json.dumps(ticket_specs, ensure_ascii=False)}\n"
         f"{cg_line}\n"
+        f"upstreamInvestigation: {json.dumps(req.investigation or {}, ensure_ascii=False)}\n"
         f"softStartLocalization: {json.dumps(soft, ensure_ascii=False)}\n"
         f"matchGap: {(soft.get('notes') if isinstance(soft, dict) else '') or ''}\n"
         f"routerOutcomeHint: {req.routed.get('outcome')}\n"

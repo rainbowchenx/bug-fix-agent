@@ -37,7 +37,7 @@ def _ticket(**kwargs) -> BatchTicket:
 def _batch(*tickets: BatchTicket) -> DefectBatch:
     return DefectBatch.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-11-05T00:00:00Z",

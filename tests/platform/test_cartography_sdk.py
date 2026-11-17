@@ -32,7 +32,7 @@ HC1 = ROOT / "test" / "fixtures" / "defect-batch" / "hc1-raw.json"
 def _batch() -> DefectBatch:
     return DefectBatch.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",
@@ -167,7 +167,7 @@ def test_heuristic_cartography_direct(tmp_path: Path):
 
     baseline = validate_code_knowledge(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "workDir": str(tmp_path),
             "partial": True,
@@ -243,7 +243,7 @@ def test_bash_command_allowed_readonly_vs_mutating():
 def test_system_prompt_forbids_per_ticket_call_flow():
     assert "For EACH match-pool ticket" not in _SYSTEM_PROMPT
     assert "likely fix locus" not in _SYSTEM_PROMPT
-    assert "Do not follow imports/callers per ticket" in _SYSTEM_PROMPT
+    assert "Use bounded investigation of imports/callers" in _SYSTEM_PROMPT
     assert "shallow" in _SYSTEM_PROMPT.lower()
     assert "unverified" in _SYSTEM_PROMPT.lower()
     assert "codegraph" in _SYSTEM_PROMPT.lower()
@@ -280,7 +280,7 @@ def _knowledge_with_matches(tmp_path: Path, matches: list[dict]):
 
     return validate_code_knowledge(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "workDir": str(tmp_path),
             "partial": False,
@@ -395,7 +395,7 @@ def test_prompt_includes_heuristic_medium_tickets(tmp_path: Path):
     )
     batch = DefectBatch.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",
@@ -457,7 +457,7 @@ def test_prompt_caps_at_max_and_prefers_weak(tmp_path: Path):
     matches.append({"defectId": "EMPTY", "candidates": [], "confidence": "low"})
     batch = DefectBatch.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",
@@ -722,7 +722,7 @@ def test_merge_modules_keeps_structural_ids(tmp_path: Path):
 
     baseline = validate_code_knowledge(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "workDir": str(tmp_path),
             "partial": False,
@@ -789,7 +789,7 @@ def test_prompt_treats_shared_candidate_sets_as_weak(tmp_path: Path):
         )
     batch = DefectBatch.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",
@@ -887,7 +887,7 @@ def test_prompt_gives_genuinely_weak_tickets_priority(tmp_path: Path):
     )
     batch = DefectBatch.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",

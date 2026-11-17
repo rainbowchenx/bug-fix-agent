@@ -132,3 +132,9 @@
 **统计限制：** 样本量、选样偏差、用户选择性应用、验收覆盖、历史答案泄露、环境差异、人工改动、未知真值及缺失成本数据：
 
 结论只适用于记录的样本与条件，不将本批比例外推为总体修复率。
+
+## 2026-11-16 优化复评补充
+
+关联：[三Agent优化方案](../../../superpowers/specs/2026-11-16-three-agent-evidence-quality-design.md) / [实施计划](../../../superpowers/plans/2026-11-16-three-agent-evidence-quality-implementation-plan.md)。
+
+填写：模型声明及已验证能力、输入图像是否实际读取、applyFix、reportDigest、stale/unbound评分数量、原文遗漏、目标遵守、因果过度断言、合理阻断、Agent2覆盖/重复读码成本。分别列原256K文本基线、原代码换约1M多模态、同配置优化代码的结果；工程测试通过不填写为业务验收通过。

@@ -96,3 +96,16 @@
 | 二次修复是否取得可核实进展 / 证据 | |
 | 累计运行与人工成本 | |
 | 优先改进建议 / 严重性 | |
+
+## 本轮报告与主张绑定（2026-11-16）
+
+| 字段 | 填写 |
+|---|---|
+| product / defectId / attemptId（缺少时写无） | |
+| reportDigest（eval_agent3 输出的完整报告摘要） | |
+| claimIds / 对应原文 statement | |
+| 当前目标及父 revisionId | |
+| 逐主张证据及未观测假设 | |
+| 评分状态 bound / stale / unbound | |
+
+机器评分 cases 中使用 `ratingBinding: {product, defectId, attemptId?, reportDigest, claimIds: []}`。报告变化后旧评语标 stale 并排除该票评分；没有绑定的历史路径基准可展示，验收成功统计仅使用有效绑定的人工反馈。主目录命中和含备选目录命中分列，均不代表根因正确率。另记执行完成、过程诚实性、业务语义正确性，不能混为一个通过率。

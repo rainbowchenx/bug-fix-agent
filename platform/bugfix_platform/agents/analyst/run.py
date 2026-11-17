@@ -50,6 +50,7 @@ from bugfix_platform.sdk.analyze import (
     AnalyzeRunner,
     analyze_mode_from_env,
     create_analyze_runner,
+    resolve_analyze_max_turns,
 )
 from bugfix_platform.sdk.codegraph import ensure_codegraph
 from bugfix_platform.sdk.cartography import profile_reading_playbook
@@ -112,6 +113,7 @@ def run_analyst(
     Returns:
         通过 ``validate_analysis_report`` 的 ``AnalysisReport``。
     """
+    from bugfix_platform.sdk.runtime_profile import runtime_profile, skill_discovery
     work_dir = str(work_dir)
     want_fix = apply_fix_from_env(apply_fix)
     match_by_id = {m.defectId: m for m in code_knowledge.defectCodeMatches}
@@ -148,6 +150,7 @@ def run_analyst(
     with lock_cm:
         tickets: list[dict[str, Any]] = []
         analyze_sources: list[str] = []
+        skill_reads: set[str] = set()
 
         def _one(raw: BatchTicket) -> dict[str, Any]:
             nonlocal remaining
@@ -171,12 +174,11 @@ def run_analyst(
             }
             snapshot = capture_workspace(Path(work_dir))
             analyze_session: Optional[str] = None
-            if routed["outcome"] != "needs_ticket_info" and (
-                remaining is None or remaining > 0
-            ):
+            if remaining is None or remaining > 0:
                 result = runner(
                     AnalyzeRequest(
                         work_dir=work_dir,
+                        max_turns=min(8, resolve_analyze_max_turns()) if ticket.pool == "needs_info" else resolve_analyze_max_turns(),
                         ticket=ticket,
                         routed=routed,
                         injected_skills=tuple(injected),
@@ -188,10 +190,16 @@ def run_analyst(
                         apply_fix=want_fix,
                         spec_atlas=spec_atlas,
                         codegraph=cg_status,
+                        investigation=match_by_id[ticket.defectId].model_dump() if ticket.defectId in match_by_id else {},
                         resume_session_id=sess_map.get(ticket.defectId),
                     )
                 )
+                skill_reads.update(result.skill_reads)
                 entry.update(result.payload)
+                entry["analysisStatus"] = ("incomplete" if result.source == "sdk_fallback" else "completed" if result.source == "sdk" else "not_executed")
+                read_refs={str(Path(p).resolve()) for p in result.read_paths}
+                entry["attachments"]=[{"ref":ref, "availability":"available" if (Path(work_dir)/ref).is_file() else "unknown",
+                    "read":str((Path(work_dir)/ref).resolve()) in read_refs} for ref in ticket.attachmentRefs or []]
                 analyze_sources.append(result.source)
                 analyze_session = result.session_id
                 _note = " ".join(str(result.detail or "").split())
@@ -240,12 +248,17 @@ def run_analyst(
                         revision=revision,
                         snapshot=snapshot,
                         generate_patch=want_fix,
+                        read_attachments=[a["ref"] for a in entry.get("attachments", []) if a.get("read")],
                     ),
                     entry,
                 ),
                 Path(work_dir),
                 entry,
             )
+            from bugfix_platform.agents.analyst.claims import bind_claims
+            entry["rootCause"] = bind_claims(entry.get("rootCause") or {}, ctx.evidence,
+                (entry.get("localization") or {}).get("candidates") or [], ticket.defectId, drifted=drifted)
+            ctx = ctx.model_copy(update={"claims": entry["rootCause"].get("claims", [])})
             decision = _decision_from_entry(entry, ctx)
             gate_errors = validate_edit_decision(ctx, decision)
             if drifted:
@@ -312,7 +325,7 @@ def run_analyst(
             try:
                 tickets.append(_one(t))
             except Exception as err:  # noqa: BLE001
-                failed = _exception_entry(t, err)
+                failed = _exception_entry(_ticket_with_revision(t, rev_map.get(t.defectId)), err)
                 tickets.append(
                     _persist_ticket_entry(
                         out_dir,
@@ -338,6 +351,8 @@ def run_analyst(
             by_outcome[tr["outcome"]] = by_outcome.get(tr["outcome"], 0) + 1
 
         report = {
+            "runtimeProfile": runtime_profile().model_dump(),
+            "skillDiscovery": skill_discovery(work_dir, code_knowledge.repoRoots, injected, skill_reads),
             "schemaVersion": ANALYSIS_REPORT_SCHEMA_VERSION,
             "productLine": defect_batch.productLine,
             "workDir": work_dir,
@@ -377,14 +392,13 @@ _OUTCOME_RESOLUTION = {
 def _ticket_with_revision(ticket: BatchTicket, revision: Optional[InputRevision]) -> BatchTicket:
     if revision is None:
         return ticket
-    updates: dict[str, Any] = {}
-    if revision.observed:
-        updates["observed"] = revision.observed
-    if revision.expected:
-        updates["expected"] = revision.expected
-    if revision.steps:
-        updates["steps"] = revision.steps
-    if revision.attachments:
+    updates: dict[str, Any] = {"revisionId": revision.revisionId}
+    for field in ("observed", "expected", "steps"):
+        if field in revision.model_fields_set:
+            updates[field] = getattr(revision, field)
+    if revision.feedbackText:
+        updates["observed"] = "\n".join(x for x in [updates.get("observed", ticket.observed), "User feedback: " + revision.feedbackText] if x)
+    if "attachments" in revision.model_fields_set:
         updates["attachmentRefs"] = list(revision.attachments)
     return ticket.model_copy(update=updates) if updates else ticket
 
@@ -428,7 +442,7 @@ def _context_with_analysis(context: TaskContext, entry: dict[str, Any]) -> TaskC
             )
         )
         seen.add(eid)
-    return context.model_copy(update={"evidence": extra})
+    return context.model_copy(update={"evidence": extra, "claims": (entry.get("rootCause") or {}).get("claims", [])})
 
 
 def _verify_current_code(
@@ -496,7 +510,7 @@ def _verify_current_code(
             )
         )
         seen.add(eid)
-    return context.model_copy(update={"evidence": extra})
+    return context.model_copy(update={"evidence": extra, "claims": (entry.get("rootCause") or {}).get("claims", [])})
 
 
 def _resolve_candidate_file(work_dir: Path, cand: dict[str, Any]) -> Path:
@@ -539,6 +553,7 @@ def _decision_from_entry(entry: dict[str, Any], context: TaskContext) -> EditDec
         editRationale=rationale,
         evidenceRefs=[e.evidenceId for e in context.evidence if e.validity == "valid"],
         openQuestions=list(root.get("openQuestions") or []),
+        questions=root.get("questions"),
     )
 
 
@@ -569,6 +584,9 @@ def _run_fix_loop(
         wt = Path(state["wt"])
         state["n"] += 1
         analysis = dict(entry)
+        analysis["currentTarget"] = context.currentTarget
+        analysis["inputRevision"] = context.revision.model_dump() if context.revision else None
+        analysis["upstreamInvestigation"] = context.investigation
         if ctx.hypotheses:
             analysis["retryFeedback"] = [h.claim for h in ctx.hypotheses]
         result = fixer(
@@ -979,6 +997,11 @@ def _persist_ticket_entry(
     *,
     already_locked: bool = False,
 ) -> dict[str, Any]:
+    decision=attempt.editDecision
+    entry = {**entry, "attemptId": attempt.attemptId,
+        "actionability":{"allowed":bool(decision and decision.allowed), "reason":decision.reason if decision else "analysis not executed"}}
+    if entry.get("outcome") == "other_blocked":
+        entry["analysisStatus"]="incomplete"
     coerced = _coerce_ticket_entry(entry)
     if not out_dir:
         return coerced

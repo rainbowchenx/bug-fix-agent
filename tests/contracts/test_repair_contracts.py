@@ -131,7 +131,7 @@ def test_old_schema_version_is_rejected():
     with pytest.raises(ValidationError, match="schemaVersion"):
         validate_attempt(
             {
-                "schemaVersion": "0.1.0",
+                "schemaVersion": "0.2.0",
                 "attemptId": "a1",
                 "defectId": "D1",
                 "execution": "completed",

@@ -30,7 +30,7 @@ def _batch(
 ) -> DefectBatch:
     return DefectBatch.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",
@@ -58,7 +58,7 @@ def _batch(
 def _knowledge(work: Path, *, candidates: list[dict] | None) -> CodeKnowledge:
     return CodeKnowledge.model_validate(
         {
-            "schemaVersion": "0.1.0",
+            "schemaVersion": "0.3.0",
             "productLine": "hc",
             "workDir": str(work),
             "partial": False,
@@ -166,7 +166,7 @@ def test_analyst_analyzes_empty_agent2_candidates(tmp_path: Path):
     assert report.applyFix is False
 
 
-def test_analyst_skips_sdk_for_needs_info(tmp_path: Path):
+def test_analyst_runs_bounded_investigation_for_needs_info(tmp_path: Path):
     work = _mini_repo(tmp_path)
     calls = {"n": 0}
 
@@ -180,8 +180,8 @@ def test_analyst_skips_sdk_for_needs_info(tmp_path: Path):
         code_knowledge=_knowledge(work, candidates=[]),
         analyze_fn=fake_analyze,
     )
-    assert calls["n"] == 0
-    assert report.tickets[0].outcome == "needs_ticket_info"
+    assert calls["n"] == 1
+    assert report.tickets[0].outcome == "plan_only"
 
 
 def test_sdk_without_credentials_is_other_blocked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

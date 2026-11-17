@@ -8,6 +8,10 @@ from bugfix_contracts.defect_batch import BatchTicket
 
 def slice_ticket(t: BatchTicket) -> dict[str, Any]:
     return {
+        "sourceDocument": t.sourceDocument.model_dump() if t.sourceDocument else None,
+        "inputQuality": t.inputQuality.model_dump(),
+        "revisionId": t.revisionId,
+        "attachmentRefs": list(t.attachmentRefs or []),
         "title": t.title,
         "testModule": t.testModule,
         "titleTag": t.titleTag,

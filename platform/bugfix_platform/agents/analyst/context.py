@@ -27,15 +27,21 @@ def build_task_context(
 ) -> TaskContext:
     """把票面原文、上游线索和快照收成分析上下文。"""
     attachments = list(ticket.attachmentRefs or [])
-    rev = revision or InputRevision(
+    base = InputRevision(
         revisionId=ticket.revisionId or f"{ticket.defectId}:v0",
         defectId=ticket.defectId,
-        observed=ticket.sourceObserved or ticket.observed,
-        expected=ticket.sourceExpected or ticket.expected,
-        steps=ticket.sourceSteps or ticket.steps,
+        observed=ticket.observed,
+        expected=ticket.expected,
+        steps=ticket.steps,
         attachments=attachments,
         source="ticket",
     )
+    if revision is not None:
+        values = base.model_dump()
+        values.update(revision.model_dump(exclude_unset=True))
+        rev = InputRevision.model_validate(values)
+    else:
+        rev = base
     actually_read = set(read_attachments or [])
     unread = [p for p in rev.attachments if p not in actually_read]
     evidence: list[Evidence] = []
@@ -65,6 +71,11 @@ def build_task_context(
                         validity=validity,
                     )
                 )
+    if knowledge is not None:
+        match = next((m for m in knowledge.defectCodeMatches if m.defectId == ticket.defectId), None)
+        investigation = match.model_dump() if match else {}
+    else:
+        investigation = {}
     conventions: list[str] = []
     spec_dirs: list[str] = []
     if knowledge is not None:
@@ -76,12 +87,15 @@ def build_task_context(
         ]
     return TaskContext(
         defectId=ticket.defectId,
+        sourceDocument=ticket.sourceDocument.model_dump() if ticket.sourceDocument else {},
         revision=rev,
         snapshot=snapshot,
         evidence=evidence,
         conventions=conventions,
         specDirs=spec_dirs,
         unreadAttachments=unread,
+        currentTarget=rev.expected or "",
+        investigation=investigation,
         generatePatch=generate_patch,
     )
 

@@ -29,9 +29,9 @@ def test_build_task_context_keeps_source_fields():
     ctx = build_task_context(_ticket(), knowledge=None, revision=None, snapshot=None)
     assert ctx.defectId == "D1"
     assert ctx.revision is not None
-    assert ctx.revision.observed == "原始现象全文"
-    assert ctx.revision.expected == "原始预期全文"
-    assert ctx.revision.steps == "原始步骤全文"
+    assert ctx.revision.observed == "蒸馏后的现象"
+    assert ctx.revision.expected == "蒸馏后的预期"
+    assert ctx.revision.steps == "蒸馏步骤"
     assert "shots/fail.png" in ctx.revision.attachments
 
 

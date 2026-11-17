@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from bugfix_agent1.defect_batch.source_quality import assess_input_quality, build_source_document
+from bugfix_contracts.defect_batch import RawDefect
+
 import re
 from typing import Optional
 
@@ -116,6 +119,8 @@ def cluster_screened(
                 duplicate=dig.duplicate,
                 semanticFree=dig.semanticFree,
                 revisionId=f"{dig.defectId}:v0",
+                sourceDocument=dig.sourceDocument or build_source_document(RawDefect(defectId=dig.defectId, title=dig.title, description=dig.description)),
+                inputQuality=assess_input_quality(dig.sourceDocument or build_source_document(RawDefect(defectId=dig.defectId, title=dig.title, description=dig.description)), dig.observed, dig.expected),
                 sourceObserved=dig.observed or None,
                 sourceExpected=dig.expected or None,
                 sourceSteps=dig.steps or None,

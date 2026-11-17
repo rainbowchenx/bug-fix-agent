@@ -37,6 +37,25 @@ IntentSource = Literal["ai", "heuristic", "field_fallback", "unclear"]
 Posture = Literal["alpha", "beta"]
 
 
+class SourceSection(BaseModel):
+    name: str
+    start: int
+    end: int
+    text: str
+
+class SourceDocument(BaseModel):
+    recordId: str
+    fieldName: str = "description"
+    description: str = ""
+    sha256: str
+    fields: dict[str, Any] = Field(default_factory=dict)
+    sections: list[SourceSection] = Field(default_factory=list)
+
+class InputQuality(BaseModel):
+    expectedOrigin: Literal["explicit", "inferred", "absent"] = "absent"
+    expectedRelevance: Literal["consistent", "conflicting", "uncertain"] = "uncertain"
+    issues: list[str] = Field(default_factory=list)
+
 class RawDefect(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -95,6 +114,8 @@ class BatchTicket(BaseModel):
     sourceExpected: Optional[str] = None
     sourceSteps: Optional[str] = None
     attachmentRefs: Optional[list[str]] = None
+    sourceDocument: Optional[SourceDocument] = None
+    inputQuality: InputQuality = Field(default_factory=InputQuality)
 
 
 class BatchCluster(BaseModel):
@@ -114,7 +135,7 @@ class BatchCluster(BaseModel):
 class DefectBatch(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    schemaVersion: str
+    schemaVersion: Literal["0.3.0"]
     productLine: str
     posture: Posture = "beta"
     generatedAt: str

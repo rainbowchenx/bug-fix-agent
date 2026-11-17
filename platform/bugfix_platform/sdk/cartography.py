@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Literal, Optional, get_args
+from pathlib import Path
 
 from bugfix_contracts import CodeKnowledge, DefectBatch, validate_code_knowledge
 from bugfix_contracts.code_knowledge import DefectCodeMatch, MatchGap
@@ -143,6 +144,7 @@ class CartographyRequest:
     model: Optional[str] = None
     injected_skills: tuple[InjectedSkill, ...] = ()
     codegraph: Optional[CodeGraphStatus] = None
+    investigation_only: bool = False
 
 
 @dataclass
@@ -151,6 +153,7 @@ class CartographyResult:
     knowledge: CodeKnowledge
     source: Literal["heuristic", "sdk", "sdk_fallback"]
     detail: Optional[str] = None
+    skill_reads: list[str] = field(default_factory=list)
 
 
 CartographyRunner = Callable[[CartographyRequest], CartographyResult]
@@ -391,10 +394,32 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
     terminal: str | None = None
     session_id: str | None = None
     budget_stop = False
+    skill_reads: set[str] = set()
+    pending_skill_reads: dict[str, str] = {}
+
+    def observe_reads(message: Any) -> None:
+        for block in getattr(message, "content", []) or []:
+            if getattr(block, "name", None) == "Read":
+                ref = (getattr(block, "input", {}) or {}).get("file_path")
+                if ref:
+                    path = Path(ref)
+                    if not path.is_absolute():
+                        path = Path(req.work_dir) / path
+                    resolved = str(path.resolve())
+                    if any(resolved == str(s.skill_md.resolve()) for s in req.injected_skills):
+                        pending_skill_reads[str(getattr(block, "id", ""))] = resolved
+            use_id = str(getattr(block, "tool_use_id", ""))
+            if use_id in pending_skill_reads and not getattr(block, "is_error", False) and getattr(block, "content", None):
+                skill_reads.add(pending_skill_reads.pop(use_id))
+
+    def finish(result: CartographyResult) -> CartographyResult:
+        result.skill_reads = sorted(skill_reads)
+        return result
 
     async def _drive(prompt_text: str, opts: Any) -> None:
         nonlocal result_text, structured, turns, cost, terminal, session_id, budget_stop
         async for message in query(prompt=prompt_text, options=opts):
+            observe_reads(message)
             text = _message_text(message)
             if text.strip():
                 texts.append(text)
@@ -424,7 +449,7 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
             fallback.detail = f"sdk cartography failed: {err}" + (
                 f"; {billing}" if billing else ""
             )
-            return fallback
+            return finish(fallback)
 
     parsed = _parse_session_json(structured, texts)
     if parsed is None and budget_stop and session_id:
@@ -436,6 +461,7 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
                 prompt=_SALVAGE_PROMPT,
                 options=_make_options(resume=session_id, turns=2),
             ):
+                observe_reads(message)
                 text = _message_text(message)
                 if text.strip():
                     salvage_texts.append(text)
@@ -472,6 +498,8 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
     if parsed is not None:
         drop_stats: dict[str, int] = {}
         try:
+            if req.investigation_only:
+                parsed = {k:v for k,v in parsed.items() if k in {"defectCodeMatches", "partial"}}
             merged = _merge_enrichment(
                 req.baseline,
                 parsed,
@@ -493,23 +521,23 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
             )
         except Exception as err:  # noqa: BLE001
             if budget_stop:
-                return _sdk_keep_baseline(req, billing)
+                return finish(_sdk_keep_baseline(req, billing))
             fallback = heuristic_cartography(req)
             fallback.source = "sdk_fallback"
-            fallback.detail = f"enriched code-knowledge invalid: {err}"
-            return fallback
+            fallback.detail = f"enriched code-knowledge invalid: {err}" + (f"; {billing}" if billing else "")
+            return finish(fallback)
         detail = _with_drop_detail(billing, drop_stats)
-        return CartographyResult(
+        return finish(CartographyResult(
             ok=True, knowledge=knowledge, source="sdk", detail=detail or None
-        )
+        ))
 
     if budget_stop:
-        return _sdk_keep_baseline(req, billing)
+        return finish(_sdk_keep_baseline(req, billing))
 
     fallback = heuristic_cartography(req)
     fallback.source = "sdk_fallback"
     fallback.detail = "sdk returned no parseable JSON cartography"
-    return fallback
+    return finish(fallback)
 
 
 def _with_drop_detail(
@@ -533,6 +561,20 @@ def _merge_enrichment(
     *,
     stats: dict[str, int] | None = None,
 ) -> dict[str, Any]:
+    # Validate raw identity before schema coercion or by-id merging can hide it.
+    raw_matches = parsed.get("defectCodeMatches")
+    if raw_matches is not None:
+        if not isinstance(raw_matches, list):
+            raise ValueError("ticket group results must be a list")
+        allowed = {t.defectId for t in tickets} if tickets is not None else {m.defectId for m in baseline.defectCodeMatches}
+        seen = set()
+        for item in raw_matches:
+            defect_id = item.get("defectId") if isinstance(item, dict) else None
+            if not defect_id or defect_id not in allowed:
+                raise ValueError("ticket outside requested group")
+            if defect_id in seen:
+                raise ValueError("duplicate ticket in group result")
+            seen.add(defect_id)
     data = baseline.model_dump()
     # Optional top-level overrides that stay within schema.
     # cartographyProfile is caller-supplied; never let the SDK reclassify.
@@ -623,7 +665,7 @@ def _merge_enrichment(
         if match.defectId in sdk_ids:
             if not match.candidates:
                 orig = baseline_by_id.get(match.defectId)
-                merged_matches.append((orig or match).model_dump())
+                merged_matches.append((match if match.facts or match.searchedScopes else (orig or match)).model_dump())
                 continue
             if match.confidence == "high":
                 match = match.model_copy(update={"confidence": "medium"})
@@ -659,6 +701,7 @@ def _coerce_sdk_match(
     baseline 示例带着 ``"gap": null``，模型会照着补一句人话解释 —— 整条
     ``DefectCodeMatch`` 就校验失败。这一个字段不值一张票，只丢掉它。
     """
+    item["investigationSource"] = "model_reported"
     gap = item.get("gap")
     if gap is not None and gap not in _ALLOWED_GAPS:
         item.pop("gap", None)
@@ -758,7 +801,7 @@ How to work:
 2) Thicken architecture (entryPoints, route/business modules, runtime shape).
    Prefer CodeGraph explore for module/symbol maps; catalog files next.
    Do not walk the whole repo file-by-file. Do not read trellis/spec bodies.
-3) Cover EVERY ticket in matchPoolTickets — shallow, not deep. Cap 3 real paths
+3) Investigate EVERY ticket in this bounded matchPoolTickets group. Cap 3 real paths
    per ticket; 0 is valid — do not pad. Empty is better than a wrong path or
    sibling stubs (mixin.js / isapi.js with no logic).
    CodeGraph MUST be used for ticket localization when ready; set
@@ -767,7 +810,7 @@ How to work:
    UNVERIFIED path-token hits: confirm with CodeGraph (or Grep/Read), replace
    if wrong, or clear them. Do not copy them blindly.
    candidate.why = why the path resembles the title/module — not a root cause,
-   not a call-flow. Do not follow imports/callers per ticket.
+   facts must cite actual code; hypotheses remain tentative. Use bounded investigation of imports/callers; do not exhaust the repository per ticket.
    Route tables, shells, hosts and entryPoints are not fix loci. If the ticket
    names web/PC, do not return /mobile/ or /h5/ exclusive files.
 4) Leave a turn to emit JSON. Incomplete is OK; set partial=true.
@@ -776,7 +819,7 @@ Return one JSON object (optionally in a ```json fence) with any of:
 secondaryHints, techStack{languages,frameworks,notes},
 architecture{summary,entryPoints,modules[{id,path,role,shared,notes}]},
 conventions{fromRules}, boundSkills,
-defectCodeMatches[{defectId,candidates[{repoPath,path,symbol,why,source}],confidence}],
+defectCodeMatches[{defectId,candidates[{repoPath,path,symbol,why,source}],confidence,searchedScopes,facts,hypotheses,ruledOut,openQuestions,nextChecks}],
 partial.
 Do not change cartographyProfile. Do not add keys that are not listed above: an
 entry that does not fit that shape is dropped before delivery, losing the whole
@@ -835,7 +878,7 @@ def annotate_investigation_coverage(
         if did not in in_prompt:
             status = "not_investigated"
         elif did in investigated:
-            status = "complete" if match.candidates else "partial"
+            status = "complete" if match.facts or match.searchedScopes else "partial"
         else:
             status = "search_draft" if match.candidates else "not_investigated"
         out.append(match.model_copy(update={"investigationStatus": status}))
@@ -896,6 +939,8 @@ def _build_prompt(
         pool_tickets.append(
             {
                 "defectId": t.defectId,
+                "sourceDocument": t.sourceDocument.model_dump() if t.sourceDocument else None,
+                "observed": t.observed, "expected": t.expected, "steps": t.steps,
                 "title": t.title,
                 "pool": t.pool,
                 "testModule": t.testModule,
@@ -914,7 +959,7 @@ def _build_prompt(
                 # 进 prompt 时降权，避免模型把 baseline medium 当真理照抄。
                 payload["confidence"] = "low"
             pool_matches.append(payload)
-    budget = cartography_turns_for_tickets(len(pairs))
+    budget = resolve_cartography_max_turns(req.max_turns, ticket_count=len(pairs))
     baseline = {
         "cartographyProfile": req.baseline.cartographyProfile,
         "secondaryHints": req.baseline.secondaryHints,
@@ -933,11 +978,13 @@ def _build_prompt(
         else "codeGraph: unavailable — use Grep/Read/Glob only"
     )
     return (
-        "Thicken architecture from the playbook, then shallow-pass EVERY listed "
+        ("Reuse the supplied repository map; do not rebuild architecture. Investigate EVERY listed "
+         if req.investigation_only else "Build the repository map once from the playbook, then investigate EVERY listed ")
+        +
         "match-pool ticket (max 3 paths each; 0 is valid, do not pad). "
         "Prefer CodeGraph when ready. heuristicUnverified=true means baseline "
         "candidates are untrusted — confirm, replace, or clear. Catalog files "
-        "are not loci. Do not follow imports or name a fix locus. Return the "
+        "are usually navigation; follow a bounded relevant call chain when supported. Return the "
         "JSON enrich object before you run out of turns.\n\n"
         f"productLine: {req.defect_batch.productLine}\n"
         f"workDir: {req.work_dir}\n"
