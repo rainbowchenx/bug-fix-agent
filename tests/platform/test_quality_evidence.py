@@ -6,7 +6,7 @@ from bugfix_contracts.repair import Claim, Question
 
 
 def test_quality_contract_round_trip_and_old_version_rejected():
-    payload={'schemaVersion':'0.3.0','productLine':'p','posture':'alpha','generatedAt':'2026-01-01T00:00:00Z',
+    payload={'schemaVersion':'0.4.0','productLine':'p','posture':'alpha','generatedAt':'2026-01-01T00:00:00Z',
         'funnel':{'total':0},'clusters':[],'tickets':[]}
     batch=DefectBatch.model_validate(payload)
     assert DefectBatch.model_validate_json(batch.model_dump_json())==batch

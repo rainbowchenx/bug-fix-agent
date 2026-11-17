@@ -19,4 +19,14 @@ def merge_revision(parent: InputRevision, feedback: Feedback) -> InputRevision:
     data["attachments"] = list(dict.fromkeys(
         x for x in parent.attachments + feedback.attachments
         if x not in feedback.removeAttachmentIds))
+    answers = list(parent.questionAnswers or [])
+    latest = {a.questionId: i for i, a in enumerate(answers)}
+    for item in feedback.questionAnswers or []:
+        payload = item.model_copy(update={"answerRevisionId": item.answerRevisionId or data["revisionId"]})
+        if item.questionId in latest:
+            answers[latest[item.questionId]] = payload
+        else:
+            latest[item.questionId] = len(answers)
+            answers.append(payload)
+    data["questionAnswers"] = [a.model_dump() if hasattr(a, "model_dump") else a for a in answers]
     return InputRevision.model_validate(data)

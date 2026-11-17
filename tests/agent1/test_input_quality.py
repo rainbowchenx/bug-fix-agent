@@ -17,7 +17,7 @@ def test_ranking_direction_not_rejected_as_vague():
 
 def test_semantic_review_can_record_conflict_without_replacing_original():
     source=build_source_document(RawDefect(defectId='D',title='D',description='原始问题：按钮状态错误'))
-    batch=DefectBatch.model_validate({'schemaVersion':'0.3.0','productLine':'p','posture':'alpha','generatedAt':'2026-01-01T00:00:00Z',
+    batch=DefectBatch.model_validate({'schemaVersion':'0.4.0','productLine':'p','posture':'alpha','generatedAt':'2026-01-01T00:00:00Z',
         'funnel':{'total':1,'needsInfo':1},'clusters':[],'tickets':[{'defectId':'D','title':'D','pool':'needs_info','expectQuality':'ambiguous','sourceDocument':source.model_dump()}]})
     updated=apply_intent_review(batch,[{'defectId':'D','inputQuality':{'expectedOrigin':'explicit','expectedRelevance':'conflicting','issues':['unrelated case expectation']}}])
     assert updated.tickets[0].inputQuality.expectedRelevance=='conflicting'

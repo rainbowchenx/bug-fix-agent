@@ -19,7 +19,7 @@ EVAL_CASES = json.loads((FIXTURES / "eval-cases.json").read_text(encoding="utf-8
 
 def _batch(tickets: list[dict] | None = None) -> DefectBatch:
     payload = {
-        "schemaVersion": "0.3.0",
+        "schemaVersion": "0.4.0",
         "productLine": "hc",
         "posture": "alpha",
         "generatedAt": "2026-01-01T00:00:00Z",

@@ -47,6 +47,9 @@ def run_cartographer(
     extra_skill_dirs: Optional[Sequence[str | Path]] = None,
     cartography_fn: Optional[CartographyRunner] = None,
     cartography_profile: Optional[str] = None,
+    artifact_dir: Optional[str | Path] = None,
+    resume_dir: Optional[str | Path] = None,
+    ticket_ids: Optional[Sequence[str]] = None,
 ) -> CodeKnowledge:
     """Agent-2 公开入口：产出供 Agent-3 消费的 ``code-knowledge``。
 
@@ -175,20 +178,34 @@ def run_cartographer(
     runner = cartography_fn or create_cartography_runner(
         cartography_mode_from_env(cartography_mode)
     )
+    persist_root = Path(artifact_dir) if artifact_dir else None
+    if persist_root is None and cartography_fn is None and cartography_mode_from_env(cartography_mode) == "sdk":
+        persist_root = Path(work_dir) / ".bugfix-runs" / "agent2"
+        try:
+            persist_root.mkdir(parents=True, exist_ok=True)
+        except OSError as err:
+            raise RuntimeError(f"Agent-2 artifact directory is not writable: {persist_root}: {err}") from err
     request = CartographyRequest(
             work_dir=work_dir,
             defect_batch=defect_batch,
             baseline=baseline,
             injected_skills=tuple(injected),
             codegraph=cg_status,
+            artifact_dir=persist_root,
         )
     import os
     if cartography_fn is None and cartography_mode_from_env(cartography_mode) == "sdk":
         from bugfix_platform.agents.cartographer.investigation import investigate_groups
-        result = investigate_groups(request, runner,
+        result = investigate_groups(
+            request,
+            runner,
             group_size=int(os.environ.get("BUGFIX_INVESTIGATION_GROUP_SIZE", "8")),
             max_groups=int(os.environ["BUGFIX_INVESTIGATION_MAX_GROUPS"]) if os.environ.get("BUGFIX_INVESTIGATION_MAX_GROUPS") else None,
-            cache_dir=os.environ.get("BUGFIX_INVESTIGATION_CACHE_DIR"))
+            cache_dir=os.environ.get("BUGFIX_INVESTIGATION_CACHE_DIR"),
+            artifact_dir=persist_root,
+            resume_dir=resume_dir or persist_root,
+            ticket_ids=list(ticket_ids) if ticket_ids is not None else None,
+        )
     else:
         result = runner(request)
     # 有没真的调用 LLM，必须能从产物读出来：否则 heuristic 与

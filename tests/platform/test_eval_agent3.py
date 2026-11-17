@@ -35,7 +35,7 @@ def _ticket(**kw):
 
 def _report(tickets: list[dict]) -> dict:
     return {
-        "schemaVersion": "0.3.0",
+        "schemaVersion": "0.4.0",
         "productLine": "hc",
         "workDir": "/tmp/repo",
         "generatedAt": "2026-01-01T00:00:00Z",
@@ -131,3 +131,29 @@ def test_score_report_usable_when_loc_and_outcome_hit(tmp_path: Path):
     out = tmp_path / "score.json"
     out.write_text(json.dumps(scored), encoding="utf-8")
     assert json.loads(out.read_text(encoding="utf-8"))["summary"]["g0Pass"] is True
+
+
+def test_score_report_stale_does_not_invent_repair_rate():
+    report = _report([_ticket()])
+    cases = [
+        {
+            "id": "osd",
+            "defectId": "D1",
+            "accepted": True,
+            "resolved": True,
+            "applyFix": True,
+            "requiredQuestions": ["q1"],
+            "answersConsumed": 1,
+            "ratingBinding": {
+                "defectId": "D1",
+                "product": "hc",
+                "reportDigest": "0" * 64,
+                "claimIds": ["missing"],
+            },
+        }
+    ]
+    scored = score_report(report, cases)
+    assert scored["rows"][0]["ratingStatus"] == "stale"
+    assert scored["summary"]["convergence"]["success"] == 0
+    assert scored["summary"]["convergence"]["repairRate"] is None
+    assert scored["applyFix"] is False

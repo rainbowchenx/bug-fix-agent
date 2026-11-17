@@ -1,4 +1,4 @@
-> 当前生产契约：0.3.0（2026-11-16）。目录保留原文档路径；旧 Agent 产物版本明确拒绝，请重新生成。
+> 当前生产契约：0.4.0（2026-11-16）。目录保留原文档路径；旧 Agent 产物版本明确拒绝，请重新生成。
 
 # code-knowledge v0.1
 
@@ -6,7 +6,7 @@
 
 | Field | Type | Notes |
 |---|---|---|
-| `schemaVersion` | string | `"0.3.0"` |
+| `schemaVersion` | string | `"0.4.0"` |
 | `productLine` / `workDir` | string | |
 | `partial` | boolean | 探测/匹配不完整仍可校验通过 |
 | `generatedAt` | ISO string | |

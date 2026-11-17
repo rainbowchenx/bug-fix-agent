@@ -6,10 +6,10 @@ from bugfix_platform.sdk.cartography import CartographyRequest, CartographyResul
 
 
 def request(tmp_path, n=37):
-    batch=DefectBatch.model_validate({'schemaVersion':'0.3.0','productLine':'p','posture':'alpha',
+    batch=DefectBatch.model_validate({'schemaVersion':'0.4.0','productLine':'p','posture':'alpha',
         'generatedAt':'2026-01-01T00:00:00Z','funnel':{'total':n,'strict':n},'clusters':[],
         'tickets':[{'defectId':str(i),'title':'failure','pool':'strict','expectQuality':'explicit'} for i in range(n)]})
-    knowledge=CodeKnowledge.model_validate({'schemaVersion':'0.3.0','productLine':'p','workDir':str(tmp_path),
+    knowledge=CodeKnowledge.model_validate({'schemaVersion':'0.4.0','productLine':'p','workDir':str(tmp_path),
         'generatedAt':'2026-01-01T00:00:00Z','partial':False,
         'defectCodeMatches':[{'defectId':str(i),'candidates':[],'confidence':'low'} for i in range(n)]})
     return CartographyRequest(str(tmp_path),batch,knowledge)

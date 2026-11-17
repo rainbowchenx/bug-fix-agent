@@ -34,6 +34,70 @@ def attribute_test_failures(failed_nodeids: Iterable[str]) -> dict[str, list[str
     return {"preexisting": preexisting, "new": new}
 
 
+def _truthy_required(case: dict[str, Any]) -> bool:
+    value = case.get("requiredQuestion")
+    if value is None:
+        value = case.get("requiredQuestions")
+    if isinstance(value, list):
+        return bool(value)
+    return bool(value)
+
+
+def _truthy_consumed(case: dict[str, Any]) -> bool:
+    if "answerConsumed" in case:
+        return bool(case.get("answerConsumed"))
+    if "answersConsumed" in case:
+        raw = case.get("answersConsumed")
+        if isinstance(raw, (int, float)):
+            return raw > 0
+        return bool(raw)
+    return False
+
+
+def convergence_metrics(
+    cases: list[dict[str, Any]],
+    *,
+    apply_fix: bool | None = None,
+) -> dict[str, Any]:
+    """固定分母计分。pending 独立统计，stale 占分母但不继承成功。"""
+    by_defect: dict[str, dict[str, Any]] = {}
+    for case in cases:
+        did = str(case.get("defectId") or case.get("id") or "")
+        if not did:
+            continue
+        product = str(case.get("product") or case.get("productLine") or "")
+        key = f"{product}:{did}"
+        prev = by_defect.get(key)
+        if prev is None or int(case.get("attemptSeq") or 0) >= int(prev.get("attemptSeq") or 0):
+            if case.get("ratingStatus") == "stale" and prev is not None and prev.get("ratingStatus") != "stale":
+                continue
+            by_defect[key] = case
+    rows = list(by_defect.values())
+    n = len(rows)
+    live = [c for c in rows if c.get("ratingStatus") != "stale"]
+    success = sum(1 for c in live if c.get("accepted") is True and c.get("resolved") is True)
+    failed = sum(1 for c in live if c.get("accepted") is True and c.get("resolved") is False)
+    pending = sum(1 for c in live if c.get("status") == "pending" or c.get("accepted") is None)
+    report_only = True if apply_fix is False else (False if apply_fix is True else (all(c.get("applyFix") is False for c in rows) if rows else True))
+    observed_den = success + failed
+    required = [c for c in live if _truthy_required(c)]
+    answered = sum(1 for c in required if _truthy_consumed(c))
+    reopened = sum(1 for c in live if c.get("questionReopened"))
+    return {
+        "uniqueDefects": n,
+        "success": success,
+        "failed": failed,
+        "pending": pending,
+        "stale": sum(1 for c in rows if c.get("ratingStatus") == "stale"),
+        "conservativeRate": (success / n) if n else None,
+        "observedRate": (success / observed_den) if observed_den else None,
+        "repairRate": None if report_only else ((success / n) if n else None),
+        "answerConsumption": (answered / len(required)) if required else None,
+        "repeatQuestionRate": (reopened / n) if n else None,
+        "note": "70% is a proposed repair-ticket SLA, not an engineering bar",
+    }
+
+
 def repair_success_metrics(
     *,
     accepted: int = 0,

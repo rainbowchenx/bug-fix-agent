@@ -15,7 +15,7 @@ from bugfix_contracts.defect_batch import validate_defect_batch
 
 def _batch(pool: str, reason_code: str | None, reason_detail: str | None) -> dict:
     return {
-        "schemaVersion": "0.3.0",
+        "schemaVersion": "0.4.0",
         "productLine": "PJ01PM20260711040",
         "posture": "beta",
         "generatedAt": "2026-11-10T00:00:00Z",

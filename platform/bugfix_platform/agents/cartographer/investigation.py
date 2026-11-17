@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import time
+from uuid import uuid4
 
 from bugfix_contracts import is_match_pool
 from bugfix_contracts.code_knowledge import CodeKnowledge, DefectCodeMatch
@@ -13,6 +14,12 @@ from bugfix_platform.sdk.cartography import (
     CartographyRequest, CartographyResult, CartographyRunner,
     resolve_cartography_max_turns,
 )
+from bugfix_platform.agents.cartographer.investigation_store import (
+    load_group_progress,
+    save_group_progress,
+)
+
+INVESTIGATION_PROTOCOL = "investigation-v3"
 
 
 def plan_groups(ticket_ids: list[str], group_size: int = 8) -> list[list[str]]:
@@ -31,41 +38,15 @@ def _complete(knowledge: CodeKnowledge, ids: list[str]) -> bool:
     )
 
 
-def investigate_groups(
-    req: CartographyRequest,
-    runner: CartographyRunner,
-    *,
-    group_size: int = 8,
-    max_groups: int | None = None,
-    cache_dir: str | Path | None = None,
-) -> CartographyResult:
-    tickets = {t.defectId: t for t in req.defect_batch.tickets if is_match_pool(t.pool)}
-    groups = plan_groups(list(tickets), group_size)
-    cache = Path(cache_dir) if cache_dir else None
-    if cache:
-        cache.mkdir(parents=True, exist_ok=True)
-    merged = {
-        m.defectId: m.model_copy(update={"investigationStatus": "not_investigated"})
-        for m in req.baseline.defectCodeMatches
-    }
-    for defect_id in tickets:
-        merged.setdefault(defect_id, DefectCodeMatch(
-            defectId=defect_id, investigationStatus="not_investigated",
-        ))
-    knowledge = req.baseline
-    records = []
-    skill_reads: set[str] = set()
-    incomplete = False
-    started = time.monotonic()
-    seconds = float(os.environ.get("BUGFIX_INVESTIGATION_TIMEOUT_SECONDS", "1800"))
-    identity = {
+def _identity(req: CartographyRequest) -> dict:
+    return {
         "workspace": workspace_digest(Path(req.work_dir)),
         "model": req.model or os.environ.get("ANTHROPIC_MODEL"),
         "skills": [(s.repoId, s.name, hashlib.sha256(s.skill_md.read_bytes()).hexdigest())
                    for s in req.injected_skills],
         "turns": req.max_turns,
         "profile": req.baseline.cartographyProfile,
-        "protocol": "investigation-v2",
+        "protocol": INVESTIGATION_PROTOCOL,
         "navigation": {
             "architecture": req.baseline.architecture.model_dump(),
             "conventions": req.baseline.conventions.model_dump(),
@@ -77,7 +58,108 @@ def investigate_groups(
             "BUGFIX_MODEL_CONTEXT_WINDOW", "BUGFIX_MODEL_MODALITIES",
         )},
     }
+
+
+def _aggregate_billing(records: list[dict]) -> dict:
+    sdk_rows = [r for r in records if r.get("source") == "sdk"]
+    costs = [r.get("cost") for r in sdk_rows]
+    turns = [r.get("turns") for r in sdk_rows]
+    if sdk_rows and any(c is None for c in costs):
+        return {"aggregate": "unknown"}
+    payload = {"aggregate": "sum" if sdk_rows else "none"}
+    if sdk_rows and all(isinstance(c, (int, float)) for c in costs):
+        payload["cost"] = float(sum(costs))
+    if sdk_rows and all(isinstance(t, int) for t in turns):
+        payload["turns"] = int(sum(turns))
+    return payload
+
+
+def investigate_groups(
+    req: CartographyRequest,
+    runner: CartographyRunner,
+    *,
+    group_size: int = 8,
+    max_groups: int | None = None,
+    cache_dir: str | Path | None = None,
+    artifact_dir: str | Path | None = None,
+    resume_dir: str | Path | None = None,
+    ticket_ids: list[str] | None = None,
+) -> CartographyResult:
+    tickets = {t.defectId: t for t in req.defect_batch.tickets if is_match_pool(t.pool)}
+    selected = list(dict.fromkeys(ticket_ids)) if ticket_ids is not None else list(tickets)
+    selected = [i for i in selected if i in tickets]
+    groups = plan_groups(selected, group_size)
+    cache = Path(cache_dir) if cache_dir else None
+    if cache:
+        cache.mkdir(parents=True, exist_ok=True)
+    artifacts = Path(artifact_dir) if artifact_dir else (Path(resume_dir) if resume_dir else None)
+    merged = {m.defectId: m for m in req.baseline.defectCodeMatches}
+    reset_ids = set(selected) if ticket_ids is not None else set(tickets)
+    for defect_id in reset_ids:
+        current = merged.get(defect_id)
+        if current is None:
+            merged[defect_id] = DefectCodeMatch(
+                defectId=defect_id, investigationStatus="not_investigated",
+            )
+        else:
+            merged[defect_id] = current.model_copy(update={"investigationStatus": "not_investigated"})
+    for defect_id in tickets:
+        merged.setdefault(defect_id, DefectCodeMatch(
+            defectId=defect_id, investigationStatus="not_investigated",
+        ))
+    knowledge = req.baseline
+    records: list[dict] = []
+    skill_reads: set[str] = set()
+    incomplete = False
+    started = time.monotonic()
+    seconds = float(os.environ.get("BUGFIX_INVESTIGATION_TIMEOUT_SECONDS", "1800"))
+    identity = _identity(req)
+    journal = load_group_progress(resume_dir) if resume_dir else None
+    journal_by_key: dict[str, dict] = {}
+    journal_matches: dict[str, DefectCodeMatch] = {}
+    identity_json = json.dumps(identity, sort_keys=True, default=str)
+    identity_ok = isinstance(journal, dict) and json.dumps(journal.get("identity") or {}, sort_keys=True, default=str) == identity_json
+    if identity_ok:
+        for item in list(journal.get("groups") or []):
+            if not isinstance(item, dict):
+                continue
+            cache_key = item.get("cacheKey")
+            if isinstance(cache_key, str) and cache_key:
+                journal_by_key[cache_key] = item
+            for raw in item.get("matches") or []:
+                try:
+                    restored_match = DefectCodeMatch.model_validate(raw)
+                except (ValueError, TypeError):
+                    continue
+                journal_matches[restored_match.defectId] = restored_match
+        for defect_id, restored_match in journal_matches.items():
+            if defect_id not in reset_ids:
+                merged[defect_id] = restored_match
     launched = 0
+    stop_reason = "completed"
+
+    def _flush_journal() -> None:
+        if artifacts is None:
+            return
+        save_group_progress(artifacts, {
+            "identity": identity,
+            "stopReason": stop_reason,
+            "billing": _aggregate_billing(records),
+            "groups": [
+                {
+                    "ids": r["ids"],
+                    "cacheKey": r.get("cacheKey"),
+                    "status": r.get("status"),
+                    "stopReason": r.get("stopReason"),
+                    "source": r.get("source"),
+                    "detail": r.get("detail"),
+                    "turns": r.get("turns"),
+                    "cost": r.get("cost"),
+                    "matches": [merged[i].model_dump() for i in r["ids"] if i in merged],
+                }
+                for r in records
+            ],
+        })
     for n, ids in enumerate(groups):
         batch = req.defect_batch.model_copy(update={"tickets": [tickets[i] for i in ids]})
         key = hashlib.sha256(json.dumps({
@@ -92,17 +174,43 @@ def investigate_groups(
                     result = CartographyResult(True, cached, "sdk", "cached group")
             except (ValueError, OSError):
                 pass  # Invalid cache entries are re-investigated, never promoted.
+        journal_hit = journal_by_key.get(key)
+        if result is None and journal_hit and journal_hit.get("matches"):
+            try:
+                restored = [
+                    DefectCodeMatch.model_validate(item) for item in journal_hit["matches"]
+                ]
+                for match in restored:
+                    merged[match.defectId] = match
+                cached_k = knowledge.model_copy(update={
+                    "defectCodeMatches": restored, "partial": False,
+                })
+                if journal_hit.get("status") == "complete" and _complete(cached_k, ids):
+                    result = CartographyResult(True, cached_k, "sdk", "resumed complete group")
+            except (ValueError, TypeError):
+                result = None
         group_base = knowledge.model_copy(update={
             "defectCodeMatches": [merged[i] for i in ids],
         })
         try:
             if result is None:
                 exhausted = max_groups is not None and launched >= max_groups
-                if exhausted or time.monotonic() - started >= seconds:
+                timed_out = time.monotonic() - started >= seconds
+                if exhausted or timed_out:
+                    stop_reason = "timeout" if timed_out else "budget_exhausted"
                     break
                 launched += 1
-                result = runner(replace(req, defect_batch=batch, baseline=group_base,
-                                        investigation_only=n > 0))
+                group_id = f"g{n:03d}-{key[:8]}"
+                call_id = uuid4().hex[:12]
+                result = runner(replace(
+                    req,
+                    defect_batch=batch,
+                    baseline=group_base,
+                    investigation_only=n > 0,
+                    artifact_dir=artifacts,
+                    group_id=group_id,
+                    call_id=call_id,
+                ))
             skill_reads.update(result.skill_reads)
             incomplete |= result.knowledge.partial or not result.ok or result.source != "sdk"
             returned = result.knowledge.defectCodeMatches
@@ -117,25 +225,48 @@ def investigate_groups(
                     temporary = dest.with_suffix(".tmp")
                     temporary.write_text(result.knowledge.model_dump_json(), encoding="utf-8")
                     temporary.replace(dest)
-            records.append({
+            group_status = "complete" if _complete(
+                knowledge.model_copy(update={"defectCodeMatches": [merged[i] for i in ids], "partial": False}),
+                ids,
+            ) else "partial"
+            record = {
                 "ids": ids, "source": result.source, "detail": result.detail, "cacheKey": key,
                 "stage": "map_and_investigation" if n == 0 else "investigation",
                 "maxTurns": resolve_cartography_max_turns(req.max_turns, ticket_count=len(ids)),
-            })
+                "stopReason": "completed" if group_status == "complete" else "partial",
+                "status": group_status,
+                "turns": result.turns,
+                "cost": result.cost,
+            }
+            records.append(record)
+            _flush_journal()
         except Exception as err:
+            stop_reason = "failed"
             for defect_id in ids:
                 merged[defect_id] = merged[defect_id].model_copy(update={"investigationStatus": "failed"})
-            records.append({"ids": ids, "source": "failed", "detail": str(err), "cacheKey": key})
+            records.append({
+                "ids": ids, "source": "failed", "detail": str(err), "cacheKey": key,
+                "stopReason": "failed", "status": "failed",
+                "turns": None, "cost": None,
+            })
+            _flush_journal()
     partial = incomplete or any(
         m.investigationStatus in {"not_investigated", "failed", "partial"}
         for m in merged.values()
     )
+    if stop_reason == "completed" and partial:
+        stop_reason = "partial"
+    _flush_journal()
     knowledge = knowledge.model_copy(update={
         "defectCodeMatches": list(merged.values()), "partial": partial,
         "investigationRuns": records,
     })
     sources = {r["source"] for r in records}
     source = "sdk" if "sdk" in sources else "sdk_fallback" if sources else "heuristic"
+    billing = _aggregate_billing(records)
     detail = "; ".join(str(r["detail"]) for r in records if r.get("detail"))
-    detail += f"; groups={len(records)}/{len(groups)}; elapsed={time.monotonic()-started:.2f}s; partial={partial}"
+    detail += (
+        f"; groups={len(records)}/{len(groups)}; elapsed={time.monotonic()-started:.2f}s; "
+        f"partial={partial}; stopReason={stop_reason}; billing={billing.get('aggregate')}"
+    )
     return CartographyResult(True, knowledge, source, detail, sorted(skill_reads))

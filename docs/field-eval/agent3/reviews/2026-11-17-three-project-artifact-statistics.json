@@ -1,0 +1,506 @@
+{
+  "date": "2026-11-17",
+  "scope": [
+    "peitao",
+    "transport",
+    "hcp"
+  ],
+  "archive": "bugfix-runs-2026-11-17-交付包.zip",
+  "sha256": "b46c82dcf401ef6c1d5cdf4da0cddde7b95c7ab6244670135855fa3c7596b3dd",
+  "reviewHead": "405b544",
+  "runCommitDeclared": "5c5c2f9",
+  "sourceCodeChange": "3c5d8d7",
+  "projects": {
+    "peitao": {
+      "rawRows": 19,
+      "batchTickets": 19,
+      "pools": {
+        "strict": 18,
+        "locatable_only": 1
+      },
+      "sourceDocumentCount": 19,
+      "qualityRelevance": {
+        "uncertain": 19
+      },
+      "a2": {
+        "groups": 3,
+        "groupSources": {
+          "sdk": 3
+        },
+        "launchedTickets": 19,
+        "invalidMatchCounter": 19,
+        "statuses": {
+          "partial": 19
+        },
+        "ticketsWithCandidates": 14,
+        "facts": 0,
+        "scopes": 0,
+        "partial": true,
+        "recordedCostUsd": 11.11,
+        "recordedTurns": 149,
+        "costIsLowerBound": false,
+        "runtimeProfile": {
+          "modelId": "EB-DeepSeek-Flash",
+          "contextWindow": null,
+          "inputModalities": [
+            "text"
+          ],
+          "capabilityStatus": "unknown",
+          "smokeStatus": "not_executed",
+          "budgets": {
+            "BUGFIX_CARTOGRAPHY_MAX_TURNS": "",
+            "effectiveAnalyzeMaxTurns": "24",
+            "needsInfoMaxTurns": "8",
+            "maxTokens": "SDK default; not explicitly configured"
+          }
+        },
+        "oldTicketsWithCandidates": 19,
+        "oldStatuses": {
+          "complete": 16,
+          "not_investigated": 3
+        },
+        "oldDetail": [
+          "enrich=sdk; turns=22; reason=completed; cost=$1.44"
+        ]
+      },
+      "a3": {
+        "outcomes": {
+          "plan_only": 6
+        },
+        "analysisStatuses": {
+          "completed": 6
+        },
+        "budgetTruncated": 5,
+        "formatRepair": 2,
+        "allowed": 0,
+        "claimStatuses": {
+          "conditional": 15,
+          "supported": 14,
+          "unverified": 15
+        },
+        "questionKinds": {
+          "choice": 8,
+          "blocking": 2,
+          "verification": 6,
+          "follow_up": 2
+        },
+        "evidenceValidity": {
+          "pending_review": 42,
+          "valid": 26
+        },
+        "runtimeProfile": {
+          "modelId": "EB-DeepSeek-Flash",
+          "contextWindow": null,
+          "inputModalities": [
+            "text"
+          ],
+          "capabilityStatus": "unknown",
+          "smokeStatus": "not_executed",
+          "budgets": {
+            "effectiveAnalyzeMaxTurns": "24",
+            "needsInfoMaxTurns": "8",
+            "maxTokens": "SDK default; not explicitly configured"
+          }
+        },
+        "applyFix": false,
+        "scoreSummary": {
+          "g0Pass": true,
+          "locAt1": "6/6",
+          "locAt3": "6/6",
+          "outcome": "6/6",
+          "verdict": "usable_pending_g3",
+          "bands": {
+            "loc": "good",
+            "outcome": "usable"
+          },
+          "analysisCompleted": 6,
+          "reported": 6,
+          "completedAnalysisLocAt3": 6,
+          "staleRatings": 0,
+          "honesty": "requires trajectory review; SDK failure alone is not dishonesty",
+          "locAt3WithAlternatives": "6/6",
+          "repair": {
+            "accepted": 0,
+            "resolved": 0,
+            "reported": 6,
+            "denominator": 6,
+            "successRate": null,
+            "reason": "no_acceptance_data"
+          }
+        },
+        "oldOutcomes": {
+          "plan_only": 5,
+          "other_blocked": 1
+        },
+        "ratingBindings": 0
+      },
+      "businessRepoHeads": {
+        "before": [
+          {
+            "path": ".",
+            "gitHead": "4e819a59d37623c89cac62d053dd98b633321891",
+            "fingerprint": "web5.0-framework@1.0.0"
+          }
+        ],
+        "after": [
+          {
+            "path": ".",
+            "gitHead": "4e819a59d37623c89cac62d053dd98b633321891",
+            "fingerprint": "web5.0-framework@1.0.0"
+          }
+        ],
+        "declaredHeadsEqual": true
+      }
+    },
+    "transport": {
+      "rawRows": 37,
+      "batchTickets": 37,
+      "pools": {
+        "strict": 34,
+        "needs_info": 3
+      },
+      "sourceDocumentCount": 37,
+      "qualityRelevance": {
+        "uncertain": 37
+      },
+      "a2": {
+        "groups": 5,
+        "groupSources": {
+          "sdk": 4,
+          "sdk_fallback": 1
+        },
+        "launchedTickets": 37,
+        "invalidMatchCounter": 29,
+        "statuses": {
+          "partial": 29,
+          "search_draft": 4,
+          "not_investigated": 4
+        },
+        "ticketsWithCandidates": 11,
+        "facts": 0,
+        "scopes": 0,
+        "partial": true,
+        "recordedCostUsd": 12.65,
+        "recordedTurns": 207,
+        "costIsLowerBound": true,
+        "runtimeProfile": {
+          "modelId": "EB-DeepSeek-Flash",
+          "contextWindow": null,
+          "inputModalities": [
+            "text"
+          ],
+          "capabilityStatus": "unknown",
+          "smokeStatus": "not_executed",
+          "budgets": {
+            "BUGFIX_CARTOGRAPHY_MAX_TURNS": "",
+            "effectiveAnalyzeMaxTurns": "24",
+            "needsInfoMaxTurns": "8",
+            "maxTokens": "SDK default; not explicitly configured"
+          }
+        },
+        "oldTicketsWithCandidates": 26,
+        "oldStatuses": {
+          "not_investigated": 21,
+          "complete": 15,
+          "partial": 1
+        },
+        "oldDetail": [
+          "enrich=sdk; turns=19; reason=completed; cost=$1.49; dropped=invalid_match:1/symbol:6"
+        ]
+      },
+      "a3": {
+        "outcomes": {
+          "plan_only": 4,
+          "other_blocked": 2
+        },
+        "analysisStatuses": {
+          "completed": 4,
+          "incomplete": 2
+        },
+        "budgetTruncated": 4,
+        "formatRepair": 0,
+        "allowed": 0,
+        "claimStatuses": {
+          "supported": 9,
+          "conditional": 8,
+          "unverified": 4
+        },
+        "questionKinds": {
+          "choice": 2,
+          "verification": 4,
+          "blocking": 2,
+          "follow_up": 1
+        },
+        "evidenceValidity": {
+          "pending_review": 31,
+          "valid": 22
+        },
+        "runtimeProfile": {
+          "modelId": "EB-DeepSeek-Flash",
+          "contextWindow": null,
+          "inputModalities": [
+            "text"
+          ],
+          "capabilityStatus": "unknown",
+          "smokeStatus": "not_executed",
+          "budgets": {
+            "effectiveAnalyzeMaxTurns": "24",
+            "needsInfoMaxTurns": "8",
+            "maxTokens": "SDK default; not explicitly configured"
+          }
+        },
+        "applyFix": false,
+        "scoreSummary": {
+          "g0Pass": true,
+          "locAt1": "3/6",
+          "locAt3": "3/6",
+          "outcome": "4/6",
+          "verdict": "mixed",
+          "bands": {
+            "loc": "usable",
+            "outcome": "unusable"
+          },
+          "analysisCompleted": 4,
+          "reported": 6,
+          "completedAnalysisLocAt3": 2,
+          "staleRatings": 0,
+          "honesty": "requires trajectory review; SDK failure alone is not dishonesty",
+          "locAt3WithAlternatives": "3/6",
+          "repair": {
+            "accepted": 0,
+            "resolved": 0,
+            "reported": 6,
+            "denominator": 6,
+            "successRate": null,
+            "reason": "no_acceptance_data"
+          }
+        },
+        "oldOutcomes": {
+          "plan_only": 6
+        },
+        "ratingBindings": 0
+      },
+      "businessRepoHeads": {
+        "before": [
+          {
+            "path": ".",
+            "gitHead": "92ed6fc0cf03035523dc8d6da656b083a60722cb",
+            "fingerprint": "web5.0-framework@1.0.0"
+          }
+        ],
+        "after": [
+          {
+            "path": ".",
+            "gitHead": "92ed6fc0cf03035523dc8d6da656b083a60722cb",
+            "fingerprint": "web5.0-framework@1.0.0"
+          }
+        ],
+        "declaredHeadsEqual": true
+      }
+    },
+    "hcp": {
+      "rawRows": 37,
+      "batchTickets": 37,
+      "pools": {
+        "strict": 26,
+        "needs_info": 6,
+        "locatable_only": 5
+      },
+      "sourceDocumentCount": 37,
+      "qualityRelevance": {
+        "uncertain": 37
+      },
+      "a2": {
+        "groups": 5,
+        "groupSources": {
+          "sdk": 5
+        },
+        "launchedTickets": 37,
+        "invalidMatchCounter": 37,
+        "statuses": {
+          "partial": 37
+        },
+        "ticketsWithCandidates": 12,
+        "facts": 0,
+        "scopes": 0,
+        "partial": true,
+        "recordedCostUsd": 20.0,
+        "recordedTurns": 339,
+        "costIsLowerBound": false,
+        "runtimeProfile": {
+          "modelId": "EB-DeepSeek-Flash",
+          "contextWindow": null,
+          "inputModalities": [
+            "text"
+          ],
+          "capabilityStatus": "unknown",
+          "smokeStatus": "not_executed",
+          "budgets": {
+            "BUGFIX_CARTOGRAPHY_MAX_TURNS": "",
+            "effectiveAnalyzeMaxTurns": "24",
+            "needsInfoMaxTurns": "8",
+            "maxTokens": "SDK default; not explicitly configured"
+          }
+        },
+        "oldTicketsWithCandidates": 27,
+        "oldStatuses": {
+          "complete": 15,
+          "not_investigated": 21,
+          "partial": 1
+        },
+        "oldDetail": [
+          "enrich=sdk; turns=120; reason=max_turns; cost=$13.19; dropped=duplicate:2/symbol:5"
+        ]
+      },
+      "a3": {
+        "outcomes": {
+          "plan_only": 6
+        },
+        "analysisStatuses": {
+          "completed": 6
+        },
+        "budgetTruncated": 5,
+        "formatRepair": 0,
+        "allowed": 0,
+        "claimStatuses": {
+          "conditional": 13,
+          "unverified": 4,
+          "supported": 16
+        },
+        "questionKinds": {
+          "blocking": 2,
+          "choice": 6,
+          "verification": 5,
+          "follow_up": 1
+        },
+        "evidenceValidity": {
+          "pending_review": 36,
+          "valid": 25
+        },
+        "runtimeProfile": {
+          "modelId": "EB-DeepSeek-Flash",
+          "contextWindow": null,
+          "inputModalities": [
+            "text"
+          ],
+          "capabilityStatus": "unknown",
+          "smokeStatus": "not_executed",
+          "budgets": {
+            "effectiveAnalyzeMaxTurns": "24",
+            "needsInfoMaxTurns": "8",
+            "maxTokens": "SDK default; not explicitly configured"
+          }
+        },
+        "applyFix": false,
+        "scoreSummary": {
+          "g0Pass": true,
+          "locAt1": "6/6",
+          "locAt3": "6/6",
+          "outcome": "6/6",
+          "verdict": "usable_pending_g3",
+          "bands": {
+            "loc": "good",
+            "outcome": "usable"
+          },
+          "analysisCompleted": 6,
+          "reported": 6,
+          "completedAnalysisLocAt3": 6,
+          "staleRatings": 0,
+          "honesty": "requires trajectory review; SDK failure alone is not dishonesty",
+          "locAt3WithAlternatives": "6/6",
+          "repair": {
+            "accepted": 0,
+            "resolved": 0,
+            "reported": 6,
+            "denominator": 6,
+            "successRate": null,
+            "reason": "no_acceptance_data"
+          }
+        },
+        "oldOutcomes": {
+          "plan_only": 6
+        },
+        "ratingBindings": 0
+      },
+      "businessRepoHeads": {
+        "before": [
+          {
+            "path": ".",
+            "gitHead": "8c0e17bcc0c80acd0cc45c9f2eae8a43ccee94de",
+            "fingerprint": "simple-single-spa-webpack-example@1.0.0"
+          }
+        ],
+        "after": [
+          {
+            "path": ".",
+            "gitHead": "8c0e17bcc0c80acd0cc45c9f2eae8a43ccee94de",
+            "fingerprint": "simple-single-spa-webpack-example@1.0.0"
+          }
+        ],
+        "declaredHeadsEqual": true
+      }
+    }
+  },
+  "limits": [
+    "No business source repositories or full tool/session trajectories in archive",
+    "Report-only applyFix=false; no patch/application/acceptance evidence",
+    "No controlled model/configuration A/B run; no second-round feedback case",
+    "invalid_match counters do not expose original validation errors"
+  ],
+  "pairedComparisonTotals": {
+    "old_oldLoc1": 12,
+    "old_oldLoc3": 12,
+    "old_oldAlt3": 13,
+    "old_newLoc1": 14,
+    "old_newLoc3": 14,
+    "old_newAlt3": 14,
+    "new_oldLoc1": 13,
+    "new_oldLoc3": 13,
+    "new_oldAlt3": 13,
+    "new_newLoc1": 15,
+    "new_newLoc3": 15,
+    "new_newAlt3": 15
+  },
+  "totals": {
+    "rawRows": 93,
+    "deepTickets": 18,
+    "a2InvalidMatchCounter": 85,
+    "a2RecordedCostUsd": 43.76,
+    "a2RecordedTurns": 695,
+    "a3BudgetTruncated": 14,
+    "a3ClaimStatuses": {
+      "conditional": 36,
+      "supported": 39,
+      "unverified": 23
+    },
+    "a2RequestedTickets": 93,
+    "a2Groups": 13,
+    "a2Facts": 0,
+    "a2Scopes": 0,
+    "a2Statuses": {
+      "partial": 85,
+      "search_draft": 4,
+      "not_investigated": 4
+    },
+    "a3ParsedReports": 16,
+    "a3IncompleteReports": 2,
+    "a3Allowed": 0,
+    "a3Claims": 98,
+    "a3Questions": 41,
+    "a3Evidence": 182,
+    "a3ClaimRefs": 147,
+    "a3ClaimRefsResolvedValid": 117,
+    "a3ClaimRefsNotResolvedValid": 30,
+    "supportedClaimsWithInvalidRefs": 0,
+    "oldA3ParsedReports": 17,
+    "oldA3IncompleteReports": 1,
+    "oldA2RecordedCostUsd": 16.12,
+    "completedAnalysisLocAt3": 14
+  },
+  "interpretation": {
+    "directoriesOnly": "All localization numbers are directory/path coverage, not causal correctness or repair success.",
+    "baselineUnderNewTruth": "Old 14/18 to new 15/18; only newly matched item is transport BGCM2026102202247, which is other_blocked with inherited Agent2 localization.",
+    "schemaRejection": "85 invalid_match counter increments; raw SDK output and detailed ValidationError were not delivered, so exact invalid fields and a one-to-one mapping to unique raw IDs cannot be proven.",
+    "model": "All three declare modelId EB-DeepSeek-Flash; contextWindow null, modalities text, capability unknown, smoke not_executed. This does not prove actual provider capability or a controlled model comparison."
+  }
+}

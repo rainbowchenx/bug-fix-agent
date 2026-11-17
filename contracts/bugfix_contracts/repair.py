@@ -1,4 +1,4 @@
-"""Agent-3 修复闭环契约（schema 0.3.0）。旧 0.1.0 attempt 明确拒绝，不静默填充证据。"""
+"""Agent-3 修复闭环契约（schema 0.4.0）。旧 Agent 产物明确拒绝，不静默填充证据。"""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-REPAIR_SCHEMA_VERSION = "0.3.0"
+REPAIR_SCHEMA_VERSION = "0.4.0"
 
 ExecutionStatus = Literal[
     "queued", "running", "completed", "failed", "interrupted", "skipped"
@@ -42,6 +42,10 @@ ScopeStatus = Literal[
     "in_scope", "external_confirmed", "external_suspected", "unknown"
 ]
 PatchFileKind = Literal["add", "modify", "delete", "rename"]
+QuestionCategory = Literal["product", "fact", "implementation", "follow_up"]
+QuestionStatus = Literal["open", "answered", "resolved", "reopened"]
+ResolutionSource = Literal["user_answer", "agent_decision", "existing_rule"]
+ResolutionDisposition = Literal["resolved", "insufficient", "conflicting"]
 
 
 class Evidence(BaseModel):
@@ -79,11 +83,96 @@ class Claim(BaseModel):
     assumptions: list[str] = Field(default_factory=list)
 
 class Question(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     id: str
     kind: Literal["blocking", "choice", "verification", "follow_up"]
     reason: str
     relatedClaimIds: list[str] = Field(default_factory=list)
     requestedEvidence: str = ""
+    category: QuestionCategory = "fact"
+    status: QuestionStatus = "open"
+    predecessorId: Optional[str] = None
+    newEvidenceRefs: list[str] = Field(default_factory=list)
+
+
+class QuestionAnswer(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    questionId: str = Field(min_length=1)
+    text: str = ""
+    answerRevisionId: Optional[str] = None
+    source: str = "user"
+
+
+class QuestionResolution(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    questionId: str = Field(min_length=1)
+    resolutionSource: ResolutionSource
+    revisionId: str = Field(min_length=1)
+    answerRevisionId: Optional[str] = None
+    targetDigest: str = Field(min_length=1)
+    disposition: ResolutionDisposition
+    resolutionSummary: str = Field(min_length=1)
+    evidenceRefs: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _user_answer_has_revision(self) -> QuestionResolution:
+        if self.resolutionSource == "user_answer" and not self.answerRevisionId:
+            raise ValueError("user_answer requires answerRevisionId")
+        if self.resolutionSource != "user_answer" and self.answerRevisionId:
+            raise ValueError("non-user resolution cannot forge a user answer")
+        return self
+
+
+class AnalysisSnapshotRef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(min_length=1)
+    digest: str = Field(min_length=1)
+    attemptId: str = Field(min_length=1)
+
+
+class PreviousAttemptContext(BaseModel):
+    """注入 AnalyzeRequest / FixRequest 的首轮包。关键答案不得被摘要截掉。"""
+
+    model_config = ConfigDict(extra="ignore")
+
+    attemptId: str = Field(min_length=1)
+    parentAttemptId: Optional[str] = None
+    revisionId: Optional[str] = None
+    digest: str = Field(min_length=1)
+    workspaceHead: Optional[str] = None
+    contentDigest: Optional[str] = None
+    currentHead: Optional[str] = None
+    currentContentDigest: Optional[str] = None
+    sourceDrift: bool = False
+    outcome: str = ""
+    topCandidates: list[dict[str, Any]] = Field(default_factory=list)
+    rootCauseSummary: str = ""
+    claims: list[Claim] = Field(default_factory=list)
+    ruledOut: list[str] = Field(default_factory=list)
+    proposedFix: Optional[dict[str, Any]] = None
+    openQuestions: list[Question] = Field(default_factory=list)
+    questionResolutions: list[QuestionResolution] = Field(default_factory=list)
+    confirmedTarget: str = ""
+    latestFeedbackKind: Optional[str] = None
+    latestFeedbackText: str = ""
+    rejectedHypotheses: list[str] = Field(default_factory=list)
+    patchState: Optional[str] = None
+    analysisRef: AnalysisSnapshotRef
+    questionAnswers: list[QuestionAnswer] = Field(default_factory=list)
+
+
+class ConvergenceResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    resolutions: list[QuestionResolution] = Field(default_factory=list)
+    openQuestions: list[Question] = Field(default_factory=list)
+    violations: list[str] = Field(default_factory=list)
+    needsClosingPass: bool
+    analysisIncomplete: bool = False
 
 class EditDecision(BaseModel):
     """第 5 节门槛结论。程序只校验结构；因果由模型解释。"""
@@ -194,6 +283,8 @@ class InputRevision(BaseModel):
     steps: Optional[str] = None
     attachments: list[str] = Field(default_factory=list)
     source: str = "ticket"
+    questionAnswers: list[QuestionAnswer] = Field(default_factory=list)
+    questionResolutions: list[QuestionResolution] = Field(default_factory=list)
 
 
 class Feedback(BaseModel):
@@ -214,6 +305,8 @@ class Feedback(BaseModel):
     removeAttachmentIds: list[str] = Field(default_factory=list)
     text: str = ""
     attachments: list[str] = Field(default_factory=list)
+    questionAnswers: list[QuestionAnswer] = Field(default_factory=list)
+    formId: Optional[str] = None
 
 
 class TaskContext(BaseModel):
@@ -235,6 +328,8 @@ class TaskContext(BaseModel):
     currentTarget: str = ""
     claims: list[Claim] = Field(default_factory=list)
     generatePatch: bool = False
+    questionResolutions: list[QuestionResolution] = Field(default_factory=list)
+    analysisIncomplete: bool = False
 
 
 class AttemptRecord(BaseModel):
@@ -257,6 +352,8 @@ class AttemptRecord(BaseModel):
     evidence: list[Evidence] = Field(default_factory=list)
     sessionId: Optional[str] = None
     cost: Optional[dict[str, Any]] = None
+    analysisRef: Optional[AnalysisSnapshotRef] = None
+    analysisDigest: Optional[str] = None
 
     @model_validator(mode="after")
     def _invariants(self) -> AttemptRecord:

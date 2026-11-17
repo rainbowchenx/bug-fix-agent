@@ -16,8 +16,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional, Sequence, Union
+from uuid import uuid4
 
 from bugfix_contracts.defect_batch import DefectBatchInput, load_defect_batch
 from bugfix_contracts import (
@@ -62,6 +64,7 @@ class ThreeAgentWorkflowResult:
     stage: Literal["agent2", "agent3", "done"]
     artifacts: WorkflowArtifacts = field(default_factory=WorkflowArtifacts)
     error: Optional[str] = None
+    artifact_dir: Optional[str] = None
 
 
 
@@ -85,6 +88,8 @@ def run_three_agent_workflow(
     agent2: Optional[CartographerFn] = None,
     agent3: Optional[AnalystFn] = None,
     artifact_dir: Optional[str | Path] = None,
+    resume_dir: Optional[str | Path] = None,
+    ticket_ids: Optional[Sequence[str]] = None,
     thread_id: Optional[str] = None,
     checkpointer: Any = None,
     on_update: Optional[WorkflowUpdateFn] = None,
@@ -148,8 +153,20 @@ def run_three_agent_workflow(
         initial["cartography_profile"] = cartography_profile
     if extra_skill_dirs:
         initial["extra_skill_dirs"] = [str(p) for p in extra_skill_dirs]
-    if artifact_dir is not None:
-        initial["artifact_dir"] = str(artifact_dir)
+    if artifact_dir is None:
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        candidate = Path(work_dir) / ".bugfix-runs" / f"{stamp}-{uuid4().hex[:8]}"
+        try:
+            candidate.mkdir(parents=True, exist_ok=True)
+            artifact_dir = candidate
+        except OSError:
+            import tempfile
+            artifact_dir = Path(tempfile.mkdtemp(prefix="bugfix-run-"))
+    initial["artifact_dir"] = str(artifact_dir)
+    if resume_dir is not None:
+        initial["resume_dir"] = str(resume_dir)
+    if ticket_ids:
+        initial["ticket_ids"] = [str(x) for x in ticket_ids]
 
     # 有桩 / checkpointer / thread_id 时需要重新 compile。
     needs_custom = (
@@ -211,6 +228,7 @@ def run_three_agent_workflow(
             stage=stage,
             artifacts=artifacts,
             error=str(err),
+            artifact_dir=str(artifact_dir) if artifact_dir is not None else None,
         )
 
     return _result_from_state(final)  # type: ignore[arg-type]
@@ -254,6 +272,7 @@ def _result_from_state(state: ThreeAgentState) -> ThreeAgentWorkflowResult:
         stage=stage,
         artifacts=artifacts,
         error=state.get("error"),
+        artifact_dir=state.get("artifact_dir"),
     )
 
 

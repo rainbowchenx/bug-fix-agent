@@ -132,7 +132,7 @@ def test_match_tickets_only_existing_paths(tmp_path: Path):
 
 def test_analyst_invalid_ticket_becomes_other_blocked(tmp_path: Path):
     batch = DefectBatch(
-        schemaVersion="0.3.0",
+        schemaVersion="0.4.0",
         productLine="hc",
         posture="alpha",
         generatedAt="2026-11-05T00:00:00Z",

@@ -1,4 +1,4 @@
-> 当前生产契约：0.3.0（2026-11-16）。目录保留原文档路径；旧 Agent 产物版本明确拒绝，请重新生成。
+> 当前生产契约：0.4.0（2026-11-16）。目录保留原文档路径；旧 Agent 产物版本明确拒绝，请重新生成。
 
 # defect-batch 阅读说明
 
@@ -34,7 +34,7 @@ raw-defects  ──►  defect-batch.json  ──► 后续步骤
 
 ## 2. 怎么读（建议顺序）
 
-1. 看 `schemaVersion`（当前 `"0.3.0"`）和 `productLine` / `posture`。
+1. 看 `schemaVersion`（当前 `"0.4.0"`）和 `productLine` / `posture`。
    `posture=beta` 表示非 Open/New 已被打进 `excluded`；`alpha` 则状态门更松。
 2. 看 `funnel`：先知道这批有多少进了主池、多少被扔掉。
 3. 按票工作：遍历 `tickets[]`，用 `is_match_pool(pool)`（或手写三池判断）过滤。
@@ -51,7 +51,7 @@ raw-defects  ──►  defect-batch.json  ──► 后续步骤
 
 | Field | Type | Notes |
 |---|---|---|
-| `schemaVersion` | string | `"0.3.0"` |
+| `schemaVersion` | string | `"0.4.0"` |
 | `productLine` | string | 线别 |
 | `posture` | `alpha` \| `beta` | beta = 仅 Open/New 进功能漏斗 |
 | `generatedAt` | ISO string | |

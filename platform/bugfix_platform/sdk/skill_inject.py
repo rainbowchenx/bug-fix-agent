@@ -239,7 +239,9 @@ def analyze_skills_addon(skills: Sequence[InjectedSkill]) -> str:
         agent="analyze",
         hard_limits=(
             "They never invent paths, never edit the repo, and never invent "
-            "outcome / schema fields outside the analysis-report contract."
+            "outcome / schema fields outside the analysis-report contract. "
+            "Product/fact choice stays open without a user answer; implementation "
+            "choices must be decided with a cited rationale."
         ),
     )
 

@@ -222,7 +222,7 @@ def test_analyst_uses_injected_analyze_fn(tmp_path: Path):
 
     batch = DefectBatch.model_validate(
         {
-            "schemaVersion": "0.3.0",
+            "schemaVersion": "0.4.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",
@@ -246,7 +246,7 @@ def test_analyst_uses_injected_analyze_fn(tmp_path: Path):
     )
     knowledge = CodeKnowledge.model_validate(
         {
-            "schemaVersion": "0.3.0",
+            "schemaVersion": "0.4.0",
             "productLine": "hc",
             "workDir": str(work),
             "partial": False,
@@ -327,7 +327,7 @@ def test_analyst_forwards_spec_atlas_and_codegraph(tmp_path: Path, monkeypatch):
 
     batch = DefectBatch.model_validate(
         {
-            "schemaVersion": "0.3.0",
+            "schemaVersion": "0.4.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",
@@ -349,7 +349,7 @@ def test_analyst_forwards_spec_atlas_and_codegraph(tmp_path: Path, monkeypatch):
     )
     knowledge = CodeKnowledge.model_validate(
         {
-            "schemaVersion": "0.3.0",
+            "schemaVersion": "0.4.0",
             "productLine": "hc",
             "workDir": str(work),
             "partial": False,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -237,6 +238,7 @@ def _build_fix_prompt(req: FixRequest) -> str:
         f"title: {t.title}\n"
         f"expected: {expected}\n"
         f"analysis: {req.analysis}\n"
+        f"previousAttempt: {json.dumps((req.analysis or {}).get('previousAttempt') or {}, ensure_ascii=False)}\n"
         "After the edits, Read the changed files and return JSON with "
         "semanticReviewStatus and semanticReview judging those exact lines.\n"
     )

@@ -263,12 +263,27 @@ def score_report(report: dict[str, Any], cases: list[dict[str, Any]]) -> dict[st
     summary["honesty"] = "requires trajectory review; SDK failure alone is not dishonesty"
     summary["locAt3WithAlternatives"] = f"{sum(bool(r.get('locAt3WithAlternatives')) for r in rows if r['locAt3'] is not None)}/{sum(r['locAt3'] is not None for r in rows)}"
 
-    from bugfix_platform.agents.analyst.baseline import repair_success_metrics
+    from bugfix_platform.agents.analyst.baseline import convergence_metrics, repair_success_metrics
 
     accepted = sum(1 for c in eligible if c.get("accepted") is True)
     resolved = sum(1 for c in eligible if c.get("accepted") is True and c.get("resolved") is True)
     summary["repair"] = repair_success_metrics(
         accepted=accepted, resolved=resolved, reported=len(cases)
+    )
+    conv_cases = []
+    for case, row in zip(cases, rows):
+        conv_cases.append(
+            {
+                **case,
+                "ratingStatus": row.get("ratingStatus"),
+                "applyFix": dumped.get("applyFix"),
+                "product": dumped.get("productLine"),
+                "requiredQuestion": case.get("requiredQuestion", case.get("requiredQuestions")),
+                "answerConsumed": case.get("answerConsumed", case.get("answersConsumed")),
+            }
+        )
+    summary["convergence"] = convergence_metrics(
+        conv_cases, apply_fix=bool(dumped.get("applyFix")) if "applyFix" in dumped else None
     )
     return {"summary": summary, "reportDigest": digest, "applyFix": dumped.get("applyFix"), "rows": rows}
 

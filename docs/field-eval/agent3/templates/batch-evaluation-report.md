@@ -1,6 +1,6 @@
 # Agent3 真实项目批次评测报告
 
-模板日期：2026-11-15。状态：待填写，非实际成绩。
+模板日期：2026-11-17。状态：待填写，非实际成绩。70% 是待业务确认的可修票试运行提议，无已确认 SLA 不自动宣告业务通过。pending/未知单独统计，不默认为成功。
 
 关联：[评测方法](../2026-11-15-real-project-evaluation.md) · [逐票表](ticket-review.md) · [汇总CSV](ticket-review-summary.csv) · [方案](../../../superpowers/specs/2026-11-15-agent3-repair-feedback-design.md) · [计划](../../../superpowers/plans/2026-11-15-agent3-repair-feedback-implementation-plan.md)。复制后调整引用。
 

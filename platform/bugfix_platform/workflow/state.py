@@ -47,6 +47,8 @@ class ThreeAgentState(TypedDict):
 
     artifact_dir: NotRequired[str]
     """若设置，各 validate 门禁在校验成功后渐进写入 JSON 产物。"""
+    resume_dir: NotRequired[str]
+    ticket_ids: NotRequired[list[str]]
 
     # --- 控制 / 可观测性 ---
     ok: NotRequired[bool]
