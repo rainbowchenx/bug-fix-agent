@@ -304,11 +304,21 @@ def run_analyst(
             ctx, aliases = _bind_current(entry, drifted_flag=drifted)
             resolutions = []
             conv = None
+            from bugfix_contracts.repair import AnalysisSnapshotRef, PreviousAttemptContext, Question
+            from bugfix_platform.agents.analyst.continuation import consume_question_answers
+            proposed = [Question.model_validate(q) for q in (entry.get("rootCause") or {}).get("questions") or []]
             if previous_payload:
-                from bugfix_contracts.repair import PreviousAttemptContext, Question
-                from bugfix_platform.agents.analyst.continuation import consume_question_answers
                 prev = PreviousAttemptContext.model_validate(previous_payload)
-                proposed = [Question.model_validate(q) for q in (entry.get("rootCause") or {}).get("questions") or []]
+            else:
+                prev = PreviousAttemptContext(
+                    attemptId="fresh",
+                    digest="0" * 64,
+                    analysisRef=AnalysisSnapshotRef(path="fresh", digest="0" * 64, attemptId="fresh"),
+                    openQuestions=[],
+                    questionLedger=[],
+                    confirmedTarget=str((entry.get("ticket") or {}).get("expected") or ticket.expected or ""),
+                )
+            if previous_payload or proposed:
                 conv = consume_question_answers(
                     prev,
                     revision,
@@ -321,7 +331,7 @@ def run_analyst(
                 root = dict(entry.get("rootCause") or {})
                 root["questions"] = [q.model_dump() for q in conv.openQuestions]
                 entry["rootCause"] = root
-                if conv.needsClosingPass and (remaining is None or remaining > 0):
+                if conv.needsClosingPass and previous_payload and (remaining is None or remaining > 0):
                     close = runner(
                         AnalyzeRequest(
                             work_dir=work_dir,

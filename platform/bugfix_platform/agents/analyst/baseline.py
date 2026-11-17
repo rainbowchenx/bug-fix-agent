@@ -117,7 +117,7 @@ def convergence_metrics(
         "observedRate": (success / observed_den) if observed_den else None,
         "repairRate": None if report_only else ((success / n) if n else None),
         "answerConsumption": (consumed_total / req_total) if req_total else None,
-        "repeatQuestionRate": (unjustified_total / reopen_den) if reopen_den else ((reopened / n) if n else None),
+        "repeatQuestionRate": (unjustified_total / req_total) if req_total else None,
         "justifiedReopenRate": (justified_total / reopen_den) if reopen_den else None,
         "note": "70% is a proposed repair-ticket SLA, not an engineering bar",
     }

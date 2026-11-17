@@ -76,13 +76,24 @@ def _complete_commit(
         tmp_form.replace(form)
     from bugfix_platform.agents.analyst.attempt_store import _write_latest
     latest = base / "defects" / attempt.defectId / "latest.json"
-    advance = bool(update_latest or recovering or not latest.is_file())
-    if not advance and latest.is_file():
+    latest_id = None
+    if latest.is_file():
         try:
-            meta = json.loads(latest.read_text(encoding="utf-8"))
+            latest_id = json.loads(latest.read_text(encoding="utf-8")).get("attemptId")
         except (OSError, json.JSONDecodeError):
-            meta = {}
-        advance = meta.get("attemptId") in {None, attempt.attemptId}
+            latest_id = None
+    incomplete_child = (
+        latest_id is not None
+        and latest_id != attempt.attemptId
+        and attempt.parentAttemptId == latest_id
+    )
+    advance = bool(
+        update_latest
+        or recovering
+        or not latest.is_file()
+        or latest_id in {None, attempt.attemptId}
+        or incomplete_child
+    )
     if advance:
         _write_latest(base, attempt.defectId, attempt.attemptId, saved)
     latest_form = base / "defects" / attempt.defectId / "feedback-form.md"
@@ -141,15 +152,22 @@ def _ledger_from_entry(
     for question in list(report.rootCause.questions or []) if report.rootCause else []:
         by_id[question.id] = question
     resolved = set()
+    insufficient = set()
     for item in resolutions or []:
         qid = getattr(item, "questionId", None) or (item.get("questionId") if isinstance(item, dict) else None)
         disp = getattr(item, "disposition", None) or (item.get("disposition") if isinstance(item, dict) else None)
-        if qid and disp == "resolved":
+        if not qid:
+            continue
+        if disp == "resolved":
             resolved.add(str(qid))
+        elif disp == "insufficient":
+            insufficient.add(str(qid))
     out = []
     for question in by_id.values():
-        if question.id in resolved and question.status != "resolved":
+        if question.id in resolved:
             question = question.model_copy(update={"status": "resolved"})
+        elif question.id in insufficient and question.status == "resolved":
+            question = question.model_copy(update={"status": "open"})
         out.append(question.model_dump())
     return out
 

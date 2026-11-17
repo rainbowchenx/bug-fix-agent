@@ -342,3 +342,96 @@ def test_failed_read_is_not_observed_and_paths_are_exact(tmp_path):
     ]
     out = verify_fact_references(str(tmp_path), matches, observed_paths=observed)
     assert out[0].observedScopes == []
+
+
+def test_nested_repo_revision_must_match_child_head(tmp_path):
+    from bugfix_contracts.code_knowledge import CodeReference, DefectCodeMatch, InvestigationFact
+    from bugfix_platform.sdk.match_payload import verify_fact_references
+
+    child = tmp_path / "child"
+    (child / "src").mkdir(parents=True)
+    (child / "src" / "a.ts").write_text("const pageId = 1;\n", encoding="utf-8")
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".git" / "HEAD").write_text("a" * 40 + "\n", encoding="utf-8")
+    (child / ".git").mkdir()
+    (child / ".git" / "HEAD").write_text("b" * 40 + "\n", encoding="utf-8")
+    matches = [
+        DefectCodeMatch(
+            defectId="A",
+            facts=[
+                InvestigationFact(
+                    claim="child file",
+                    source="model_reported",
+                    validity="unverified",
+                    reference=CodeReference(
+                        repoId="child", path="src/a.ts", snippet="pageId", revision="a" * 40
+                    ),
+                ),
+                InvestigationFact(
+                    claim="child correct",
+                    source="model_reported",
+                    validity="unverified",
+                    reference=CodeReference(
+                        repoId="child", path="src/a.ts", snippet="pageId", revision="b" * 40
+                    ),
+                ),
+            ],
+            candidates=[{"repoPath": "child", "path": "src/a.ts", "source": "grep", "why": "name"}],
+        )
+    ]
+    out = verify_fact_references(
+        str(tmp_path),
+        matches,
+        observed_paths=["child/src/a.ts"],
+        repo_roots=[{"path": "child", "gitHead": "b" * 40}],
+    )
+    assert out[0].facts[0].validity == "unverified"
+    assert out[0].facts[1].validity == "reference_verified"
+
+
+def test_outside_read_does_not_become_in_repo_observation(tmp_path):
+    from bugfix_platform.sdk.match_payload import apply_tool_observation, verify_fact_references
+    from bugfix_contracts.code_knowledge import DefectCodeMatch
+
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "a.ts").write_text("inside\n", encoding="utf-8")
+    outside = tmp_path.parent / "a.ts"
+    outside.write_text("outside\n", encoding="utf-8")
+    pending: dict[str, str] = {}
+    observed: list[str] = []
+    apply_tool_observation(
+        pending,
+        observed,
+        {"id": "t1", "name": "Read", "input": {"file_path": str(outside)}},
+        str(tmp_path),
+    )
+    apply_tool_observation(
+        pending,
+        observed,
+        {"tool_use_id": "t1", "is_error": False, "content": "outside"},
+        str(tmp_path),
+    )
+    apply_tool_observation(
+        pending,
+        observed,
+        {"id": "t2", "name": "Read", "input": {"file_path": "../a.ts"}},
+        str(tmp_path),
+    )
+    apply_tool_observation(
+        pending,
+        observed,
+        {"tool_use_id": "t2", "is_error": False, "content": "outside again"},
+        str(tmp_path),
+    )
+    assert "a.ts" not in observed
+    assert "src/a.ts" not in observed
+    matches = [
+        DefectCodeMatch(
+            defectId="A",
+            candidates=[{"path": "a.ts", "source": "grep", "why": "name"}],
+            observedScopes=[],
+        )
+    ]
+    out = verify_fact_references(str(tmp_path), matches, observed_paths=observed)
+    assert out[0].observedScopes == []

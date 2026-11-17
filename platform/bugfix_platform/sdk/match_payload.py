@@ -472,7 +472,7 @@ def verify_fact_references(
                         body = path.read_text(encoding="utf-8", errors="replace")
                     except OSError:
                         body = ""
-                    if body and ref.snippet in body and _version_matches(path, ref, heads):
+                    if body and ref.snippet in body and _version_matches(path, ref, heads, root=root):
                         validity = "reference_verified"
             facts.append(fact.model_copy(update={"validity": validity, "source": "model_reported"}))
         scopes = []
@@ -503,7 +503,7 @@ def apply_tool_observation(
     if name in {"Read", "Grep", "Glob"} and tool_id:
         ref = params.get("file_path") or params.get("path")
         if isinstance(ref, str) and ref.strip():
-            pending[str(tool_id)] = repo_relative_path(work_dir, ref)
+            pending[str(tool_id)] = repo_relative_path(work_dir, ref) or ""
         return
     if not use_id:
         return
@@ -513,11 +513,12 @@ def apply_tool_observation(
     is_error = bool(getattr(block, "is_error", False) or (block.get("is_error") if isinstance(block, dict) else False))
     content = getattr(block, "content", None) if not isinstance(block, dict) else block.get("content")
     rel = pending.pop(key)
-    if not is_error and content:
+    if not is_error and content and rel:
         observed.append(rel)
 
 
-def repo_relative_path(work_dir: str, raw: str) -> str:
+def repo_relative_path(work_dir: str, raw: str) -> str | None:
+    """返回仓内相对路径；越界路径返回 None，不得折叠成仓内同名路径。"""
     root = Path(work_dir).resolve()
     path = Path(raw)
     if not path.is_absolute():
@@ -525,7 +526,7 @@ def repo_relative_path(work_dir: str, raw: str) -> str:
     try:
         rel = path.resolve().relative_to(root)
     except ValueError:
-        return _norm_obs(raw)
+        return None
     return _norm_obs(str(rel))
 
 
@@ -546,11 +547,20 @@ def _safe_repo_file(root: Path, repo_id: str, rel: str) -> Path | None:
     return candidate
 
 
-def _version_matches(path: Path, ref: CodeReference, heads: dict[str, str]) -> bool:
+def _version_matches(
+    path: Path,
+    ref: CodeReference,
+    heads: dict[str, str],
+    *,
+    root: Path,
+) -> bool:
     if ref.revision:
-        head = heads.get(".") or heads.get(str(path))
-        repo_head = _git_head(path.parent)
-        if ref.revision not in {head, repo_head}:
+        repo_key = "." if ref.repoId in {".", ""} else _norm_obs(ref.repoId)
+        expected = heads.get(repo_key)
+        if expected is None:
+            repo_base = root if repo_key == "." else (root / repo_key)
+            expected = _git_head(repo_base)
+        if expected is None or ref.revision != expected:
             return False
     if ref.contentDigest:
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -569,7 +579,12 @@ def _repo_heads(root: Path, repo_roots: list[Any] | None) -> dict[str, str]:
         path = getattr(item, "path", None) or (item.get("path") if isinstance(item, dict) else None)
         git_head = getattr(item, "gitHead", None) or (item.get("gitHead") if isinstance(item, dict) else None)
         if path and git_head:
-            heads[str(path)] = str(git_head)
+            heads[_norm_obs(str(path)) or "."] = str(git_head)
+        elif path:
+            repo_path = root / str(path)
+            discovered = _git_head(repo_path)
+            if discovered:
+                heads[_norm_obs(str(path)) or "."] = discovered
     return heads
 
 

@@ -196,9 +196,10 @@ def consume_question_answers(
             rewritten = [q for q in proposed if q.predecessorId == question.id]
             if not rewritten and question.kind in {"blocking", "choice"} and question.id not in resolved_ids:
                 if question.id in invalidated_ids:
-                    continue
-                violations.append(f"omitted parent question {question.id}")
-                _keep_open(question)
+                    violations.append(f"expected changed; restatement required for {question.id}")
+                else:
+                    violations.append(f"omitted parent question {question.id}")
+                _keep_open(question, "open")
                 continue
             incoming = rewritten[0] if rewritten else question
         if incoming.id != question.id and not incoming.predecessorId:
@@ -269,6 +270,41 @@ def consume_question_answers(
             continue
         if question.kind in {"blocking", "choice"} and not question.reason:
             violations.append(f"new blocking question {question.id} lacks first-seen rationale")
+        refs = _rewrite_refs(question.newEvidenceRefs or [], aliases)
+        if refs != list(question.newEvidenceRefs or []):
+            question = question.model_copy(update={"newEvidenceRefs": refs})
+        refs_ok = bool(refs) and all(ref in evidence_ids for ref in refs)
+        if question.status == "resolved" and question.category == "implementation" and refs_ok:
+            resolutions.append(
+                QuestionResolution(
+                    questionId=question.id,
+                    resolutionSource="agent_decision",
+                    revisionId=revision_id,
+                    targetDigest=td,
+                    disposition="resolved",
+                    resolutionSummary=(question.reason or "implementation decision")[:500],
+                    evidenceRefs=refs,
+                )
+            )
+            continue
+        if question.status == "resolved" and question.category in {"product", "fact"}:
+            answer = answers.get(question.id)
+            if answer and answer.text.strip() and (refs_ok or question.relatedClaimIds):
+                resolutions.append(
+                    QuestionResolution(
+                        questionId=question.id,
+                        resolutionSource="user_answer",
+                        revisionId=revision.revisionId if revision is not None else revision_id,
+                        answerRevisionId=answer.answerRevisionId or (revision.revisionId if revision else revision_id),
+                        targetDigest=td,
+                        disposition="resolved",
+                        resolutionSummary=(question.reason or answer.text)[:500],
+                        evidenceRefs=refs,
+                    )
+                )
+                continue
+            _keep_open(question, "answered" if answer and answer.text.strip() else "open")
+            continue
         open_questions.append(question)
 
     blocking_open = [

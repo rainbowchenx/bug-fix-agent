@@ -72,3 +72,14 @@ def test_answer_consumption_is_per_question_not_per_ticket():
     rates = convergence_metrics(unjustified)
     assert rates["repeatQuestionRate"] == 1 / 2
     assert rates["justifiedReopenRate"] == 1 / 2
+    ten = [
+        _case(
+            1,
+            requiredQuestions=[f"q{i}" for i in range(10)],
+            unjustifiedReopens=1,
+            justifiedReopens=0,
+        )
+    ]
+    assert convergence_metrics(ten)["repeatQuestionRate"] == 0.1
+    empty_q = [_case(1, requiredQuestions=[], unjustifiedReopens=0, justifiedReopens=0)]
+    assert convergence_metrics(empty_q)["repeatQuestionRate"] is None

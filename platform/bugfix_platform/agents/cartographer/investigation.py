@@ -116,7 +116,6 @@ def investigate_groups(
     identity = _identity(req)
     journal = load_group_progress(resume_dir) if resume_dir else None
     journal_by_key: dict[str, dict] = {}
-    journal_matches: dict[str, DefectCodeMatch] = {}
     identity_json = json.dumps(identity, sort_keys=True, default=str)
     identity_ok = isinstance(journal, dict) and json.dumps(journal.get("identity") or {}, sort_keys=True, default=str) == identity_json
     if identity_ok:
@@ -126,12 +125,6 @@ def investigate_groups(
             cache_key = item.get("cacheKey")
             if isinstance(cache_key, str) and cache_key:
                 journal_by_key[cache_key] = item
-            for raw in item.get("matches") or []:
-                try:
-                    restored_match = DefectCodeMatch.model_validate(raw)
-                except (ValueError, TypeError):
-                    continue
-                journal_matches[restored_match.defectId] = restored_match
         for item in list(journal.get("groups") or []):
             ids = [str(x) for x in (item.get("ids") or [])]
             if not ids or any(i not in tickets for i in ids):
@@ -142,12 +135,15 @@ def investigate_groups(
             }, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
             if expected_key != item.get("cacheKey"):
                 continue
-            for did in ids:
-                if did in reset_ids:
+            for raw in item.get("matches") or []:
+                try:
+                    restored_match = DefectCodeMatch.model_validate(raw)
+                except (ValueError, TypeError):
                     continue
-                restored_match = journal_matches.get(did)
-                if restored_match is not None:
-                    merged[did] = restored_match
+                if restored_match.defectId in reset_ids:
+                    continue
+                if restored_match.defectId in ids:
+                    merged[restored_match.defectId] = restored_match
     launched = 0
     stop_reason = "completed"
 

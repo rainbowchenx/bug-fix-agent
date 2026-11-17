@@ -281,6 +281,85 @@ def test_closing_pass_cannot_wipe_unanswered_questions(tmp_path, monkeypatch):
     assert any(q.id == "q1" for q in (ticket.rootCause.questions or []))
 
 
+def test_first_round_implementation_decision_allows_edit(tmp_path, monkeypatch):
+    from bugfix_platform.sdk.codegraph import CodeGraphStatus
+    from bugfix_platform.agents.analyst.run import run_analyst
+    monkeypatch.setattr(
+        "bugfix_platform.agents.analyst.run.ensure_codegraph",
+        lambda *a, **k: CodeGraphStatus(ready=False),
+    )
+    work = _mini_repo(tmp_path / "repo")
+    out = tmp_path / "out"
+    knowledge = CodeKnowledge.model_validate({
+        "schemaVersion": "0.4.0",
+        "productLine": "hc",
+        "workDir": str(work),
+        "generatedAt": "2026-01-01T00:00:00Z",
+        "partial": False,
+        "defectCodeMatches": [{
+            "defectId": "D1",
+            "candidates": [{"path": "src/add.py", "source": "grep", "why": "add"}],
+            "confidence": "medium",
+            "observedScopes": ["src/add.py"],
+        }],
+    })
+
+    def analyze(req):
+        payload = dict(req.routed)
+        payload.update({
+            "outcome": "plan_only",
+            "proposedFix": {
+                "summary": "return a+b",
+                "steps": ["edit add"],
+                "targetFiles": ["src/add.py"],
+            },
+            "rootCause": {
+                "summary": "add subtracts instead of adding",
+                "ruledOut": [],
+                "openQuestions": [],
+                "questions": [{
+                    "id": "q2",
+                    "kind": "choice",
+                    "reason": "use for-loop on operands",
+                    "category": "implementation",
+                    "status": "resolved",
+                    "newEvidenceRefs": ["candidate:1"],
+                    "relatedClaimIds": ["c1"],
+                }],
+                "claims": [{
+                    "claimId": "c1",
+                    "statement": "operands swapped",
+                    "role": "conclusion",
+                    "status": "unverified",
+                    "evidenceRefs": ["candidate:1"],
+                    "assumptions": [],
+                }],
+            },
+            "localization": {
+                "candidates": [{
+                    "repoPath": ".",
+                    "path": "src/add.py",
+                    "why": "add implementation here",
+                    "snippet": "return a - b",
+                    "source": "grep",
+                }],
+            },
+            "blockers": None,
+            "confidence": "high",
+            "verifyStatus": "skipped",
+            "suggestedVerify": {"steps": ["python -c"], "executed": False},
+        })
+        return AnalyzeResult(ok=True, payload=payload, source="sdk")
+
+    report = run_analyst(
+        work_dir=work, defect_batch=_batch(), code_knowledge=knowledge,
+        analyze_fn=analyze, artifact_dir=out, apply_fix=False,
+    )
+    ticket = report.tickets[0]
+    assert ticket.actionability.get("allowed") is True
+    assert not any(q.id == "q2" and q.status != "resolved" for q in (ticket.rootCause.questions or []))
+
+
 def test_candidate_alias_converges_implementation_question(tmp_path, monkeypatch):
     from bugfix_platform.sdk.codegraph import CodeGraphStatus
     from bugfix_platform.agents.analyst.run import run_analyst

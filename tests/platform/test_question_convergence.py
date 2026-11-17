@@ -238,3 +238,88 @@ def test_expected_change_invalidates_old_resolution():
     revision = InputRevision(revisionId="r1", defectId="D1", expected="return a-b instead")
     result = consume_question_answers(prev, revision, [], [], revision_id="r1")
     assert all(r.questionId != "q1" or r.disposition != "resolved" for r in result.resolutions)
+    assert any(q.id == "q1" for q in result.openQuestions)
+    assert result.analysisIncomplete is True
+
+
+def test_expected_change_restatement_can_resolve_without_reasking():
+    evidence = [Evidence(evidenceId="e1", category="code_observation", validity="valid")]
+    old_td = __import__("hashlib").sha256(b"add should return a+b").hexdigest()
+    prev = _prev(
+        openQuestions=[],
+        questionLedger=[
+            Question(id="q1", kind="choice", reason="product target?", category="product", status="resolved", relatedClaimIds=[]),
+        ],
+        questionResolutions=[
+            QuestionResolution(
+                questionId="q1",
+                resolutionSource="user_answer",
+                revisionId="r0",
+                answerRevisionId="r0",
+                targetDigest=old_td,
+                disposition="resolved",
+                resolutionSummary="old target",
+                evidenceRefs=["e1"],
+            )
+        ],
+        questionAnswers=[QuestionAnswer(questionId="q1", text="keep a+b", answerRevisionId="r0")],
+    )
+    revision = InputRevision(
+        revisionId="r1",
+        defectId="D1",
+        expected="return a-b instead",
+        questionAnswers=[QuestionAnswer(questionId="q1", text="now return a-b", answerRevisionId="r1")],
+    )
+    proposed = [
+        Question(
+            id="q1",
+            kind="choice",
+            reason="user confirmed a-b under new expected",
+            category="product",
+            status="resolved",
+            relatedClaimIds=["c1"],
+            newEvidenceRefs=["e1"],
+        )
+    ]
+    result = consume_question_answers(prev, revision, proposed, evidence, revision_id="r1")
+    by_id = {r.questionId: r for r in result.resolutions}
+    assert by_id["q1"].disposition == "resolved"
+    assert by_id["q1"].targetDigest == __import__("hashlib").sha256(b"return a-b instead").hexdigest()
+    assert not any(q.id == "q1" and q.status != "resolved" for q in result.openQuestions)
+    assert result.analysisIncomplete is False
+
+
+def test_first_round_implementation_question_creates_resolution():
+    evidence = [Evidence(evidenceId="read-D1-1", category="code_observation", validity="valid")]
+    prev = PreviousAttemptContext.model_validate(
+        {
+            "attemptId": "fresh",
+            "digest": "0" * 64,
+            "analysisRef": {"path": "fresh", "digest": "0" * 64, "attemptId": "fresh"},
+            "openQuestions": [],
+            "questionLedger": [],
+            "questionResolutions": [],
+            "questionAnswers": [],
+        }
+    )
+    proposed = [
+        Question(
+            id="q2",
+            kind="choice",
+            reason="use for-loop",
+            category="implementation",
+            status="resolved",
+            newEvidenceRefs=["candidate:1"],
+            relatedClaimIds=[],
+        )
+    ]
+    result = consume_question_answers(
+        prev,
+        None,
+        proposed,
+        evidence,
+        revision_id="round",
+        evidence_aliases={"candidate:1": "read-D1-1"},
+    )
+    assert any(r.questionId == "q2" and r.disposition == "resolved" for r in result.resolutions)
+    assert not any(q.id == "q2" for q in result.openQuestions)

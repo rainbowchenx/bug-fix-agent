@@ -177,3 +177,69 @@ def test_subset_resume_keeps_historical_journal_groups(tmp_path):
     before = len(calls)
     investigate_groups(req, runner, group_size=8, artifact_dir=artifacts, resume_dir=artifacts)
     assert len(calls) == before
+
+
+def test_journal_restores_matches_from_verified_input_version(tmp_path):
+    from dataclasses import replace
+    from bugfix_contracts.code_knowledge import InvestigationFact
+    from bugfix_platform.agents.cartographer.investigation import investigate_groups
+    from bugfix_platform.sdk.cartography import CartographyResult
+    from tests.platform.test_investigation_batches import request, complete
+
+    req = request(tmp_path / "repo", 9)
+    calls = []
+
+    def runner(r):
+        calls.append([t.defectId for t in r.defect_batch.tickets])
+        result = complete(r)
+        tagged = []
+        for match, ticket in zip(result.knowledge.defectCodeMatches, r.defect_batch.tickets):
+            tagged.append(
+                match.model_copy(
+                    update={
+                        "facts": [
+                            InvestigationFact(
+                                claim=f"from:{ticket.title}",
+                                source="model_reported",
+                                validity="unverified",
+                            )
+                        ]
+                    }
+                )
+            )
+        return CartographyResult(
+            True,
+            result.knowledge.model_copy(update={"defectCodeMatches": tagged}),
+            "sdk",
+        )
+
+    artifacts = tmp_path / "art"
+    investigate_groups(req, runner, group_size=8, artifact_dir=artifacts, resume_dir=artifacts)
+    tickets = [
+        t.model_copy(update={"title": "changed target"}) if t.defectId == "0" else t
+        for t in req.defect_batch.tickets
+    ]
+    changed = replace(req, defect_batch=req.defect_batch.model_copy(update={"tickets": tickets}))
+    investigate_groups(
+        changed, runner, ticket_ids=["0"], group_size=8, artifact_dir=artifacts, resume_dir=artifacts
+    )
+    restore_tickets = [
+        t.model_copy(update={"title": "failure"}) if t.defectId == "0" else t
+        for t in req.defect_batch.tickets
+    ]
+    restored_req = replace(
+        req, defect_batch=req.defect_batch.model_copy(update={"tickets": restore_tickets})
+    )
+    before = len(calls)
+    out = investigate_groups(
+        restored_req,
+        runner,
+        ticket_ids=["8"],
+        group_size=8,
+        artifact_dir=artifacts,
+        resume_dir=artifacts,
+    )
+    by_id = {m.defectId: m for m in out.knowledge.defectCodeMatches}
+    assert by_id["0"].facts[0].claim == "from:failure"
+    assert by_id["0"].investigationStatus == "complete"
+    assert all(c != ["0"] for c in calls[before:])
