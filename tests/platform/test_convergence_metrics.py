@@ -58,3 +58,17 @@ def test_stale_does_not_count_as_success_and_report_only_has_no_repair_rate():
         _case(1, requiredQuestions=["q1"], answersConsumed=1, accepted=True, resolved=True),
     ]
     assert convergence_metrics(template)["answerConsumption"] == 1.0
+
+
+def test_answer_consumption_is_per_question_not_per_ticket():
+    cases = [
+        _case(1, requiredQuestions=["q1", "q2", "q3"], answersConsumed=1, accepted=True, resolved=True),
+    ]
+    metrics = convergence_metrics(cases)
+    assert metrics["answerConsumption"] == 1 / 3
+    unjustified = [
+        _case(1, requiredQuestions=["q1", "q2"], unjustifiedReopens=1, justifiedReopens=1),
+    ]
+    rates = convergence_metrics(unjustified)
+    assert rates["repeatQuestionRate"] == 1 / 2
+    assert rates["justifiedReopenRate"] == 1 / 2

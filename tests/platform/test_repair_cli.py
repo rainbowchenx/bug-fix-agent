@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from bugfix_contracts.repair import REPAIR_SCHEMA_VERSION, AttemptRecord
+from bugfix_contracts.repair import REPAIR_SCHEMA_VERSION, AttemptRecord, Feedback
 from bugfix_platform.agents.analyst.attempt_store import save_attempt
+from bugfix_platform.agents.analyst.sessions import select_resume_parent
 from bugfix_platform.cli import main
 
 
@@ -57,3 +58,26 @@ def test_resume_cli_writes_decision_without_cwd_guess(tmp_path: Path):
     data = json.loads(dest.read_text(encoding="utf-8"))
     assert data["action"] in ("resume", "new")
     assert data.get("sessionId") != "cwd-recent"
+
+
+def test_resume_parent_does_not_roll_back_consumed_feedback():
+    feedback = Feedback(feedbackId="f1", defectId="D1", attemptId="a1", text="q1 answered")
+    first = AttemptRecord(
+        schemaVersion=REPAIR_SCHEMA_VERSION,
+        attemptId="a1",
+        defectId="D1",
+        execution="completed",
+        resolution="needs_information",
+    )
+    assert select_resume_parent(first, feedback) == "a1"
+    second = AttemptRecord(
+        schemaVersion=REPAIR_SCHEMA_VERSION,
+        attemptId="a2",
+        defectId="D1",
+        parentAttemptId="a1",
+        revisionId="D1:f1",
+        execution="completed",
+        resolution="needs_information",
+    )
+    assert select_resume_parent(second, feedback) == "a2"
+    assert select_resume_parent(second, feedback, revision_id="D1:f1") == "a2"

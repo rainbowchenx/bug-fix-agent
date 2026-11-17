@@ -34,24 +34,36 @@ def attribute_test_failures(failed_nodeids: Iterable[str]) -> dict[str, list[str
     return {"preexisting": preexisting, "new": new}
 
 
-def _truthy_required(case: dict[str, Any]) -> bool:
-    value = case.get("requiredQuestion")
-    if value is None:
-        value = case.get("requiredQuestions")
-    if isinstance(value, list):
-        return bool(value)
-    return bool(value)
+def _question_counts(case: dict[str, Any]) -> tuple[int, int]:
+    required = case.get("requiredQuestions")
+    if required is None:
+        required = case.get("requiredQuestion")
+    if isinstance(required, list):
+        n_req = len([item for item in required if item])
+    elif isinstance(required, (int, float)):
+        n_req = int(required)
+    elif required:
+        n_req = 1
+    else:
+        n_req = 0
+    consumed = case.get("answersConsumed")
+    if consumed is None:
+        consumed = case.get("answerConsumed")
+    if isinstance(consumed, (int, float)):
+        n_cons = int(consumed)
+    elif consumed:
+        n_cons = n_req or 1
+    else:
+        n_cons = 0
+    return n_req, min(n_cons, n_req) if n_req else 0
 
 
-def _truthy_consumed(case: dict[str, Any]) -> bool:
-    if "answerConsumed" in case:
-        return bool(case.get("answerConsumed"))
-    if "answersConsumed" in case:
-        raw = case.get("answersConsumed")
-        if isinstance(raw, (int, float)):
-            return raw > 0
-        return bool(raw)
-    return False
+def _reopen_counts(case: dict[str, Any]) -> tuple[int, int]:
+    unjustified = int(case.get("unjustifiedReopens") or 0)
+    justified = int(case.get("justifiedReopens") or 0)
+    if unjustified == 0 and justified == 0 and case.get("questionReopened"):
+        unjustified = 1
+    return unjustified, justified
 
 
 def convergence_metrics(
@@ -80,9 +92,21 @@ def convergence_metrics(
     pending = sum(1 for c in live if c.get("status") == "pending" or c.get("accepted") is None)
     report_only = True if apply_fix is False else (False if apply_fix is True else (all(c.get("applyFix") is False for c in rows) if rows else True))
     observed_den = success + failed
-    required = [c for c in live if _truthy_required(c)]
-    answered = sum(1 for c in required if _truthy_consumed(c))
-    reopened = sum(1 for c in live if c.get("questionReopened"))
+    req_total = 0
+    consumed_total = 0
+    unjustified_total = 0
+    justified_total = 0
+    reopened = 0
+    for case in live:
+        n_req, n_cons = _question_counts(case)
+        req_total += n_req
+        consumed_total += n_cons
+        uj, jr = _reopen_counts(case)
+        unjustified_total += uj
+        justified_total += jr
+        if uj or jr or case.get("questionReopened"):
+            reopened += 1
+    reopen_den = unjustified_total + justified_total
     return {
         "uniqueDefects": n,
         "success": success,
@@ -92,8 +116,9 @@ def convergence_metrics(
         "conservativeRate": (success / n) if n else None,
         "observedRate": (success / observed_den) if observed_den else None,
         "repairRate": None if report_only else ((success / n) if n else None),
-        "answerConsumption": (answered / len(required)) if required else None,
-        "repeatQuestionRate": (reopened / n) if n else None,
+        "answerConsumption": (consumed_total / req_total) if req_total else None,
+        "repeatQuestionRate": (unjustified_total / reopen_den) if reopen_den else ((reopened / n) if n else None),
+        "justifiedReopenRate": (justified_total / reopen_den) if reopen_den else None,
         "note": "70% is a proposed repair-ticket SLA, not an engineering bar",
     }
 

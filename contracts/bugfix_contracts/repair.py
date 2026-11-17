@@ -155,6 +155,7 @@ class PreviousAttemptContext(BaseModel):
     ruledOut: list[str] = Field(default_factory=list)
     proposedFix: Optional[dict[str, Any]] = None
     openQuestions: list[Question] = Field(default_factory=list)
+    questionLedger: list[Question] = Field(default_factory=list)
     questionResolutions: list[QuestionResolution] = Field(default_factory=list)
     confirmedTarget: str = ""
     latestFeedbackKind: Optional[str] = None

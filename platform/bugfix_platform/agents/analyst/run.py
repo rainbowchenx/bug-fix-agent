@@ -260,6 +260,35 @@ def run_analyst(
                     }
                 entry["blockers"] = None
 
+            def _bind_current(entry_obj: dict[str, Any], *, drifted_flag: bool):
+                from bugfix_platform.agents.analyst.claims import bind_claims, evidence_aliases
+                ctx_obj = _verify_current_code(
+                    _context_with_analysis(
+                        build_task_context(
+                            ticket,
+                            code_knowledge,
+                            revision=revision,
+                            snapshot=snapshot,
+                            generate_patch=want_fix,
+                            read_attachments=[a["ref"] for a in entry_obj.get("attachments", []) if a.get("read")],
+                        ),
+                        entry_obj,
+                    ),
+                    Path(work_dir),
+                    entry_obj,
+                )
+                cands = (entry_obj.get("localization") or {}).get("candidates") or []
+                entry_obj["rootCause"] = bind_claims(
+                    entry_obj.get("rootCause") or {},
+                    ctx_obj.evidence,
+                    cands,
+                    ticket.defectId,
+                    drifted=drifted_flag,
+                )
+                ctx_obj = ctx_obj.model_copy(update={"claims": entry_obj["rootCause"].get("claims", [])})
+                aliases, _ = evidence_aliases(ctx_obj.evidence, cands, ticket.defectId)
+                return ctx_obj, aliases
+
             drifted = bool(
                 snapshot.contentDigest
                 and workspace_digest(Path(work_dir)) != snapshot.contentDigest
@@ -272,25 +301,7 @@ def run_analyst(
                     if x
                 )
                 entry["localization"] = loc
-            ctx = _verify_current_code(
-                _context_with_analysis(
-                    build_task_context(
-                        ticket,
-                        code_knowledge,
-                        revision=revision,
-                        snapshot=snapshot,
-                        generate_patch=want_fix,
-                        read_attachments=[a["ref"] for a in entry.get("attachments", []) if a.get("read")],
-                    ),
-                    entry,
-                ),
-                Path(work_dir),
-                entry,
-            )
-            from bugfix_platform.agents.analyst.claims import bind_claims
-            entry["rootCause"] = bind_claims(entry.get("rootCause") or {}, ctx.evidence,
-                (entry.get("localization") or {}).get("candidates") or [], ticket.defectId, drifted=drifted)
-            ctx = ctx.model_copy(update={"claims": entry["rootCause"].get("claims", [])})
+            ctx, aliases = _bind_current(entry, drifted_flag=drifted)
             resolutions = []
             conv = None
             if previous_payload:
@@ -304,6 +315,7 @@ def run_analyst(
                     proposed,
                     list(ctx.evidence),
                     revision_id=revision.revisionId if revision is not None else "round",
+                    evidence_aliases=aliases,
                 )
                 resolutions = conv.resolutions
                 root = dict(entry.get("rootCause") or {})
@@ -341,10 +353,23 @@ def run_analyst(
                             entry[key] = close.payload[key]
                     if close_root:
                         merged_root = dict(entry.get("rootCause") or {})
-                        for key in ("summary", "ruledOut", "claims"):
+                        for key in ("summary", "ruledOut", "claims", "questions"):
                             if close_root.get(key) is not None:
                                 merged_root[key] = close_root[key]
                         entry["rootCause"] = merged_root
+                    drifted = bool(
+                        snapshot.contentDigest
+                        and workspace_digest(Path(work_dir)) != snapshot.contentDigest
+                    )
+                    if drifted:
+                        loc = dict(entry.get("localization") or {})
+                        loc["notes"] = "; ".join(
+                            x
+                            for x in [loc.get("notes"), "source changed after analyze; refuse edit"]
+                            if x
+                        )
+                        entry["localization"] = loc
+                    ctx, aliases = _bind_current(entry, drifted_flag=drifted)
                     proposed_close = [
                         Question.model_validate(q) for q in (close_root.get("questions") or [])
                     ]
@@ -354,6 +379,7 @@ def run_analyst(
                         proposed_close or proposed,
                         list(ctx.evidence),
                         revision_id=revision.revisionId if revision is not None else "round",
+                        evidence_aliases=aliases,
                     )
                     resolutions = conv.resolutions
                     root = dict(entry.get("rootCause") or {})
@@ -447,6 +473,7 @@ def run_analyst(
                 revision=revision,
                 workspace=snapshot,
                 resolutions=resolutions,
+                previous_ledger=(previous_payload or {}).get("questionLedger") or (previous_payload or {}).get("openQuestions"),
             )
 
         for t in defect_batch.tickets:
@@ -1131,6 +1158,7 @@ def _persist_ticket_entry(
     revision: Optional[InputRevision] = None,
     workspace=None,
     resolutions: Optional[list] = None,
+    previous_ledger: Optional[list] = None,
 ) -> dict[str, Any]:
     decision=attempt.editDecision
     entry = {**entry, "attemptId": attempt.attemptId,
@@ -1152,6 +1180,7 @@ def _persist_ticket_entry(
             workspace=workspace,
             parent_attempt_id=attempt.parentAttemptId,
             resolutions=resolutions,
+            previous_ledger=previous_ledger,
         )
         save_analysis_snapshot(
             Path(out_dir),

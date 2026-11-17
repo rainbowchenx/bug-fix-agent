@@ -162,6 +162,63 @@ def test_short_unknown_answers_do_not_auto_resolve():
     assert all(r.disposition != "resolved" for r in result.resolutions if r.questionId == "q1")
 
 
+def test_candidate_alias_resolves_implementation_question():
+    evidence = [Evidence(evidenceId="read-D1-1", category="code_observation", validity="valid")]
+    prev = _prev()
+    proposed = [
+        Question(
+            id="q2",
+            kind="choice",
+            reason="use for-loop",
+            category="implementation",
+            status="resolved",
+            newEvidenceRefs=["candidate:1"],
+            relatedClaimIds=[],
+        ),
+        Question(id="q1", kind="choice", reason="product target?", category="product", relatedClaimIds=[]),
+    ]
+    result = consume_question_answers(
+        prev,
+        None,
+        proposed,
+        evidence,
+        revision_id="r1",
+        evidence_aliases={"candidate:1": "read-D1-1", "src/add.py": "read-D1-1"},
+    )
+    by_id = {r.questionId: r for r in result.resolutions}
+    assert by_id["q2"].disposition == "resolved"
+    assert by_id["q2"].evidenceRefs == ["read-D1-1"]
+
+
+def test_resolved_question_cannot_reopen_without_new_evidence():
+    evidence = [Evidence(evidenceId="e1", category="code_observation", validity="valid")]
+    prev = _prev(
+        openQuestions=[],
+        questionLedger=[
+            Question(id="q1", kind="choice", reason="product target?", category="product", status="resolved", relatedClaimIds=[]),
+        ],
+        questionResolutions=[
+            QuestionResolution(
+                questionId="q1",
+                resolutionSource="user_answer",
+                revisionId="r0",
+                answerRevisionId="r0",
+                targetDigest=__import__("hashlib").sha256(b"add should return a+b").hexdigest(),
+                disposition="resolved",
+                resolutionSummary="keep a+b",
+                evidenceRefs=["e1"],
+            )
+        ],
+        questionAnswers=[QuestionAnswer(questionId="q1", text="keep a+b", answerRevisionId="r0")],
+    )
+    proposed = [
+        Question(id="q1", kind="choice", reason="ask again", category="product", status="open", relatedClaimIds=[]),
+    ]
+    result = consume_question_answers(prev, None, proposed, evidence, revision_id="r1")
+    assert any("reopen of q1" in v for v in result.violations)
+    assert result.analysisIncomplete is True
+
+
 def test_expected_change_invalidates_old_resolution():
     old_td = __import__("hashlib").sha256(b"add should return a+b").hexdigest()
     prev = _prev(

@@ -110,6 +110,24 @@ def test_same_digest_retry_completes_missing_attempt_and_form(tmp_path: Path):
     assert (tmp_path / "defects" / "D1" / "latest.json").is_file()
 
 
+def test_interrupted_new_attempt_retry_advances_latest(tmp_path: Path):
+    a0 = AttemptRecord(schemaVersion=REPAIR_SCHEMA_VERSION, attemptId="a0", defectId="D1", execution="completed", resolution="analysis_only")
+    save_analysis_snapshot(tmp_path, a0, build_snapshot_from_entry(_entry("D1", "first")))
+    a1 = AttemptRecord(schemaVersion=REPAIR_SCHEMA_VERSION, attemptId="a1", defectId="D1", execution="completed", resolution="analysis_only", parentAttemptId="a0")
+    snap = build_snapshot_from_entry(_entry("D1", "second"))
+    dest = tmp_path / "defects" / "D1" / "attempts" / "a1"
+    dest.mkdir(parents=True, exist_ok=True)
+    payload = snap.model_dump()
+    payload["digest"] = snap.digest or snapshot_digest(payload)
+    (dest / "analysis.json").write_text(json.dumps(payload), encoding="utf-8")
+    save_analysis_snapshot(tmp_path, a1, snap)
+    latest = json.loads((tmp_path / "defects" / "D1" / "latest.json").read_text(encoding="utf-8"))
+    assert latest["attemptId"] == "a1"
+    save_analysis_snapshot(tmp_path, a0, build_snapshot_from_entry(_entry("D1", "first")))
+    latest = json.loads((tmp_path / "defects" / "D1" / "latest.json").read_text(encoding="utf-8"))
+    assert latest["attemptId"] == "a1"
+
+
 def test_run_analyst_report_only_writes_snapshot(tmp_path: Path, monkeypatch):
     from bugfix_platform.sdk.codegraph import CodeGraphStatus
     monkeypatch.setattr(

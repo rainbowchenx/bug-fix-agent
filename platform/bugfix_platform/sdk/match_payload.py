@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -420,11 +421,15 @@ def _normalize_candidates(
             issues.append(ParseIssue(fieldPath=path, reason="path_not_found", action="isolate", rawRef=path))
             rejected.append(path)
             continue
-        source = item.get("source") or "model_reported"
-        if source not in _ALLOWED_SOURCE:
+        raw_source = item.get("source")
+        if raw_source in (None, ""):
+            source = "model_reported"
+        elif not isinstance(raw_source, str) or raw_source not in _ALLOWED_SOURCE:
             issues.append(ParseIssue(fieldPath=path, reason="illegal_source", action="isolate", rawRef=path))
             rejected.append(path)
             continue
+        else:
+            source = raw_source
         symbol = item.get("symbol") if isinstance(item.get("symbol"), str) else None
         if item.get("symbol") is not None and symbol is None:
             issues.append(ParseIssue(fieldPath=f"{path}.symbol", reason="bad_type", action="drop", rawRef=path))
@@ -444,10 +449,16 @@ def _normalize_candidates(
     return out, issues, rejected
 
 
-def verify_fact_references(work_dir: str, matches: list[DefectCodeMatch], observed_paths: list[str] | None = None) -> list[DefectCodeMatch]:
-    """保留引用；仅当片段出现在当前文件时由程序升级 reference_verified。"""
-    root = Path(work_dir)
+def verify_fact_references(
+    work_dir: str,
+    matches: list[DefectCodeMatch],
+    observed_paths: list[str] | None = None,
+    repo_roots: list[Any] | None = None,
+) -> list[DefectCodeMatch]:
+    """保留引用；仅当仓内当前版本片段命中时由程序升级 reference_verified。"""
+    root = Path(work_dir).resolve()
     observed = {_norm_obs(p) for p in (observed_paths or []) if str(p).strip()}
+    heads = _repo_heads(root, repo_roots)
     out: list[DefectCodeMatch] = []
     for match in matches:
         facts: list[InvestigationFact] = []
@@ -455,28 +466,137 @@ def verify_fact_references(work_dir: str, matches: list[DefectCodeMatch], observ
             ref = fact.reference
             validity = "unverified"
             if ref is not None and ref.snippet and ref.path:
-                path = root / (ref.repoId if ref.repoId not in {".", ""} else "") / ref.path
-                if ref.repoId in {".", ""}:
-                    path = root / ref.path
-                try:
-                    body = path.read_text(encoding="utf-8", errors="replace")
-                except OSError:
-                    body = ""
-                if body and ref.snippet in body:
-                    validity = "reference_verified"
+                path = _safe_repo_file(root, ref.repoId, ref.path)
+                if path is not None:
+                    try:
+                        body = path.read_text(encoding="utf-8", errors="replace")
+                    except OSError:
+                        body = ""
+                    if body and ref.snippet in body and _version_matches(path, ref, heads):
+                        validity = "reference_verified"
             facts.append(fact.model_copy(update={"validity": validity, "source": "model_reported"}))
         scopes = []
         for cand in match.candidates or []:
-            rel = _norm_obs(cand.path)
-            if rel and (rel in observed or any(obs.endswith(rel) or rel in obs for obs in observed)):
+            rel = _candidate_rel(cand.repoPath if hasattr(cand, "repoPath") else ".", cand.path)
+            if rel in observed:
                 scopes.append(cand.path)
         for fact in facts:
             if fact.reference and fact.reference.path:
-                rel = _norm_obs(fact.reference.path)
-                if rel and (rel in observed or any(obs.endswith(rel) or rel in obs for obs in observed)):
+                rel = _candidate_rel(fact.reference.repoId, fact.reference.path)
+                if rel in observed:
                     scopes.append(fact.reference.path)
         out.append(match.model_copy(update={"facts": facts, "observedScopes": list(dict.fromkeys(scopes))}))
     return out
+
+
+def apply_tool_observation(
+    pending: dict[str, str],
+    observed: list[str],
+    block: Any,
+    work_dir: str,
+) -> None:
+    """仅在成功 ToolResult 后记录规范化观察范围。"""
+    name = getattr(block, "name", None) or (block.get("name") if isinstance(block, dict) else None)
+    params = getattr(block, "input", None) or (block.get("input") if isinstance(block, dict) else {}) or {}
+    tool_id = getattr(block, "id", None) or (block.get("id") if isinstance(block, dict) else None)
+    use_id = getattr(block, "tool_use_id", None) or (block.get("tool_use_id") if isinstance(block, dict) else None)
+    if name in {"Read", "Grep", "Glob"} and tool_id:
+        ref = params.get("file_path") or params.get("path")
+        if isinstance(ref, str) and ref.strip():
+            pending[str(tool_id)] = repo_relative_path(work_dir, ref)
+        return
+    if not use_id:
+        return
+    key = str(use_id)
+    if key not in pending:
+        return
+    is_error = bool(getattr(block, "is_error", False) or (block.get("is_error") if isinstance(block, dict) else False))
+    content = getattr(block, "content", None) if not isinstance(block, dict) else block.get("content")
+    rel = pending.pop(key)
+    if not is_error and content:
+        observed.append(rel)
+
+
+def repo_relative_path(work_dir: str, raw: str) -> str:
+    root = Path(work_dir).resolve()
+    path = Path(raw)
+    if not path.is_absolute():
+        path = root / path
+    try:
+        rel = path.resolve().relative_to(root)
+    except ValueError:
+        return _norm_obs(raw)
+    return _norm_obs(str(rel))
+
+
+def _safe_repo_file(root: Path, repo_id: str, rel: str) -> Path | None:
+    base = root if repo_id in {".", ""} else (root / str(repo_id)).resolve()
+    if repo_id not in {".", ""}:
+        try:
+            base.relative_to(root)
+        except ValueError:
+            return None
+    try:
+        candidate = (base / rel).resolve()
+        candidate.relative_to(base)
+    except (OSError, ValueError):
+        return None
+    if not candidate.is_file():
+        return None
+    return candidate
+
+
+def _version_matches(path: Path, ref: CodeReference, heads: dict[str, str]) -> bool:
+    if ref.revision:
+        head = heads.get(".") or heads.get(str(path))
+        repo_head = _git_head(path.parent)
+        if ref.revision not in {head, repo_head}:
+            return False
+    if ref.contentDigest:
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        declared = str(ref.contentDigest)
+        if declared not in {digest, digest[: len(declared)]}:
+            return False
+    return True
+
+
+def _repo_heads(root: Path, repo_roots: list[Any] | None) -> dict[str, str]:
+    heads: dict[str, str] = {}
+    root_head = _git_head(root)
+    if root_head:
+        heads["."] = root_head
+    for item in repo_roots or []:
+        path = getattr(item, "path", None) or (item.get("path") if isinstance(item, dict) else None)
+        git_head = getattr(item, "gitHead", None) or (item.get("gitHead") if isinstance(item, dict) else None)
+        if path and git_head:
+            heads[str(path)] = str(git_head)
+    return heads
+
+
+def _git_head(start: Path) -> str | None:
+    cur = start
+    for _ in range(8):
+        git = cur / ".git" / "HEAD"
+        if git.is_file():
+            text = git.read_text(encoding="utf-8").strip()
+            if text.startswith("ref:"):
+                ref = cur / ".git" / text.split(":", 1)[1].strip()
+                if ref.is_file():
+                    return ref.read_text(encoding="utf-8").strip()[:40]
+                return text
+            return text[:40]
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    return None
+
+
+def _candidate_rel(repo_id: str, path: str) -> str:
+    rel = _norm_obs(path)
+    repo = _norm_obs(repo_id)
+    if repo in {"", "."}:
+        return rel
+    return f"{repo}/{rel}"
 
 
 def _norm_obs(path: str) -> str:

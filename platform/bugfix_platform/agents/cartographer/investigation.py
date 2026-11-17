@@ -132,33 +132,65 @@ def investigate_groups(
                 except (ValueError, TypeError):
                     continue
                 journal_matches[restored_match.defectId] = restored_match
-        for defect_id, restored_match in journal_matches.items():
-            if defect_id not in reset_ids:
-                merged[defect_id] = restored_match
+        for item in list(journal.get("groups") or []):
+            ids = [str(x) for x in (item.get("ids") or [])]
+            if not ids or any(i not in tickets for i in ids):
+                continue
+            current_tickets = [tickets[i] for i in ids]
+            expected_key = hashlib.sha256(json.dumps({
+                "identity": identity, "tickets": [t.model_dump() for t in current_tickets],
+            }, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+            if expected_key != item.get("cacheKey"):
+                continue
+            for did in ids:
+                if did in reset_ids:
+                    continue
+                restored_match = journal_matches.get(did)
+                if restored_match is not None:
+                    merged[did] = restored_match
     launched = 0
     stop_reason = "completed"
+
+    def _group_payload(record: dict) -> dict:
+        ids = list(record.get("ids") or [])
+        return {
+            "ids": ids,
+            "cacheKey": record.get("cacheKey"),
+            "status": record.get("status"),
+            "stopReason": record.get("stopReason"),
+            "source": record.get("source"),
+            "detail": record.get("detail"),
+            "turns": record.get("turns"),
+            "cost": record.get("cost"),
+            "matches": [merged[i].model_dump() for i in ids if i in merged],
+        }
 
     def _flush_journal() -> None:
         if artifacts is None:
             return
+        by_key: dict[str, dict] = {}
+        order: list[str] = []
+        if identity_ok:
+            for item in list((journal or {}).get("groups") or []):
+                cache_key = item.get("cacheKey") if isinstance(item, dict) else None
+                if isinstance(cache_key, str) and cache_key:
+                    by_key[cache_key] = item
+                    order.append(cache_key)
+        for record in records:
+            cache_key = record.get("cacheKey")
+            payload = _group_payload(record)
+            if isinstance(cache_key, str) and cache_key:
+                if cache_key not in by_key:
+                    order.append(cache_key)
+                by_key[cache_key] = payload
+            else:
+                order.append(f"anon-{len(order)}")
+                by_key[order[-1]] = payload
         save_group_progress(artifacts, {
             "identity": identity,
             "stopReason": stop_reason,
             "billing": _aggregate_billing(records),
-            "groups": [
-                {
-                    "ids": r["ids"],
-                    "cacheKey": r.get("cacheKey"),
-                    "status": r.get("status"),
-                    "stopReason": r.get("stopReason"),
-                    "source": r.get("source"),
-                    "detail": r.get("detail"),
-                    "turns": r.get("turns"),
-                    "cost": r.get("cost"),
-                    "matches": [merged[i].model_dump() for i in r["ids"] if i in merged],
-                }
-                for r in records
-            ],
+            "groups": [by_key[key] for key in order if key in by_key],
         })
     for n, ids in enumerate(groups):
         batch = req.defect_batch.model_copy(update={"tickets": [tickets[i] for i in ids]})

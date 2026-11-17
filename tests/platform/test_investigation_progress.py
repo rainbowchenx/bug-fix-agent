@@ -145,3 +145,35 @@ def test_ticket_ids_rerun_keeps_other_tickets(tmp_path):
     assert all(
         m.investigationStatus == "complete" for m in second.knowledge.defectCodeMatches
     )
+
+
+def test_subset_resume_keeps_historical_journal_groups(tmp_path):
+    from dataclasses import replace
+    import json
+    from bugfix_platform.agents.cartographer.investigation import investigate_groups
+    from tests.platform.test_investigation_batches import request, complete
+
+    req = request(tmp_path / "repo", 9)
+    calls = []
+
+    def runner(r):
+        calls.append([t.defectId for t in r.defect_batch.tickets])
+        return complete(r)
+
+    artifacts = tmp_path / "art"
+    investigate_groups(req, runner, group_size=8, artifact_dir=artifacts, resume_dir=artifacts)
+    first_groups = len(json.loads((artifacts / "agent2" / "progress.json").read_text(encoding="utf-8"))["groups"])
+    assert first_groups >= 2
+    investigate_groups(
+        replace(req, baseline=req.baseline),
+        runner,
+        ticket_ids=["8"],
+        group_size=8,
+        artifact_dir=artifacts,
+        resume_dir=artifacts,
+    )
+    journal = json.loads((artifacts / "agent2" / "progress.json").read_text(encoding="utf-8"))
+    assert len(journal["groups"]) >= first_groups
+    before = len(calls)
+    investigate_groups(req, runner, group_size=8, artifact_dir=artifacts, resume_dir=artifacts)
+    assert len(calls) == before

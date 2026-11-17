@@ -162,6 +162,7 @@ class AnalysisSnapshot(BaseModel):
     effectiveRevision: Optional[InputRevision] = None
     workspaceSnapshot: Optional[WorkspaceSnapshot] = None
     questionResolutions: list[QuestionResolution] = Field(default_factory=list)
+    questionLedger: list[Question] = Field(default_factory=list)
     parentAttemptId: Optional[str] = None
     digest: str = Field(min_length=1)
     baseRevisionId: Optional[str] = None

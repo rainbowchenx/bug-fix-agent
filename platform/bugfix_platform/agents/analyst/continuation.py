@@ -85,6 +85,7 @@ def build_previous_attempt(
         ruledOut=list(report.rootCause.ruledOut or []) if report.rootCause else [],
         proposedFix=report.proposedFix.model_dump() if report.proposedFix else None,
         openQuestions=list(report.rootCause.questions or []) if report.rootCause else [],
+        questionLedger=list(snapshot.questionLedger or report.rootCause.questions or []) if report.rootCause else list(snapshot.questionLedger or []),
         questionResolutions=list(snapshot.questionResolutions or []),
         confirmedTarget=(report.ticket.expected or "") if report.ticket else "",
         latestFeedbackKind=feedback.kind if feedback else None,
@@ -119,6 +120,23 @@ def _evidence_ids(current_evidence: list[Any]) -> set[str]:
     return {str(x) for x in ids}
 
 
+def _rewrite_refs(refs: list[Any], aliases: dict[str, str]) -> list[str]:
+    out: list[str] = []
+    for raw in refs or []:
+        text = str(raw).strip()
+        if not text:
+            continue
+        out.append(aliases.get(text, text))
+    return out
+
+
+def _merge_parent_questions(previous: PreviousAttemptContext) -> list[Question]:
+    by_id: dict[str, Question] = {}
+    for question in list(previous.questionLedger or []) + list(previous.openQuestions or []):
+        by_id.setdefault(question.id, question)
+    return list(by_id.values())
+
+
 def consume_question_answers(
     previous: PreviousAttemptContext,
     revision: Optional[InputRevision],
@@ -126,10 +144,12 @@ def consume_question_answers(
     current_evidence: list[Any],
     *,
     revision_id: str = "round",
+    evidence_aliases: Optional[dict[str, str]] = None,
 ) -> ConvergenceResult:
     """由分析会话给出处理结论，程序只校验引用/状态/目标；不靠字数或关键词判业务。"""
     answers = _answer_map(revision, previous)
-    parent_questions = list(previous.openQuestions or [])
+    aliases = dict(evidence_aliases or {})
+    parent_questions = _merge_parent_questions(previous)
     proposed = list(proposed_questions or [])
     proposed_by_id = {q.id: q for q in proposed}
     parent_ids = {q.id for q in parent_questions}
@@ -144,8 +164,21 @@ def consume_question_answers(
         and revision.expected != previous.confirmedTarget
     )
     resolutions: list[QuestionResolution] = []
+    invalidated_ids: set[str] = set()
     for item in previous.questionResolutions or []:
         if expected_changed and item.targetDigest != td:
+            invalidated_ids.add(item.questionId)
+            resolutions.append(
+                QuestionResolution(
+                    questionId=item.questionId,
+                    resolutionSource="agent_decision",
+                    revisionId=revision.revisionId if revision is not None else revision_id,
+                    targetDigest=td,
+                    disposition="insufficient",
+                    resolutionSummary="expected changed; restatement required",
+                    evidenceRefs=list(item.evidenceRefs or []),
+                )
+            )
             continue
         resolutions.append(item)
     resolved_ids = {r.questionId for r in resolutions if r.disposition == "resolved"}
@@ -162,17 +195,22 @@ def consume_question_answers(
         if incoming is None:
             rewritten = [q for q in proposed if q.predecessorId == question.id]
             if not rewritten and question.kind in {"blocking", "choice"} and question.id not in resolved_ids:
+                if question.id in invalidated_ids:
+                    continue
                 violations.append(f"omitted parent question {question.id}")
                 _keep_open(question)
                 continue
             incoming = rewritten[0] if rewritten else question
         if incoming.id != question.id and not incoming.predecessorId:
             violations.append(f"rewritten question {incoming.id} missing predecessorId")
+        incoming_refs = _rewrite_refs(incoming.newEvidenceRefs or [], aliases)
+        if incoming_refs != list(incoming.newEvidenceRefs or []):
+            incoming = incoming.model_copy(update={"newEvidenceRefs": incoming_refs})
         if question.id in resolved_ids and incoming.status == "open" and not incoming.newEvidenceRefs:
             violations.append(f"reopen of {question.id} without new evidence")
             continue
         model_resolved = incoming.status == "resolved"
-        refs = [str(x) for x in (incoming.newEvidenceRefs or []) if str(x).strip()]
+        refs = incoming_refs
         refs_ok = bool(refs) and all(ref in evidence_ids for ref in refs)
 
         if model_resolved and question.kind in {"blocking", "choice"} and incoming.category in {"product", "fact"}:

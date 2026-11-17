@@ -203,6 +203,31 @@ def test_json_scanner_advances_on_braces_inside_strings():
     assert envelope["defectCodeMatches"][0]["defectId"] == "A"
 
 
+def test_bad_candidate_source_keeps_same_ticket_facts():
+    parsed = {
+        "defectCodeMatches": [
+            {
+                "defectId": "A",
+                "facts": [{"claim": "keep A", "reference": {"path": "src/a.ts", "snippet": "pageId"}}],
+                "candidates": [
+                    {"path": "src/a.ts", "source": "grep"},
+                    {"path": "src/bad.ts", "source": {"bad": 1}},
+                ],
+            },
+            {
+                "defectId": "B",
+                "facts": [{"claim": "keep B"}],
+                "candidates": [{"path": "src/b.ts", "source": "grep"}],
+            },
+        ],
+    }
+    group = normalize_group_matches(parsed, requested_ids={"A", "B"})
+    by_id = {m.defectId: m for m in group.accepted}
+    assert set(by_id) == {"A", "B"}
+    assert by_id["A"].facts[0].claim == "keep A"
+    assert [c.path for c in by_id["A"].candidates] == ["src/a.ts"]
+
+
 def test_verify_fact_references_upgrades_only_when_snippet_exists(tmp_path):
     from bugfix_contracts.code_knowledge import CodeReference, DefectCodeMatch, InvestigationFact
     from bugfix_platform.sdk.match_payload import verify_fact_references
@@ -227,3 +252,93 @@ def test_verify_fact_references_upgrades_only_when_snippet_exists(tmp_path):
     out = verify_fact_references(str(tmp_path), matches, observed_paths=["src/a.ts"])
     assert out[0].facts[0].validity == "reference_verified"
     assert "src/a.ts" in out[0].observedScopes
+
+
+def test_outside_and_stale_revision_references_stay_unverified(tmp_path):
+    from bugfix_contracts.code_knowledge import CodeReference, DefectCodeMatch, InvestigationFact
+    from bugfix_platform.sdk.match_payload import verify_fact_references
+
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "a.ts").write_text("const pageId = 1;\n", encoding="utf-8")
+    outside = tmp_path.parent / "outside.txt"
+    outside.write_text("pageId leaked\n", encoding="utf-8")
+    matches = [
+        DefectCodeMatch(
+            defectId="A",
+            facts=[
+                InvestigationFact(
+                    claim="outside",
+                    source="model_reported",
+                    validity="unverified",
+                    reference=CodeReference(
+                        repoId=".", path="../outside.txt", snippet="pageId", revision="wrong"
+                    ),
+                ),
+                InvestigationFact(
+                    claim="stale digest",
+                    source="model_reported",
+                    validity="unverified",
+                    reference=CodeReference(
+                        repoId=".", path="src/a.ts", snippet="pageId", contentDigest="0" * 64
+                    ),
+                ),
+            ],
+            candidates=[{"path": "src/a.ts", "source": "grep", "why": "name"}],
+        )
+    ]
+    out = verify_fact_references(str(tmp_path), matches, observed_paths=["src/a.ts"])
+    assert {f.validity for f in out[0].facts} == {"unverified"}
+    assert out[0].investigationStatus != "complete" or all(f.validity != "reference_verified" for f in out[0].facts)
+
+
+def test_failed_read_is_not_observed_and_paths_are_exact(tmp_path):
+    from bugfix_platform.sdk.match_payload import apply_tool_observation, verify_fact_references
+    from bugfix_contracts.code_knowledge import CodeReference, DefectCodeMatch, InvestigationFact
+
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "a.ts").write_text("const pageId = 1;\n", encoding="utf-8")
+    pending: dict[str, str] = {}
+    observed: list[str] = []
+    apply_tool_observation(
+        pending,
+        observed,
+        {"id": "t1", "name": "Read", "input": {"file_path": str(src / "a.ts")}},
+        str(tmp_path),
+    )
+    apply_tool_observation(
+        pending,
+        observed,
+        {"tool_use_id": "t1", "is_error": True, "content": "permission denied"},
+        str(tmp_path),
+    )
+    apply_tool_observation(
+        pending,
+        observed,
+        {"id": "t2", "name": "Read", "input": {"file_path": "pkg/a.ts"}},
+        str(tmp_path),
+    )
+    apply_tool_observation(
+        pending,
+        observed,
+        {"tool_use_id": "t2", "is_error": False, "content": "other file"},
+        str(tmp_path),
+    )
+    assert observed == ["pkg/a.ts"]
+    matches = [
+        DefectCodeMatch(
+            defectId="A",
+            candidates=[{"path": "src/a.ts", "source": "grep", "why": "name"}],
+            facts=[
+                InvestigationFact(
+                    claim="reads pageId",
+                    source="model_reported",
+                    validity="unverified",
+                    reference=CodeReference(repoId=".", path="src/a.ts", snippet="pageId"),
+                )
+            ],
+        )
+    ]
+    out = verify_fact_references(str(tmp_path), matches, observed_paths=observed)
+    assert out[0].observedScopes == []

@@ -81,10 +81,10 @@ def _cmd_resume(
     revisions = {defect_id: revision} if revision is not None else {}
     session_ids = {defect_id: decision.sessionId} if decision.sessionId else {}
     from bugfix_platform.agents.analyst.feedback import load_latest_feedback
-    from bugfix_platform.agents.analyst.sessions import load_latest_attempt
+    from bugfix_platform.agents.analyst.sessions import load_latest_attempt, select_resume_parent
     feedback = load_latest_feedback(base, defect_id)
     latest = load_latest_attempt(base, defect_id)
-    parent_id = (feedback.attemptId if feedback is not None else None) or (latest.attemptId if latest is not None else None)
+    parent_id = select_resume_parent(latest, feedback, revision_id=revision_id)
     parent_attempt_ids = {defect_id: parent_id} if parent_id else {}
     report = run_analyst(
         work_dir=work_dir,

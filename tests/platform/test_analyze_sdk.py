@@ -55,6 +55,8 @@ def test_analyze_prompt_includes_architecture_map():
     assert ANALYZE_TOOLS == ["Read", "Glob", "Grep"]
     assert "MUST Read" in _SYSTEM_PROMPT
     assert "already Read" not in _SYSTEM_PROMPT
+    assert "newEvidenceRefs" in _SYSTEM_PROMPT
+    assert "candidate:1" in _SYSTEM_PROMPT
 
 
 def test_analyze_prompt_uses_effective_observed_not_legacy_duplicate():

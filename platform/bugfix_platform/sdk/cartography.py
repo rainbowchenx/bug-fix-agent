@@ -450,6 +450,7 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
     skill_reads: set[str] = set()
     pending_skill_reads: dict[str, str] = {}
     observed_paths: list[str] = []
+    pending_observe: dict[str, str] = {}
     recorder = None
     if req.artifact_dir:
         from bugfix_platform.agents.cartographer.investigation_store import InvestigationRecorder
@@ -473,13 +474,11 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
         return {k: v for k, v in payload.items() if v is not None}
 
     def observe_reads(message: Any) -> None:
+        from bugfix_platform.sdk.match_payload import apply_tool_observation
         for block in getattr(message, "content", []) or []:
+            apply_tool_observation(pending_observe, observed_paths, block, req.work_dir)
             name = getattr(block, "name", None) or (block.get("name") if isinstance(block, dict) else None)
             params = getattr(block, "input", None) or (block.get("input") if isinstance(block, dict) else {}) or {}
-            if name in {"Read", "Grep", "Glob"}:
-                ref = params.get("file_path") or params.get("path") or params.get("pattern") or params.get("target")
-                if ref:
-                    observed_paths.append(str(ref))
             if name == "Read":
                 ref = params.get("file_path")
                 if ref:
@@ -674,6 +673,7 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
                 req.work_dir,
                 list(knowledge.defectCodeMatches),
                 observed_paths=observed_paths,
+                repo_roots=list(req.baseline.repoRoots or []),
             )
             knowledge = knowledge.model_copy(
                 update={
@@ -702,7 +702,10 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
                 knowledge = knowledge.model_copy(
                     update={
                         "defectCodeMatches": verify_fact_references(
-                            req.work_dir, list(knowledge.defectCodeMatches), observed_paths=observed_paths
+                            req.work_dir,
+                            list(knowledge.defectCodeMatches),
+                            observed_paths=observed_paths,
+                            repo_roots=list(req.baseline.repoRoots or []),
                         )
                     }
                 )

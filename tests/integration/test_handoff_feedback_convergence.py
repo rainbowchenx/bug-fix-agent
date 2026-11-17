@@ -279,3 +279,146 @@ def test_closing_pass_cannot_wipe_unanswered_questions(tmp_path, monkeypatch):
     ticket = report2.tickets[0]
     assert ticket.actionability["allowed"] is False
     assert any(q.id == "q1" for q in (ticket.rootCause.questions or []))
+
+
+def test_candidate_alias_converges_implementation_question(tmp_path, monkeypatch):
+    from bugfix_platform.sdk.codegraph import CodeGraphStatus
+    from bugfix_platform.agents.analyst.run import run_analyst
+    monkeypatch.setattr(
+        "bugfix_platform.agents.analyst.run.ensure_codegraph",
+        lambda *a, **k: CodeGraphStatus(ready=False),
+    )
+    work = _mini_repo(tmp_path / "repo")
+    out = tmp_path / "out"
+    knowledge = CodeKnowledge.model_validate({
+        "schemaVersion": "0.4.0",
+        "productLine": "hc",
+        "workDir": str(work),
+        "generatedAt": "2026-01-01T00:00:00Z",
+        "partial": False,
+        "defectCodeMatches": [{
+            "defectId": "D1",
+            "candidates": [{"path": "src/add.py", "source": "grep", "why": "add"}],
+            "confidence": "medium",
+            "observedScopes": ["src/add.py"],
+        }],
+    })
+
+    def analyze1(req):
+        payload = dict(req.routed)
+        payload.update(_entry())
+        payload["rootCause"]["questions"] = [{
+            "id": "q2",
+            "kind": "choice",
+            "reason": "map or for?",
+            "category": "implementation",
+            "relatedClaimIds": ["c1"],
+        }]
+        payload["localization"]["candidates"] = [{
+            "path": "src/add.py",
+            "why": "add implementation here",
+            "snippet": "return a - b",
+            "source": "grep",
+        }]
+        return AnalyzeResult(ok=True, payload=payload, source="sdk")
+
+    run_analyst(
+        work_dir=work, defect_batch=_batch(), code_knowledge=knowledge,
+        analyze_fn=analyze1, artifact_dir=out, apply_fix=False,
+    )
+
+    def analyze2(req):
+        payload = dict(req.routed)
+        payload.update(_entry())
+        payload["rootCause"]["questions"] = [{
+            "id": "q2",
+            "kind": "choice",
+            "reason": "use for-loop",
+            "category": "implementation",
+            "status": "resolved",
+            "newEvidenceRefs": ["candidate:1"],
+            "relatedClaimIds": ["c1"],
+        }]
+        payload["localization"]["candidates"] = [{
+            "path": "src/add.py",
+            "why": "add implementation here",
+            "snippet": "return a - b",
+            "source": "grep",
+        }]
+        payload["outcome"] = "plan_only"
+        return AnalyzeResult(ok=True, payload=payload, source="sdk")
+
+    report2 = run_analyst(
+        work_dir=work, defect_batch=_batch(), code_knowledge=knowledge,
+        analyze_fn=analyze2, artifact_dir=out, apply_fix=False,
+    )
+    ticket = report2.tickets[0]
+    assert ticket.actionability.get("allowed") is True
+    assert not any(q.id == "q2" and q.status != "resolved" for q in (ticket.rootCause.questions or []))
+
+
+def test_closing_rebuilds_evidence_after_source_change(tmp_path, monkeypatch):
+    from bugfix_platform.sdk.codegraph import CodeGraphStatus
+    from bugfix_platform.agents.analyst.run import run_analyst
+    monkeypatch.setattr(
+        "bugfix_platform.agents.analyst.run.ensure_codegraph",
+        lambda *a, **k: CodeGraphStatus(ready=False),
+    )
+    work = _mini_repo(tmp_path / "repo")
+    out = tmp_path / "out"
+    knowledge = CodeKnowledge.model_validate({
+        "schemaVersion": "0.4.0",
+        "productLine": "hc",
+        "workDir": str(work),
+        "generatedAt": "2026-01-01T00:00:00Z",
+        "partial": False,
+        "defectCodeMatches": [{
+            "defectId": "D1",
+            "candidates": [{"path": "src/add.py", "source": "grep", "why": "add"}],
+            "confidence": "medium",
+        }],
+    })
+
+    def analyze1(req):
+        payload = dict(req.routed)
+        payload.update(_entry())
+        return AnalyzeResult(ok=True, payload=payload, source="sdk")
+
+    run_analyst(
+        work_dir=work, defect_batch=_batch(), code_knowledge=knowledge,
+        analyze_fn=analyze1, artifact_dir=out, apply_fix=False,
+    )
+
+    def analyze2(req):
+        payload = dict(req.routed)
+        payload.update(_entry())
+        if (req.previous_attempt or {}).get("closingPass"):
+            (work / "src" / "add.py").write_text("def add(a, b):\n    return a * b\n", encoding="utf-8")
+            payload["localization"]["candidates"] = [{
+                "path": "src/add.py",
+                "why": "add implementation here",
+                "snippet": "return a - b",
+                "source": "grep",
+            }]
+            payload["rootCause"]["questions"] = [{
+                "id": "q1",
+                "kind": "choice",
+                "reason": "user confirmed a+b",
+                "category": "product",
+                "status": "resolved",
+                "relatedClaimIds": ["c1"],
+                "newEvidenceRefs": ["read-D1-1"],
+            }]
+            payload["outcome"] = "patch_ready"
+        else:
+            payload["rootCause"]["questions"] = []
+            payload["outcome"] = "patch_ready"
+        return AnalyzeResult(ok=True, payload=payload, source="sdk")
+
+    report2 = run_analyst(
+        work_dir=work, defect_batch=_batch(), code_knowledge=knowledge,
+        analyze_fn=analyze2, artifact_dir=out, apply_fix=True,
+        fix_fn=lambda req: FixResult(ok=True, source="sdk", payload={}),
+    )
+    ticket = report2.tickets[0]
+    assert ticket.actionability["allowed"] is False
