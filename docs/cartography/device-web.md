@@ -308,7 +308,7 @@ python -c "import json;print(json.load(open('transport/package.json'))['autoDepe
 ## 7. 回归夹具（建议，未做）
 
 ```text
-test/fixtures/repos/device-web/
+tests/fixtures/repos/device-web/
 ├── package.json                  # name: web5.0-framework + autoDependencies
 ├── src/
 │   ├── index.asp  dispatch.asp
@@ -324,7 +324,7 @@ test/fixtures/repos/device-web/
 **必须同时存在**一个"宿主相同但架构不同"的反例夹具，否则 E1 会复发：
 
 ```text
-test/fixtures/repos/device-web-host-micro-frontend/    ← 用 camera 抽出来
+tests/fixtures/repos/device-web-host-micro-frontend/    ← 用 camera 抽出来
 ├── src/index.asp                   # 宿主标记：与 device-web 完全相同
 ├── src/project_config.json         # 同上
 ├── src/index.html                  # 但这里有多个 mount div

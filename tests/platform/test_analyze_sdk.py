@@ -20,7 +20,7 @@ from bugfix_platform.sdk.analyze import (
 from bugfix_platform.workflow import run_three_agent_workflow
 
 ROOT = Path(__file__).resolve().parents[2]
-HC1 = ROOT / "test" / "fixtures" / "defect-batch" / "hc1-raw.json"
+HC1 = ROOT / "tests" / "fixtures" / "defect-batch" / "hc1-raw.json"
 
 
 def test_analyze_prompt_includes_architecture_map():

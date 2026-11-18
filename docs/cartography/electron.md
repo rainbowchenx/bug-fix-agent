@@ -422,7 +422,7 @@ print([m.path for m in mods if m.role=='main' and m.path.startswith('web/')])"
 多仓场景要两个夹具，否则测不出"容器 vs 内容"：
 
 ```text
-test/fixtures/repos/electron/
+tests/fixtures/repos/electron/
 ├── package.json                  # electron + electron-builder + vite-plugin-electron(-renderer)
 ├── electron-builder.json5        # asar:false / extraFiles: subsystem, driver
 ├── electron/
@@ -435,7 +435,7 @@ test/fixtures/repos/electron/
     ├── src/main.ts               # ← 必须判 renderer，不能判 main
     └── src/request/index.ts      # ipc/http 开关
 
-test/fixtures/repos/electron-multi-repo/     ← 容器夹具
+tests/fixtures/repos/electron-multi-repo/     ← 容器夹具
 ├── tool/                         # 上面那套（含 .git）
 └── subsystem/                    # koa + vite-plugin-electron（无 electron 依赖）
     └── package.json              # ← 必须判 unknown，不能判 electron_node

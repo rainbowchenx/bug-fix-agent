@@ -7,8 +7,8 @@ import json
 import pytest
 
 from bugfix_contracts.code_knowledge import InvestigationFact
-from bugfix_platform.sdk.match_payload import (
-    find_business_envelope,
+from bugfix_platform.sdk.match_payload import find_business_envelope
+from bugfix_platform.agents.cartographer.match_payload import (
     normalize_group_matches,
     normalize_sdk_match,
 )
@@ -230,7 +230,7 @@ def test_bad_candidate_source_keeps_same_ticket_facts():
 
 def test_verify_fact_references_upgrades_only_when_snippet_exists(tmp_path):
     from bugfix_contracts.code_knowledge import CodeReference, DefectCodeMatch, InvestigationFact
-    from bugfix_platform.sdk.match_payload import verify_fact_references
+    from bugfix_platform.agents.cartographer.match_payload import verify_fact_references
 
     src = tmp_path / "src"
     src.mkdir()
@@ -256,7 +256,7 @@ def test_verify_fact_references_upgrades_only_when_snippet_exists(tmp_path):
 
 def test_outside_and_stale_revision_references_stay_unverified(tmp_path):
     from bugfix_contracts.code_knowledge import CodeReference, DefectCodeMatch, InvestigationFact
-    from bugfix_platform.sdk.match_payload import verify_fact_references
+    from bugfix_platform.agents.cartographer.match_payload import verify_fact_references
 
     src = tmp_path / "src"
     src.mkdir()
@@ -293,7 +293,8 @@ def test_outside_and_stale_revision_references_stay_unverified(tmp_path):
 
 
 def test_failed_read_is_not_observed_and_paths_are_exact(tmp_path):
-    from bugfix_platform.sdk.match_payload import apply_tool_observation, verify_fact_references
+    from bugfix_platform.sdk.match_payload import apply_tool_observation
+    from bugfix_platform.agents.cartographer.match_payload import verify_fact_references
     from bugfix_contracts.code_knowledge import CodeReference, DefectCodeMatch, InvestigationFact
 
     src = tmp_path / "src"
@@ -346,7 +347,7 @@ def test_failed_read_is_not_observed_and_paths_are_exact(tmp_path):
 
 def test_nested_repo_revision_must_match_child_head(tmp_path):
     from bugfix_contracts.code_knowledge import CodeReference, DefectCodeMatch, InvestigationFact
-    from bugfix_platform.sdk.match_payload import verify_fact_references
+    from bugfix_platform.agents.cartographer.match_payload import verify_fact_references
 
     child = tmp_path / "child"
     (child / "src").mkdir(parents=True)
@@ -390,7 +391,8 @@ def test_nested_repo_revision_must_match_child_head(tmp_path):
 
 
 def test_outside_read_does_not_become_in_repo_observation(tmp_path):
-    from bugfix_platform.sdk.match_payload import apply_tool_observation, verify_fact_references
+    from bugfix_platform.sdk.match_payload import apply_tool_observation
+    from bugfix_platform.agents.cartographer.match_payload import verify_fact_references
     from bugfix_contracts.code_knowledge import DefectCodeMatch
 
     src = tmp_path / "src"

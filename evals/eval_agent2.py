@@ -8,7 +8,7 @@
 
 用法::
 
-    python packaging/eval_agent2.py \\
+    python evals/eval_agent2.py \\
         --repo /path/to/repo --profile device_web \\
         --batch /path/to/defect-batch.json \\
         --cases <eval-dir>/cases.json \\

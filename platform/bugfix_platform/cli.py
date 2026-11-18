@@ -18,25 +18,13 @@ from bugfix_contracts.env import load_env_file
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 
 def _cmd_feedback(root: str, file: str) -> int:
-    """导入一份反馈 JSON 或填写后的 Markdown 表，按 feedbackId 幂等。"""
-    from bugfix_contracts.repair import Feedback
-    from bugfix_platform.agents.analyst.attempt_store import store_lock
-    from bugfix_platform.agents.analyst.feedback import import_feedback
-    from bugfix_platform.agents.analyst.feedback_document import import_filled_form
+    from bugfix_platform.workflow.resume import import_run_feedback
 
-    src = Path(file)
-    text = src.read_text(encoding="utf-8")
-    with store_lock(Path(root)):
-        if src.suffix.lower() in {".md", ".markdown"} or "BUGFIX_FEEDBACK_FORM" in text:
-            revision = import_filled_form(root, text, already_locked=True)
-        else:
-            feedback = Feedback.model_validate(json.loads(text))
-            revision = import_feedback(Path(root), feedback, already_locked=True)
+    revision = import_run_feedback(Path(root), Path(file))
     print(json.dumps(revision.model_dump(), ensure_ascii=False, indent=2))
     return 0
 
@@ -48,108 +36,22 @@ def _cmd_resume(
     apply_fix: bool = False,
     execute: bool = False,
 ) -> int:
-    """Hold the artifact lock across parent selection, analysis and report publication."""
-    from bugfix_platform.agents.analyst.attempt_store import AttemptStoreBusy, store_lock
+    from bugfix_platform.workflow.resume import (
+        AttemptStoreBusy, ResumeRequestError, SessionDecision, resume_defect,
+    )
 
-    base = Path(root)
+    def print_decision(decision: SessionDecision) -> None:
+        print(json.dumps(
+            {"action": decision.action, "sessionId": decision.sessionId, "reason": decision.reason},
+            ensure_ascii=False, indent=2,
+        ))
+
     try:
-        with store_lock(base):
-            return _resume_locked(base, defect_id, revision_id, apply_fix, execute)
-    except AttemptStoreBusy as err:
+        resume_defect(Path(root), defect_id, revision_id, apply_fix=apply_fix,
+                      execute=execute, on_decision=print_decision)
+    except (AttemptStoreBusy, ResumeRequestError) as err:
         print(str(err), file=sys.stderr)
         return 1
-
-
-def _resume_locked(
-    base: Path, defect_id: str, revision_id: str | None, apply_fix: bool, execute: bool
-) -> int:
-    """预览会话决策；execute 只分析，apply-fix 显式授权编辑。"""
-    from bugfix_contracts.analysis_report import validate_analysis_report
-    from bugfix_contracts.code_knowledge import validate_code_knowledge
-    from bugfix_contracts.defect_batch import load_defect_batch
-    from bugfix_platform.agents.analyst.report_store import atomic_write_report, load_or_rebuild_analysis_report
-    from bugfix_platform.agents.analyst.run import run_analyst
-    from bugfix_platform.agents.analyst.sessions import load_revision, resume_from_store
-
-    batch_path = base / "defect-batch.json"
-    knowledge_path = base / "code-knowledge.json"
-    report_path = base / "analysis-report.json"
-    batch = load_defect_batch(batch_path) if batch_path.is_file() else None
-    if batch is not None and not any(t.defectId == defect_id for t in batch.tickets):
-        print(f"unknown defect: {defect_id}", file=sys.stderr)
-        return 1
-    previous = None
-    knowledge = None
-    if apply_fix or execute:
-        if batch is None or not knowledge_path.is_file():
-            print("resume execution needs defect-batch.json and code-knowledge.json", file=sys.stderr)
-            return 1
-        knowledge = validate_code_knowledge(json.loads(knowledge_path.read_text(encoding="utf-8")))
-        previous = load_or_rebuild_analysis_report(
-            base,
-            product_line=batch.productLine,
-            work_dir=knowledge.workDir,
-            apply_fix=apply_fix,
-        )
-    decision = resume_from_store(base, defect_id, revision_id)
-    print(json.dumps({"action": decision.action, "sessionId": decision.sessionId,
-                      "reason": decision.reason}, ensure_ascii=False, indent=2))
-    if not apply_fix and not execute:
-        return 0
-    assert knowledge is not None
-    work_dir = previous.workDir if previous is not None else knowledge.workDir
-    revision = load_revision(base, defect_id, revision_id)
-    revisions = {defect_id: revision} if revision is not None else {}
-    session_ids = {defect_id: decision.sessionId} if decision.sessionId else {}
-    from bugfix_platform.agents.analyst.feedback import load_latest_feedback
-    from bugfix_platform.agents.analyst.sessions import load_latest_attempt, select_resume_parent
-    feedback = load_latest_feedback(base, defect_id)
-    latest = load_latest_attempt(base, defect_id)
-    parent_id = select_resume_parent(latest, feedback, revision_id=revision_id)
-    parent_attempt_ids = {defect_id: parent_id} if parent_id else {}
-    report = run_analyst(
-        work_dir=work_dir,
-        defect_batch=batch,
-        code_knowledge=knowledge,
-        apply_fix=apply_fix,
-        ticket_ids=[defect_id],
-        revisions=revisions,
-        session_ids=session_ids,
-        parent_attempt_ids=parent_attempt_ids,
-        artifact_dir=base,
-        already_locked=True,
-    )
-    dumped = report.model_dump()
-    round_dir = base / "rounds"
-    round_dir.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    (round_dir / f"{defect_id}-{stamp}.json").write_text(
-        json.dumps(dumped, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    by_id: dict[str, object] = {}
-    if previous is not None:
-        for item in previous.model_dump()["tickets"]:
-            by_id[item["defectId"]] = item
-    for item in dumped.get("tickets") or []:
-        if isinstance(item, dict) and item.get("defectId"):
-            by_id[str(item["defectId"])] = item
-    merged_tickets = list(by_id.values())
-    by_outcome: dict[str, int] = {}
-    for item in merged_tickets:
-        if not isinstance(item, dict):
-            continue
-        oc = str(item.get("outcome") or "other_blocked")
-        by_outcome[oc] = by_outcome.get(oc, 0) + 1
-    dumped["tickets"] = merged_tickets
-    dumped["summary"] = {"total": len(merged_tickets), "byOutcome": by_outcome}
-    atomic_write_report(report_path, validate_analysis_report(dumped).model_dump_json(indent=2))
-    from bugfix_platform.agents.analyst.report import render_report
-
-    atomic_write_report(
-        base / "analysis-report.md",
-        render_report({"batchId": dumped.get("productLine"), "tickets": merged_tickets}),
-    )
     return 0
 
 
@@ -317,23 +219,6 @@ def main(argv: list[str] | None = None) -> int:
         ),
     }
     print(json.dumps(payload, ensure_ascii=False, indent=2))
-
-    out_root = args.out_dir or result.artifact_dir
-    if out_root:
-        out = Path(out_root)
-        out.mkdir(parents=True, exist_ok=True)
-        if result.artifacts.defect_batch:
-            (out / "defect-batch.json").write_text(
-                result.artifacts.defect_batch.model_dump_json(indent=2), encoding="utf-8"
-            )
-        if result.artifacts.code_knowledge:
-            (out / "code-knowledge.json").write_text(
-                result.artifacts.code_knowledge.model_dump_json(indent=2), encoding="utf-8"
-            )
-        if result.artifacts.analysis_report:
-            (out / "analysis-report.json").write_text(
-                result.artifacts.analysis_report.model_dump_json(indent=2), encoding="utf-8"
-            )
 
     return 0 if result.ok else 1
 

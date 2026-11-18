@@ -4,7 +4,7 @@
 
 用法::
 
-    python packaging/eval_agent3.py \\
+    python evals/eval_agent3.py \\
         --report analysis-report.json \\
         --cases <eval-dir>/cases.json \\
         --out <eval-dir>/score.json

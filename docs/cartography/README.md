@@ -2,7 +2,7 @@
 
 Agent-2 **不再判仓型**：`cartographyProfile` 由调用方传入（`--cartography-profile` /
 `options.cartographyProfile`）。这份目录是类型已知之后的**读码地图**——每类该先打开哪些
-清单、缺陷沿哪条边跳。评测夹具在 `test/fixtures/repos/`（`pytest tests/platform/test_cartography_eval.py`）。
+清单、缺陷沿哪条边跳。评测夹具在 `tests/fixtures/repos/`（`pytest tests/platform/test_cartography_eval.py`）。
 
 | 文档 | 类型 | 样本 | 状态 |
 |---|---|---|---|
@@ -240,10 +240,10 @@ led/                     容器 → 不判型，只枚举子仓
 ## 4. 回归夹具
 
 样本仓不入库（几百 MB，submodule URL 指向内部域名，含未脱敏业务信息）。
-每类在 `test/fixtures/repos/<type>/` 下放人造微型夹具，只保留判据要素：
+每类在 `tests/fixtures/repos/<type>/` 下放人造微型夹具，只保留判据要素：
 
 ```text
-test/fixtures/repos/
+tests/fixtures/repos/
 ├── micro-frontend/            # submodule 型：.gitmodules + 3 个 src/<App> + mount div
 ├── micro-frontend-in-repo/    # 同仓模块型（camera）：空 root-application + 3 个 vue.app.js
 ├── device-web/                # index.asp + project_config.json + 双入口

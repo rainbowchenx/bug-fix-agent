@@ -40,7 +40,7 @@ bugfix-platform run --work-dir ./repos --product-line hc --defect-batch /tmp/def
 ```
 
 - Python ≥ 3.11；依赖见 `pyproject.toml`（核心 `pydantic`；Agent-1 extra `openpyxl`；平台 extra `langgraph`；SDK / HTTP 为 optional extra）
-- 测试在 `tests/`（按 `agent1/` / `platform/` / `contracts/` 切开）；缺陷样本夹具在 `test/fixtures/defect-batch/`；Agent-2 读码夹具在 `test/fixtures/repos/`
+- 测试在 `tests/`（按 `agent1/` / `platform/` / `contracts/` 切开）；缺陷样本夹具在 `tests/fixtures/defect-batch/`；Agent-2 读码夹具在 `tests/fixtures/repos/`
 
 ## 架构要点
 
@@ -49,7 +49,7 @@ bugfix-platform run --work-dir ./repos --product-line hc --defect-batch /tmp/def
 | `contracts/bugfix_contracts/` | 契约 SSOT（含 `load_defect_batch`，两侧共用） |
 | `agent1/bugfix_agent1/` | Agent-1：ingest + defect_batch + CLI |
 | `agent1/skills/defect-batch-prepare/` | Agent-1 Claude Code skill（纯文档 + 评测） |
-| `platform/bugfix_platform/agents/cartographer/` | Agent-2（仓型由调用方传入；读码策略见 `docs/cartography/`，夹具评测见 `test/fixtures/repos/`） |
+| `platform/bugfix_platform/agents/cartographer/` | Agent-2（仓型由调用方传入；读码策略见 `docs/cartography/`，夹具评测见 `tests/fixtures/repos/`） |
 | `platform/bugfix_platform/agents/analyst/` | Agent-3 |
 | `platform/bugfix_platform/sdk/` | Agent-2/3 Claude Agent SDK + overlay skill 发现 |
 | `platform/bugfix_platform/workflow/` | LangGraph 父编排 + 门禁 |

@@ -8,7 +8,7 @@ from bugfix_contracts import DefectBatch
 from bugfix_agent1.defect_batch import run_defect_batch_prepare
 
 ROOT = Path(__file__).resolve().parents[1]
-HC1 = ROOT / "test" / "fixtures" / "defect-batch" / "hc1-raw.json"
+HC1 = ROOT / "tests" / "fixtures" / "defect-batch" / "hc1-raw.json"
 
 
 def ensure_git_repo(path: Path, *, head: str = "a" * 40) -> Path:

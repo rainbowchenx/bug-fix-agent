@@ -39,7 +39,7 @@ xlsx 需要 `openpyxl`。skill 要让 Claude Code 能读到 `agent1/skills/defec
 今晚若有空，用仓库夹具热身（不必打分）：
 
 ```bash
-bugfix-agent prepare-batch --product-line hc --source test/fixtures/defect-batch/hc1-raw.json --posture alpha --out /tmp/hc1-batch.json
+bugfix-agent prepare-batch --product-line hc --source tests/fixtures/defect-batch/hc1-raw.json --posture alpha --out /tmp/hc1-batch.json
 ```
 
 `hc1` alpha 应为 50 张票。能跑通再带真实数据。

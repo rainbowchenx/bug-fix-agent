@@ -16,15 +16,21 @@ Agent-1（defect-batch）在图外：``prepare-batch`` / skill + Claude Code。
 （不越过红灯继续交付）。
 """
 
+from importlib import import_module
+
 from bugfix_platform.workflow.gates import ArtifactValidationError
-from bugfix_platform.workflow.graph import create_three_agent_graph, default_three_agent_graph
-from bugfix_platform.workflow.run import (
-    ThreeAgentWorkflowResult,
-    WorkflowArtifacts,
-    WorkflowUpdateFn,
-    load_defect_batch,
-    run_three_agent_workflow,
-)
+
+
+def __getattr__(name: str):
+    """Keep the graph dependency optional for artifact-only feedback commands."""
+    if name in {"create_three_agent_graph", "default_three_agent_graph"}:
+        module = import_module(".graph", __name__)
+    elif name in __all__ and name != "ArtifactValidationError":
+        module = import_module(".run", __name__)
+    else:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    return getattr(module, name)
+
 
 __all__ = [
     "run_three_agent_workflow",

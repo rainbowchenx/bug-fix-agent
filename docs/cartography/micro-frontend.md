@@ -345,7 +345,7 @@ print(map_architecture(wd, discover_repo_roots(wd), 'micro_frontend'))"
 样本仓不入库（几百 MB + submodule URL 指向内部域名）。人造微型夹具只保留判据要素：
 
 ```text
-test/fixtures/repos/micro-frontend/
+tests/fixtures/repos/micro-frontend/
 ├── package.json                 # single-spa + single-spa-vue + light-front-vue
 ├── .gitmodules                  # 3 条 src/<App> submodule
 ├── build/config/modules.js      # 两模块 × 三入口

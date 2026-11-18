@@ -15,13 +15,13 @@ from bugfix_contracts.defect_batch import DefectBatch
 from bugfix_platform.agents.analyst import run_analyst
 from bugfix_platform.agents.cartographer import run_cartographer
 from bugfix_platform.sdk.analyze import AnalyzeRequest, AnalyzeResult, heuristic_analyze
+from bugfix_platform.agents.cartographer.handoff import heuristic_cartography
 from bugfix_platform.sdk.cartography import (
     CartographyRequest,
     CartographyResult,
-    heuristic_cartography,
 )
 
-FIXTURES = Path(__file__).resolve().parents[2] / "test" / "fixtures" / "repos"
+FIXTURES = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "repos"
 
 _TICKET = {
     "defectId": "D1",

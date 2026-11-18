@@ -8,7 +8,7 @@
 对已有 `analysis-report.json` 打分：
 
 ```bash
-python packaging/eval_agent3.py \
+python evals/eval_agent3.py \
   --report /path/to/analysis-report.json \
   --cases field-eval/agent3/<run>/cases.json \
   --out field-eval/agent3/<run>/score.json
@@ -148,7 +148,7 @@ transport 三张票的路径真值可直接复用 Agent-2 的 `bug-fix-测试专
 
 ## 5. 修复闭环（无验收不算成功）
 
-`packaging/eval_agent3.py` 的 `summary.repair.successRate` **只在有用户验收数据时**才有数字；未反馈一律 `null`，原因 `no_acceptance_data`。不要把 `patch_ready` 或检查通过当成修复成功。
+`evals/eval_agent3.py` 的 `summary.repair.successRate` **只在有用户验收数据时**才有数字；未反馈一律 `null`，原因 `no_acceptance_data`。不要把 `patch_ready` 或检查通过当成修复成功。
 
 分析路径与 generate-patch 分开打分。端到端最小集：
 
@@ -193,4 +193,4 @@ transport 三张票的路径真值可直接复用 Agent-2 的 `bug-fix-测试专
 
 按用户范围仅评peitao、transport、hcp，共93原始票/18深度分析票。见[独立复评与交付判定](reviews/2026-11-17-three-project-real-run-assessment.md)、[配对CSV](reviews/2026-11-17-three-project-ticket-comparison.csv)、[统计JSON](reviews/2026-11-17-three-project-artifact-statistics.json)。正式评分计算已复核，但目录命中不等于根因正确，工程验收与实测交付分列。
 
-后续仅文档交付：[Agent2调查保全与Agent3反馈收敛方案](../../superpowers/specs/2026-11-17-agent2-lossless-handoff-agent3-convergence-design.md)及[实施计划](../../superpowers/plans/2026-11-17-agent2-lossless-handoff-agent3-convergence-plan.md)。工程计分见 `packaging/eval_agent3.py` 的 `convergence_metrics`；70% 仍是待业务确认的提议，真实项目试点未执行前不得写成已通过。
+后续仅文档交付：[Agent2调查保全与Agent3反馈收敛方案](../../superpowers/specs/2026-11-17-agent2-lossless-handoff-agent3-convergence-design.md)及[实施计划](../../superpowers/plans/2026-11-17-agent2-lossless-handoff-agent3-convergence-plan.md)。工程计分见 `evals/eval_agent3.py` 的 `convergence_metrics`；70% 仍是待业务确认的提议，真实项目试点未执行前不得写成已通过。

@@ -21,9 +21,6 @@ from bugfix_platform.sdk.cartography import (
     CartographyRequest,
     CartographyResult,
     cartography_mode_from_env,
-    create_cartography_runner,
-    heuristic_cartography,
-    run_claude_cartography,
 )
 
 __all__ = [
@@ -43,7 +40,4 @@ __all__ = [
     "CartographyRequest",
     "CartographyResult",
     "cartography_mode_from_env",
-    "create_cartography_runner",
-    "heuristic_cartography",
-    "run_claude_cartography",
 ]

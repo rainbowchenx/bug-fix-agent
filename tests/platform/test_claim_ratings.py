@@ -9,7 +9,7 @@ def test_changed_claim_invalidates_rating():
 def test_stale_rating_excluded_and_alternatives_separate():
     import sys
     from pathlib import Path
-    sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'packaging'))
+    sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'evals'))
     from eval_agent3 import score_report
     report={'schemaVersion':'0.4.0','productLine':'p','workDir':'repo','generatedAt':'2026-01-01T00:00:00Z',
         'openMr':False,'applyFix':False,'summary':{'total':1,'byOutcome':{'plan_only':1}},'tickets':[
@@ -28,7 +28,7 @@ def test_stale_rating_excluded_and_alternatives_separate():
 def test_honest_failed_analysis_does_not_credit_inherited_localization():
     import sys
     from pathlib import Path
-    sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'packaging'))
+    sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'evals'))
     from eval_agent3 import score_ticket
     row=score_ticket({'defectId':'D','expectPathPrefix':'src','expectOutcomes':['plan_only']},
         {'defectId':'D','outcome':'other_blocked','analysisStatus':'incomplete',

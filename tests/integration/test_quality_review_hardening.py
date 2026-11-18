@@ -7,7 +7,7 @@ from tests.platform.test_repair_entry import _knowledge
 from tests.platform.test_investigation_batches import request
 from bugfix_platform.http import create_app
 from bugfix_platform.workflow import run_three_agent_workflow
-from bugfix_platform.sdk.cartography import _merge_enrichment
+from bugfix_platform.agents.cartographer.handoff import _merge_enrichment
 
 
 @pytest.mark.parametrize('options',[{}, {'applyFix':False}])

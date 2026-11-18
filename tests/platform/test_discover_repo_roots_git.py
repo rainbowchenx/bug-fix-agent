@@ -70,6 +70,6 @@ def test_no_git_hard_fails(tmp_path: Path):
 
 
 def test_electron_container_fixture():
-    root = Path(__file__).resolve().parents[2] / "test" / "fixtures" / "repos" / "electron-container"
+    root = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "repos" / "electron-container"
     roots = discover_repo_roots(root)
     assert sorted(r.path for r in roots) == ["calibration-subsystem", "calibrationtool"]

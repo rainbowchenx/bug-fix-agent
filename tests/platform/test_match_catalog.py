@@ -153,7 +153,7 @@ def test_filter_keeps_shared_and_ipc_controller(tmp_path: Path):
 
 
 def test_nested_router_is_route_table_and_not_a_locus():
-    work = Path(__file__).resolve().parents[2] / "test" / "fixtures" / "repos" / "device-web"
+    work = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "repos" / "device-web"
     roots = discover_repo_roots(work)
     mapped = map_architecture(work, roots, "device_web")
     tables = [

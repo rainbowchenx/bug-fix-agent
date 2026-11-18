@@ -21,7 +21,7 @@ from bugfix_contracts.defect_batch import BatchTicket, DefectBatch
 from bugfix_platform.agents.cartographer import run_cartographer
 from bugfix_platform.agents.cartographer.match import _tokens
 
-FIXTURES = Path(__file__).resolve().parents[2] / "test" / "fixtures" / "repos"
+FIXTURES = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "repos"
 
 
 def _ticket(**kw) -> BatchTicket:

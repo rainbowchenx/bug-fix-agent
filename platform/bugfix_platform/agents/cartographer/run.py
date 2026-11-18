@@ -29,11 +29,11 @@ from bugfix_contracts import (
     validate_code_knowledge,
 )
 from bugfix_contracts.code_knowledge import Architecture, CartographyProfile, SpecAtlas, SpecEntry
+from bugfix_platform.agents.cartographer.handoff import create_cartography_runner
 from bugfix_platform.sdk.cartography import (
     CartographyRequest,
     CartographyRunner,
     cartography_mode_from_env,
-    create_cartography_runner,
 )
 from bugfix_platform.sdk.codegraph import ensure_codegraph
 from bugfix_platform.sdk.skill_inject import InjectedSkill, discover_cartography_skills

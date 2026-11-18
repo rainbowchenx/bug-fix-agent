@@ -50,7 +50,7 @@ _FIXTURE_GIT_ROOTS = (
 def _plant_fixture_git_markers() -> None:
     from tests.helpers import ensure_git_repo
 
-    root = Path(__file__).resolve().parents[1] / "test" / "fixtures" / "repos"
+    root = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "repos"
     for rel in _FIXTURE_GIT_ROOTS:
         ensure_git_repo(root / rel)
 

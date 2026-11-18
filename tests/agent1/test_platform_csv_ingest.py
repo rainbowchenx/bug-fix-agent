@@ -1,7 +1,7 @@
 """Platform-CSV ingest 回归。
 
 四个带 ``@skipif`` 的用例依赖本地脱敏导出（gitignore，不入库），数据在才跑：
-``缺陷拉取/脱敏/``。仓库内稳定回归请用 ``test/fixtures/defect-batch/``。
+``缺陷拉取/脱敏/``。仓库内稳定回归请用 ``tests/fixtures/defect-batch/``。
 """
 
 from pathlib import Path

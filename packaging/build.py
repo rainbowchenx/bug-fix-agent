@@ -336,7 +336,7 @@ def _verify_package(out: Path) -> None:
         raise SystemExit("shipped package is missing SKILL.md")
 
     exe = out / "scripts" / ("agent1.exe" if os.name == "nt" else "agent1")
-    fixture = ROOT / "test" / "fixtures" / "defect-batch" / "hc1-raw.json"
+    fixture = ROOT / "tests" / "fixtures" / "defect-batch" / "hc1-raw.json"
     if not fixture.is_file():
         raise SystemExit(f"missing smoke fixture: {fixture}")
     smoke = BUILD / "smoke"

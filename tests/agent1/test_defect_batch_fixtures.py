@@ -3,7 +3,7 @@ from pathlib import Path
 from bugfix_agent1.defect_batch import run_defect_batch_prepare
 
 ROOT = Path(__file__).resolve().parents[2]
-FX = ROOT / "test" / "fixtures" / "defect-batch"
+FX = ROOT / "tests" / "fixtures" / "defect-batch"
 
 
 def test_hc1_alpha_funnel():

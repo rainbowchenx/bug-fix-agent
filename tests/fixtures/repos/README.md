@@ -4,7 +4,7 @@
 
 生成（改结构时重跑）::
 
-    python test/fixtures/repos/_generate.py
+    python tests/fixtures/repos/_generate.py
 
 每个产品仓根会写假 ``.git``（``discover_repo_roots`` 只认 git）。嵌套
 ``.git`` 无法入库；pytest session 也会再种一遍。

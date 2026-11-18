@@ -80,3 +80,37 @@ def test_platform_import_does_not_load_agent1():
         cwd=ROOT,
         env=env,
     )
+
+
+def test_platform_and_contract_source_dependencies():
+    import ast
+
+    root = Path(__file__).resolve().parents[1]
+    platform = root / "platform" / "bugfix_platform"
+    rules = [
+        (root / "contracts" / "bugfix_contracts", ("bugfix_agent1", "bugfix_platform")),
+        (platform / "sdk", (
+            "bugfix_platform.agents", "bugfix_platform.workflow",
+            "bugfix_platform.http", "bugfix_platform.cli",
+        )),
+        (platform / "cli.py", ("bugfix_platform.agents",)),
+        (platform / "http", ("bugfix_platform.agents",)),
+    ]
+    violations = []
+    for base, forbidden in rules:
+        for path in [base] if base.is_file() else sorted(base.rglob("*.py")):
+            package = ".".join(path.relative_to(platform.parent).parts[:-1]) if path.is_relative_to(platform) else "bugfix_contracts"
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+                if isinstance(node, ast.Import):
+                    names = [alias.name for alias in node.names]
+                elif isinstance(node, ast.ImportFrom):
+                    parts = package.split(".")
+                    prefix = ".".join(parts[:len(parts) - node.level + 1]) if node.level else ""
+                    module = ".".join(part for part in (prefix, node.module) if part)
+                    names = [module, *(f"{module}.{alias.name}" for alias in node.names)]
+                else:
+                    continue
+                for name in names:
+                    if any(name == rule or name.startswith(rule + ".") for rule in forbidden):
+                        violations.append(f"{path.relative_to(root)}:{node.lineno} imports {name}")
+    assert not violations, "\n".join(violations)

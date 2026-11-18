@@ -13,7 +13,7 @@ from bugfix_contracts.defect_batch import BatchTicket, DefectBatch
 from bugfix_platform.sdk.cartography import PROFILE_READING_PLAYBOOK, profile_reading_playbook
 
 ROOT = Path(__file__).resolve().parents[2]
-FIXTURES = ROOT / "test" / "fixtures" / "repos"
+FIXTURES = ROOT / "tests" / "fixtures" / "repos"
 EVAL_CASES = json.loads((FIXTURES / "eval-cases.json").read_text(encoding="utf-8"))
 
 

@@ -3,6 +3,7 @@ from pathlib import Path
 
 from bugfix_platform.agents.cartographer import run_cartographer
 from bugfix_contracts import DefectBatch
+from bugfix_platform.agents.cartographer.handoff import heuristic_cartography
 from bugfix_platform.sdk.cartography import (
     CARTOGRAPHY_TOOLS,
     DEFAULT_CARTOGRAPHY_BASE_TURNS,
@@ -18,7 +19,6 @@ from bugfix_platform.sdk.cartography import (
     bash_command_allowed,
     cartography_mode_from_env,
     cartography_turns_for_tickets,
-    heuristic_cartography,
     is_weak_match,
     resolve_cartography_max_turns,
     select_prompt_tickets,
@@ -26,7 +26,7 @@ from bugfix_platform.sdk.cartography import (
 from bugfix_platform.workflow import run_three_agent_workflow
 
 ROOT = Path(__file__).resolve().parents[2]
-HC1 = ROOT / "test" / "fixtures" / "defect-batch" / "hc1-raw.json"
+HC1 = ROOT / "tests" / "fixtures" / "defect-batch" / "hc1-raw.json"
 
 
 def _batch() -> DefectBatch:
@@ -479,7 +479,7 @@ def test_prompt_caps_at_max_and_prefers_weak(tmp_path: Path):
 
 
 def test_merge_falls_back_to_baseline_when_sdk_candidates_all_drop(tmp_path: Path):
-    from bugfix_platform.sdk.cartography import _merge_enrichment
+    from bugfix_platform.agents.cartographer.handoff import _merge_enrichment
 
     src = tmp_path / "src"
     src.mkdir()
@@ -520,7 +520,7 @@ def test_merge_falls_back_to_baseline_when_sdk_candidates_all_drop(tmp_path: Pat
 
 
 def test_merge_keeps_real_file_and_caps_sdk_confidence(tmp_path: Path):
-    from bugfix_platform.sdk.cartography import _merge_enrichment
+    from bugfix_platform.agents.cartographer.handoff import _merge_enrichment
 
     src = tmp_path / "src" / "Config"
     src.mkdir(parents=True)
@@ -566,7 +566,7 @@ def test_merge_keeps_real_file_and_caps_sdk_confidence(tmp_path: Path):
 
 def test_merge_rescues_candidate_whose_repo_path_is_the_file(tmp_path: Path):
     """peitao 02 轮的真实形状：repoPath 与 path 都填成文件路径。"""
-    from bugfix_platform.sdk.cartography import _merge_enrichment
+    from bugfix_platform.agents.cartographer.handoff import _merge_enrichment
 
     rel = "src/view/portal/login/pc/components/loginOne.vue"
     target = tmp_path / rel
@@ -603,7 +603,7 @@ def test_merge_rescues_candidate_whose_repo_path_is_the_file(tmp_path: Path):
 
 def test_merge_reports_dropped_candidates(tmp_path: Path):
     """丢弃必须留痕，否则「模型给了 3 个、交付 0 个」在产物里查不出。"""
-    from bugfix_platform.sdk.cartography import _merge_enrichment, _with_drop_detail
+    from bugfix_platform.agents.cartographer.handoff import _merge_enrichment, _with_drop_detail
 
     baseline = _knowledge_with_matches(
         tmp_path, [{"defectId": "D1", "candidates": [], "confidence": "low"}]
@@ -636,7 +636,7 @@ def test_merge_keeps_sdk_answer_when_gap_is_prose(tmp_path: Path):
     `gap` 是枚举 `no_path_token_overlap`，整条 `DefectCodeMatch` 校验失败后
     以前会把这张票连 baseline 原件一起静默丢掉（40 → 39）。只丢这个字段。
     """
-    from bugfix_platform.sdk.cartography import _merge_enrichment
+    from bugfix_platform.agents.cartographer.handoff import _merge_enrichment
 
     rel = "web/src/layout/projectDialog/list/factorSimulationDialog.vue"
     # 真实形状：仓在 workDir 下的子目录 calibrationtool/，模型把仓名又写进了 path
@@ -687,7 +687,7 @@ def test_merge_keeps_sdk_answer_when_gap_is_prose(tmp_path: Path):
 
 def test_merge_keeps_baseline_when_sdk_entry_is_invalid(tmp_path: Path):
     """不合 schema 的条目不能先顶掉 baseline 那条，再自己消失。"""
-    from bugfix_platform.sdk.cartography import _merge_enrichment, _with_drop_detail
+    from bugfix_platform.agents.cartographer.handoff import _merge_enrichment, _with_drop_detail
 
     baseline = _knowledge_with_matches(
         tmp_path,
@@ -715,7 +715,7 @@ def test_merge_keeps_baseline_when_sdk_entry_is_invalid(tmp_path: Path):
 
 def test_merge_modules_keeps_structural_ids(tmp_path: Path):
     """整段替换会把规则算的 controller 域 / ipc:<Prefix> 节点换成散文。"""
-    from bugfix_platform.sdk.cartography import _merge_enrichment
+    from bugfix_platform.agents.cartographer.handoff import _merge_enrichment
 
     from bugfix_contracts import validate_code_knowledge
 
@@ -810,7 +810,7 @@ def test_prompt_treats_shared_candidate_sets_as_weak(tmp_path: Path):
 
 def test_merge_overridden_ticket_keeps_baseline_title(tmp_path: Path):
     """模型只回 defectId/candidates/confidence；title/clusterId 要继承 baseline。"""
-    from bugfix_platform.sdk.cartography import _merge_enrichment
+    from bugfix_platform.agents.cartographer.handoff import _merge_enrichment
 
     src = tmp_path / "src"
     src.mkdir()

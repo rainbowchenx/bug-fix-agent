@@ -2,7 +2,7 @@
 
 Run from repo root::
 
-    python test/fixtures/repos/_generate.py
+    python tests/fixtures/repos/_generate.py
 """
 
 from __future__ import annotations

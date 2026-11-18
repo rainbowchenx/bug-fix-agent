@@ -15,7 +15,7 @@ from bugfix_contracts.defect_batch import DefectBatch
 from bugfix_platform.agents.cartographer import run_cartographer
 from bugfix_platform.sdk.cartography import _billing
 
-FIXTURES = Path(__file__).resolve().parents[2] / "test" / "fixtures" / "repos"
+FIXTURES = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "repos"
 
 
 def _batch() -> DefectBatch:

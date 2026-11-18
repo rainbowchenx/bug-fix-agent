@@ -2,6 +2,8 @@
 
 本地 **三 Agent 缺陷分析** 工作流（Python ≥ 3.11）。Agent-1 在图外（skill + Claude Code / `prepare-batch`）；LangGraph 只编排 Agent-2→3。默认**只分析、不出 MR**。
 
+[架构与恢复链路](docs/architecture.md) · [工程测试](#调试) · [离线评测](evals/README.md) · [构建发布](#打包) · [实测归档](docs/field-eval/archive.md)
+
 ```text
 source (CSV/JSON/xlsx)
         │
@@ -116,7 +118,7 @@ bugfix-agent apply-review \
 - **raw-defects JSON**（见契约）
 - Excel 可先用 `xlsx-to-raw` 转 JSON（`bugfix-agent xlsx-to-raw`）
 
-脱敏样本目录：`缺陷拉取/脱敏/`（若已入库）。夹具：`test/fixtures/defect-batch/`。
+脱敏样本目录：`缺陷拉取/脱敏/`（若已入库）。夹具：`tests/fixtures/defect-batch/`。
 
 ### 2）LangGraph 跑 Agent-2→3（需要已有 defect-batch）
 
@@ -326,7 +328,7 @@ raw-defects  ──Agent-1──►  defect-batch  ──Agent-2──►  code-
 - `boundSkills[]`：本次绑定的 analyze overlay（在前）+ 包内置 skill 名
 - `outcome`：`plan_only` · `unlocalized` · `needs_ticket_info` · …（见契约枚举）
 - 当前默认 `verifyStatus=skipped`；`applyFix=false` 只出报告；`openMr` 不会真正推 MR
-- 实仓怎么打分：[`docs/field-eval/agent3/README.md`](docs/field-eval/agent3/README.md)（`packaging/eval_agent3.py`）
+- 实仓怎么打分：[`docs/field-eval/agent3/README.md`](docs/field-eval/agent3/README.md)（`evals/eval_agent3.py`）
 
 仓特异性 skill 写法与注入位置：[`docs/prompts/agent2/`](docs/prompts/agent2/)（Agent-3 共用，见 [`docs/prompts/agent3/`](docs/prompts/agent3/)）。`profiles: bugfix` 两边都加载；overlay 压过包内置 SOP。
 

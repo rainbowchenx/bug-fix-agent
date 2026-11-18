@@ -105,9 +105,19 @@ def load_or_rebuild_analysis_report(
     )
     if report is None or committed is None:
         return committed or report
-    tickets = {ticket.defectId: ticket for ticket in report.tickets}
-    tickets.update((ticket.defectId, ticket) for ticket in committed.tickets)
-    payload = report.model_dump()
+    return merge_analysis_report(committed, report, keep_previous_metadata=True)
+
+
+def merge_analysis_report(
+    current: AnalysisReport,
+    previous: AnalysisReport | None,
+    *,
+    keep_previous_metadata: bool = False,
+) -> AnalysisReport:
+    tickets = {ticket.defectId: ticket for ticket in previous.tickets} if previous else {}
+    tickets.update((ticket.defectId, ticket) for ticket in current.tickets)
+    metadata = previous if keep_previous_metadata and previous is not None else current
+    payload = metadata.model_dump()
     payload["tickets"] = list(tickets.values())
     payload["summary"] = {
         "total": len(tickets),
@@ -121,3 +131,17 @@ def atomic_write_report(path: Path, text: str) -> None:
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(text, encoding="utf-8")
     temporary.replace(path)
+
+
+def publish_analysis_report(root: Path, report: AnalysisReport, *, already_locked: bool = False) -> None:
+    from contextlib import nullcontext
+
+    from bugfix_platform.agents.analyst.attempt_store import store_lock
+    from bugfix_platform.agents.analyst.report import render_report
+
+    with nullcontext() if already_locked else store_lock(root):
+        atomic_write_report(root / "analysis-report.json", report.model_dump_json(indent=2))
+        atomic_write_report(
+            root / "analysis-report.md",
+            render_report({"batchId": report.productLine, "tickets": report.model_dump()["tickets"]}),
+        )

@@ -21,7 +21,7 @@ from bugfix_contracts.code_knowledge import Architecture, MatchCandidate
 from bugfix_contracts.defect_batch import BatchTicket
 
 ROOT = Path(__file__).resolve().parents[2]
-FIXTURES = ROOT / "test" / "fixtures" / "repos"
+FIXTURES = ROOT / "tests" / "fixtures" / "repos"
 
 
 def _batch_with_module() -> DefectBatch:

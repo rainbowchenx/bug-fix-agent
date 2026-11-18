@@ -35,6 +35,10 @@ from typing import Any, Callable, Literal, Optional, Sequence
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, RetryPolicy
 
+from pathlib import Path
+
+from bugfix_platform.agents.analyst.attempt_store import store_lock
+from bugfix_platform.agents.analyst.report_store import publish_analysis_report
 from bugfix_platform.agents.analyst import run_analyst
 from bugfix_platform.agents.cartographer import run_cartographer
 from bugfix_contracts import CodeKnowledge
@@ -232,7 +236,14 @@ def create_three_agent_graph(
             call_kwargs["artifact_dir"] = state["artifact_dir"]
         if state.get("ticket_ids"):
             call_kwargs["ticket_ids"] = state["ticket_ids"]
-        report = analyst(**call_kwargs)
+        artifact_dir = state.get("artifact_dir")
+        if artifact_dir and agent3 is None:
+            root = Path(artifact_dir)
+            with store_lock(root):
+                report = analyst(**call_kwargs, already_locked=True)
+                publish_analysis_report(root, report, already_locked=True)
+        else:
+            report = analyst(**call_kwargs)
         # 未预期异常向上抛，交给 RetryPolicy。
         raw = report.model_dump() if hasattr(report, "model_dump") else report
         return {
@@ -256,7 +267,8 @@ def create_three_agent_graph(
                 goto=END,
             )
         dumped = validated.model_dump()
-        persist_artifact(state.get("artifact_dir"), "analysis-report.json", dumped)
+        if agent3 is not None and (artifact_dir := state.get("artifact_dir")):
+            publish_analysis_report(Path(artifact_dir), validated)
         return Command(
             update={
                 "analysis_report": dumped,

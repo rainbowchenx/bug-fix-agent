@@ -321,7 +321,7 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
                 partial_root["claims"]=partial_root.get("claims") or []
                 partial_root["questions"]=(partial_root.get("questions") or []) + [{
                     "id":"analysis-incomplete", "kind":"blocking", "reason":"Structured analysis incomplete; retry required"}]
-                from bugfix_platform.agents.analyst.claims import normalize_root
+                from bugfix_contracts.analysis_report import normalize_root
                 blocked.payload["rootCause"]=normalize_root(partial_root)
             return finish(blocked)
 
@@ -393,7 +393,7 @@ def _normalize_payload(data: dict[str, Any]) -> dict[str, Any]:
     if "outcome" in data and isinstance(data["outcome"], str):
         out["outcome"] = data["outcome"]
     if isinstance(data.get("rootCause"), dict):
-        from bugfix_platform.agents.analyst.claims import normalize_root
+        from bugfix_contracts.analysis_report import normalize_root
         root = dict(data["rootCause"])
         candidates = (data.get("localization") or {}).get("candidates") or []
         allowed_refs = {f"candidate:{i}" for i in range(1, len(candidates)+1)}

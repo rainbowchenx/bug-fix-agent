@@ -36,6 +36,7 @@ from bugfix_platform.workflow.graph import (
     create_three_agent_graph,
     default_three_agent_graph,
 )
+from bugfix_platform.workflow.persist import persist_artifact
 from bugfix_platform.workflow.state import ThreeAgentState
 
 WorkflowUpdateFn = Callable[[dict[str, Any]], None]
@@ -116,6 +117,7 @@ def run_three_agent_workflow(
 
     want_fix = apply_fix_from_env(apply_fix)
     if open_mr and not want_fix:
+        persist_artifact(str(artifact_dir) if artifact_dir else None, "defect-batch.json", batch.model_dump())
         return ThreeAgentWorkflowResult(
             ok=False,
             stage="agent3",
@@ -124,6 +126,7 @@ def run_three_agent_workflow(
         )
 
     if skip_agent2 and not skip_agent3:
+        persist_artifact(str(artifact_dir) if artifact_dir else None, "defect-batch.json", batch.model_dump())
         return ThreeAgentWorkflowResult(
             ok=False,
             stage="agent2",

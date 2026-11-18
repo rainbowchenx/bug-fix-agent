@@ -15,7 +15,8 @@ from bugfix_platform.agents.cartographer.investigation_store import (
     record_group_response,
     save_format_repair,
 )
-from bugfix_platform.sdk.cartography import CartographyRequest, run_claude_cartography
+from bugfix_platform.sdk.cartography import CartographyRequest
+from bugfix_platform.agents.cartographer.handoff import run_claude_cartography
 
 
 def _envelope(**kw: Any) -> dict[str, Any]:

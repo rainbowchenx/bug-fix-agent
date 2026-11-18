@@ -1830,7 +1830,7 @@ def _patch_attempt(*, digest: str, checks: list) -> object:
 
 
 def test_final_candidate_mixed_checks_are_not_passed():
-    from bugfix_platform.agents.analyst.run import _attach_checks_to_entry
+    from bugfix_platform.agents.analyst.attempt import _attach_checks_to_entry
 
     attempt = _patch_attempt(
         digest="final-digest",
@@ -1853,7 +1853,7 @@ def test_final_candidate_mixed_checks_are_not_passed():
     )
     # digest of the PatchSet is computed from path+digest+kind, not the literal above;
     # stamp both checks with the real final digest after construction.
-    from bugfix_platform.agents.analyst.run import _patchset_digest
+    from bugfix_platform.agents.analyst.attempt import _patchset_digest
 
     digest = _patchset_digest(attempt.patchSet)
     attempt = attempt.model_copy(
@@ -1872,7 +1872,7 @@ def test_final_candidate_mixed_checks_are_not_passed():
 
 
 def test_unmatched_final_candidate_does_not_reuse_old_checks():
-    from bugfix_platform.agents.analyst.run import _attach_checks_to_entry, _patchset_digest
+    from bugfix_platform.agents.analyst.attempt import _attach_checks_to_entry, _patchset_digest
 
     attempt = _patch_attempt(
         digest="new-file",

@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "packaging"))
+sys.path.insert(0, str(ROOT / "evals"))
 
 from eval_agent3 import loc_hit, score_report, score_ticket  # noqa: E402
 
