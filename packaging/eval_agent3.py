@@ -280,6 +280,8 @@ def score_report(report: dict[str, Any], cases: list[dict[str, Any]]) -> dict[st
                 "product": dumped.get("productLine"),
                 "requiredQuestion": case.get("requiredQuestion", case.get("requiredQuestions")),
                 "answerConsumed": case.get("answerConsumed", case.get("answersConsumed")),
+                "effectiveAnswers": case.get("effectiveAnswers", case.get("answersProvided")),
+                "eligible": case.get("eligible", case.get("repairEligible")),
             }
         )
     summary["convergence"] = convergence_metrics(

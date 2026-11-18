@@ -42,8 +42,8 @@ def test_duplicate_attempts_and_stale_scores_and_zero_denominator():
     assert empty["conservativeRate"] is None
     assert empty["answerConsumption"] is None
     answers = [
-        _case(1, requiredQuestion=True, answerConsumed=True),
-        _case(2, requiredQuestion=True, answerConsumed=False),
+        _case(1, effectiveAnswers=1, answersConsumed=1),
+        _case(2, effectiveAnswers=1, answersConsumed=0),
     ]
     assert convergence_metrics(answers)["answerConsumption"] == 0.5
 
@@ -60,12 +60,16 @@ def test_stale_does_not_count_as_success_and_report_only_has_no_repair_rate():
     assert convergence_metrics(template)["answerConsumption"] == 1.0
 
 
-def test_answer_consumption_is_per_question_not_per_ticket():
+def test_answer_consumption_uses_effective_answers_not_required_denominator():
     cases = [
         _case(1, requiredQuestions=["q1", "q2", "q3"], answersConsumed=1, accepted=True, resolved=True),
     ]
     metrics = convergence_metrics(cases)
-    assert metrics["answerConsumption"] == 1 / 3
+    assert metrics["answerConsumption"] == 1.0
+    partial = [
+        _case(1, requiredQuestions=["q1", "q2", "q3"], effectiveAnswers=2, answersConsumed=1),
+    ]
+    assert convergence_metrics(partial)["answerConsumption"] == 0.5
     unjustified = [
         _case(1, requiredQuestions=["q1", "q2"], unjustifiedReopens=1, justifiedReopens=1),
     ]
@@ -83,3 +87,11 @@ def test_answer_consumption_is_per_question_not_per_ticket():
     assert convergence_metrics(ten)["repeatQuestionRate"] == 0.1
     empty_q = [_case(1, requiredQuestions=[], unjustifiedReopens=0, justifiedReopens=0)]
     assert convergence_metrics(empty_q)["repeatQuestionRate"] is None
+    eligible = [
+        _case(1, eligible=True, accepted=True, resolved=True),
+        _case(2, eligible=True, accepted=True, resolved=False),
+        _case(3, eligible=False, accepted=True, resolved=True),
+    ]
+    el = convergence_metrics(eligible)
+    assert el["eligibleDefects"] == 2
+    assert el["eligibleRepairRate"] == 0.5

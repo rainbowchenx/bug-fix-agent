@@ -52,6 +52,8 @@ def _cmd_resume(
     from bugfix_contracts.analysis_report import validate_analysis_report
     from bugfix_contracts.code_knowledge import validate_code_knowledge
     from bugfix_contracts.defect_batch import load_defect_batch
+    from bugfix_platform.agents.analyst.attempt_store import store_lock
+    from bugfix_platform.agents.analyst.report_store import load_or_rebuild_analysis_report
     from bugfix_platform.agents.analyst.run import run_analyst
     from bugfix_platform.agents.analyst.sessions import load_revision, resume_from_store
 
@@ -64,18 +66,24 @@ def _cmd_resume(
         print(f"unknown defect: {defect_id}", file=sys.stderr)
         return 1
     previous = None
+    knowledge = None
     if apply_fix or execute:
         if batch is None or not knowledge_path.is_file():
             print("resume execution needs defect-batch.json and code-knowledge.json", file=sys.stderr)
             return 1
         knowledge = validate_code_knowledge(json.loads(knowledge_path.read_text(encoding="utf-8")))
-        if report_path.is_file():
-            previous = validate_analysis_report(json.loads(report_path.read_text(encoding="utf-8")))
+        previous = load_or_rebuild_analysis_report(
+            base,
+            product_line=batch.productLine,
+            work_dir=knowledge.workDir,
+            apply_fix=apply_fix,
+        )
     decision = resume_from_store(base, defect_id, revision_id)
     print(json.dumps({"action": decision.action, "sessionId": decision.sessionId,
                       "reason": decision.reason}, ensure_ascii=False, indent=2))
     if not apply_fix and not execute:
         return 0
+    assert knowledge is not None
     work_dir = previous.workDir if previous is not None else knowledge.workDir
     revision = load_revision(base, defect_id, revision_id)
     revisions = {defect_id: revision} if revision is not None else {}
@@ -105,32 +113,39 @@ def _cmd_resume(
         json.dumps(dumped, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    by_id: dict[str, object] = {}
-    if previous is not None:
-        for item in previous.model_dump()["tickets"]:
-            by_id[item["defectId"]] = item
-    for item in dumped.get("tickets") or []:
-        if isinstance(item, dict) and item.get("defectId"):
-            by_id[str(item["defectId"])] = item
-    merged_tickets = list(by_id.values())
-    by_outcome: dict[str, int] = {}
-    for item in merged_tickets:
-        if not isinstance(item, dict):
-            continue
-        oc = str(item.get("outcome") or "other_blocked")
-        by_outcome[oc] = by_outcome.get(oc, 0) + 1
-    dumped["tickets"] = merged_tickets
-    dumped["summary"] = {"total": len(merged_tickets), "byOutcome": by_outcome}
-    report_path.write_text(
-        validate_analysis_report(dumped).model_dump_json(indent=2),
-        encoding="utf-8",
-    )
-    from bugfix_platform.agents.analyst.report import render_report
+    with store_lock(base):
+        previous = load_or_rebuild_analysis_report(
+            base,
+            product_line=batch.productLine if batch is not None else knowledge.productLine,
+            work_dir=work_dir,
+            apply_fix=apply_fix,
+        )
+        by_id: dict[str, object] = {}
+        if previous is not None:
+            for item in previous.model_dump()["tickets"]:
+                by_id[item["defectId"]] = item
+        for item in dumped.get("tickets") or []:
+            if isinstance(item, dict) and item.get("defectId"):
+                by_id[str(item["defectId"])] = item
+        merged_tickets = list(by_id.values())
+        by_outcome: dict[str, int] = {}
+        for item in merged_tickets:
+            if not isinstance(item, dict):
+                continue
+            oc = str(item.get("outcome") or "other_blocked")
+            by_outcome[oc] = by_outcome.get(oc, 0) + 1
+        dumped["tickets"] = merged_tickets
+        dumped["summary"] = {"total": len(merged_tickets), "byOutcome": by_outcome}
+        report_path.write_text(
+            validate_analysis_report(dumped).model_dump_json(indent=2),
+            encoding="utf-8",
+        )
+        from bugfix_platform.agents.analyst.report import render_report
 
-    (base / "analysis-report.md").write_text(
-        render_report({"batchId": dumped.get("productLine"), "tickets": merged_tickets}),
-        encoding="utf-8",
-    )
+        (base / "analysis-report.md").write_text(
+            render_report({"batchId": dumped.get("productLine"), "tickets": merged_tickets}),
+            encoding="utf-8",
+        )
     return 0
 
 

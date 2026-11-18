@@ -60,6 +60,50 @@ def test_prompt_contains_previous_attempt_answers(tmp_path: Path):
     assert ctx.analysisRef.path.endswith("analysis.json")
 
 
+def test_previous_attempt_classifies_applied_patch_with_worktree(tmp_path: Path):
+    import hashlib
+    from bugfix_contracts.repair import PatchFile, PatchSet
+
+    work = tmp_path / "repo"
+    (work / "src").mkdir(parents=True)
+    body = b"def add(a, b):\n    return a + b\n"
+    (work / "src" / "add.py").write_bytes(body)
+    digest = hashlib.sha256(body).hexdigest()
+    attempt = AttemptRecord(
+        schemaVersion=REPAIR_SCHEMA_VERSION,
+        attemptId="a1",
+        defectId="D1",
+        execution="completed",
+        resolution="patch_produced",
+        patchSet=PatchSet(
+            patchSetId="p1",
+            delivery="candidate",
+            baselineHead="aaa",
+            patches=[
+                PatchFile(
+                    path="src/add.py",
+                    kind="modify",
+                    digest=digest,
+                    archivePath=str(work / "src" / "add.py"),
+                )
+            ],
+        ),
+    )
+    snap = build_snapshot_from_entry(
+        _entry(),
+        workspace=WorkspaceSnapshot(repoId=".", head="aaa", contentDigest="d1", capturedAt="t"),
+    )
+    save_analysis_snapshot(tmp_path, attempt, snap)
+    ctx = build_previous_attempt(
+        tmp_path,
+        "D1",
+        "a1",
+        current_snapshot=WorkspaceSnapshot(repoId=".", head="aaa", contentDigest="d1", capturedAt="t"),
+        worktree=work,
+    )
+    assert ctx.patchState == "applied"
+
+
 def test_source_drift_when_dirty_changes(tmp_path: Path):
     attempt = AttemptRecord(
         schemaVersion=REPAIR_SCHEMA_VERSION,

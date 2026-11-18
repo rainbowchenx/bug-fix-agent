@@ -31,6 +31,7 @@ def build_previous_attempt(
     current_snapshot: Optional[WorkspaceSnapshot] = None,
     feedback: Optional[Feedback] = None,
     patch=None,
+    worktree: Path | str | None = None,
 ) -> PreviousAttemptContext:
     snapshot = load_analysis_snapshot(root, defect_id, parent_attempt_id)
     report = snapshot.ticketReport
@@ -67,7 +68,10 @@ def build_previous_attempt(
     if patch is not None:
         snap = current_snapshot or parent_ws
         if snap is not None:
-            patch_state = str(classify_patch_state(patch, snap).get("application") or "unknown")
+            tree = Path(worktree) if worktree is not None else None
+            patch_state = str(
+                classify_patch_state(patch, snap, worktree=tree).get("application") or "unknown"
+            )
     return PreviousAttemptContext(
         attemptId=parent_attempt_id,
         parentAttemptId=snapshot.parentAttemptId,

@@ -209,8 +209,6 @@ def investigate_groups(
                 restored = [
                     DefectCodeMatch.model_validate(item) for item in journal_hit["matches"]
                 ]
-                for match in restored:
-                    merged[match.defectId] = match
                 group_partial = bool(journal_hit.get("partial")) or journal_hit.get("status") != "complete"
                 cached_k = knowledge.model_copy(update={
                     "defectCodeMatches": restored, "partial": group_partial,
@@ -220,7 +218,11 @@ def investigate_groups(
                     and not journal_hit.get("partial")
                     and _complete(cached_k, ids)
                 ):
+                    for match in restored:
+                        merged[match.defectId] = match
                     result = CartographyResult(True, cached_k, "sdk", "resumed complete group")
+                elif group_partial:
+                    incomplete = True
             except (ValueError, TypeError):
                 result = None
         group_base = knowledge.model_copy(update={
@@ -232,6 +234,7 @@ def investigate_groups(
                 timed_out = time.monotonic() - started >= seconds
                 if exhausted or timed_out:
                     stop_reason = "timeout" if timed_out else "budget_exhausted"
+                    incomplete = True
                     break
                 launched += 1
                 group_id = f"g{n:03d}-{key[:8]}"

@@ -193,6 +193,7 @@ def run_analyst(
                         parent_attempt,
                         current_snapshot=snapshot,
                         feedback=load_latest_feedback(Path(out_dir), ticket.defectId),
+                        worktree=work_dir,
                     )
                     if revision is not None:
                         previous_ctx = previous_ctx.model_copy(

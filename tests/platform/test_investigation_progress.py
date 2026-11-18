@@ -225,6 +225,51 @@ def test_sdk_partial_group_is_not_resumed_as_complete(tmp_path):
     assert second.knowledge.partial is True
 
 
+def test_zero_budget_resume_keeps_group_partial(tmp_path):
+    from bugfix_contracts.code_knowledge import InvestigationFact, CodeReference
+    from bugfix_platform.agents.cartographer.investigation import investigate_groups
+    from bugfix_platform.sdk.cartography import CartographyResult
+    from tests.platform.test_investigation_batches import request
+
+    req = request(tmp_path / "repo", 1)
+    calls = []
+
+    def runner(r):
+        calls.append([t.defectId for t in r.defect_batch.tickets])
+        match = r.baseline.defectCodeMatches[0].model_copy(
+            update={
+                "investigationStatus": "complete",
+                "searchedScopes": ["src"],
+                "observedScopes": ["src/a.ts"],
+                "facts": [
+                    InvestigationFact(
+                        claim="reads pageId",
+                        source="model_reported",
+                        validity="reference_verified",
+                        reference=CodeReference(repoId=".", path="src/a.ts", snippet="pageId"),
+                    )
+                ],
+            }
+        )
+        return CartographyResult(
+            True,
+            r.baseline.model_copy(update={"partial": True, "defectCodeMatches": [match]}),
+            "sdk",
+            "sdk marked partial",
+        )
+
+    artifacts = tmp_path / "art"
+    first = investigate_groups(req, runner, artifact_dir=artifacts, resume_dir=artifacts)
+    assert first.knowledge.partial is True
+    before = len(calls)
+    second = investigate_groups(
+        req, runner, max_groups=0, artifact_dir=artifacts, resume_dir=artifacts
+    )
+    assert len(calls) == before
+    assert second.knowledge.partial is True
+    assert "budget_exhausted" in (second.detail or "")
+
+
 def test_journal_restores_matches_from_verified_input_version(tmp_path):
     from dataclasses import replace
     from bugfix_contracts.code_knowledge import InvestigationFact

@@ -55,7 +55,25 @@ def _question_counts(case: dict[str, Any]) -> tuple[int, int]:
         n_cons = n_req or 1
     else:
         n_cons = 0
-    return n_req, min(n_cons, n_req) if n_req else 0
+    return n_req, n_cons
+
+
+def _effective_answer_counts(case: dict[str, Any]) -> tuple[int, int]:
+    """有效答案消费：已合理处理数 / 本轮有效答案数。"""
+    _, handled = _question_counts(case)
+    raw = case.get("effectiveAnswers")
+    if raw is None:
+        raw = case.get("answersProvided")
+    if isinstance(raw, list):
+        received = len([item for item in raw if item])
+    elif isinstance(raw, (int, float)):
+        received = int(raw)
+    elif raw:
+        received = handled or 1
+    else:
+        received = handled
+    handled = min(handled, received) if received else 0
+    return received, handled
 
 
 def _reopen_counts(case: dict[str, Any]) -> tuple[int, int]:
@@ -64,6 +82,14 @@ def _reopen_counts(case: dict[str, Any]) -> tuple[int, int]:
     if unjustified == 0 and justified == 0 and case.get("questionReopened"):
         unjustified = 1
     return unjustified, justified
+
+
+def _is_eligible(case: dict[str, Any]) -> bool:
+    if "eligible" in case:
+        return bool(case.get("eligible"))
+    if "repairEligible" in case:
+        return bool(case.get("repairEligible"))
+    return False
 
 
 def convergence_metrics(
@@ -93,20 +119,26 @@ def convergence_metrics(
     report_only = True if apply_fix is False else (False if apply_fix is True else (all(c.get("applyFix") is False for c in rows) if rows else True))
     observed_den = success + failed
     req_total = 0
-    consumed_total = 0
+    effective_total = 0
+    handled_total = 0
     unjustified_total = 0
     justified_total = 0
     reopened = 0
     for case in live:
-        n_req, n_cons = _question_counts(case)
+        n_req, _ = _question_counts(case)
         req_total += n_req
-        consumed_total += n_cons
+        received, handled = _effective_answer_counts(case)
+        effective_total += received
+        handled_total += handled
         uj, jr = _reopen_counts(case)
         unjustified_total += uj
         justified_total += jr
         if uj or jr or case.get("questionReopened"):
             reopened += 1
     reopen_den = unjustified_total + justified_total
+    has_eligibility = any(("eligible" in c) or ("repairEligible" in c) for c in live)
+    eligible = [c for c in live if _is_eligible(c)] if has_eligibility else []
+    eligible_success = sum(1 for c in eligible if c.get("accepted") is True and c.get("resolved") is True)
     return {
         "uniqueDefects": n,
         "success": success,
@@ -116,9 +148,11 @@ def convergence_metrics(
         "conservativeRate": (success / n) if n else None,
         "observedRate": (success / observed_den) if observed_den else None,
         "repairRate": None if report_only else ((success / n) if n else None),
-        "answerConsumption": (consumed_total / req_total) if req_total else None,
+        "answerConsumption": (handled_total / effective_total) if effective_total else None,
         "repeatQuestionRate": (unjustified_total / req_total) if req_total else None,
         "justifiedReopenRate": (justified_total / reopen_den) if reopen_den else None,
+        "eligibleDefects": len(eligible) if has_eligibility else None,
+        "eligibleRepairRate": (eligible_success / len(eligible)) if eligible else (None if has_eligibility else None),
         "note": "70% is a proposed repair-ticket SLA, not an engineering bar",
     }
 
