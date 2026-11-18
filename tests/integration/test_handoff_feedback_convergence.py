@@ -205,10 +205,11 @@ def test_apply_fix_control_chain_writes_real_file(tmp_path, monkeypatch):
         })
         return AnalyzeResult(ok=True, payload=payload, source="sdk")
 
-    calls = {"n": 0}
+    calls = {"n": 0, "previous": False}
 
     def fixer(req):
         calls["n"] += 1
+        calls["previous"] = bool((req.analysis or {}).get("previousAttempt"))
         target = Path(req.worktree_path) / "src" / "add.py"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text("def add(a, b):\n    return a + b\n", encoding="utf-8")
@@ -218,6 +219,16 @@ def test_apply_fix_control_chain_writes_real_file(tmp_path, monkeypatch):
         })
 
     from bugfix_platform.agents.analyst.run import run_analyst
+    from bugfix_platform.agents.analyst.sessions import load_latest_attempt
+    first = run_analyst(
+        work_dir=work,
+        defect_batch=batch,
+        code_knowledge=knowledge,
+        analyze_fn=analyze,
+        apply_fix=False,
+        artifact_dir=out,
+    )
+    parent_id = first.tickets[0].attemptId
     report = run_analyst(
         work_dir=work,
         defect_batch=batch,
@@ -226,10 +237,15 @@ def test_apply_fix_control_chain_writes_real_file(tmp_path, monkeypatch):
         fix_fn=fixer,
         apply_fix=True,
         artifact_dir=out,
+        parent_attempt_ids={"D1": parent_id},
     )
     assert report.applyFix is True
     assert calls["n"] == 1
+    assert calls["previous"] is True
     assert report.tickets[0].defectId == "D1"
+    latest = load_latest_attempt(out, "D1")
+    assert latest is not None
+    assert latest.parentAttemptId == parent_id
 
 
 def test_closing_pass_cannot_wipe_unanswered_questions(tmp_path, monkeypatch):
@@ -358,6 +374,58 @@ def test_first_round_implementation_decision_allows_edit(tmp_path, monkeypatch):
     ticket = report.tickets[0]
     assert ticket.actionability.get("allowed") is True
     assert not any(q.id == "q2" and q.status != "resolved" for q in (ticket.rootCause.questions or []))
+    snap = load_analysis_snapshot(out, "D1", ticket.attemptId)
+    by_id = {q.id: q for q in snap.questionLedger}
+    assert by_id["q2"].status == "resolved"
+    assert any(r.questionId == "q2" and r.disposition == "resolved" for r in snap.questionResolutions)
+
+    def reopen(req):
+        payload = dict(req.routed)
+        payload.update({
+            "outcome": "plan_only",
+            "proposedFix": {"summary": "return a+b", "steps": [], "targetFiles": ["src/add.py"]},
+            "rootCause": {
+                "summary": "add subtracts instead of adding",
+                "ruledOut": [],
+                "openQuestions": [],
+                "questions": [{
+                    "id": "q2",
+                    "kind": "choice",
+                    "reason": "ask again without new evidence",
+                    "category": "implementation",
+                    "status": "open",
+                    "relatedClaimIds": ["c1"],
+                }],
+                "claims": [{
+                    "claimId": "c1",
+                    "statement": "operands swapped",
+                    "role": "conclusion",
+                    "status": "unverified",
+                    "evidenceRefs": ["candidate:1"],
+                    "assumptions": [],
+                }],
+            },
+            "localization": {
+                "candidates": [{
+                    "path": "src/add.py",
+                    "why": "add implementation here",
+                    "snippet": "return a - b",
+                    "source": "grep",
+                }],
+            },
+            "blockers": None,
+            "confidence": "high",
+            "verifyStatus": "skipped",
+            "suggestedVerify": {"steps": [], "executed": False},
+        })
+        return AnalyzeResult(ok=True, payload=payload, source="sdk")
+
+    report2 = run_analyst(
+        work_dir=work, defect_batch=_batch(), code_knowledge=knowledge,
+        analyze_fn=reopen, artifact_dir=out, apply_fix=False,
+    )
+    assert report2.tickets[0].actionability.get("allowed") is False
+    assert "reopen" in str(report2.tickets[0].actionability.get("reason") or "").lower() or report2.tickets[0].analysisStatus == "incomplete"
 
 
 def test_candidate_alias_converges_implementation_question(tmp_path, monkeypatch):

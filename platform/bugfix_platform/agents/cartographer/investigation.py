@@ -153,6 +153,7 @@ def investigate_groups(
             "ids": ids,
             "cacheKey": record.get("cacheKey"),
             "status": record.get("status"),
+            "partial": bool(record.get("partial") or record.get("status") != "complete"),
             "stopReason": record.get("stopReason"),
             "source": record.get("source"),
             "detail": record.get("detail"),
@@ -210,10 +211,15 @@ def investigate_groups(
                 ]
                 for match in restored:
                     merged[match.defectId] = match
+                group_partial = bool(journal_hit.get("partial")) or journal_hit.get("status") != "complete"
                 cached_k = knowledge.model_copy(update={
-                    "defectCodeMatches": restored, "partial": False,
+                    "defectCodeMatches": restored, "partial": group_partial,
                 })
-                if journal_hit.get("status") == "complete" and _complete(cached_k, ids):
+                if (
+                    journal_hit.get("status") == "complete"
+                    and not journal_hit.get("partial")
+                    and _complete(cached_k, ids)
+                ):
                     result = CartographyResult(True, cached_k, "sdk", "resumed complete group")
             except (ValueError, TypeError):
                 result = None
@@ -253,8 +259,12 @@ def investigate_groups(
                     temporary = dest.with_suffix(".tmp")
                     temporary.write_text(result.knowledge.model_dump_json(), encoding="utf-8")
                     temporary.replace(dest)
+            group_partial = bool(result.knowledge.partial)
             group_status = "complete" if _complete(
-                knowledge.model_copy(update={"defectCodeMatches": [merged[i] for i in ids], "partial": False}),
+                knowledge.model_copy(update={
+                    "defectCodeMatches": [merged[i] for i in ids],
+                    "partial": group_partial,
+                }),
                 ids,
             ) else "partial"
             record = {
@@ -263,6 +273,7 @@ def investigate_groups(
                 "maxTurns": resolve_cartography_max_turns(req.max_turns, ticket_count=len(ids)),
                 "stopReason": "completed" if group_status == "complete" else "partial",
                 "status": group_status,
+                "partial": group_partial or group_status != "complete",
                 "turns": result.turns,
                 "cost": result.cost,
             }

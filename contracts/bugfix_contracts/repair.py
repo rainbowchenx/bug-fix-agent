@@ -171,6 +171,7 @@ class ConvergenceResult(BaseModel):
 
     resolutions: list[QuestionResolution] = Field(default_factory=list)
     openQuestions: list[Question] = Field(default_factory=list)
+    questionLedger: list[Question] = Field(default_factory=list)
     violations: list[str] = Field(default_factory=list)
     needsClosingPass: bool
     analysisIncomplete: bool = False

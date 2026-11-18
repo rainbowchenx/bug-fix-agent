@@ -303,6 +303,7 @@ def run_analyst(
                 entry["localization"] = loc
             ctx, aliases = _bind_current(entry, drifted_flag=drifted)
             resolutions = []
+            round_ledger: list[Any] = []
             conv = None
             from bugfix_contracts.repair import AnalysisSnapshotRef, PreviousAttemptContext, Question
             from bugfix_platform.agents.analyst.continuation import consume_question_answers
@@ -328,6 +329,7 @@ def run_analyst(
                     evidence_aliases=aliases,
                 )
                 resolutions = conv.resolutions
+                round_ledger = [q.model_dump() for q in (conv.questionLedger or [])]
                 root = dict(entry.get("rootCause") or {})
                 root["questions"] = [q.model_dump() for q in conv.openQuestions]
                 entry["rootCause"] = root
@@ -392,6 +394,7 @@ def run_analyst(
                         evidence_aliases=aliases,
                     )
                     resolutions = conv.resolutions
+                    round_ledger = [q.model_dump() for q in (conv.questionLedger or [])]
                     root = dict(entry.get("rootCause") or {})
                     root["questions"] = [q.model_dump() for q in conv.openQuestions]
                     entry["rootCause"] = root
@@ -437,6 +440,8 @@ def run_analyst(
                 "plan_only",
                 "patch_ready",
             ):
+                if previous_payload:
+                    entry = {**entry, "previousAttempt": previous_payload}
                 attempt, entry = _run_fix_loop(
                     work_dir=work_dir,
                     ticket=ticket,
@@ -450,6 +455,8 @@ def run_analyst(
                     snapshot=snapshot,
                     revision=revision,
                     session_id=session_id,
+                    parent_attempt_id=parent_attempt,
+                    previous_attempt=previous_payload,
                 )
             else:
                 if want_fix and entry.get("outcome") == "patch_ready" and not decision.allowed:
@@ -484,6 +491,7 @@ def run_analyst(
                 workspace=snapshot,
                 resolutions=resolutions,
                 previous_ledger=(previous_payload or {}).get("questionLedger") or (previous_payload or {}).get("openQuestions"),
+                round_ledger=round_ledger,
             )
 
         for t in defect_batch.tickets:
@@ -738,6 +746,8 @@ def _run_fix_loop(
     snapshot: Any,
     revision: Optional[InputRevision],
     session_id: Optional[str],
+    parent_attempt_id: Optional[str] = None,
+    previous_attempt: Optional[dict[str, Any]] = None,
 ) -> tuple[AttemptRecord, dict[str, Any]]:
     last_payload: dict[str, Any] = {}
     attempt_id = uuid4().hex[:12]
@@ -754,6 +764,8 @@ def _run_fix_loop(
         analysis["currentTarget"] = context.currentTarget
         analysis["inputRevision"] = context.revision.model_dump() if context.revision else None
         analysis["upstreamInvestigation"] = context.investigation
+        if previous_attempt:
+            analysis["previousAttempt"] = previous_attempt
         if ctx.hypotheses:
             analysis["retryFeedback"] = [h.claim for h in ctx.hypotheses]
         result = fixer(
@@ -868,6 +880,7 @@ def _run_fix_loop(
         update={
             "revisionId": revision.revisionId if revision else attempt.revisionId,
             "sessionId": session_id,
+            "parentAttemptId": parent_attempt_id or attempt.parentAttemptId,
             "evidence": list(context.evidence),
             "editDecision": attempt.editDecision or decision,
         }
@@ -1169,6 +1182,7 @@ def _persist_ticket_entry(
     workspace=None,
     resolutions: Optional[list] = None,
     previous_ledger: Optional[list] = None,
+    round_ledger: Optional[list] = None,
 ) -> dict[str, Any]:
     decision=attempt.editDecision
     entry = {**entry, "attemptId": attempt.attemptId,
@@ -1191,6 +1205,7 @@ def _persist_ticket_entry(
             parent_attempt_id=attempt.parentAttemptId,
             resolutions=resolutions,
             previous_ledger=previous_ledger,
+            round_ledger=round_ledger,
         )
         save_analysis_snapshot(
             Path(out_dir),

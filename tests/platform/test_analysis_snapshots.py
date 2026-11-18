@@ -128,6 +128,32 @@ def test_interrupted_new_attempt_retry_advances_latest(tmp_path: Path):
     assert latest["attemptId"] == "a1"
 
 
+def test_apply_fix_attempt_recovers_latest_with_parent(tmp_path: Path):
+    a0 = AttemptRecord(schemaVersion=REPAIR_SCHEMA_VERSION, attemptId="a0", defectId="D1", execution="completed", resolution="analysis_only")
+    save_analysis_snapshot(tmp_path, a0, build_snapshot_from_entry(_entry("D1", "first")))
+    a1 = AttemptRecord(
+        schemaVersion=REPAIR_SCHEMA_VERSION,
+        attemptId="a1",
+        defectId="D1",
+        execution="completed",
+        resolution="patch_produced",
+        parentAttemptId="a0",
+    )
+    snap = build_snapshot_from_entry(_entry("D1", "fixed"))
+    dest = tmp_path / "defects" / "D1" / "attempts" / "a1"
+    dest.mkdir(parents=True, exist_ok=True)
+    payload = snap.model_dump()
+    payload["digest"] = snap.digest or snapshot_digest(payload)
+    (dest / "analysis.json").write_text(json.dumps(payload), encoding="utf-8")
+    (dest / "attempt.json").write_text(json.dumps(a1.model_dump(), ensure_ascii=False), encoding="utf-8")
+    (dest / "feedback-form.md").write_text("# form\n", encoding="utf-8")
+    latest = json.loads((tmp_path / "defects" / "D1" / "latest.json").read_text(encoding="utf-8"))
+    assert latest["attemptId"] == "a0"
+    save_analysis_snapshot(tmp_path, a1, snap)
+    latest = json.loads((tmp_path / "defects" / "D1" / "latest.json").read_text(encoding="utf-8"))
+    assert latest["attemptId"] == "a1"
+
+
 def test_latest_write_failure_recovers_on_same_digest_retry(tmp_path: Path, monkeypatch):
     a0 = AttemptRecord(schemaVersion=REPAIR_SCHEMA_VERSION, attemptId="a0", defectId="D1", execution="completed", resolution="analysis_only")
     save_analysis_snapshot(tmp_path, a0, build_snapshot_from_entry(_entry("D1", "first")))

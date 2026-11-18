@@ -323,3 +323,4 @@ def test_first_round_implementation_question_creates_resolution():
     )
     assert any(r.questionId == "q2" and r.disposition == "resolved" for r in result.resolutions)
     assert not any(q.id == "q2" for q in result.openQuestions)
+    assert any(q.id == "q2" and q.status == "resolved" for q in result.questionLedger)

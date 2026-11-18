@@ -164,6 +164,7 @@ def consume_question_answers(
         and revision.expected != previous.confirmedTarget
     )
     resolutions: list[QuestionResolution] = []
+    ledger_by_id: dict[str, Question] = {q.id: q for q in parent_questions}
     invalidated_ids: set[str] = set()
     for item in previous.questionResolutions or []:
         if expected_changed and item.targetDigest != td:
@@ -187,7 +188,14 @@ def consume_question_answers(
     evidence_ids = _evidence_ids(current_evidence)
 
     def _keep_open(question: Question, status: str = "open") -> None:
-        open_questions.append(question.model_copy(update={"status": status}))
+        updated = question.model_copy(update={"status": status})
+        open_questions.append(updated)
+        ledger_by_id[updated.id] = updated
+
+    def _mark_resolved(question: Question, refs: list[str]) -> Question:
+        updated = question.model_copy(update={"status": "resolved", "newEvidenceRefs": refs})
+        ledger_by_id[updated.id] = updated
+        return updated
 
     for question in parent_questions:
         incoming = proposed_by_id.get(question.id)
@@ -229,6 +237,7 @@ def consume_question_answers(
                     )
                 )
                 resolved_ids.add(question.id)
+                _mark_resolved(incoming if incoming.id == question.id else question, refs)
                 continue
             if answer and answer.text.strip():
                 resolutions.append(
@@ -258,12 +267,14 @@ def consume_question_answers(
                 )
             )
             resolved_ids.add(question.id)
+            _mark_resolved(incoming if incoming.id == question.id else question, refs)
             continue
         if incoming.kind in {"blocking", "choice"}:
             status = "answered" if answer and answer.text.strip() else "open"
             _keep_open(incoming if incoming.id == question.id else question, status)
             continue
         open_questions.append(incoming)
+        ledger_by_id[incoming.id] = incoming
 
     for question in proposed:
         if question.id in parent_ids or question.predecessorId in parent_ids:
@@ -286,6 +297,7 @@ def consume_question_answers(
                     evidenceRefs=refs,
                 )
             )
+            _mark_resolved(question, refs)
             continue
         if question.status == "resolved" and question.category in {"product", "fact"}:
             answer = answers.get(question.id)
@@ -302,10 +314,12 @@ def consume_question_answers(
                         evidenceRefs=refs,
                     )
                 )
+                _mark_resolved(question, refs)
                 continue
             _keep_open(question, "answered" if answer and answer.text.strip() else "open")
             continue
         open_questions.append(question)
+        ledger_by_id[question.id] = question
 
     blocking_open = [
         q for q in open_questions
@@ -315,6 +329,7 @@ def consume_question_answers(
     return ConvergenceResult(
         resolutions=resolutions,
         openQuestions=open_questions,
+        questionLedger=list(ledger_by_id.values()),
         violations=violations,
         needsClosingPass=needs_closing,
         analysisIncomplete=bool(violations) or bool(blocking_open),

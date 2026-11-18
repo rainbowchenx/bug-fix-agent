@@ -144,12 +144,16 @@ def _ledger_from_entry(
     report: TicketReport,
     resolutions: Optional[list] = None,
     previous_ledger: Optional[list] = None,
+    round_ledger: Optional[list] = None,
 ) -> list[dict[str, Any]]:
     by_id: dict[str, Question] = {}
     for raw in previous_ledger or []:
         question = raw if isinstance(raw, Question) else Question.model_validate(raw)
         by_id[question.id] = question
     for question in list(report.rootCause.questions or []) if report.rootCause else []:
+        by_id[question.id] = question
+    for raw in round_ledger or []:
+        question = raw if isinstance(raw, Question) else Question.model_validate(raw)
         by_id[question.id] = question
     resolved = set()
     insufficient = set()
@@ -180,6 +184,7 @@ def build_snapshot_from_entry(
     parent_attempt_id: Optional[str] = None,
     resolutions: Optional[list] = None,
     previous_ledger: Optional[list] = None,
+    round_ledger: Optional[list] = None,
 ) -> AnalysisSnapshot:
     report = TicketReport.model_validate(entry)
     payload = {
@@ -187,7 +192,9 @@ def build_snapshot_from_entry(
         "effectiveRevision": revision.model_dump() if revision is not None else None,
         "workspaceSnapshot": workspace.model_dump() if workspace is not None else None,
         "questionResolutions": [r.model_dump() if hasattr(r, "model_dump") else r for r in (resolutions or [])],
-        "questionLedger": _ledger_from_entry(report, resolutions, previous_ledger),
+        "questionLedger": _ledger_from_entry(
+            report, resolutions, previous_ledger, round_ledger=round_ledger
+        ),
         "parentAttemptId": parent_attempt_id,
         "baseRevisionId": getattr(revision, "revisionId", None) if revision is not None else None,
     }
