@@ -49,7 +49,7 @@ def test_run_analyst_persists_all_tickets_including_excluded(tmp_path: Path):
     (work / "src" / "a.ts").write_text("export {}\n", encoding="utf-8")
     batch = DefectBatch.model_validate(
         {
-            "schemaVersion": "0.3.0",
+            "schemaVersion": "0.4.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",
@@ -74,7 +74,7 @@ def test_run_analyst_persists_all_tickets_including_excluded(tmp_path: Path):
     )
     knowledge = CodeKnowledge.model_validate(
         {
-            "schemaVersion": "0.3.0",
+            "schemaVersion": "0.4.0",
             "productLine": "hc",
             "workDir": str(work),
             "partial": False,

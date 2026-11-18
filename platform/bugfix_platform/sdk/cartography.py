@@ -41,7 +41,8 @@ _SALVAGE_PROMPT = (
 )
 
 # Thorough read session: Bash + CodeGraph MCP; no mutate tools.
-CARTOGRAPHY_TOOLS = ["Read", "Glob", "Grep", "Bash", *CODEGRAPH_MCP_TOOLS]
+# Bash 在真实 CLI 路由验证完成前关闭（F05/S）。Read/Grep/Glob/CodeGraph 足够只读调查。
+CARTOGRAPHY_TOOLS = ["Read", "Glob", "Grep", *CODEGRAPH_MCP_TOOLS]
 DISALLOWED_TOOLS = ["Edit", "Write", "NotebookEdit", "MultiEdit"]
 
 # Destructive / egress patterns for Bash (defense in depth; prompt also forbids mutation).
@@ -125,6 +126,8 @@ def bash_command_allowed(command: str) -> tuple[bool, str]:
             False,
             "bash blocked: mutating, network, package-install, or VCS-write commands are not allowed in Agent-2",
         )
+    if re.search(r"(>>|tee\b|python(?:3)?\s+-c\b|(?<![0-9])>\s*\S+)", text):
+        return False, "bash blocked: redirects, tee, or python -c can write files"
     return True, ""
 
 
@@ -145,6 +148,9 @@ class CartographyRequest:
     injected_skills: tuple[InjectedSkill, ...] = ()
     codegraph: Optional[CodeGraphStatus] = None
     investigation_only: bool = False
+    artifact_dir: Optional[str | Path] = None
+    group_id: Optional[str] = None
+    call_id: Optional[str] = None
 
 
 @dataclass
@@ -154,6 +160,8 @@ class CartographyResult:
     source: Literal["heuristic", "sdk", "sdk_fallback"]
     detail: Optional[str] = None
     skill_reads: list[str] = field(default_factory=list)
+    turns: Optional[int] = None
+    cost: Optional[float] = None
 
 
 CartographyRunner = Callable[[CartographyRequest], CartographyResult]
@@ -200,6 +208,38 @@ def heuristic_cartography(req: CartographyRequest) -> CartographyResult:
         knowledge=knowledge,
         source="heuristic",
     )
+
+
+def cartography_allowed_tools() -> list[str]:
+    """S 未通过前不启用 Bash。"""
+    return [name for name in CARTOGRAPHY_TOOLS if name != "Bash"]
+
+
+def _cartography_hooks() -> dict[str, list[Any]]:
+    """PreToolUse 在 SDK 真正执行前拦截写 Bash；whole-tool allow 不能当唯一闸。"""
+    try:
+        from claude_agent_sdk import HookMatcher
+    except ImportError:
+        return {}
+
+    async def pre_tool_use(hook_input: Any, _tool_use_id: str | None, _ctx: Any) -> dict[str, Any]:
+        payload = hook_input if isinstance(hook_input, dict) else {}
+        tool = str(payload.get("tool_name") or "")
+        tool_input = payload.get("tool_input") if isinstance(payload.get("tool_input"), dict) else payload
+        if tool == "Bash" or "command" in (tool_input or {}):
+            cmd = str((tool_input or {}).get("command") or "")
+            ok, reason = bash_command_allowed(cmd)
+            if not ok:
+                return {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PreToolUse",
+                        "permissionDecision": "deny",
+                        "permissionDecisionReason": reason,
+                    }
+                }
+        return {}
+
+    return {"PreToolUse": [HookMatcher(matcher="Bash", hooks=[pre_tool_use], on_failure="block")]}
 
 
 async def _can_use_cartography_tool(
@@ -284,6 +324,11 @@ def _budget_exhausted(message: Any) -> bool:
 
 
 def _parse_session_json(structured: Any, texts: list[str]) -> Optional[dict[str, Any]]:
+    from bugfix_platform.sdk.match_payload import find_business_envelope
+
+    envelope, _ref = find_business_envelope(structured=structured, texts=texts)
+    if envelope is not None:
+        return envelope
     parsed = parse_json_payload(structured)
     if parsed is not None:
         return parsed
@@ -361,15 +406,20 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
     cg = req.codegraph
 
     def _make_options(*, resume: str | None = None, turns: Optional[int] = None) -> Any:
+        hooks = _cartography_hooks()
+        tools = cartography_allowed_tools()
+        if not hooks:
+            tools = [name for name in tools if name != "Bash"]
         kwargs: dict[str, Any] = {
             "cwd": req.work_dir,
             "system_prompt": system_prompt,
-            "allowed_tools": list(CARTOGRAPHY_TOOLS),
+            "allowed_tools": tools,
             "disallowed_tools": list(DISALLOWED_TOOLS),
             "permission_mode": "dontAsk",
             "max_turns": turns if turns is not None else max_turns,
             "model": model,
             "can_use_tool": _can_use_cartography_tool,
+            "hooks": hooks,
         }
         if cg is not None:
             kwargs.update(cg.mcp_option_kwargs(req.work_dir))
@@ -380,10 +430,13 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
         except TypeError:
             kwargs.pop("resume", None)
             kwargs.pop("strict_mcp_config", None)
+            kwargs.pop("hooks", None)
+            kwargs["allowed_tools"] = [name for name in kwargs["allowed_tools"] if name != "Bash"]
             try:
                 return ClaudeAgentOptions(**kwargs)
             except TypeError:
                 kwargs.pop("mcp_servers", None)
+                kwargs.pop("can_use_tool", None)
                 return ClaudeAgentOptions(**kwargs)
 
     texts: list[str] = []
@@ -396,11 +449,38 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
     budget_stop = False
     skill_reads: set[str] = set()
     pending_skill_reads: dict[str, str] = {}
+    observed_paths: list[str] = []
+    pending_observe: dict[str, str] = {}
+    recorder = None
+    if req.artifact_dir:
+        from bugfix_platform.agents.cartographer.investigation_store import InvestigationRecorder
+        import uuid as _uuid
+
+        recorder = InvestigationRecorder(
+            req.artifact_dir,
+            req.group_id or "ungrouped",
+            req.call_id or _uuid.uuid4().hex,
+            budget={"max_turns": max_turns},
+        )
+
+    def _tool_event(block: Any) -> dict[str, Any]:
+        payload = {
+            "name": getattr(block, "name", None) or (block.get("name") if isinstance(block, dict) else None),
+            "id": getattr(block, "id", None) or (block.get("id") if isinstance(block, dict) else None),
+            "tool_use_id": getattr(block, "tool_use_id", None) or (block.get("tool_use_id") if isinstance(block, dict) else None),
+            "input": getattr(block, "input", None) if not isinstance(block, dict) else block.get("input"),
+            "content": getattr(block, "content", None) if not isinstance(block, dict) else block.get("content"),
+        }
+        return {k: v for k, v in payload.items() if v is not None}
 
     def observe_reads(message: Any) -> None:
+        from bugfix_platform.sdk.match_payload import apply_tool_observation
         for block in getattr(message, "content", []) or []:
-            if getattr(block, "name", None) == "Read":
-                ref = (getattr(block, "input", {}) or {}).get("file_path")
+            apply_tool_observation(pending_observe, observed_paths, block, req.work_dir)
+            name = getattr(block, "name", None) or (block.get("name") if isinstance(block, dict) else None)
+            params = getattr(block, "input", None) or (block.get("input") if isinstance(block, dict) else {}) or {}
+            if name == "Read":
+                ref = params.get("file_path")
                 if ref:
                     path = Path(ref)
                     if not path.is_absolute():
@@ -408,12 +488,16 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
                     resolved = str(path.resolve())
                     if any(resolved == str(s.skill_md.resolve()) for s in req.injected_skills):
                         pending_skill_reads[str(getattr(block, "id", ""))] = resolved
-            use_id = str(getattr(block, "tool_use_id", ""))
+            use_id = str(getattr(block, "tool_use_id", "") or "")
             if use_id in pending_skill_reads and not getattr(block, "is_error", False) and getattr(block, "content", None):
                 skill_reads.add(pending_skill_reads.pop(use_id))
 
     def finish(result: CartographyResult) -> CartographyResult:
         result.skill_reads = sorted(skill_reads)
+        if result.turns is None:
+            result.turns = turns
+        if result.cost is None:
+            result.cost = cost
         return result
 
     async def _drive(prompt_text: str, opts: Any) -> None:
@@ -423,6 +507,18 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
             text = _message_text(message)
             if text.strip():
                 texts.append(text)
+            if recorder is not None:
+                kind = "result" if isinstance(message, ResultMessage) else "assistant"
+                tools = [_tool_event(b) for b in (getattr(message, "content", None) or [])]
+                recorder.append_event(
+                    {
+                        "kind": kind,
+                        "text": text,
+                        "tools": [t for t in tools if t],
+                        "structured_output": getattr(message, "structured_output", None),
+                        "is_error": bool(getattr(message, "is_error", False)),
+                    }
+                )
             if not isinstance(message, ResultMessage):
                 continue
             turns = message.num_turns
@@ -442,6 +538,24 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
     try:
         anyio.run(_drive, prompt, _make_options())
     except Exception as err:  # noqa: BLE001
+        if recorder is not None:
+            recorder.append_event({"kind": "error", "text": str(err)})
+            candidates = [t for t in texts if t.strip()]
+            if structured is not None:
+                candidates.insert(0, json.dumps(structured, default=str))
+            try:
+                recorder.save_parse_inputs(candidates)
+                recorder.save_response(
+                    {
+                        "structured_output": structured,
+                        "result_text": result_text,
+                        "errors": [str(err)],
+                        "parse_candidates": candidates,
+                    }
+                )
+            except OSError:
+                recorder.artifact_error = "unwritable"
+            recorder.fail("sdk_error", str(err))
         if not budget_stop:
             fallback = heuristic_cartography(req)
             fallback.source = "sdk_fallback"
@@ -451,20 +565,46 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
             )
             return finish(fallback)
 
+    if recorder is not None:
+        candidates = list(texts)
+        if result_text:
+            candidates.append(result_text)
+        try:
+            recorder.save_parse_inputs(candidates)
+            recorder.save_response(
+                {
+                    "structured_output": structured,
+                    "result_text": result_text,
+                    "errors": [],
+                    "parse_candidates": candidates,
+                }
+            )
+        except OSError as err:
+            recorder.fail("artifact_error", str(err))
+
     parsed = _parse_session_json(structured, texts)
-    if parsed is None and budget_stop and session_id:
+    remaining_turns = None
+    if max_turns is not None and turns is not None:
+        remaining_turns = max(0, int(max_turns) - int(turns))
+    if remaining_turns is None:
+        salvage_turns = 2
+    else:
+        salvage_turns = min(2, remaining_turns)
+    if parsed is None and budget_stop and session_id and salvage_turns > 0:
         salvage_texts: list[str] = []
 
         async def _salvage() -> None:
             nonlocal structured, result_text, turns, cost, terminal
             async for message in query(
                 prompt=_SALVAGE_PROMPT,
-                options=_make_options(resume=session_id, turns=2),
+                options=_make_options(resume=session_id, turns=salvage_turns),
             ):
                 observe_reads(message)
                 text = _message_text(message)
                 if text.strip():
                     salvage_texts.append(text)
+                    if recorder is not None:
+                        recorder.append_event({"kind": "salvage", "text": text})
                 if not isinstance(message, ResultMessage):
                     continue
                 extra_turns = message.num_turns
@@ -481,15 +621,33 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
                         or "cartography salvage error"
                     )
 
-        first_turns, first_cost, first_terminal = turns, cost, terminal
         try:
             anyio.run(_salvage)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as salvage_err:  # noqa: BLE001
+            if recorder is not None:
+                recorder.append_event({"kind": "salvage_error", "text": str(salvage_err)})
+        if recorder is not None:
+            try:
+                from bugfix_platform.agents.cartographer.investigation_store import save_format_repair
+                save_format_repair(
+                    req.artifact_dir,
+                    req.group_id or "ungrouped",
+                    recorder.call_id,
+                    before="\n".join(texts),
+                    after="\n".join(salvage_texts),
+                )
+                recorder.save_response(
+                    {
+                        "phase": "format_repair",
+                        "structured_output": structured,
+                        "result_text": result_text,
+                        "parse_candidates": salvage_texts,
+                    }
+                )
+            except OSError as err:
+                recorder.fail("artifact_error", str(err))
         texts.extend(salvage_texts)
         parsed = _parse_session_json(structured, texts)
-        if parsed is None:
-            turns, cost, terminal = first_turns, first_cost, first_terminal
 
     if budget_stop and not terminal:
         terminal = "max_turns"
@@ -508,25 +666,72 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
             )
             if budget_stop:
                 merged["partial"] = True
+            from bugfix_platform.sdk.match_payload import verify_fact_references
             knowledge = validate_code_knowledge(merged)
             prompt_ids = [t.defectId for t, _ in select_prompt_tickets(req)]
+            verified = verify_fact_references(
+                req.work_dir,
+                list(knowledge.defectCodeMatches),
+                observed_paths=observed_paths,
+                repo_roots=list(req.baseline.repoRoots or []),
+            )
             knowledge = knowledge.model_copy(
                 update={
                     "defectCodeMatches": annotate_investigation_coverage(
-                        list(knowledge.defectCodeMatches),
+                        verified,
                         prompt_ids=prompt_ids,
                         investigated_ids=investigated_ids_from_parsed(parsed),
                     )
                 }
             )
         except Exception as err:  # noqa: BLE001
-            if budget_stop:
-                return finish(_sdk_keep_baseline(req, billing))
-            fallback = heuristic_cartography(req)
-            fallback.source = "sdk_fallback"
-            fallback.detail = f"enriched code-knowledge invalid: {err}" + (f"; {billing}" if billing else "")
-            return finish(fallback)
+            from bugfix_platform.sdk.match_payload import normalize_group_matches, verify_fact_references
+            allowed = {t.defectId for t in req.defect_batch.tickets}
+            group = normalize_group_matches(parsed or {}, requested_ids=allowed, raw_ref="sdk")
+            data = req.baseline.model_dump()
+            by_id = {m["defectId"]: m for m in data.get("defectCodeMatches") or []}
+            for match in group.accepted:
+                by_id[match.defectId] = match.model_dump()
+            data["defectCodeMatches"] = list(by_id.values())
+            data["partial"] = True
+            hints = list(data.get("secondaryHints") or [])
+            hints.append(f"internal_error:{err}")
+            data["secondaryHints"] = hints
+            try:
+                knowledge = validate_code_knowledge(data)
+                knowledge = knowledge.model_copy(
+                    update={
+                        "defectCodeMatches": verify_fact_references(
+                            req.work_dir,
+                            list(knowledge.defectCodeMatches),
+                            observed_paths=observed_paths,
+                            repo_roots=list(req.baseline.repoRoots or []),
+                        )
+                    }
+                )
+                detail = _with_drop_detail(billing, drop_stats)
+                if recorder is not None and recorder.artifact_error is None:
+                    recorder.finalize(status="saved", stop_reason="internal_error", turns=turns, cost=cost, terminal=terminal)
+                return finish(CartographyResult(
+                    ok=True, knowledge=knowledge, source="sdk",
+                    detail="; ".join(x for x in [detail, f"internal_error:{err}"] if x),
+                ))
+            except Exception:
+                if budget_stop:
+                    return finish(_sdk_keep_baseline(req, billing))
+                fallback = heuristic_cartography(req)
+                fallback.source = "sdk_fallback"
+                fallback.detail = f"enriched code-knowledge invalid: {err}" + (f"; {billing}" if billing else "")
+                return finish(fallback)
         detail = _with_drop_detail(billing, drop_stats)
+        if recorder is not None and recorder.artifact_error is None:
+            recorder.finalize(
+                status="saved",
+                stop_reason=terminal or "completed",
+                turns=turns,
+                cost=cost,
+                terminal=terminal,
+            )
         return finish(CartographyResult(
             ok=True, knowledge=knowledge, source="sdk", detail=detail or None
         ))
@@ -561,20 +766,14 @@ def _merge_enrichment(
     *,
     stats: dict[str, int] | None = None,
 ) -> dict[str, Any]:
-    # Validate raw identity before schema coercion or by-id merging can hide it.
-    raw_matches = parsed.get("defectCodeMatches")
-    if raw_matches is not None:
-        if not isinstance(raw_matches, list):
-            raise ValueError("ticket group results must be a list")
-        allowed = {t.defectId for t in tickets} if tickets is not None else {m.defectId for m in baseline.defectCodeMatches}
-        seen = set()
-        for item in raw_matches:
-            defect_id = item.get("defectId") if isinstance(item, dict) else None
-            if not defect_id or defect_id not in allowed:
-                raise ValueError("ticket outside requested group")
-            if defect_id in seen:
-                raise ValueError("duplicate ticket in group result")
-            seen.add(defect_id)
+    from bugfix_platform.sdk.match_payload import normalize_group_matches
+
+    allowed = {t.defectId for t in tickets} if tickets is not None else {m.defectId for m in baseline.defectCodeMatches}
+    group = normalize_group_matches(parsed, requested_ids=allowed, raw_ref="sdk")
+    for issue in group.issues:
+        _bump(stats, issue.reason)
+    parsed = dict(parsed)
+    parsed.update({k: v for k, v in group.shared.items() if v is not None})
     data = baseline.model_dump()
     # Optional top-level overrides that stay within schema.
     # cartographyProfile is caller-supplied; never let the SDK reclassify.
@@ -612,28 +811,30 @@ def _merge_enrichment(
             )
         )[:40]
     sdk_ids: set[str] = set()
-    if isinstance(parsed.get("defectCodeMatches"), list) and parsed["defectCodeMatches"]:
-        # Prefer SDK matches when present; keep baseline for ids SDK omitted.
+    if group.accepted:
         by_id = {m["defectId"]: m for m in data.get("defectCodeMatches") or []}
-        for item in parsed["defectCodeMatches"]:
-            if not isinstance(item, dict) or not item.get("defectId"):
-                continue
-            did = str(item["defectId"])
+        for match in group.accepted:
+            did = match.defectId
             sdk_ids.add(did)
-            cleaned = _coerce_sdk_match(dict(item), stats)
-            if cleaned is None:
-                # 覆盖之前先校验：以前一条不合 schema 的条目会先把 baseline 那条顶掉，
-                # 再在下面的解析循环里被静默丢弃 —— 模型答对的票在产物里直接消失（led）。
-                _bump(stats, "invalid_match")
-                continue
-            # 模型只回 defectId/candidates/confidence；标的身份字段从 baseline 继承，
-            # 否则被覆盖的票在产物里标题变成 null（下游只能看到一串 BGCM 号）。
+            cleaned = match.model_dump()
             orig = by_id.get(did) or {}
             for key in ("title", "clusterId"):
                 if not cleaned.get(key) and orig.get(key):
                     cleaned[key] = orig[key]
             by_id[did] = cleaned
         data["defectCodeMatches"] = list(by_id.values())
+    if isinstance(group.shared.get("secondaryHints"), list):
+        parsed = {**parsed, "secondaryHints": group.shared["secondaryHints"]}
+    if isinstance(group.shared.get("techStack"), dict):
+        parsed = {**parsed, "techStack": group.shared["techStack"]}
+    if isinstance(group.shared.get("architecture"), dict):
+        parsed = {**parsed, "architecture": group.shared["architecture"]}
+    if isinstance(group.shared.get("conventions"), dict):
+        parsed = {**parsed, "conventions": group.shared["conventions"]}
+    if isinstance(group.shared.get("boundSkills"), list):
+        parsed = {**parsed, "boundSkills": group.shared["boundSkills"]}
+    if isinstance(group.shared.get("partial"), bool):
+        parsed = {**parsed, "partial": group.shared["partial"]}
     # Drop hallucinated paths (SDK or merge). Empty SDK tickets fall back to baseline.
     from bugfix_platform.agents.cartographer.match import (
         filter_existing_candidates,
@@ -695,22 +896,20 @@ def _bump(stats: dict[str, int] | None, key: str) -> None:
 def _coerce_sdk_match(
     item: dict[str, Any], stats: dict[str, int] | None
 ) -> dict[str, Any] | None:
-    """把模型条目收成契约允许的形状；实在不可用才返回 ``None``。
+    """把模型条目收成契约允许的形状；实在不可用才返回 ``None``。"""
+    from bugfix_platform.sdk.match_payload import normalize_sdk_match
 
-    ``gap`` 是空候选的原因码（枚举 ``no_path_token_overlap``）。提示词里给出的
-    baseline 示例带着 ``"gap": null``，模型会照着补一句人话解释 —— 整条
-    ``DefectCodeMatch`` 就校验失败。这一个字段不值一张票，只丢掉它。
-    """
-    item["investigationSource"] = "model_reported"
-    gap = item.get("gap")
-    if gap is not None and gap not in _ALLOWED_GAPS:
-        item.pop("gap", None)
-        _bump(stats, "gap_coerced")
-    try:
-        DefectCodeMatch.model_validate(item)
-    except Exception:  # noqa: BLE001
+    defect_id = str(item.get("defectId") or "")
+    result = normalize_sdk_match(
+        item,
+        requested_ids={defect_id} if defect_id else set(),
+        raw_ref=defect_id or "item",
+    )
+    for issue in result.issues:
+        _bump(stats, issue.reason)
+    if result.accepted is None:
         return None
-    return item
+    return result.accepted.model_dump()
 
 
 def _merge_modules(
@@ -728,14 +927,19 @@ def _merge_modules(
     for item in incoming:
         if not isinstance(item, dict) or not item.get("id"):
             continue
-        mid = str(item["id"])
+        from bugfix_contracts.code_knowledge import ArchModule
+        try:
+            clean = ArchModule.model_validate(item).model_dump()
+        except Exception:  # noqa: BLE001
+            continue
+        mid = str(clean.get("id"))
         if mid in index:
             merged = dict(out[index[mid]])
-            merged.update({k: v for k, v in item.items() if v is not None and v != ""})
+            merged.update({k: v for k, v in clean.items() if v is not None and v != ""})
             out[index[mid]] = merged
         else:
             index[mid] = len(out)
-            out.append(dict(item))
+            out.append(clean)
     return out
 
 
@@ -782,16 +986,15 @@ Your job is to thicken the architecture map and SHALLOW-PASS every listed match-
 ticket (confirm or replace heuristic candidates). Agent-3 follows imports and names
 the fix locus. You do not.
 
-Tools: CodeGraph MCP (preferred), Read, Glob, Grep, and Bash.
+Tools: CodeGraph MCP (preferred), Read, Glob, and Grep. Bash is disabled.
 When CodeGraph is ready (codegraph_explore / codegraph_node), the first structural,
 symbol, or ticket-confirm tool call MUST be codegraph_explore (or node/callers).
 It is a pre-built local index; do not re-grep what it already returned. Treat
 CodeGraph source excerpts as already Read. Fall back to Grep/Read/Glob only when
 CodeGraph is unavailable or returns empty. specAtlas.entries are path indexes
 (kind=doc_ref); do not copy spec markdown into entries, notes, or conventions.
-Bash is for READ-ONLY exploration only (e.g. rg/find/git log|blame|grep|show,
-ls, cat/head/sed -n, or `codegraph explore` CLI). NEVER mutate the repo:
-no edit/write tools, no git write, no install, no network, no rm/chmod.
+Do not call Bash. NEVER mutate the repo: no edit/write tools, no git write,
+    no install, no network, no rm/chmod.
 
 cartographyProfile is CALLER-SUPPLIED. Do not reclassify the repo.
 
@@ -824,7 +1027,8 @@ partial.
 Do not change cartographyProfile. Do not add keys that are not listed above: an
 entry that does not fit that shape is dropped before delivery, losing the whole
 ticket. ``gap`` is not yours to write.
-candidate source must be one of: codegraph, grep, heuristic, claude_md.
+candidate source must be one of: codegraph, grep, heuristic, claude_md, model_reported.
+facts is a list of objects {claim, reference?, validity?, source?}; a non-empty string is stored as an unverified claim. Never set source=tool_observed or validity=reference_verified.
 repoPath = the repo root as listed in repoRoots; use "." for a single-repo workDir.
 path = the file path relative to that root. Never put the file path in both fields:
 a candidate whose repoPath/path cannot be resolved is dropped before delivery.
@@ -854,6 +1058,26 @@ def _shared_signatures(matches: list[Any]) -> set[tuple[str, ...]]:
     return {sig for sig, n in counts.items() if n >= SHARED_SIGNATURE_MIN_TICKETS}
 
 
+def _investigation_complete(match: DefectCodeMatch) -> bool:
+    """complete = 可追溯代码观察或实际检索，不是 facts 非空。"""
+    if match.storageStatus == "artifact_error":
+        return False
+    if match.acceptanceStatus == "rejected":
+        return False
+    observed = [s for s in (match.observedScopes or []) if str(s).strip()]
+    if observed:
+        return True
+    for fact in match.facts or []:
+        ref = getattr(fact, "reference", None)
+        if ref is None and isinstance(fact, dict):
+            ref = fact.get("reference")
+        snippet = getattr(ref, "snippet", None) if ref is not None and not isinstance(ref, dict) else (ref or {}).get("snippet") if isinstance(ref, dict) else None
+        validity = getattr(fact, "validity", None) or (fact.get("validity") if isinstance(fact, dict) else None)
+        if snippet and validity == "reference_verified":
+            return True
+    return False
+
+
 def investigated_ids_from_parsed(parsed: dict[str, Any] | None) -> list[str]:
     """只把模型实际返回的票算作已调查，不把 prompt 列表整批记 complete。"""
     out: list[str] = []
@@ -878,9 +1102,9 @@ def annotate_investigation_coverage(
         if did not in in_prompt:
             status = "not_investigated"
         elif did in investigated:
-            status = "complete" if match.facts or match.searchedScopes else "partial"
+            status = "complete" if _investigation_complete(match) else "partial"
         else:
-            status = "search_draft" if match.candidates else "not_investigated"
+            status = "search_draft" if match.candidates else "failed"
         out.append(match.model_copy(update={"investigationStatus": status}))
     return out
 

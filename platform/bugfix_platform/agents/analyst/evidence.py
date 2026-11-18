@@ -14,6 +14,8 @@ _PLACEHOLDER = re.compile(
 def validate_edit_decision(context: TaskContext, decision: EditDecision) -> list[str]:
     """返回拒绝原因。空列表表示程序侧允许进入编辑。"""
     errors: list[str] = []
+    if getattr(context, "analysisIncomplete", False):
+        errors.append("analysis incomplete")
     if not (decision.behaviorTarget or "").strip():
         errors.append("missing behaviorTarget")
     if not (decision.codeAssociation or "").strip():
@@ -24,11 +26,25 @@ def validate_edit_decision(context: TaskContext, decision: EditDecision) -> list
         decision.editRationale or ""
     ):
         errors.append("placeholder analysis")
+    resolved_ids = {
+        r.questionId
+        for r in (getattr(context, "questionResolutions", None) or [])
+        if getattr(r, "disposition", None) == "resolved"
+    }
     if decision.questions is None:
         if decision.openQuestions:
             errors.append("open questions unresolved")
-    elif any(q.kind in {"blocking", "choice"} for q in decision.questions):
-        errors.append("blocking question unresolved")
+    else:
+        for q in decision.questions:
+            if q.kind not in {"blocking", "choice"}:
+                continue
+            status = getattr(q, "status", "open") or "open"
+            if status in {"open", "answered", "reopened"}:
+                errors.append("blocking question unresolved")
+                break
+            if status == "resolved" and q.id not in resolved_ids:
+                errors.append("resolved question lacks matching resolution")
+                break
     if not decision.evidenceRefs:
         errors.append("missing evidenceRefs")
     by_id = {e.evidenceId: e for e in context.evidence}

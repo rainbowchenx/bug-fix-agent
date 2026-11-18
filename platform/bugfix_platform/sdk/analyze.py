@@ -44,6 +44,7 @@ class AnalyzeRequest:
     codegraph: Optional[CodeGraphStatus] = None
     investigation: Optional[dict[str, Any]] = None
     resume_session_id: Optional[str] = None
+    previous_attempt: Optional[dict[str, Any]] = None
 
 
 @dataclass
@@ -604,8 +605,15 @@ rootCause.claims is an array of {claimId,statement,role:fact|hypothesis|conclusi
 status:supported|conditional|unverified|refuted,evidenceRefs,assumptions}.
 Use evidenceRefs candidate:1, candidate:2, etc. pointing to localization candidates, or their exact path. A reference identifies supporting material; it does not by itself prove runtime causation.
 rootCause.questions is an array (possibly empty) of {id,kind:blocking|choice|verification|follow_up,
-reason,relatedClaimIds,requestedEvidence}. openQuestions is its human-readable projection.
+reason,relatedClaimIds,requestedEvidence,category:product|fact|implementation,status:open|answered|resolved,
+newEvidenceRefs}. openQuestions is its human-readable projection.
+Use newEvidenceRefs candidate:1 / candidate:2 or the exact localization path; the program
+maps those aliases onto this attempt's evidence IDs. Do not invent internal evidence IDs.
 Only questions that change THIS repair target or mechanism are blocking/choice.
+Product/fact blocking or choice questions cannot be marked resolved without a user
+answer or an existing project rule cited by path. Ordinary implementation choices
+must be decided by you with a concrete rationale and newEvidenceRefs; do not bounce them to the user.
+If previousAttempt listed open questions, keep each id or set predecessorId.
 Evidence snippets prove quotation accuracy, not causality. External device effects,
 measured latency and runtime CSS behavior remain conditional without observation.
 Respect the current expected behavior, especially user-confirmed changes. Do not
@@ -724,4 +732,7 @@ def _build_prompt(req: AnalyzeRequest) -> str:
         f"matchGap: {(soft.get('notes') if isinstance(soft, dict) else '') or ''}\n"
         f"routerOutcomeHint: {req.routed.get('outcome')}\n"
         f"applyFix: {apply_flag}\n"
+        f"previousAttempt: {json.dumps(req.previous_attempt or {}, ensure_ascii=False)}\n"
+        "If previousAttempt.analysisRef.path exists, Read it when you need the full first-round record. "
+        "Do not drop confirmed answers or CURRENT ACCEPTANCE TARGET in any summary.\n"
     )

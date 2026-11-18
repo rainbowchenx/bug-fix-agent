@@ -135,7 +135,7 @@ class BatchCluster(BaseModel):
 class DefectBatch(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    schemaVersion: Literal["0.3.0"]
+    schemaVersion: Literal["0.4.0"]
     productLine: str
     posture: Posture = "beta"
     generatedAt: str

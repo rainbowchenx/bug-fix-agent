@@ -37,7 +37,13 @@ def store_lock(root: Path) -> Iterator[Path]:
             lock.unlink()
 
 
-def save_attempt(root: Path, attempt: AttemptRecord, *, already_locked: bool = False) -> Path:
+def save_attempt(
+    root: Path,
+    attempt: AttemptRecord,
+    *,
+    already_locked: bool = False,
+    update_latest: bool = True,
+) -> Path:
     """原子写入 ``defects/<id>/attempts/<attemptId>/attempt.json``。"""
 
     def _write(base: Path) -> Path:
@@ -56,17 +62,24 @@ def save_attempt(root: Path, attempt: AttemptRecord, *, already_locked: bool = F
             encoding="utf-8",
         )
         tmp.replace(dest)
-        latest = base / "defects" / attempt.defectId / "latest.json"
-        latest.write_text(
-            json.dumps({"attemptId": attempt.attemptId, "path": str(dest)}, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        if update_latest:
+            _write_latest(base, attempt.defectId, attempt.attemptId, dest)
         return dest
 
     if already_locked:
         return _write(Path(root))
     with store_lock(root) as base:
         return _write(base)
+
+
+def _write_latest(base: Path, defect_id: str, attempt_id: str, dest: Path) -> None:
+    latest = base / "defects" / defect_id / "latest.json"
+    tmp = latest.with_suffix(".tmp")
+    tmp.write_text(
+        json.dumps({"attemptId": attempt_id, "path": str(dest)}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    tmp.replace(latest)
 
 
 def load_attempt(path: Path) -> AttemptRecord:

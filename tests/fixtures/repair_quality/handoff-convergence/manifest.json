@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-17",
+  "schemaVersion": "0.4.0",
+  "scope": "Handoff/convergence contract fixtures. Not a captured SDK corpus.",
+  "invalidMatchCount": 85,
+  "invalidMatchCountSource": "three-project field eval counter; proves a failure mode, not 85 archived payloads",
+  "stringFacts": {
+    "role": "reproduced_input",
+    "note": "Local string-facts payload reproduces whole-ticket validation failure; it is not a captured SDK response",
+    "example": ["route handler reads pageId"]
+  },
+  "originalErrorResponses": "pending",
+  "productsInScope": ["peitao", "transport", "hcp"]
+}

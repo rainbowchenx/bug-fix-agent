@@ -1,0 +1,653 @@
+{
+  "peitao": {
+    "summary": {
+      "g0Pass": true,
+      "locAt1": "6/6",
+      "locAt3": "6/6",
+      "outcome": "6/6",
+      "verdict": "usable_pending_g3",
+      "bands": {
+        "loc": "good",
+        "outcome": "usable"
+      },
+      "analysisCompleted": 6,
+      "reported": 6,
+      "completedAnalysisLocAt3": 6,
+      "staleRatings": 0,
+      "honesty": "requires trajectory review; SDK failure alone is not dishonesty",
+      "locAt3WithAlternatives": "6/6",
+      "repair": {
+        "accepted": 0,
+        "resolved": 0,
+        "reported": 6,
+        "denominator": 6,
+        "successRate": null,
+        "reason": "no_acceptance_data"
+      }
+    },
+    "rows": [
+      {
+        "id": "peitao-maintainlog-i18n",
+        "defectId": "BGCM2026102808455",
+        "g0": [],
+        "g0Pass": true,
+        "analyze": "sdk",
+        "outcome": "plan_only",
+        "outcomeOk": true,
+        "locAt1": true,
+        "locAt3": true,
+        "nCandidates": 2,
+        "top1": "src/view/operations/maintain/maintainLog/pc/maintainLog.vue",
+        "candidates": [
+          "src/view/operations/maintain/maintainLog/pc/maintainLog.vue",
+          "src/view/operations/maintain/maintainLog/mixin.js"
+        ],
+        "rootCauseWeakOk": true,
+        "expect": "src/view/operations/maintain/maintainLog/",
+        "expectOutcomes": [
+          "plan_only"
+        ],
+        "locAt3WithAlternatives": true,
+        "analysisCompleted": true,
+        "executionIssues": [],
+        "inheritedLocalizationOnly": false,
+        "completedAnalysisLocAt3": true,
+        "evidenceScope": "path match; not causal verification",
+        "ratingStatus": "unbound",
+        "ratingBindingLevel": "report"
+      },
+      {
+        "id": "peitao-remotectrl-permission",
+        "defectId": "BGCM2026102808006",
+        "g0": [],
+        "g0Pass": true,
+        "analyze": "sdk",
+        "outcome": "plan_only",
+        "outcomeOk": true,
+        "locAt1": true,
+        "locAt3": true,
+        "nCandidates": 6,
+        "top1": "src/view/device/remoteCtrl/pc/remoteCtrlSet.vue",
+        "candidates": [
+          "src/view/device/remoteCtrl/pc/remoteCtrlSet.vue",
+          "src/view/device/remoteCtrl/mixin.js",
+          "src/view/device/remoteCtrl/mixin.js"
+        ],
+        "rootCauseWeakOk": true,
+        "expect": "src/view/device/remoteCtrl/",
+        "expectOutcomes": [
+          "plan_only"
+        ],
+        "locAt3WithAlternatives": true,
+        "analysisCompleted": true,
+        "executionIssues": [],
+        "inheritedLocalizationOnly": false,
+        "completedAnalysisLocAt3": true,
+        "evidenceScope": "path match; not causal verification",
+        "ratingStatus": "unbound",
+        "ratingBindingLevel": "report"
+      },
+      {
+        "id": "peitao-remotectrl-uncouple",
+        "defectId": "BGCM2026102902007",
+        "g0": [],
+        "g0Pass": true,
+        "analyze": "sdk",
+        "outcome": "plan_only",
+        "outcomeOk": true,
+        "locAt1": true,
+        "locAt3": true,
+        "nCandidates": 5,
+        "top1": "src/view/device/remoteCtrl/mixin.js",
+        "candidates": [
+          "src/view/device/remoteCtrl/mixin.js",
+          "src/common/vue/components/pc/base/Form/Form.vue",
+          "src/common/vue/components/pc/base/Form/Form.vue"
+        ],
+        "rootCauseWeakOk": true,
+        "expect": "src/view/device/remoteCtrl/",
+        "expectOutcomes": [
+          "plan_only"
+        ],
+        "locAt3WithAlternatives": true,
+        "analysisCompleted": true,
+        "executionIssues": [],
+        "inheritedLocalizationOnly": false,
+        "completedAnalysisLocAt3": true,
+        "evidenceScope": "path match; not causal verification",
+        "ratingStatus": "unbound",
+        "ratingBindingLevel": "report"
+      },
+      {
+        "id": "peitao-cra-web-upgrade",
+        "defectId": "BGCM2026102809314",
+        "g0": [],
+        "g0Pass": true,
+        "analyze": "sdk",
+        "outcome": "plan_only",
+        "outcomeOk": true,
+        "locAt1": true,
+        "locAt3": true,
+        "nCandidates": 6,
+        "top1": "src/view/operations/maintain/upgrade/pc/upgrade.vue",
+        "candidates": [
+          "src/view/operations/maintain/upgrade/pc/upgrade.vue",
+          "src/view/operations/maintain/upgrade/mixin.js",
+          "src/view/operations/maintain/upgrade/pc/upgrade.vue"
+        ],
+        "rootCauseWeakOk": true,
+        "expect": "src/view/operations/maintain/upgrade/",
+        "expectOutcomes": [
+          "plan_only"
+        ],
+        "locAt3WithAlternatives": true,
+        "analysisCompleted": true,
+        "executionIssues": [],
+        "inheritedLocalizationOnly": false,
+        "completedAnalysisLocAt3": true,
+        "evidenceScope": "path match; not causal verification",
+        "ratingStatus": "unbound",
+        "ratingBindingLevel": "report"
+      },
+      {
+        "id": "peitao-onvif-ipc",
+        "defectId": "BGCM2026103000881",
+        "g0": [],
+        "g0Pass": true,
+        "analyze": "sdk",
+        "outcome": "plan_only",
+        "outcomeOk": true,
+        "locAt1": true,
+        "locAt3": true,
+        "nCandidates": 4,
+        "top1": "src/view/device/ipc/mobile/videoParameter.vue",
+        "candidates": [
+          "src/view/device/ipc/mobile/videoParameter.vue",
+          "src/view/device/ipc/mobile/videoParameter.vue",
+          "src/view/device/ipc/pc/component/singleChannelConfig.vue"
+        ],
+        "rootCauseWeakOk": true,
+        "expect": "src/view/device/ipc/",
+        "expectOutcomes": [
+          "plan_only"
+        ],
+        "locAt3WithAlternatives": true,
+        "analysisCompleted": true,
+        "executionIssues": [],
+        "inheritedLocalizationOnly": false,
+        "completedAnalysisLocAt3": true,
+        "evidenceScope": "path match; not causal verification",
+        "ratingStatus": "unbound",
+        "ratingBindingLevel": "report"
+      },
+      {
+        "id": "peitao-usermanage",
+        "defectId": "BGCM2026110304188",
+        "g0": [],
+        "g0Pass": true,
+        "analyze": "sdk",
+        "outcome": "plan_only",
+        "outcomeOk": true,
+        "locAt1": true,
+        "locAt3": true,
+        "nCandidates": 5,
+        "top1": "src/view/config/userManage/userList/pc/userList.vue",
+        "candidates": [
+          "src/view/config/userManage/userList/pc/userList.vue",
+          "src/view/config/userManage/userList/pc/userList.vue",
+          "src/view/config/userManage/userList/mixin.js"
+        ],
+        "rootCauseWeakOk": true,
+        "expect": "src/view/config/userManage/",
+        "expectOutcomes": [
+          "plan_only"
+        ],
+        "locAt3WithAlternatives": true,
+        "analysisCompleted": true,
+        "executionIssues": [],
+        "inheritedLocalizationOnly": false,
+        "completedAnalysisLocAt3": true,
+        "evidenceScope": "path match; not causal verification",
+        "ratingStatus": "unbound",
+        "ratingBindingLevel": "report"
+      }
+    ],
+    "reportDigest": "f2b051523c631391be29996fcc06da72176aa3aa8ebe50923f19caff12ab0bc3",
+    "savedSummaryMatches": true,
+    "savedDigestMatchesSanitizedReport": true
+  },
+  "transport": {
+    "summary": {
+      "g0Pass": true,
+      "locAt1": "3/6",
+      "locAt3": "3/6",
+      "outcome": "4/6",
+      "verdict": "mixed",
+      "bands": {
+        "loc": "usable",
+        "outcome": "unusable"
+      },
+      "analysisCompleted": 4,
+      "reported": 6,
+      "completedAnalysisLocAt3": 2,
+      "staleRatings": 0,
+      "honesty": "requires trajectory review; SDK failure alone is not dishonesty",
+      "locAt3WithAlternatives": "3/6",
+      "repair": {
+        "accepted": 0,
+        "resolved": 0,
+        "reported": 6,
+        "denominator": 6,
+        "successRate": null,
+        "reason": "no_acceptance_data"
+      }
+    },
+    "rows": [
+      {
+        "id": "transport-posthvt-trigger",
+        "defectId": "BGCM2026102600211",
+        "g0": [],
+        "g0Pass": true,
+        "analyze": "sdk",
+        "outcome": "plan_only",
+        "outcomeOk": true,
+        "locAt1": true,
+        "locAt3": true,
+        "nCandidates": 8,
+        "top1": "src/Config/view/snap/triggerMode/postHVT/postHvtMixin.js",
+        "candidates": [
+          "src/Config/view/snap/triggerMode/postHVT/postHvtMixin.js",
+          "src/Config/view/snap/triggerMode/postHVT/postHvtMixin.js",
+          "src/Config/view/snap/triggerMode/postHVT/postHvtMixin.js"
+        ],
+        "rootCauseWeakOk": true,
+        "expect": "src/Config/view/snap/triggerMode/postHVT/",
+        "expectOutcomes": [
+          "plan_only"
+        ],
+        "locAt3WithAlternatives": true,
+        "analysisCompleted": true,
+        "executionIssues": [],
+        "inheritedLocalizationOnly": false,
+        "completedAnalysisLocAt3": true,
+        "evidenceScope": "path match; not causal verification",
+        "ratingStatus": "unbound",
+        "ratingBindingLevel": "report"
+      },
+      {
+        "id": "transport-previewstream",
+        "defectId": "BGCM2026102400935",
+        "g0": [],
+        "g0Pass": true,
+        "analyze": "sdk_fallback",
+        "outcome": "other_blocked",
+        "outcomeOk": false,
+        "locAt1": false,
+        "locAt3": false,
+        "nCandidates": 0,
+        "top1": null,
+        "candidates": [],
+        "rootCauseWeakOk": true,
+        "expect": "src/Preview/components/base/PreviewStream/",
+        "expectOutcomes": [
+          "plan_only"
+        ],
+        "locAt3WithAlternatives": false,
+        "analysisCompleted": false,
+        "executionIssues": [
+          "analyze_source=sdk_fallback"
+        ],
+        "inheritedLocalizationOnly": false,
+        "completedAnalysisLocAt3": false,
+        "evidenceScope": "path match; not causal verification",
+        "ratingStatus": "unbound",
+        "ratingBindingLevel": "report"
+      },
+      {
+        "id": "transport-rapidosd",
+        "defectId": "BGCM2026102202247",
+        "g0": [],
+        "g0Pass": true,
+        "analyze": "sdk_fallback",
+        "outcome": "other_blocked",
+        "outcomeOk": false,
+        "locAt1": true,
+        "locAt3": true,
+        "nCandidates": 1,
+        "top1": "src/RapidConfig/view/index/rapidOSDConfig/rapidOSDConfig.vue",
+        "candidates": [
+          "src/RapidConfig/view/index/rapidOSDConfig/rapidOSDConfig.vue"
+        ],
+        "rootCauseWeakOk": true,
+        "expect": "src/RapidConfig/view/index/rapidOSDConfig/",
+        "expectOutcomes": [
+          "plan_only"
+        ],
+        "locAt3WithAlternatives": true,
+        "analysisCompleted": false,
+        "executionIssues": [
+          "analyze_source=sdk_fallback"
+        ],
+        "inheritedLocalizationOnly": true,
+        "completedAnalysisLocAt3": false,
+        "evidenceScope": "path match; not causal verification",
+        "ratingStatus": "unbound",
+        "ratingBindingLevel": "report"
+      },
+      {
+        "id": "transport-regexposure",
+        "defectId": "BGCM2026102702440",
+        "g0": [],
+        "g0Pass": true,
+        "analyze": "sdk",
+        "outcome": "plan_only",
+        "outcomeOk": true,
+        "locAt1": true,
+        "locAt3": true,
+        "nCandidates": 4,
+        "top1": "src/Config/view/video/videoCode/regExposure/regExposure.vue",
+        "candidates": [
+          "src/Config/view/video/videoCode/regExposure/regExposure.vue",
+          "src/Config/view/video/videoCode/videoMixin.js",
+          "src/Common/libs/jsWebControl/drawTools.js"
+        ],
+        "rootCauseWeakOk": true,
+        "expect": "src/Config/view/video/videoCode/regExposure/",
+        "expectOutcomes": [
+          "plan_only"
+        ],
+        "locAt3WithAlternatives": true,
+        "analysisCompleted": true,
+        "executionIssues": [],
+        "inheritedLocalizationOnly": false,
+        "completedAnalysisLocAt3": true,
+        "evidenceScope": "path match; not causal verification",
+        "ratingStatus": "unbound",
+        "ratingBindingLevel": "report"
+      },
+      {
+        "id": "transport-hvt",
+        "defectId": "BGCM2026102809398",
+        "g0": [],
+        "g0Pass": true,
+        "analyze": "sdk",
+        "outcome": "plan_only",
+        "outcomeOk": true,
+        "locAt1": false,
+        "locAt3": false,
+        "nCandidates": 5,
+        "top1": "src/Preview/components/base/UploadPic/uploadPicMixin.js",
+        "candidates": [
+          "src/Preview/components/base/UploadPic/uploadPicMixin.js",
+          "src/Preview/components/base/UploadPic/uploadPicMixin.js",
+          "src/Preview/components/base/UploadPic/UploadPic.vue"
+        ],
+        "rootCauseWeakOk": true,
+        "expect": "src/Config/view/snap/triggerMode/postHVT/",
+        "expectOutcomes": [
+          "plan_only"
+        ],
+        "locAt3WithAlternatives": false,
+        "analysisCompleted": true,
+        "executionIssues": [],
+        "inheritedLocalizationOnly": false,
+        "completedAnalysisLocAt3": false,
+        "evidenceScope": "path match; not causal verification",
+        "ratingStatus": "unbound",
+        "ratingBindingLevel": "report"
+      },
+      {
+        "id": "transport-personrunredlight",
+        "defectId": "BGCM2026102906318",
+        "g0": [],
+        "g0Pass": true,
+        "analyze": "sdk",
+        "outcome": "plan_only",
+        "outcomeOk": true,
+        "locAt1": false,
+        "locAt3": false,
+        "nCandidates": 5,
+        "top1": "src/Config/view/snap/triggerMode/postHVT/postHvtMixin.js",
+        "candidates": [
+          "src/Config/view/snap/triggerMode/postHVT/postHvtMixin.js",
+          "src/Config/view/snap/triggerMode/postHVT/postHvtMixin.js",
+          "src/Config/view/snap/triggerMode/postHVT/postHvtMixin.js"
+        ],
+        "rootCauseWeakOk": true,
+        "expect": "src/Config/view/snap/triggerMode/personRunRedLight/",
+        "expectOutcomes": [
+          "plan_only"
+        ],
+        "locAt3WithAlternatives": false,
+        "analysisCompleted": true,
+        "executionIssues": [],
+        "inheritedLocalizationOnly": false,
+        "completedAnalysisLocAt3": false,
+        "evidenceScope": "path match; not causal verification",
+        "ratingStatus": "unbound",
+        "ratingBindingLevel": "report"
+      }
+    ],
+    "reportDigest": "efc63fcffb100368633f50809b5cb5fd8d10a3017ec695816297651fb4fabece",
+    "savedSummaryMatches": true,
+    "savedDigestMatchesSanitizedReport": true
+  },
+  "hcp": {
+    "summary": {
+      "g0Pass": true,
+      "locAt1": "6/6",
+      "locAt3": "6/6",
+      "outcome": "6/6",
+      "verdict": "usable_pending_g3",
+      "bands": {
+        "loc": "good",
+        "outcome": "usable"
+      },
+      "analysisCompleted": 6,
+      "reported": 6,
+      "completedAnalysisLocAt3": 6,
+      "staleRatings": 0,
+      "honesty": "requires trajectory review; SDK failure alone is not dishonesty",
+      "locAt3WithAlternatives": "6/6",
+      "repair": {
+        "accepted": 0,
+        "resolved": 0,
+        "reported": 6,
+        "denominator": 6,
+        "successRate": null,
+        "reason": "no_acceptance_data"
+      }
+    },
+    "rows": [
+      {
+        "id": "hcp-sadp-online-discover",
+        "defectId": "BGCM2026110302952",
+        "g0": [],
+        "g0Pass": true,
+        "analyze": "sdk",
+        "outcome": "plan_only",
+        "outcomeOk": true,
+        "locAt1": true,
+        "locAt3": true,
+        "nCandidates": 4,
+        "top1": "src/Resource/components/sadp_detection/reset-password-dialog.vue",
+        "candidates": [
+          "src/Resource/components/sadp_detection/reset-password-dialog.vue",
+          "src/Resource/components/sadp_detection/reset-password-dialog.vue",
+          "src/Resource/components/sadp_detection/reset-password-dialog.vue"
+        ],
+        "rootCauseWeakOk": true,
+        "expect": "src/Resource/components/sadp_detection/",
+        "expectOutcomes": [
+          "plan_only"
+        ],
+        "locAt3WithAlternatives": true,
+        "analysisCompleted": true,
+        "executionIssues": [],
+        "inheritedLocalizationOnly": false,
+        "completedAnalysisLocAt3": true,
+        "evidenceScope": "path match; not causal verification",
+        "ratingStatus": "unbound",
+        "ratingBindingLevel": "report"
+      },
+      {
+        "id": "hcp-onvif-jump",
+        "defectId": "BGCM2026110303610",
+        "g0": [],
+        "g0Pass": true,
+        "analyze": "sdk",
+        "outcome": "plan_only",
+        "outcomeOk": true,
+        "locAt1": true,
+        "locAt3": true,
+        "nCandidates": 5,
+        "top1": "src/Resource/components/DeviceBasicInfo.vue",
+        "candidates": [
+          "src/Resource/components/DeviceBasicInfo.vue",
+          "src/Resource/view/encoder/EncoderAdd.vue",
+          "src/Resource/components/DeviceBasicInfo.vue"
+        ],
+        "rootCauseWeakOk": true,
+        "expect": "src/Resource/components/DeviceBasicInfo.vue",
+        "expectOutcomes": [
+          "plan_only"
+        ],
+        "locAt3WithAlternatives": true,
+        "analysisCompleted": true,
+        "executionIssues": [],
+        "inheritedLocalizationOnly": false,
+        "completedAnalysisLocAt3": true,
+        "evidenceScope": "path match; not causal verification",
+        "ratingStatus": "unbound",
+        "ratingBindingLevel": "report"
+      },
+      {
+        "id": "hcp-hotstandby-loading",
+        "defectId": "BGCM2026110304123",
+        "g0": [],
+        "g0Pass": true,
+        "analyze": "sdk",
+        "outcome": "plan_only",
+        "outcomeOk": true,
+        "locAt1": true,
+        "locAt3": true,
+        "nCandidates": 3,
+        "top1": "src/Resource/view/encoder/HotSpare.vue",
+        "candidates": [
+          "src/Resource/view/encoder/HotSpare.vue",
+          "node_modules/hui-intl/src/components/message/src/main.vue",
+          "node_modules/hui-intl/src/components/message/src/main.js"
+        ],
+        "rootCauseWeakOk": true,
+        "expect": "src/Resource/view/encoder/HotSpare.vue",
+        "expectOutcomes": [
+          "plan_only"
+        ],
+        "locAt3WithAlternatives": true,
+        "analysisCompleted": true,
+        "executionIssues": [],
+        "inheritedLocalizationOnly": false,
+        "completedAnalysisLocAt3": true,
+        "evidenceScope": "path match; not causal verification",
+        "ratingStatus": "unbound",
+        "ratingBindingLevel": "report"
+      },
+      {
+        "id": "hcp-access-device-linkage",
+        "defectId": "BGCM2026110304635",
+        "g0": [],
+        "g0Pass": true,
+        "analyze": "sdk",
+        "outcome": "plan_only",
+        "outcomeOk": true,
+        "locAt1": true,
+        "locAt3": true,
+        "nCandidates": 5,
+        "top1": "src/Resource/components/remoteConfig/LinkageConfigForm.vue",
+        "candidates": [
+          "src/Resource/components/remoteConfig/LinkageConfigForm.vue",
+          "src/Resource/components/remoteConfig/LinkageConfigForm.vue",
+          "src/Resource/components/remoteConfig/LinkageConfig.vue"
+        ],
+        "rootCauseWeakOk": true,
+        "expect": "src/Resource/components/remoteConfig/LinkageConfigForm.vue",
+        "expectOutcomes": [
+          "plan_only"
+        ],
+        "locAt3WithAlternatives": true,
+        "analysisCompleted": true,
+        "executionIssues": [],
+        "inheritedLocalizationOnly": false,
+        "completedAnalysisLocAt3": true,
+        "evidenceScope": "path match; not causal verification",
+        "ratingStatus": "unbound",
+        "ratingBindingLevel": "report"
+      },
+      {
+        "id": "hcp-access-device-list",
+        "defectId": "BGCM2026110304762",
+        "g0": [],
+        "g0Pass": true,
+        "analyze": "sdk",
+        "outcome": "plan_only",
+        "outcomeOk": true,
+        "locAt1": true,
+        "locAt3": true,
+        "nCandidates": 5,
+        "top1": "src/Resource/view/access/AccessList.vue",
+        "candidates": [
+          "src/Resource/view/access/AccessList.vue",
+          "src/Resource/components/DeviceRefreshPopover.vue",
+          "src/Resource/components/DeviceListActionBar.vue"
+        ],
+        "rootCauseWeakOk": true,
+        "expect": "src/Resource/view/access/AccessList.vue",
+        "expectOutcomes": [
+          "plan_only"
+        ],
+        "locAt3WithAlternatives": true,
+        "analysisCompleted": true,
+        "executionIssues": [],
+        "inheritedLocalizationOnly": false,
+        "completedAnalysisLocAt3": true,
+        "evidenceScope": "path match; not causal verification",
+        "ratingStatus": "unbound",
+        "ratingBindingLevel": "report"
+      },
+      {
+        "id": "hcp-sadp-reset-i18n",
+        "defectId": "BGCM2026110303220",
+        "g0": [],
+        "g0Pass": true,
+        "analyze": "sdk",
+        "outcome": "plan_only",
+        "outcomeOk": true,
+        "locAt1": true,
+        "locAt3": true,
+        "nCandidates": 4,
+        "top1": "src/Resource/components/sadp_detection/reset-password-dialog.vue",
+        "candidates": [
+          "src/Resource/components/sadp_detection/reset-password-dialog.vue",
+          "src/Resource/components/sadp_detection/reset-password-dialog.vue",
+          "src/Resource/components/sadp_detection/reset-password-dialog.vue"
+        ],
+        "rootCauseWeakOk": true,
+        "expect": "src/Resource/components/sadp_detection/",
+        "expectOutcomes": [
+          "plan_only"
+        ],
+        "locAt3WithAlternatives": true,
+        "analysisCompleted": true,
+        "executionIssues": [],
+        "inheritedLocalizationOnly": false,
+        "completedAnalysisLocAt3": true,
+        "evidenceScope": "path match; not causal verification",
+        "ratingStatus": "unbound",
+        "ratingBindingLevel": "report"
+      }
+    ],
+    "reportDigest": "e152ce754bcb0b6d5b378755ef6bf56d440f31bd11a67b34fc13c6f2386ef0e8",
+    "savedSummaryMatches": true,
+    "savedDigestMatchesSanitizedReport": true
+  }
+}

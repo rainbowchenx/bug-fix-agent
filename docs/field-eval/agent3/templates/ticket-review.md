@@ -1,6 +1,6 @@
 # Agent3 逐票评审表
 
-模板日期：2026-11-15。复制到实际评测目录后填写；空白表示待填，N/A表示不适用，未知/未验收不得填“通过”。
+模板日期：2026-11-17。复制到实际评测目录后填写；空白表示待填，N/A表示不适用，未知/未验收不得填“通过”。70% 是待业务确认的可修票试运行提议，不是工程 SLA，不能由合成样本自动满足。
 
 关联：[评测方法](../2026-11-15-real-project-evaluation.md) · [方案](../../../superpowers/specs/2026-11-15-agent3-repair-feedback-design.md) · [计划](../../../superpowers/plans/2026-11-15-agent3-repair-feedback-implementation-plan.md) · [批次报告](batch-evaluation-report.md)。复制后按需调整链接。
 
@@ -28,6 +28,10 @@
 
 | 字段 | 填写 |
 |---|---|
+| 人工 eligibility（true / false）/ 理由 / 标注时间 | |
+| 本轮有效答案数 effectiveAnswers / 已合理处理数 answersConsumed | |
+| 有效答案 / 本轮必答题分母 / 反馈是否足量 | |
+| 问题消费 / 重开理由 | |
 | 轮次 / attempt / 输入revision / 父轮次 | |
 | 本轮新增信息及对应旧补丁 | |
 | 实际代码/构建 / 补丁应用情况 | |

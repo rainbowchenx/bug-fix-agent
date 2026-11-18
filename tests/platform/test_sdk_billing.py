@@ -21,7 +21,7 @@ FIXTURES = Path(__file__).resolve().parents[2] / "test" / "fixtures" / "repos"
 def _batch() -> DefectBatch:
     return DefectBatch.model_validate(
         {
-            "schemaVersion": "0.3.0",
+            "schemaVersion": "0.4.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",
@@ -180,6 +180,7 @@ def test_max_turns_merges_json_from_assistant_stream(monkeypatch):
 
 
 def test_max_turns_salvage_resume_merges_json(monkeypatch):
+    monkeypatch.setenv("BUGFIX_CARTOGRAPHY_MAX_TURNS", "24")
     _install_fake_query(
         monkeypatch,
         [
@@ -189,7 +190,7 @@ def test_max_turns_salvage_resume_merges_json(monkeypatch):
                 errors=["Reached maximum number of turns (18)"],
                 result=None,
                 structured_output=None,
-                num_turns=18,
+                num_turns=16,
                 total_cost_usd=0.9,
                 terminal_reason="max_turns",
                 session_id="s-resume",

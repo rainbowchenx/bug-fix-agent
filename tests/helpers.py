@@ -35,7 +35,7 @@ def defect_batch_from_hc1(*, posture: str = "alpha") -> DefectBatch:
 def minimal_defect_batch() -> DefectBatch:
     return DefectBatch.model_validate(
         {
-            "schemaVersion": "0.3.0",
+            "schemaVersion": "0.4.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-11-05T00:00:00Z",

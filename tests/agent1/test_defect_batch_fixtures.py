@@ -41,4 +41,4 @@ def test_hitools_sample():
         source=FX / "hitools-sample80-raw.json",
     )
     assert batch.funnel["total"] == 80
-    assert batch.schemaVersion == "0.3.0"
+    assert batch.schemaVersion == "0.4.0"

@@ -39,7 +39,7 @@ _TICKET = {
 def _batch() -> DefectBatch:
     return DefectBatch.model_validate(
         {
-            "schemaVersion": "0.3.0",
+            "schemaVersion": "0.4.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",

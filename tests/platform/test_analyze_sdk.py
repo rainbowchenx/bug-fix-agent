@@ -55,6 +55,8 @@ def test_analyze_prompt_includes_architecture_map():
     assert ANALYZE_TOOLS == ["Read", "Glob", "Grep"]
     assert "MUST Read" in _SYSTEM_PROMPT
     assert "already Read" not in _SYSTEM_PROMPT
+    assert "newEvidenceRefs" in _SYSTEM_PROMPT
+    assert "candidate:1" in _SYSTEM_PROMPT
 
 
 def test_analyze_prompt_uses_effective_observed_not_legacy_duplicate():
@@ -222,7 +224,7 @@ def test_analyst_uses_injected_analyze_fn(tmp_path: Path):
 
     batch = DefectBatch.model_validate(
         {
-            "schemaVersion": "0.3.0",
+            "schemaVersion": "0.4.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",
@@ -246,7 +248,7 @@ def test_analyst_uses_injected_analyze_fn(tmp_path: Path):
     )
     knowledge = CodeKnowledge.model_validate(
         {
-            "schemaVersion": "0.3.0",
+            "schemaVersion": "0.4.0",
             "productLine": "hc",
             "workDir": str(work),
             "partial": False,
@@ -327,7 +329,7 @@ def test_analyst_forwards_spec_atlas_and_codegraph(tmp_path: Path, monkeypatch):
 
     batch = DefectBatch.model_validate(
         {
-            "schemaVersion": "0.3.0",
+            "schemaVersion": "0.4.0",
             "productLine": "hc",
             "posture": "alpha",
             "generatedAt": "2026-01-01T00:00:00Z",
@@ -349,7 +351,7 @@ def test_analyst_forwards_spec_atlas_and_codegraph(tmp_path: Path, monkeypatch):
     )
     knowledge = CodeKnowledge.model_validate(
         {
-            "schemaVersion": "0.3.0",
+            "schemaVersion": "0.4.0",
             "productLine": "hc",
             "workDir": str(work),
             "partial": False,

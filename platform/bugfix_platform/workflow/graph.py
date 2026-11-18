@@ -150,6 +150,12 @@ def create_three_agent_graph(
             call_kwargs["extra_skill_dirs"] = state["extra_skill_dirs"]
         if state.get("cartography_profile"):
             call_kwargs["cartography_profile"] = state["cartography_profile"]
+        if state.get("artifact_dir"):
+            call_kwargs["artifact_dir"] = state["artifact_dir"]
+        if state.get("resume_dir"):
+            call_kwargs["resume_dir"] = state["resume_dir"]
+        if state.get("ticket_ids"):
+            call_kwargs["ticket_ids"] = state["ticket_ids"]
         knowledge = cartographer(**call_kwargs)
         # 未预期异常向上抛，交给 RetryPolicy；出口 schema 由 validate_knowledge 把关。
         raw = knowledge.model_dump() if hasattr(knowledge, "model_dump") else knowledge
@@ -224,6 +230,8 @@ def create_three_agent_graph(
             call_kwargs["extra_skill_dirs"] = state["extra_skill_dirs"]
         if state.get("artifact_dir"):
             call_kwargs["artifact_dir"] = state["artifact_dir"]
+        if state.get("ticket_ids"):
+            call_kwargs["ticket_ids"] = state["ticket_ids"]
         report = analyst(**call_kwargs)
         # 未预期异常向上抛，交给 RetryPolicy。
         raw = report.model_dump() if hasattr(report, "model_dump") else report

@@ -4,7 +4,13 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from bugfix_contracts.repair import Claim, Question
+from bugfix_contracts.repair import (
+    Claim,
+    InputRevision,
+    Question,
+    QuestionResolution,
+    WorkspaceSnapshot,
+)
 from bugfix_contracts.defect_batch import SourceDocument, InputQuality
 from bugfix_contracts.common import CONTRACT_SCHEMA_VERSION, Confidence
 
@@ -134,7 +140,7 @@ class AnalysisReport(BaseModel):
 
     runtimeProfile: dict[str, Any] = Field(default_factory=dict)
     skillDiscovery: list[dict[str, Any]] = Field(default_factory=list)
-    schemaVersion: Literal["0.3.0"]
+    schemaVersion: Literal["0.4.0"]
     productLine: str = Field(min_length=1)
     workDir: str = Field(min_length=1)
     generatedAt: str = Field(min_length=1)
@@ -145,6 +151,21 @@ class AnalysisReport(BaseModel):
     summary: Optional[ReportSummary] = None
     boundSkills: list[str] = Field(default_factory=list)
     tickets: list[TicketReport]
+
+
+class AnalysisSnapshot(BaseModel):
+    """不可覆盖的逐票分析真源。digest 是规范化内容摘要，不含本字段自身。"""
+
+    model_config = ConfigDict(extra="ignore")
+
+    ticketReport: TicketReport
+    effectiveRevision: Optional[InputRevision] = None
+    workspaceSnapshot: Optional[WorkspaceSnapshot] = None
+    questionResolutions: list[QuestionResolution] = Field(default_factory=list)
+    questionLedger: list[Question] = Field(default_factory=list)
+    parentAttemptId: Optional[str] = None
+    digest: str = Field(min_length=1)
+    baseRevisionId: Optional[str] = None
 
 
 def validate_analysis_report(data: Any) -> AnalysisReport:

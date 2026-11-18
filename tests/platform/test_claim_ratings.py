@@ -11,7 +11,7 @@ def test_stale_rating_excluded_and_alternatives_separate():
     from pathlib import Path
     sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'packaging'))
     from eval_agent3 import score_report
-    report={'schemaVersion':'0.3.0','productLine':'p','workDir':'repo','generatedAt':'2026-01-01T00:00:00Z',
+    report={'schemaVersion':'0.4.0','productLine':'p','workDir':'repo','generatedAt':'2026-01-01T00:00:00Z',
         'openMr':False,'applyFix':False,'summary':{'total':1,'byOutcome':{'plan_only':1}},'tickets':[
         {'defectId':'D','ticket':{'title':'t','pool':'strict'},'outcome':'plan_only','proposedFix':{'summary':'correct arguments'},'confidence':'low',
          'localization':{'candidates':[{'path':'alternative/f.ts','why':'read'}],'notes':'analyze=sdk'},

@@ -79,6 +79,8 @@ def run_analyst(
     ticket_ids: Optional[Sequence[str]] = None,
     revisions: Optional[Mapping[str, InputRevision]] = None,
     session_ids: Optional[Mapping[str, str]] = None,
+    parent_attempt_ids: Optional[Mapping[str, str]] = None,
+    already_locked: bool = False,
 ) -> AnalysisReport:
     """Agent-3 公开入口：产出 ``analysis-report``（默认只出报告、不改码）。
 
@@ -109,6 +111,7 @@ def run_analyst(
         ticket_ids: 若给出则只处理这些缺陷。
         revisions: 票 ID → 补充 InputRevision。
         session_ids: 票 ID → 续接会话。
+        already_locked: 调用方持有产物根锁，并负责发布汇总 Markdown。
 
     Returns:
         通过 ``validate_analysis_report`` 的 ``AnalysisReport``。
@@ -144,8 +147,9 @@ def run_analyst(
     wanted = {str(x) for x in ticket_ids} if ticket_ids is not None else None
     rev_map = dict(revisions or {})
     sess_map = dict(session_ids or {})
+    parent_map = dict(parent_attempt_ids or {})
     locked = bool(out_dir)
-    lock_cm = store_lock(Path(out_dir)) if out_dir else nullcontext()
+    lock_cm = store_lock(Path(out_dir)) if out_dir and not already_locked else nullcontext()
 
     with lock_cm:
         tickets: list[dict[str, Any]] = []
@@ -174,6 +178,36 @@ def run_analyst(
             }
             snapshot = capture_workspace(Path(work_dir))
             analyze_session: Optional[str] = None
+            previous_payload = None
+            parent_attempt = parent_map.get(ticket.defectId)
+            parent_explicit = parent_attempt is not None
+            if out_dir and parent_attempt is None:
+                latest_prev = load_latest_attempt(Path(out_dir), ticket.defectId)
+                if latest_prev is not None:
+                    parent_attempt = latest_prev.attemptId
+            if out_dir and parent_attempt:
+                from bugfix_platform.agents.analyst.continuation import build_previous_attempt
+                from bugfix_platform.agents.analyst.feedback import load_latest_feedback
+                try:
+                    previous_ctx = build_previous_attempt(
+                        out_dir,
+                        ticket.defectId,
+                        parent_attempt,
+                        current_snapshot=snapshot,
+                        feedback=load_latest_feedback(Path(out_dir), ticket.defectId),
+                        worktree=work_dir,
+                    )
+                    if revision is not None:
+                        previous_ctx = previous_ctx.model_copy(
+                            update={"questionAnswers": list(revision.questionAnswers or previous_ctx.questionAnswers)}
+                        )
+                    previous_payload = previous_ctx.model_dump()
+                except (OSError, ValueError) as err:
+                    if parent_explicit:
+                        raise RuntimeError(
+                            f"parent snapshot missing or corrupt for {ticket.defectId}/{parent_attempt}: {err}"
+                        ) from err
+                    previous_payload = None
             if remaining is None or remaining > 0:
                 result = runner(
                     AnalyzeRequest(
@@ -192,6 +226,7 @@ def run_analyst(
                         codegraph=cg_status,
                         investigation=match_by_id[ticket.defectId].model_dump() if ticket.defectId in match_by_id else {},
                         resume_session_id=sess_map.get(ticket.defectId),
+                        previous_attempt=previous_payload,
                     )
                 )
                 skill_reads.update(result.skill_reads)
@@ -228,6 +263,35 @@ def run_analyst(
                     }
                 entry["blockers"] = None
 
+            def _bind_current(entry_obj: dict[str, Any], *, drifted_flag: bool):
+                from bugfix_platform.agents.analyst.claims import bind_claims, evidence_aliases
+                ctx_obj = _verify_current_code(
+                    _context_with_analysis(
+                        build_task_context(
+                            ticket,
+                            code_knowledge,
+                            revision=revision,
+                            snapshot=snapshot,
+                            generate_patch=want_fix,
+                            read_attachments=[a["ref"] for a in entry_obj.get("attachments", []) if a.get("read")],
+                        ),
+                        entry_obj,
+                    ),
+                    Path(work_dir),
+                    entry_obj,
+                )
+                cands = (entry_obj.get("localization") or {}).get("candidates") or []
+                entry_obj["rootCause"] = bind_claims(
+                    entry_obj.get("rootCause") or {},
+                    ctx_obj.evidence,
+                    cands,
+                    ticket.defectId,
+                    drifted=drifted_flag,
+                )
+                ctx_obj = ctx_obj.model_copy(update={"claims": entry_obj["rootCause"].get("claims", [])})
+                aliases, _ = evidence_aliases(ctx_obj.evidence, cands, ticket.defectId)
+                return ctx_obj, aliases
+
             drifted = bool(
                 snapshot.contentDigest
                 and workspace_digest(Path(work_dir)) != snapshot.contentDigest
@@ -240,25 +304,124 @@ def run_analyst(
                     if x
                 )
                 entry["localization"] = loc
-            ctx = _verify_current_code(
-                _context_with_analysis(
-                    build_task_context(
-                        ticket,
-                        code_knowledge,
-                        revision=revision,
-                        snapshot=snapshot,
-                        generate_patch=want_fix,
-                        read_attachments=[a["ref"] for a in entry.get("attachments", []) if a.get("read")],
-                    ),
-                    entry,
-                ),
-                Path(work_dir),
-                entry,
-            )
-            from bugfix_platform.agents.analyst.claims import bind_claims
-            entry["rootCause"] = bind_claims(entry.get("rootCause") or {}, ctx.evidence,
-                (entry.get("localization") or {}).get("candidates") or [], ticket.defectId, drifted=drifted)
-            ctx = ctx.model_copy(update={"claims": entry["rootCause"].get("claims", [])})
+            ctx, aliases = _bind_current(entry, drifted_flag=drifted)
+            resolutions = []
+            round_ledger: list[Any] = []
+            conv = None
+            from bugfix_contracts.repair import AnalysisSnapshotRef, PreviousAttemptContext, Question
+            from bugfix_platform.agents.analyst.continuation import consume_question_answers
+            proposed = [Question.model_validate(q) for q in (entry.get("rootCause") or {}).get("questions") or []]
+            if previous_payload:
+                prev = PreviousAttemptContext.model_validate(previous_payload)
+            else:
+                prev = PreviousAttemptContext(
+                    attemptId="fresh",
+                    digest="0" * 64,
+                    analysisRef=AnalysisSnapshotRef(path="fresh", digest="0" * 64, attemptId="fresh"),
+                    openQuestions=[],
+                    questionLedger=[],
+                    confirmedTarget=str((entry.get("ticket") or {}).get("expected") or ticket.expected or ""),
+                )
+            if previous_payload or proposed:
+                conv = consume_question_answers(
+                    prev,
+                    revision,
+                    proposed,
+                    list(ctx.evidence),
+                    revision_id=revision.revisionId if revision is not None else "round",
+                    evidence_aliases=aliases,
+                )
+                resolutions = conv.resolutions
+                round_ledger = [q.model_dump() for q in (conv.questionLedger or [])]
+                root = dict(entry.get("rootCause") or {})
+                root["questions"] = [q.model_dump() for q in conv.openQuestions]
+                entry["rootCause"] = root
+                if conv.needsClosingPass and previous_payload and (remaining is None or remaining > 0):
+                    close = runner(
+                        AnalyzeRequest(
+                            work_dir=work_dir,
+                            max_turns=2 if remaining is None else min(2, remaining),
+                            ticket=ticket,
+                            routed=routed,
+                            injected_skills=tuple(injected),
+                            cartography_profile=code_knowledge.cartographyProfile,
+                            architecture=code_knowledge.architecture.model_dump(),
+                            reading_playbook=profile_reading_playbook(
+                                code_knowledge.cartographyProfile
+                            ),
+                            apply_fix=want_fix,
+                            spec_atlas=spec_atlas,
+                            codegraph=cg_status,
+                            investigation=match_by_id[ticket.defectId].model_dump() if ticket.defectId in match_by_id else {},
+                            resume_session_id=analyze_session or sess_map.get(ticket.defectId),
+                            previous_attempt={
+                                **previous_payload,
+                                "closingPass": True,
+                                "violations": conv.violations,
+                                "openQuestions": [q.model_dump() for q in conv.openQuestions],
+                            },
+                        )
+                    )
+                    close_root = close.payload.get("rootCause") if isinstance(close.payload.get("rootCause"), dict) else {}
+                    for key in ("proposedFix", "localization", "outcome"):
+                        if key in close.payload:
+                            entry[key] = close.payload[key]
+                    if close_root:
+                        merged_root = dict(entry.get("rootCause") or {})
+                        for key in ("summary", "ruledOut", "claims", "questions"):
+                            if close_root.get(key) is not None:
+                                merged_root[key] = close_root[key]
+                        entry["rootCause"] = merged_root
+                    drifted = bool(
+                        snapshot.contentDigest
+                        and workspace_digest(Path(work_dir)) != snapshot.contentDigest
+                    )
+                    if drifted:
+                        loc = dict(entry.get("localization") or {})
+                        loc["notes"] = "; ".join(
+                            x
+                            for x in [loc.get("notes"), "source changed after analyze; refuse edit"]
+                            if x
+                        )
+                        entry["localization"] = loc
+                    ctx, aliases = _bind_current(entry, drifted_flag=drifted)
+                    proposed_close = [
+                        Question.model_validate(q) for q in (close_root.get("questions") or [])
+                    ]
+                    conv = consume_question_answers(
+                        prev,
+                        revision,
+                        proposed_close or proposed,
+                        list(ctx.evidence),
+                        revision_id=revision.revisionId if revision is not None else "round",
+                        evidence_aliases=aliases,
+                    )
+                    resolutions = conv.resolutions
+                    round_ledger = [q.model_dump() for q in (conv.questionLedger or [])]
+                    root = dict(entry.get("rootCause") or {})
+                    root["questions"] = [q.model_dump() for q in conv.openQuestions]
+                    entry["rootCause"] = root
+                    if remaining is not None:
+                        remaining -= 1
+                if conv.needsClosingPass or conv.analysisIncomplete:
+                    entry["analysisStatus"] = "incomplete"
+                    loc = dict(entry.get("localization") or {})
+                    loc["notes"] = "; ".join(
+                        x
+                        for x in [
+                            loc.get("notes"),
+                            "closing pass incomplete" if conv.needsClosingPass else "analysis incomplete",
+                            *conv.violations[:3],
+                        ]
+                        if x
+                    )
+                    entry["localization"] = loc
+                ctx = ctx.model_copy(
+                    update={
+                        "questionResolutions": resolutions,
+                        "analysisIncomplete": bool(conv.analysisIncomplete or conv.needsClosingPass),
+                    }
+                )
             decision = _decision_from_entry(entry, ctx)
             gate_errors = validate_edit_decision(ctx, decision)
             if drifted:
@@ -280,6 +443,8 @@ def run_analyst(
                 "plan_only",
                 "patch_ready",
             ):
+                if previous_payload:
+                    entry = {**entry, "previousAttempt": previous_payload}
                 attempt, entry = _run_fix_loop(
                     work_dir=work_dir,
                     ticket=ticket,
@@ -293,6 +458,8 @@ def run_analyst(
                     snapshot=snapshot,
                     revision=revision,
                     session_id=session_id,
+                    parent_attempt_id=parent_attempt,
+                    previous_attempt=previous_payload,
                 )
             else:
                 if want_fix and entry.get("outcome") == "patch_ready" and not decision.allowed:
@@ -316,8 +483,19 @@ def run_analyst(
                     session_id=session_id,
                     decision=decision,
                     evidence=list(ctx.evidence),
+                    parent_attempt_id=parent_attempt,
                 )
-            return _persist_ticket_entry(out_dir, entry, attempt, already_locked=locked)
+            return _persist_ticket_entry(
+                out_dir,
+                entry,
+                attempt,
+                already_locked=locked,
+                revision=revision,
+                workspace=snapshot,
+                resolutions=resolutions,
+                previous_ledger=(previous_payload or {}).get("questionLedger") or (previous_payload or {}).get("openQuestions"),
+                round_ledger=round_ledger,
+            )
 
         for t in defect_batch.tickets:
             if wanted is not None and t.defectId not in wanted:
@@ -365,7 +543,7 @@ def run_analyst(
             "boundSkills": bound_skills,
             "tickets": tickets,
         }
-        if out_dir:
+        if out_dir and not already_locked:
             _write_markdown_report(out_dir, defect_batch.productLine, tickets)
         return validate_analysis_report(report)
 
@@ -571,6 +749,8 @@ def _run_fix_loop(
     snapshot: Any,
     revision: Optional[InputRevision],
     session_id: Optional[str],
+    parent_attempt_id: Optional[str] = None,
+    previous_attempt: Optional[dict[str, Any]] = None,
 ) -> tuple[AttemptRecord, dict[str, Any]]:
     last_payload: dict[str, Any] = {}
     attempt_id = uuid4().hex[:12]
@@ -587,6 +767,8 @@ def _run_fix_loop(
         analysis["currentTarget"] = context.currentTarget
         analysis["inputRevision"] = context.revision.model_dump() if context.revision else None
         analysis["upstreamInvestigation"] = context.investigation
+        if previous_attempt:
+            analysis["previousAttempt"] = previous_attempt
         if ctx.hypotheses:
             analysis["retryFeedback"] = [h.claim for h in ctx.hypotheses]
         result = fixer(
@@ -701,6 +883,7 @@ def _run_fix_loop(
         update={
             "revisionId": revision.revisionId if revision else attempt.revisionId,
             "sessionId": session_id,
+            "parentAttemptId": parent_attempt_id or attempt.parentAttemptId,
             "evidence": list(context.evidence),
             "editDecision": attempt.editDecision or decision,
         }
@@ -968,6 +1151,7 @@ def _attempt_from_entry(
     evidence: Optional[list[Evidence]] = None,
     patch_set: Optional[PatchSet] = None,
     checks: Optional[list[VerificationRun]] = None,
+    parent_attempt_id: Optional[str] = None,
 ) -> AttemptRecord:
     outcome = str(entry.get("outcome") or "other_blocked")
     kind = str((entry.get("blockers") or {}).get("kind") or "")
@@ -978,6 +1162,7 @@ def _attempt_from_entry(
         schemaVersion=REPAIR_SCHEMA_VERSION,
         attemptId=uuid4().hex[:12],
         defectId=str(entry.get("defectId") or "unknown"),
+        parentAttemptId=parent_attempt_id,
         revisionId=revision.revisionId if revision else None,
         sessionId=session_id,
         execution="completed",
@@ -996,6 +1181,11 @@ def _persist_ticket_entry(
     attempt: AttemptRecord,
     *,
     already_locked: bool = False,
+    revision: Optional[InputRevision] = None,
+    workspace=None,
+    resolutions: Optional[list] = None,
+    previous_ledger: Optional[list] = None,
+    round_ledger: Optional[list] = None,
 ) -> dict[str, Any]:
     decision=attempt.editDecision
     entry = {**entry, "attemptId": attempt.attemptId,
@@ -1005,10 +1195,29 @@ def _persist_ticket_entry(
     coerced = _coerce_ticket_entry(entry)
     if not out_dir:
         return coerced
+    from bugfix_platform.agents.analyst.analysis_store import (
+        SnapshotConflict,
+        build_snapshot_from_entry,
+        save_analysis_snapshot,
+    )
     try:
-        save_attempt(Path(out_dir), attempt, already_locked=already_locked)
+        snapshot = build_snapshot_from_entry(
+            coerced,
+            revision=revision,
+            workspace=workspace,
+            parent_attempt_id=attempt.parentAttemptId,
+            resolutions=resolutions,
+            previous_ledger=previous_ledger,
+            round_ledger=round_ledger,
+        )
+        save_analysis_snapshot(
+            Path(out_dir),
+            attempt,
+            snapshot,
+            already_locked=already_locked,
+        )
         return coerced
-    except (AttemptStoreBusy, OSError) as err:
+    except (AttemptStoreBusy, OSError, SnapshotConflict) as err:
         failed = dict(entry)
         failed["outcome"] = "other_blocked"
         failed["proposedFix"] = None

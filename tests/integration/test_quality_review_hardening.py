@@ -59,10 +59,11 @@ def test_graph_does_not_drop_authorization_and_repeat_internal_type_error(tmp_pa
     [{'defectId':'0','candidates':[]},{'defectId':'0','candidates':[]}],
     [{'defectId':'outside-group','candidates':[],'confidence':'INVALID'}],
 ])
-def test_sdk_rejects_invalid_ticket_identity_before_merge(tmp_path,matches):
+def test_sdk_isolates_invalid_ticket_identity_before_merge(tmp_path,matches):
     req=request(tmp_path,1)
-    with pytest.raises(ValueError,match='ticket|group|duplicate'):
-        _merge_enrichment(req.baseline,{'defectCodeMatches':matches},tickets=req.defect_batch.tickets)
+    merged=_merge_enrichment(req.baseline,{'defectCodeMatches':matches},tickets=req.defect_batch.tickets)
+    ids={m['defectId'] for m in merged['defectCodeMatches']}
+    assert 'outside-group' not in ids
 
 
 def test_failed_ticket_report_keeps_effective_revision(tmp_path,monkeypatch):

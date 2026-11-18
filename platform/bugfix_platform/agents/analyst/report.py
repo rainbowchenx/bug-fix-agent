@@ -20,6 +20,9 @@ def render_report(report: dict[str, Any]) -> str:
         resolution = item.get("resolution") or item.get("outcome") or ""
         lines.append(f"- {did}: {resolution}")
         lines.append(f"  analysis: {item.get('analysisStatus', 'not_executed')}; actionability: {item.get('actionability') or {}}")
+        attempt_id = item.get("attemptId") or ""
+        if attempt_id:
+            lines.append(f"  feedbackForm: defects/{did}/attempts/{attempt_id}/feedback-form.md")
         target=(item.get('ticket') or {}).get('expected')
         if target:
             lines.append(f"  currentTarget: {target}")

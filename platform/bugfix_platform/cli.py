@@ -23,12 +23,20 @@ from pathlib import Path
 
 
 def _cmd_feedback(root: str, file: str) -> int:
-    """导入一份反馈 JSON，按 feedbackId 幂等。"""
+    """导入一份反馈 JSON 或填写后的 Markdown 表，按 feedbackId 幂等。"""
     from bugfix_contracts.repair import Feedback
+    from bugfix_platform.agents.analyst.attempt_store import store_lock
     from bugfix_platform.agents.analyst.feedback import import_feedback
+    from bugfix_platform.agents.analyst.feedback_document import import_filled_form
 
-    payload = json.loads(Path(file).read_text(encoding="utf-8"))
-    revision = import_feedback(Path(root), Feedback.model_validate(payload))
+    src = Path(file)
+    text = src.read_text(encoding="utf-8")
+    with store_lock(Path(root)):
+        if src.suffix.lower() in {".md", ".markdown"} or "BUGFIX_FEEDBACK_FORM" in text:
+            revision = import_filled_form(root, text, already_locked=True)
+        else:
+            feedback = Feedback.model_validate(json.loads(text))
+            revision = import_feedback(Path(root), feedback, already_locked=True)
     print(json.dumps(revision.model_dump(), ensure_ascii=False, indent=2))
     return 0
 
@@ -40,14 +48,29 @@ def _cmd_resume(
     apply_fix: bool = False,
     execute: bool = False,
 ) -> int:
+    """Hold the artifact lock across parent selection, analysis and report publication."""
+    from bugfix_platform.agents.analyst.attempt_store import AttemptStoreBusy, store_lock
+
+    base = Path(root)
+    try:
+        with store_lock(base):
+            return _resume_locked(base, defect_id, revision_id, apply_fix, execute)
+    except AttemptStoreBusy as err:
+        print(str(err), file=sys.stderr)
+        return 1
+
+
+def _resume_locked(
+    base: Path, defect_id: str, revision_id: str | None, apply_fix: bool, execute: bool
+) -> int:
     """预览会话决策；execute 只分析，apply-fix 显式授权编辑。"""
     from bugfix_contracts.analysis_report import validate_analysis_report
     from bugfix_contracts.code_knowledge import validate_code_knowledge
     from bugfix_contracts.defect_batch import load_defect_batch
+    from bugfix_platform.agents.analyst.report_store import atomic_write_report, load_or_rebuild_analysis_report
     from bugfix_platform.agents.analyst.run import run_analyst
     from bugfix_platform.agents.analyst.sessions import load_revision, resume_from_store
 
-    base = Path(root)
     batch_path = base / "defect-batch.json"
     knowledge_path = base / "code-knowledge.json"
     report_path = base / "analysis-report.json"
@@ -56,22 +79,34 @@ def _cmd_resume(
         print(f"unknown defect: {defect_id}", file=sys.stderr)
         return 1
     previous = None
+    knowledge = None
     if apply_fix or execute:
         if batch is None or not knowledge_path.is_file():
             print("resume execution needs defect-batch.json and code-knowledge.json", file=sys.stderr)
             return 1
         knowledge = validate_code_knowledge(json.loads(knowledge_path.read_text(encoding="utf-8")))
-        if report_path.is_file():
-            previous = validate_analysis_report(json.loads(report_path.read_text(encoding="utf-8")))
+        previous = load_or_rebuild_analysis_report(
+            base,
+            product_line=batch.productLine,
+            work_dir=knowledge.workDir,
+            apply_fix=apply_fix,
+        )
     decision = resume_from_store(base, defect_id, revision_id)
     print(json.dumps({"action": decision.action, "sessionId": decision.sessionId,
                       "reason": decision.reason}, ensure_ascii=False, indent=2))
     if not apply_fix and not execute:
         return 0
+    assert knowledge is not None
     work_dir = previous.workDir if previous is not None else knowledge.workDir
     revision = load_revision(base, defect_id, revision_id)
     revisions = {defect_id: revision} if revision is not None else {}
     session_ids = {defect_id: decision.sessionId} if decision.sessionId else {}
+    from bugfix_platform.agents.analyst.feedback import load_latest_feedback
+    from bugfix_platform.agents.analyst.sessions import load_latest_attempt, select_resume_parent
+    feedback = load_latest_feedback(base, defect_id)
+    latest = load_latest_attempt(base, defect_id)
+    parent_id = select_resume_parent(latest, feedback, revision_id=revision_id)
+    parent_attempt_ids = {defect_id: parent_id} if parent_id else {}
     report = run_analyst(
         work_dir=work_dir,
         defect_batch=batch,
@@ -80,7 +115,9 @@ def _cmd_resume(
         ticket_ids=[defect_id],
         revisions=revisions,
         session_ids=session_ids,
+        parent_attempt_ids=parent_attempt_ids,
         artifact_dir=base,
+        already_locked=True,
     )
     dumped = report.model_dump()
     round_dir = base / "rounds"
@@ -106,15 +143,12 @@ def _cmd_resume(
         by_outcome[oc] = by_outcome.get(oc, 0) + 1
     dumped["tickets"] = merged_tickets
     dumped["summary"] = {"total": len(merged_tickets), "byOutcome": by_outcome}
-    report_path.write_text(
-        validate_analysis_report(dumped).model_dump_json(indent=2),
-        encoding="utf-8",
-    )
+    atomic_write_report(report_path, validate_analysis_report(dumped).model_dump_json(indent=2))
     from bugfix_platform.agents.analyst.report import render_report
 
-    (base / "analysis-report.md").write_text(
+    atomic_write_report(
+        base / "analysis-report.md",
         render_report({"batchId": dumped.get("productLine"), "tickets": merged_tickets}),
-        encoding="utf-8",
     )
     return 0
 
@@ -183,6 +217,8 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     run_p.add_argument("--out-dir", default=None, help="Write artifacts JSON here")
+    run_p.add_argument("--resume-dir", default=None, help="Agent-2 progress journal to resume")
+    run_p.add_argument("--ticket-ids", default=None, help="Comma-separated defect IDs to investigate/analyze")
 
     fb_p = sub.add_parser(
         "feedback",
@@ -260,11 +296,14 @@ def main(argv: list[str] | None = None) -> int:
         cartography_profile=args.cartography_profile,
         extra_skill_dirs=args.skills_dirs,
         artifact_dir=args.out_dir,
+        resume_dir=getattr(args, "resume_dir", None),
+        ticket_ids=[x for x in (args.ticket_ids or "").split(",") if x] or None,
     )
     payload = {
         "ok": result.ok,
         "stage": result.stage,
         "error": result.error,
+        "artifactDir": result.artifact_dir,
         "funnel": result.artifacts.defect_batch.funnel if result.artifacts.defect_batch else None,
         "profile": (
             result.artifacts.code_knowledge.cartographyProfile
@@ -279,8 +318,9 @@ def main(argv: list[str] | None = None) -> int:
     }
     print(json.dumps(payload, ensure_ascii=False, indent=2))
 
-    if args.out_dir:
-        out = Path(args.out_dir)
+    out_root = args.out_dir or result.artifact_dir
+    if out_root:
+        out = Path(out_root)
         out.mkdir(parents=True, exist_ok=True)
         if result.artifacts.defect_batch:
             (out / "defect-batch.json").write_text(

@@ -51,9 +51,9 @@ def test_original_ticket_through_feedback_and_report_only_resume(tmp_path,monkey
 def test_needs_info_receives_bounded_first_investigation(tmp_path,monkeypatch):
     from bugfix_contracts import DefectBatch,CodeKnowledge
     monkeypatch.setenv('BUGFIX_CODEGRAPH','0')
-    batch=DefectBatch.model_validate({'schemaVersion':'0.3.0','productLine':'p','posture':'alpha','generatedAt':'2026-01-01T00:00:00Z',
+    batch=DefectBatch.model_validate({'schemaVersion':'0.4.0','productLine':'p','posture':'alpha','generatedAt':'2026-01-01T00:00:00Z',
         'funnel':{'total':1,'needsInfo':1},'clusters':[],'tickets':[{'defectId':'D','title':'UI missing hint','pool':'needs_info','expectQuality':'absent'}]})
-    knowledge=CodeKnowledge.model_validate({'schemaVersion':'0.3.0','productLine':'p','workDir':str(tmp_path),'partial':False,'generatedAt':'2026-01-01T00:00:00Z'})
+    knowledge=CodeKnowledge.model_validate({'schemaVersion':'0.4.0','productLine':'p','workDir':str(tmp_path),'partial':False,'generatedAt':'2026-01-01T00:00:00Z'})
     seen=[]
     def analyze(req):
         seen.append(req)

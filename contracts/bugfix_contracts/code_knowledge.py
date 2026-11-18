@@ -14,14 +14,62 @@ CartographyProfile = Literal[
     "device_web",
     "unknown",
 ]
-MatchSource = Literal["codegraph", "grep", "heuristic", "claude_md"]
+MatchSource = Literal["codegraph", "grep", "heuristic", "claude_md", "model_reported"]
 MatchGap = Literal["no_path_token_overlap"]
+FactValidity = Literal["unverified", "reference_verified", "rejected"]
+FactSource = Literal["model_reported", "tool_observed"]
+AcceptanceStatus = Literal["accepted", "rejected", "isolated"]
+StorageStatus = Literal["saved", "artifact_error", "not_saved"]
+ParseAction = Literal["isolate", "coerce", "drop", "reject", "record"]
 
 
 class RepoRoot(BaseModel):
     path: str = Field(min_length=1)
     gitHead: Optional[str] = None
     fingerprint: Optional[str] = None
+
+
+class CodeReference(BaseModel):
+    """Fact 引用只说明来源位置；存在路径不等于 claim 因果成立。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    repoId: str = Field(min_length=1)
+    path: str = Field(min_length=1)
+    revision: Optional[str] = None
+    contentDigest: Optional[str] = None
+    snippet: Optional[str] = None
+    startLine: Optional[int] = None
+    endLine: Optional[int] = None
+
+
+class InvestigationFact(BaseModel):
+    """生产事实。字符串只是适配器输入，不能直接写入本类型。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    claim: str = Field(min_length=1)
+    reference: Optional[CodeReference] = None
+    validity: FactValidity = "unverified"
+    source: FactSource = "model_reported"
+
+
+class ParseIssue(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    fieldPath: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+    action: ParseAction
+    rawRef: Optional[str] = None
+
+
+class RawResponseRef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(min_length=1)
+    digest: str = Field(min_length=1)
+    callId: str = Field(min_length=1)
+    truncated: bool = False
 
 
 class MatchCandidate(BaseModel):
@@ -45,12 +93,15 @@ class DefectCodeMatch(BaseModel):
     ] = None
     """Agent-2 逐票覆盖。缺省表示旧产物未声明，不能当成已调查。"""
     searchedScopes: list[str] = Field(default_factory=list)
+    observedScopes: list[str] = Field(default_factory=list)
     openQuestions: list[str] = Field(default_factory=list)
-    facts: list[dict[str, Any]] = Field(default_factory=list)
+    facts: list[InvestigationFact] = Field(default_factory=list)
     hypotheses: list[str] = Field(default_factory=list)
     ruledOut: list[str] = Field(default_factory=list)
     nextChecks: list[str] = Field(default_factory=list)
     investigationSource: Literal["model_reported", "tool_observed"] = "model_reported"
+    acceptanceStatus: Optional[AcceptanceStatus] = None
+    storageStatus: Optional[StorageStatus] = None
 
 
 class SpecEntry(BaseModel):
@@ -105,7 +156,7 @@ class CodeKnowledge(BaseModel):
     skillDiscovery: list[dict[str, Any]] = Field(default_factory=list)
     model_config = ConfigDict(extra="ignore")
 
-    schemaVersion: Literal["0.3.0"]
+    schemaVersion: Literal["0.4.0"]
     productLine: str = Field(min_length=1)
     workDir: str = Field(min_length=1)
     investigationRuns: list[dict[str, Any]] = Field(default_factory=list)
@@ -121,6 +172,17 @@ class CodeKnowledge(BaseModel):
     specAtlas: SpecAtlas = Field(default_factory=SpecAtlas)
     capabilities: Capabilities = Field(default_factory=Capabilities)
     defectCodeMatches: list[DefectCodeMatch] = Field(default_factory=list)
+
+
+class MatchParseResult(BaseModel):
+    """不可信模型响应对单票的分层校验结果；不直接写业务文件。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    accepted: Optional[DefectCodeMatch] = None
+    issues: list[ParseIssue] = Field(default_factory=list)
+    acceptedFields: list[str] = Field(default_factory=list)
+    rejectedFields: list[str] = Field(default_factory=list)
 
 
 def validate_code_knowledge(data: Any) -> CodeKnowledge:

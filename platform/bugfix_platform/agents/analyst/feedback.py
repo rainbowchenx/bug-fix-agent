@@ -5,13 +5,25 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from bugfix_contracts.repair import Feedback, InputRevision, PatchSet, WorkspaceSnapshot
 
 
-def import_feedback(root: Path, feedback: Feedback) -> InputRevision:
+def import_feedback(root: Path, feedback: Feedback, *, already_locked: bool = False) -> InputRevision:
     """按 feedbackId 幂等；相同文字不同 ID 仍是新一轮。"""
+    from bugfix_platform.agents.analyst.attempt_store import store_lock
+
+    def _import() -> InputRevision:
+        return _import_feedback_locked(Path(root), feedback)
+
+    if already_locked:
+        return _import()
+    with store_lock(Path(root)):
+        return _import()
+
+
+def _import_feedback_locked(root: Path, feedback: Feedback) -> InputRevision:
     batch_path = Path(root) / "defect-batch.json"
     original_ticket = None
     if batch_path.is_file():
@@ -25,18 +37,31 @@ def import_feedback(root: Path, feedback: Feedback) -> InputRevision:
     dest = base / f"{feedback.feedbackId}.json"
     if dest.is_file():
         existing = json.loads(dest.read_text(encoding="utf-8"))
-        if existing.get("feedback") != feedback.model_dump():
+        stored = existing.get("feedback") or {}
+        if stored.get("feedbackId") == feedback.feedbackId:
+            comparable = {k: v for k, v in feedback.model_dump().items() if k != "parentRevisionId"}
+            stored_cmp = {k: v for k, v in stored.items() if k != "parentRevisionId"}
+            if comparable != stored_cmp and stored != feedback.model_dump():
+                raise ValueError("feedbackId conflicts with existing content")
+            return InputRevision.model_validate(existing["revision"])
+        if stored != feedback.model_dump():
             raise ValueError("feedbackId conflicts with existing content")
         return InputRevision.model_validate(existing["revision"])
+    if feedback.attemptId:
+        from bugfix_platform.agents.analyst.analysis_store import load_analysis_snapshot, snapshot_path
+        snap = snapshot_path(root, feedback.defectId, feedback.attemptId)
+        if snap.is_file() or feedback.formId:
+            try:
+                load_analysis_snapshot(root, feedback.defectId, feedback.attemptId)
+            except OSError as err:
+                raise ValueError(f"unknown parent attempt: {feedback.attemptId}") from err
     from bugfix_platform.agents.analyst.revisions import merge_revision
     parent = None
     from bugfix_platform.agents.analyst.sessions import load_revision
     try:
-        parent = load_revision(root, feedback.defectId, feedback.parentRevisionId)
+        parent = load_revision(root, feedback.defectId, None)
     except ValueError:
-        if not feedback.parentRevisionId:
-            raise
-        parent = None  # An explicitly requested original ticket revision is resolved below.
+        raise
     if parent is None:
         if original_ticket is not None:
             ticket = original_ticket
@@ -44,10 +69,9 @@ def import_feedback(root: Path, feedback: Feedback) -> InputRevision:
                 defectId=feedback.defectId, observed=ticket.observed, expected=ticket.expected,
                 steps=ticket.steps, attachments=ticket.attachmentRefs or [])
     if parent is None:
-        if feedback.parentRevisionId:
-            raise ValueError("unknown parent revision")
         parent = InputRevision(revisionId=f"{feedback.defectId}:v0", defectId=feedback.defectId)
-    revision = merge_revision(parent, feedback)
+    merge_source = feedback.model_copy(update={"parentRevisionId": parent.revisionId})
+    revision = merge_revision(parent, merge_source)
     temporary = dest.with_suffix(".tmp")
     temporary.write_text(
         json.dumps(
@@ -60,9 +84,32 @@ def import_feedback(root: Path, feedback: Feedback) -> InputRevision:
     temporary.replace(dest)
     pointer = base.parent / "feedback-latest.json"
     pointer_tmp = pointer.with_suffix(".tmp")
-    pointer_tmp.write_text(json.dumps({"revisionId": revision.revisionId}), encoding="utf-8")
+    pointer_tmp.write_text(
+        json.dumps({"revisionId": revision.revisionId, "attemptId": feedback.attemptId}),
+        encoding="utf-8",
+    )
     pointer_tmp.replace(pointer)
     return revision
+
+
+def load_latest_feedback(root: Path, defect_id: str) -> Optional[Feedback]:
+    folder = Path(root) / "defects" / defect_id / "feedback"
+    if not folder.is_dir():
+        return None
+    files = sorted(folder.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    for path in files:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        raw = payload.get("feedback") if isinstance(payload, dict) else None
+        if not isinstance(raw, dict):
+            continue
+        try:
+            return Feedback.model_validate(raw)
+        except Exception:  # noqa: BLE001
+            continue
+    return None
 
 
 def classify_patch_state(
