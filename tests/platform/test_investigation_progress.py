@@ -268,6 +268,25 @@ def test_zero_budget_resume_keeps_group_partial(tmp_path):
     assert len(calls) == before
     assert second.knowledge.partial is True
     assert "budget_exhausted" in (second.detail or "")
+    assert second.knowledge.defectCodeMatches[0].facts == first.knowledge.defectCodeMatches[0].facts
+
+    from tests.platform.test_investigation_batches import complete
+
+    def finish(r):
+        assert r.baseline.defectCodeMatches[0].facts == first.knowledge.defectCodeMatches[0].facts
+        result = complete(r)
+        match = result.knowledge.defectCodeMatches[0].model_copy(update={"facts": []})
+        result.knowledge = result.knowledge.model_copy(update={"defectCodeMatches": [match]})
+        return result
+
+    cache = tmp_path / "cache"
+    completed = investigate_groups(req, finish, artifact_dir=artifacts, resume_dir=artifacts, cache_dir=cache)
+    assert completed.knowledge.partial is False
+    assert completed.knowledge.defectCodeMatches[0].facts == first.knowledge.defectCodeMatches[0].facts
+    cached = investigate_groups(req, runner, max_groups=0, cache_dir=cache)
+    assert len(calls) == before
+    assert cached.knowledge.partial is False
+    assert cached.knowledge.defectCodeMatches[0].facts == first.knowledge.defectCodeMatches[0].facts
 
 
 def test_journal_restores_matches_from_verified_input_version(tmp_path):
@@ -334,3 +353,28 @@ def test_journal_restores_matches_from_verified_input_version(tmp_path):
     assert by_id["0"].facts[0].claim == "from:failure"
     assert by_id["0"].investigationStatus == "complete"
     assert all(c != ["0"] for c in calls[before:])
+
+
+def test_zero_budget_restores_groups_after_first_pending_group(tmp_path):
+    from bugfix_platform.agents.cartographer.investigation import investigate_groups
+    from tests.platform.test_investigation_batches import complete, request
+
+    req = request(tmp_path / "repo", 2)
+    calls = []
+
+    def runner(group):
+        result = complete(group)
+        did = group.defect_batch.tickets[0].defectId
+        calls.append(did)
+        if did == "0":
+            result.knowledge = result.knowledge.model_copy(update={"partial": True})
+        return result
+
+    artifacts = tmp_path / "art"
+    options = dict(group_size=1, artifact_dir=artifacts, resume_dir=artifacts)
+    investigate_groups(req, runner, **options)
+    resumed = investigate_groups(req, runner, max_groups=0, **options)
+    assert calls == ["0", "1"]
+    assert resumed.knowledge.partial is True
+    assert resumed.knowledge.investigationRuns[0]["status"] == "complete"
+    assert resumed.knowledge.defectCodeMatches[1].investigationStatus == "complete"

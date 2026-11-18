@@ -48,16 +48,29 @@ def _cmd_resume(
     apply_fix: bool = False,
     execute: bool = False,
 ) -> int:
+    """Hold the artifact lock across parent selection, analysis and report publication."""
+    from bugfix_platform.agents.analyst.attempt_store import AttemptStoreBusy, store_lock
+
+    base = Path(root)
+    try:
+        with store_lock(base):
+            return _resume_locked(base, defect_id, revision_id, apply_fix, execute)
+    except AttemptStoreBusy as err:
+        print(str(err), file=sys.stderr)
+        return 1
+
+
+def _resume_locked(
+    base: Path, defect_id: str, revision_id: str | None, apply_fix: bool, execute: bool
+) -> int:
     """预览会话决策；execute 只分析，apply-fix 显式授权编辑。"""
     from bugfix_contracts.analysis_report import validate_analysis_report
     from bugfix_contracts.code_knowledge import validate_code_knowledge
     from bugfix_contracts.defect_batch import load_defect_batch
-    from bugfix_platform.agents.analyst.attempt_store import store_lock
-    from bugfix_platform.agents.analyst.report_store import load_or_rebuild_analysis_report
+    from bugfix_platform.agents.analyst.report_store import atomic_write_report, load_or_rebuild_analysis_report
     from bugfix_platform.agents.analyst.run import run_analyst
     from bugfix_platform.agents.analyst.sessions import load_revision, resume_from_store
 
-    base = Path(root)
     batch_path = base / "defect-batch.json"
     knowledge_path = base / "code-knowledge.json"
     report_path = base / "analysis-report.json"
@@ -104,6 +117,7 @@ def _cmd_resume(
         session_ids=session_ids,
         parent_attempt_ids=parent_attempt_ids,
         artifact_dir=base,
+        already_locked=True,
     )
     dumped = report.model_dump()
     round_dir = base / "rounds"
@@ -113,39 +127,29 @@ def _cmd_resume(
         json.dumps(dumped, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    with store_lock(base):
-        previous = load_or_rebuild_analysis_report(
-            base,
-            product_line=batch.productLine if batch is not None else knowledge.productLine,
-            work_dir=work_dir,
-            apply_fix=apply_fix,
-        )
-        by_id: dict[str, object] = {}
-        if previous is not None:
-            for item in previous.model_dump()["tickets"]:
-                by_id[item["defectId"]] = item
-        for item in dumped.get("tickets") or []:
-            if isinstance(item, dict) and item.get("defectId"):
-                by_id[str(item["defectId"])] = item
-        merged_tickets = list(by_id.values())
-        by_outcome: dict[str, int] = {}
-        for item in merged_tickets:
-            if not isinstance(item, dict):
-                continue
-            oc = str(item.get("outcome") or "other_blocked")
-            by_outcome[oc] = by_outcome.get(oc, 0) + 1
-        dumped["tickets"] = merged_tickets
-        dumped["summary"] = {"total": len(merged_tickets), "byOutcome": by_outcome}
-        report_path.write_text(
-            validate_analysis_report(dumped).model_dump_json(indent=2),
-            encoding="utf-8",
-        )
-        from bugfix_platform.agents.analyst.report import render_report
+    by_id: dict[str, object] = {}
+    if previous is not None:
+        for item in previous.model_dump()["tickets"]:
+            by_id[item["defectId"]] = item
+    for item in dumped.get("tickets") or []:
+        if isinstance(item, dict) and item.get("defectId"):
+            by_id[str(item["defectId"])] = item
+    merged_tickets = list(by_id.values())
+    by_outcome: dict[str, int] = {}
+    for item in merged_tickets:
+        if not isinstance(item, dict):
+            continue
+        oc = str(item.get("outcome") or "other_blocked")
+        by_outcome[oc] = by_outcome.get(oc, 0) + 1
+    dumped["tickets"] = merged_tickets
+    dumped["summary"] = {"total": len(merged_tickets), "byOutcome": by_outcome}
+    atomic_write_report(report_path, validate_analysis_report(dumped).model_dump_json(indent=2))
+    from bugfix_platform.agents.analyst.report import render_report
 
-        (base / "analysis-report.md").write_text(
-            render_report({"batchId": dumped.get("productLine"), "tickets": merged_tickets}),
-            encoding="utf-8",
-        )
+    atomic_write_report(
+        base / "analysis-report.md",
+        render_report({"batchId": dumped.get("productLine"), "tickets": merged_tickets}),
+    )
     return 0
 
 

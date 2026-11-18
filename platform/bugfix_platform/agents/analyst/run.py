@@ -80,6 +80,7 @@ def run_analyst(
     revisions: Optional[Mapping[str, InputRevision]] = None,
     session_ids: Optional[Mapping[str, str]] = None,
     parent_attempt_ids: Optional[Mapping[str, str]] = None,
+    already_locked: bool = False,
 ) -> AnalysisReport:
     """Agent-3 公开入口：产出 ``analysis-report``（默认只出报告、不改码）。
 
@@ -110,6 +111,7 @@ def run_analyst(
         ticket_ids: 若给出则只处理这些缺陷。
         revisions: 票 ID → 补充 InputRevision。
         session_ids: 票 ID → 续接会话。
+        already_locked: 调用方持有产物根锁，并负责发布汇总 Markdown。
 
     Returns:
         通过 ``validate_analysis_report`` 的 ``AnalysisReport``。
@@ -147,7 +149,7 @@ def run_analyst(
     sess_map = dict(session_ids or {})
     parent_map = dict(parent_attempt_ids or {})
     locked = bool(out_dir)
-    lock_cm = store_lock(Path(out_dir)) if out_dir else nullcontext()
+    lock_cm = store_lock(Path(out_dir)) if out_dir and not already_locked else nullcontext()
 
     with lock_cm:
         tickets: list[dict[str, Any]] = []
@@ -541,7 +543,7 @@ def run_analyst(
             "boundSkills": bound_skills,
             "tickets": tickets,
         }
-        if out_dir:
+        if out_dir and not already_locked:
             _write_markdown_report(out_dir, defect_batch.productLine, tickets)
         return validate_analysis_report(report)
 

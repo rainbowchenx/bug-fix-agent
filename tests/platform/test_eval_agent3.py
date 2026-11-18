@@ -157,3 +157,32 @@ def test_score_report_stale_does_not_invent_repair_rate():
     assert scored["summary"]["convergence"]["success"] == 0
     assert scored["summary"]["convergence"]["repairRate"] is None
     assert scored["applyFix"] is False
+
+
+
+def test_score_report_keeps_fixed_eligible_cohort_and_hides_report_only_rates():
+    from bugfix_platform.agents.analyst.ratings import report_digest
+
+    report = _report([_ticket(), _ticket(defectId="D2")])
+    for apply_fix in (True, False):
+        report["applyFix"] = apply_fix
+        cases = [
+            {
+                "defectId": "D1", "eligible": True, "accepted": True, "resolved": True,
+                "effectiveAnswers": 2, "answersConsumed": 1,
+                "ratingBinding": {"defectId": "D1", "product": "hc", "reportDigest": report_digest(report)},
+            },
+            {
+                "defectId": "D2", "eligible": True, "accepted": True, "resolved": True,
+                "ratingBinding": {"defectId": "D2", "product": "hc", "reportDigest": "0" * 64},
+            },
+        ]
+        summary = score_report(report, cases)["summary"]
+        metrics = summary["convergence"]
+        assert metrics["eligibleDefects"] == 2
+        assert metrics["eligibleRepairRate"] == (0.5 if apply_fix else None)
+        assert metrics["answerConsumption"] == 0.5
+        if not apply_fix:
+            assert summary["repair"]["successRate"] is None
+            for field in ("repairRate", "conservativeRate", "observedRate"):
+                assert metrics[field] is None

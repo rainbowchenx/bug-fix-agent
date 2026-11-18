@@ -28,7 +28,8 @@
 
 | 字段 | 填写 |
 |---|---|
-| 人工 eligibility / 理由 / 标注时间 | |
+| 人工 eligibility（true / false）/ 理由 / 标注时间 | |
+| 本轮有效答案数 effectiveAnswers / 已合理处理数 answersConsumed | |
 | 有效答案 / 本轮必答题分母 / 反馈是否足量 | |
 | 问题消费 / 重开理由 | |
 | 轮次 / attempt / 输入revision / 父轮次 | |

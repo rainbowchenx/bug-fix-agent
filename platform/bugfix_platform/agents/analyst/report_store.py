@@ -1,12 +1,17 @@
-"""汇总 analysis-report：优先读完整文件，损坏时从逐票快照重建。"""
+"""协调已提交的逐票快照与派生汇总。"""
 
 from __future__ import annotations
 
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Any, Optional
 
-from bugfix_contracts.analysis_report import AnalysisReport, validate_analysis_report
+from bugfix_contracts.analysis_report import (
+    ANALYSIS_REPORT_SCHEMA_VERSION,
+    AnalysisReport,
+    validate_analysis_report,
+)
 from bugfix_platform.agents.analyst.analysis_store import load_analysis_snapshot
 from bugfix_platform.agents.analyst.sessions import load_latest_attempt
 
@@ -22,16 +27,17 @@ def load_analysis_report(root: Path | str, *, allow_rebuild_on_error: bool = Tru
     try:
         raw = path.read_text(encoding="utf-8")
         data = json.loads(raw)
-    except (OSError, json.JSONDecodeError):
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return None
     try:
         return validate_analysis_report(data)
-    except (ValueError, TypeError) as err:
-        if "schemaVersion" in str(err):
+    except (ValueError, TypeError):
+        version = data.get("schemaVersion") if isinstance(data, dict) else None
+        if not allow_rebuild_on_error or (
+            isinstance(version, str) and version != ANALYSIS_REPORT_SCHEMA_VERSION
+        ):
             raise
-        if allow_rebuild_on_error:
-            return None
-        raise
+        return None
 
 
 def rebuild_analysis_report_from_snapshots(
@@ -66,7 +72,7 @@ def rebuild_analysis_report_from_snapshots(
         oc = str(item.get("outcome") or "other_blocked")
         by_outcome[oc] = by_outcome.get(oc, 0) + 1
     payload = {
-        "schemaVersion": "0.4.0",
+        "schemaVersion": ANALYSIS_REPORT_SCHEMA_VERSION,
         "productLine": product_line or "unknown",
         "workDir": work_dir or str(base),
         "generatedAt": "1970-01-01T00:00:00Z",
@@ -89,13 +95,29 @@ def load_or_rebuild_analysis_report(
     work_dir: str = "",
     apply_fix: bool = False,
 ) -> Optional[AnalysisReport]:
-    """完整汇总优先；损坏或缺失时从逐票快照重建。"""
+    """以已提交快照更新汇总，保留没有快照的现有条目。"""
     report = load_analysis_report(root)
-    if report is not None:
-        return report
-    return rebuild_analysis_report_from_snapshots(
+    committed = rebuild_analysis_report_from_snapshots(
         root,
         product_line=product_line,
         work_dir=work_dir,
         apply_fix=apply_fix,
     )
+    if report is None or committed is None:
+        return committed or report
+    tickets = {ticket.defectId: ticket for ticket in report.tickets}
+    tickets.update((ticket.defectId, ticket) for ticket in committed.tickets)
+    payload = report.model_dump()
+    payload["tickets"] = list(tickets.values())
+    payload["summary"] = {
+        "total": len(tickets),
+        "byOutcome": dict(Counter(ticket.outcome for ticket in tickets.values())),
+    }
+    return validate_analysis_report(payload)
+
+
+def atomic_write_report(path: Path, text: str) -> None:
+    """Publish a complete report file while the caller holds the artifact lock."""
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(text, encoding="utf-8")
+    temporary.replace(path)

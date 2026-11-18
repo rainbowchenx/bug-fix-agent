@@ -116,6 +116,7 @@ def investigate_groups(
     identity = _identity(req)
     journal = load_group_progress(resume_dir) if resume_dir else None
     journal_by_key: dict[str, dict] = {}
+    unselected_partial_ids: set[str] = set()
     identity_json = json.dumps(identity, sort_keys=True, default=str)
     identity_ok = isinstance(journal, dict) and json.dumps(journal.get("identity") or {}, sort_keys=True, default=str) == identity_json
     if identity_ok:
@@ -144,6 +145,10 @@ def investigate_groups(
                     continue
                 if restored_match.defectId in ids:
                     merged[restored_match.defectId] = restored_match
+                    if item.get("partial") or item.get("status") != "complete":
+                        unselected_partial_ids.add(restored_match.defectId)
+                    else:
+                        unselected_partial_ids.discard(restored_match.defectId)
     launched = 0
     stop_reason = "completed"
 
@@ -203,12 +208,15 @@ def investigate_groups(
                     result = CartographyResult(True, cached, "sdk", "cached group")
             except (ValueError, OSError):
                 pass  # Invalid cache entries are re-investigated, never promoted.
+        restored_by_id: dict[str, DefectCodeMatch] = {}
         journal_hit = journal_by_key.get(key)
         if result is None and journal_hit and journal_hit.get("matches"):
             try:
                 restored = [
                     DefectCodeMatch.model_validate(item) for item in journal_hit["matches"]
                 ]
+                restored_by_id = {match.defectId: match for match in restored if match.defectId in ids}
+                merged.update(restored_by_id)
                 group_partial = bool(journal_hit.get("partial")) or journal_hit.get("status") != "complete"
                 cached_k = knowledge.model_copy(update={
                     "defectCodeMatches": restored, "partial": group_partial,
@@ -218,11 +226,7 @@ def investigate_groups(
                     and not journal_hit.get("partial")
                     and _complete(cached_k, ids)
                 ):
-                    for match in restored:
-                        merged[match.defectId] = match
                     result = CartographyResult(True, cached_k, "sdk", "resumed complete group")
-                elif group_partial:
-                    incomplete = True
             except (ValueError, TypeError):
                 result = None
         group_base = knowledge.model_copy(update={
@@ -235,7 +239,8 @@ def investigate_groups(
                 if exhausted or timed_out:
                     stop_reason = "timeout" if timed_out else "budget_exhausted"
                     incomplete = True
-                    break
+                    # Other groups may still have reusable records without spending budget.
+                    continue
                 launched += 1
                 group_id = f"g{n:03d}-{key[:8]}"
                 call_id = uuid4().hex[:12]
@@ -255,14 +260,23 @@ def investigate_groups(
                     or any(m.defectId not in ids for m in returned)):
                 raise ValueError("investigation returned duplicate or out-of-group ticket")
             for match in returned:
+                prior = restored_by_id.get(match.defectId)
+                if prior is not None and result.source == "sdk":
+                    # Matching input and workspace identity make these observations reusable.
+                    facts = list(match.facts)
+                    facts.extend(fact for fact in prior.facts if fact not in facts)
+                    match = match.model_copy(update={"facts": facts})
                 merged[match.defectId] = match
             if result.source == "sdk":
                 knowledge = result.knowledge
                 if dest and result.ok and _complete(result.knowledge, ids):
                     temporary = dest.with_suffix(".tmp")
-                    temporary.write_text(result.knowledge.model_dump_json(), encoding="utf-8")
+                    temporary.write_text(
+                        knowledge.model_copy(update={"defectCodeMatches": [merged[i] for i in ids]}).model_dump_json(),
+                        encoding="utf-8",
+                    )
                     temporary.replace(dest)
-            group_partial = bool(result.knowledge.partial)
+            group_partial = result.knowledge.partial or not result.ok or result.source != "sdk"
             group_status = "complete" if _complete(
                 knowledge.model_copy(update={
                     "defectCodeMatches": [merged[i] for i in ids],
@@ -292,7 +306,7 @@ def investigate_groups(
                 "turns": None, "cost": None,
             })
             _flush_journal()
-    partial = incomplete or any(
+    partial = incomplete or bool(unselected_partial_ids) or any(
         m.investigationStatus in {"not_investigated", "failed", "partial"}
         for m in merged.values()
     )

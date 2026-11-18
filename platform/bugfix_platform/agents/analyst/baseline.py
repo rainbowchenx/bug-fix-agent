@@ -58,22 +58,19 @@ def _question_counts(case: dict[str, Any]) -> tuple[int, int]:
     return n_req, n_cons
 
 
-def _effective_answer_counts(case: dict[str, Any]) -> tuple[int, int]:
-    """有效答案消费：已合理处理数 / 本轮有效答案数。"""
+def _effective_answer_counts(case: dict[str, Any]) -> tuple[int, int] | None:
+    """没有独立录入的有效答案数时保留未知。"""
     _, handled = _question_counts(case)
     raw = case.get("effectiveAnswers")
     if raw is None:
         raw = case.get("answersProvided")
     if isinstance(raw, list):
-        received = len([item for item in raw if item])
-    elif isinstance(raw, (int, float)):
-        received = int(raw)
-    elif raw:
-        received = handled or 1
+        received = sum(bool(item) for item in raw)
+    elif isinstance(raw, int) and not isinstance(raw, bool) and raw >= 0:
+        received = raw
     else:
-        received = handled
-    handled = min(handled, received) if received else 0
-    return received, handled
+        return None
+    return received, min(max(handled, 0), received)
 
 
 def _reopen_counts(case: dict[str, Any]) -> tuple[int, int]:
@@ -84,12 +81,12 @@ def _reopen_counts(case: dict[str, Any]) -> tuple[int, int]:
     return unjustified, justified
 
 
-def _is_eligible(case: dict[str, Any]) -> bool:
-    if "eligible" in case:
-        return bool(case.get("eligible"))
-    if "repairEligible" in case:
-        return bool(case.get("repairEligible"))
-    return False
+def _eligibility(case: dict[str, Any]) -> bool | None:
+    for field in ("eligible", "repairEligible", "eligibility"):
+        value = case.get(field)
+        if isinstance(value, bool):
+            return value
+    return None
 
 
 def convergence_metrics(
@@ -107,8 +104,6 @@ def convergence_metrics(
         key = f"{product}:{did}"
         prev = by_defect.get(key)
         if prev is None or int(case.get("attemptSeq") or 0) >= int(prev.get("attemptSeq") or 0):
-            if case.get("ratingStatus") == "stale" and prev is not None and prev.get("ratingStatus") != "stale":
-                continue
             by_defect[key] = case
     rows = list(by_defect.values())
     n = len(rows)
@@ -123,36 +118,42 @@ def convergence_metrics(
     handled_total = 0
     unjustified_total = 0
     justified_total = 0
-    reopened = 0
+    missing_answer_denominator = False
     for case in live:
         n_req, _ = _question_counts(case)
         req_total += n_req
-        received, handled = _effective_answer_counts(case)
-        effective_total += received
-        handled_total += handled
+        answer_counts = _effective_answer_counts(case)
+        if answer_counts is not None:
+            received, handled = answer_counts
+            effective_total += received
+            handled_total += handled
+        elif case.get("answersConsumed") is not None or case.get("answerConsumed") is not None:
+            missing_answer_denominator = True
         uj, jr = _reopen_counts(case)
         unjustified_total += uj
         justified_total += jr
-        if uj or jr or case.get("questionReopened"):
-            reopened += 1
     reopen_den = unjustified_total + justified_total
-    has_eligibility = any(("eligible" in c) or ("repairEligible" in c) for c in live)
-    eligible = [c for c in live if _is_eligible(c)] if has_eligibility else []
-    eligible_success = sum(1 for c in eligible if c.get("accepted") is True and c.get("resolved") is True)
+    has_eligibility = any(_eligibility(c) is not None for c in rows)
+    eligible = [c for c in rows if _eligibility(c) is True]
+    eligible_success = sum(
+        1 for c in eligible
+        if c.get("ratingStatus") not in {"stale", "unbound"}
+        and c.get("accepted") is True and c.get("resolved") is True
+    )
     return {
         "uniqueDefects": n,
         "success": success,
         "failed": failed,
         "pending": pending,
         "stale": sum(1 for c in rows if c.get("ratingStatus") == "stale"),
-        "conservativeRate": (success / n) if n else None,
-        "observedRate": (success / observed_den) if observed_den else None,
+        "conservativeRate": (success / n) if n and not report_only else None,
+        "observedRate": (success / observed_den) if observed_den and not report_only else None,
         "repairRate": None if report_only else ((success / n) if n else None),
-        "answerConsumption": (handled_total / effective_total) if effective_total else None,
+        "answerConsumption": (handled_total / effective_total) if effective_total and not missing_answer_denominator else None,
         "repeatQuestionRate": (unjustified_total / req_total) if req_total else None,
         "justifiedReopenRate": (justified_total / reopen_den) if reopen_den else None,
         "eligibleDefects": len(eligible) if has_eligibility else None,
-        "eligibleRepairRate": (eligible_success / len(eligible)) if eligible else (None if has_eligibility else None),
+        "eligibleRepairRate": (eligible_success / len(eligible)) if eligible and not report_only else None,
         "note": "70% is a proposed repair-ticket SLA, not an engineering bar",
     }
 

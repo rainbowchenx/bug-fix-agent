@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from bugfix_contracts.repair import REPAIR_SCHEMA_VERSION, AttemptRecord, Feedback
 from bugfix_platform.agents.analyst.attempt_store import save_attempt
 from bugfix_platform.agents.analyst.sessions import select_resume_parent
@@ -60,7 +62,8 @@ def test_resume_cli_writes_decision_without_cwd_guess(tmp_path: Path):
     assert data.get("sessionId") != "cwd-recent"
 
 
-def test_corrupt_analysis_report_rebuilds_from_snapshots(tmp_path: Path, monkeypatch):
+@pytest.mark.parametrize("old_report", ["truncated", "invalid", "stale"])
+def test_resume_reconciles_committed_snapshots(tmp_path: Path, monkeypatch, old_report):
     from bugfix_contracts import CodeKnowledge, DefectBatch
     from bugfix_platform.agents.analyst.analysis_store import build_snapshot_from_entry, save_analysis_snapshot
     from bugfix_platform.agents.analyst.report_store import load_or_rebuild_analysis_report
@@ -131,7 +134,15 @@ def test_corrupt_analysis_report_rebuilds_from_snapshots(tmp_path: Path, monkeyp
     )
     assert rebuilt is not None
     assert any(t.defectId == "D2" for t in rebuilt.tickets)
-    (root / "analysis-report.json").write_text('{"schemaVersion":"0.4.0",', encoding="utf-8")
+    report_path = root / "analysis-report.json"
+    if old_report == "truncated":
+        report_path.write_text('{"schemaVersion":"0.4.0",', encoding="utf-8")
+    elif old_report == "invalid":
+        report_path.write_text("{}", encoding="utf-8")
+    else:
+        outdated = rebuilt.model_dump()
+        outdated["tickets"][0]["attemptId"] = "old-d2"
+        report_path.write_text(json.dumps(outdated), encoding="utf-8")
 
     def analyze(req):
         payload = dict(req.routed)
@@ -143,12 +154,26 @@ def test_corrupt_analysis_report_rebuilds_from_snapshots(tmp_path: Path, monkeyp
         "bugfix_platform.agents.analyst.run.create_analyze_runner",
         lambda *a, **k: analyze,
     )
-    rc = main(["resume", "--root", str(root), "--defect-id", "D1", "--execute"])
+    from bugfix_platform.agents.analyst.run import run_analyst
+
+    args = ["resume", "--root", str(root), "--defect-id", "D1", "--execute"]
+    competing = []
+
+    def run_with_competing_resume(**kwargs):
+        if not competing:
+            competing.append(None)
+            competing[0] = main(args)
+        return run_analyst(**kwargs)
+
+    monkeypatch.setattr("bugfix_platform.agents.analyst.run.run_analyst", run_with_competing_resume)
+    rc = main(args)
+    assert competing == [1]
     assert rc == 0
     report = json.loads((root / "analysis-report.json").read_text(encoding="utf-8"))
     ids = {t["defectId"] for t in report["tickets"]}
     assert "D1" in ids
     assert "D2" in ids
+    assert next(t for t in report["tickets"] if t["defectId"] == "D2")["attemptId"] == "a1"
 
 
 def test_resume_parent_does_not_roll_back_consumed_feedback():

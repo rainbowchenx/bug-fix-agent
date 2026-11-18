@@ -17,14 +17,14 @@ def test_fixed_denominator_conservative_and_observed():
         + [_case(i, accepted=True, resolved=False) for i in range(14, 17)]
         + [_case(i, accepted=None, status="pending") for i in range(17, 20)]
     )
-    metrics = convergence_metrics(cases)
+    metrics = convergence_metrics(cases, apply_fix=True)
     assert metrics["uniqueDefects"] == 20
     assert metrics["conservativeRate"] == 14 / 20
     assert metrics["observedRate"] == 14 / 17
     assert metrics["pending"] == 3
-    assert metrics["repairRate"] is None
+    assert convergence_metrics(cases, apply_fix=False)["repairRate"] is None
     dropped = [c for c in cases if c.get("status") != "pending"]
-    dropped_metrics = convergence_metrics(dropped)
+    dropped_metrics = convergence_metrics(dropped, apply_fix=True)
     assert dropped_metrics["uniqueDefects"] == 17
     assert dropped_metrics["conservativeRate"] != metrics["conservativeRate"]
 
@@ -57,7 +57,7 @@ def test_stale_does_not_count_as_success_and_report_only_has_no_repair_rate():
     template = [
         _case(1, requiredQuestions=["q1"], answersConsumed=1, accepted=True, resolved=True),
     ]
-    assert convergence_metrics(template)["answerConsumption"] == 1.0
+    assert convergence_metrics(template)["answerConsumption"] is None
 
 
 def test_answer_consumption_uses_effective_answers_not_required_denominator():
@@ -65,7 +65,7 @@ def test_answer_consumption_uses_effective_answers_not_required_denominator():
         _case(1, requiredQuestions=["q1", "q2", "q3"], answersConsumed=1, accepted=True, resolved=True),
     ]
     metrics = convergence_metrics(cases)
-    assert metrics["answerConsumption"] == 1.0
+    assert metrics["answerConsumption"] is None
     partial = [
         _case(1, requiredQuestions=["q1", "q2", "q3"], effectiveAnswers=2, answersConsumed=1),
     ]
@@ -92,6 +92,6 @@ def test_answer_consumption_uses_effective_answers_not_required_denominator():
         _case(2, eligible=True, accepted=True, resolved=False),
         _case(3, eligible=False, accepted=True, resolved=True),
     ]
-    el = convergence_metrics(eligible)
+    el = convergence_metrics(eligible, apply_fix=True)
     assert el["eligibleDefects"] == 2
     assert el["eligibleRepairRate"] == 0.5
