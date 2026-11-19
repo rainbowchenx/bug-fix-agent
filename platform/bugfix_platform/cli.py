@@ -147,6 +147,10 @@ def main(argv: list[str] | None = None) -> int:
         help="Run the next analyze/edit/check turn after writing the session decision",
     )
 
+    commit_p = sub.add_parser("commit", help="Commit a staged Agent-3 candidate locally")
+    commit_p.add_argument("--root", required=True, help="Artifact / report root")
+    commit_p.add_argument("--defect-id", required=True)
+
     serve_p = sub.add_parser("serve", help="HTTP API (S4 FastAPI): POST/GET /v1/runs")
     serve_p.add_argument("--host", default="127.0.0.1")
     serve_p.add_argument("--port", type=int, default=8787)
@@ -165,6 +169,17 @@ def main(argv: list[str] | None = None) -> int:
         from bugfix_platform.http.app import run_server
 
         run_server(host=args.host, port=args.port)
+        return 0
+
+    if args.cmd == "commit":
+        from bugfix_platform.workflow.commit import commit_candidate
+
+        try:
+            sha = commit_candidate(Path(args.root), args.defect_id)
+        except (OSError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(json.dumps({"defectId": args.defect_id, "commitSha": sha}))
         return 0
 
     if args.cmd == "feedback":

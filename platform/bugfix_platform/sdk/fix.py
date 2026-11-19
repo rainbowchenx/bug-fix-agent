@@ -160,6 +160,8 @@ def run_claude_fix(req: FixRequest) -> FixResult:
         "semanticReviewStatus": review["status"],
         "semanticReviewExecuted": review["status"] != "not_executed",
     }
+    if review.get("commitMessage"):
+        payload["commitMessage"] = review["commitMessage"]
     return FixResult(
         ok=True,
         source="sdk",
@@ -174,6 +176,8 @@ Stay inside proposedFix.targetFiles unless a file you read proves another file i
 Do not commit, push, or run tests. Do not invent extra features.
 IRON LAW: if the analysis has no real root cause, make no edits.
 After editing, Read the files you changed. End with a JSON object:
+commitMessage: a concise Git subject describing the actual fix, with an optional body.
+Include the defect ID. Omit it when no files changed.
 semanticReviewStatus: passed | failed | not_executed
 semanticReviewExecuted: true only if you judged the actual edited lines
 semanticReview: how THIS diff restores expected behavior, whether success /
@@ -198,6 +202,10 @@ def _parse_semantic_review(texts: list[str]) -> dict[str, str]:
         parsed = parse_json_payload(text)
         if not isinstance(parsed, dict):
             continue
+        raw_message = parsed.get("commitMessage")
+        message_fields = {}
+        if isinstance(raw_message, str) and raw_message.strip():
+            message_fields["commitMessage"] = raw_message.strip()
         review = str(parsed.get("semanticReview") or parsed.get("reviewConclusion") or "").strip()
         executed = parsed.get("semanticReviewExecuted")
         raw_status = parsed.get("semanticReviewStatus")
@@ -206,21 +214,24 @@ def _parse_semantic_review(texts: list[str]) -> dict[str, str]:
         status = str(raw_status or "").strip().lower()
         if executed is False:
             return {
+                **message_fields,
                 "status": "not_executed",
                 "text": _annotate_review(review, "semanticReviewExecuted=false"),
             }
         if status in _REVIEW_STATUSES:
             if review:
-                return {"status": status, "text": review}
+                return {**message_fields, "status": status, "text": review}
             if status == "not_executed":
-                return {"status": status, "text": "semantic review not executed"}
-            return {"status": status, "text": f"semantic review {status}"}
+                return {**message_fields, "status": status, "text": "semantic review not executed"}
+            return {**message_fields, "status": status, "text": f"semantic review {status}"}
         if not status:
             return {
+                **message_fields,
                 "status": "not_executed",
                 "text": _annotate_review(review, "semantic review not executed (missing semanticReviewStatus)"),
             }
         return {
+            **message_fields,
             "status": "not_executed",
             "text": _annotate_review(
                 review, f"semantic review not executed (unknown semanticReviewStatus={status})"
@@ -240,5 +251,5 @@ def _build_fix_prompt(req: FixRequest) -> str:
         f"analysis: {req.analysis}\n"
         f"previousAttempt: {json.dumps((req.analysis or {}).get('previousAttempt') or {}, ensure_ascii=False)}\n"
         "After the edits, Read the changed files and return JSON with "
-        "semanticReviewStatus and semanticReview judging those exact lines.\n"
+        "commitMessage, semanticReviewStatus and semanticReview based on those exact lines.\n"
     )

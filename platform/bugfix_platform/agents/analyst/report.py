@@ -42,6 +42,10 @@ def render_report(report: dict[str, Any]) -> str:
         patch_path = (patch or {}).get("path")
         if patch_path:
             lines.append(f"  patch: {patch_path}")
+        commit_message = patch.get("commitMessage")
+        if commit_message:
+            lines.append("  commitMessage:")
+            lines.extend(f"    {line}" for line in commit_message.splitlines())
         summary = (patch or {}).get("summary") or ""
         if summary:
             lines.append(f"  patchFiles: {summary}")

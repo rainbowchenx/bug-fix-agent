@@ -91,6 +91,7 @@ class ProposedFix(BaseModel):
 class PatchInfo(BaseModel):
     path: Optional[str] = None
     summary: Optional[str] = None
+    commitMessage: Optional[str] = None
 
 
 class SuggestedVerify(BaseModel):

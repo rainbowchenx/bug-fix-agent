@@ -360,4 +360,12 @@ MIT
 
 只出报告续跑：`bugfix-platform feedback --root <产物目录> --file feedback.json`，再执行 `bugfix-platform resume --root <产物目录> --defect-id <票号> --execute`。未加 execute/apply-fix 时只预览；`--execute` 不授权改码。
 
+候选补丁的 `patch.commitMessage` 由修复模型根据实际差异生成。验收逐票补丁后，在业务仓库暂存这张票的变更，再运行：
+
+```bash
+bugfix-platform commit --root <产物目录> --defect-id <票号>
+```
+
+命令核对暂存内容与候选补丁一致，使用报告里的提交信息创建本地 Git 提交，并返回 `commitSha`。提交目标为报告的 `workDir`，该目录须是 Git 仓库根目录。缺少模型提交信息时可重新生成候选。
+
 配置参见 `.env.example`：模型窗口/模态均是声明，不自动当已验证能力；Agent2 默认每组8票，支持整批新组数/时间预算及可选完成组缓存（缓存目录放在业务工作区外）。业务技能可通过显式目录或 `BUGFIX_SKILL_ALLOWLIST` 选择。真实模型 smoke 与业务效果须另行实测。

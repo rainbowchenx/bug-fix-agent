@@ -1334,7 +1334,7 @@ def test_multifile_patch_bundle_applies_complete_fix(tmp_path: Path):
             "export function report(e) { return e; }\n",
             encoding="utf-8",
         )
-        return FixResult(ok=True, source="sdk", payload={"outcome": "patch_ready", "patch": {"path": "x"}})
+        return FixResult(ok=True, source="sdk", payload={"outcome": "patch_ready", "patch": {"path": "x"}, "commitMessage": "fix: repair both files (D1)"})
 
     report = run_analyst(
         work_dir=work,
@@ -1347,6 +1347,7 @@ def test_multifile_patch_bundle_applies_complete_fix(tmp_path: Path):
     )
     ticket = report.tickets[0]
     assert ticket.outcome == "patch_ready"
+    assert ticket.patch.commitMessage == "fix: repair both files (D1)"
     bundle = Path(str(ticket.patch.path if ticket.patch else ""))
     assert bundle.is_file()
     text = bundle.read_text(encoding="utf-8", errors="replace")

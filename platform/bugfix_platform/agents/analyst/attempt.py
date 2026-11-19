@@ -772,6 +772,9 @@ def _run_fix_loop(
                 if x
             ),
         }
+        message = last_payload.get("commitMessage")
+        if isinstance(message, str) and message.strip():
+            entry["patch"]["commitMessage"] = message.strip()
         entry["blockers"] = None
         proposed = dict(entry.get("proposedFix") or {})
         if not proposed.get("summary"):

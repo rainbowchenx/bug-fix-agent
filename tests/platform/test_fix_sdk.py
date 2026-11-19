@@ -41,6 +41,7 @@ def test_run_claude_fix_keeps_edits_and_review_without_git(tmp_path: Path, monke
         "semanticReview": "rethrow restores toast; fail path still visible in handleFail",
         "semanticReviewStatus": "passed",
         "semanticReviewExecuted": True,
+        "commitMessage": "fix: surface handleFail errors (D1)",
     }
 
     class ResultMessage:
@@ -77,6 +78,7 @@ def test_run_claude_fix_keeps_edits_and_review_without_git(tmp_path: Path, monke
     assert result.detail != "fix session produced empty diff"
     assert "rethrow restores toast" in str(result.payload.get("semanticReview") or "")
     assert result.payload.get("semanticReviewStatus") == "passed"
+    assert result.payload.get("commitMessage") == review["commitMessage"]
     assert "throw e" in (work / "src" / "a.ts").read_text(encoding="utf-8")
     assert result.payload, "git-less work copy must not drop the SDK payload"
 
