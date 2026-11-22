@@ -161,6 +161,22 @@ def test_model_cannot_declare_tool_observed_or_verified():
     assert isinstance(fact, InvestigationFact)
 
 
+def test_bad_reference_fields_have_exact_raw_refs_without_losing_valid_fields():
+    result = normalize_sdk_match(
+        {"defectId": "A", "facts": [{"claim": "x", "reference": {
+            "path": "src/a.ts", "snippet": "pageId", "startLine": True, "contentDigest": 123,
+        }}]},
+        requested_ids={"A"}, raw_ref="response.json#structured_output.defectCodeMatches[0]",
+    )
+    ref = result.accepted.facts[0].reference
+    assert (ref.path, ref.snippet, ref.startLine, ref.contentDigest) == ("src/a.ts", "pageId", None, None)
+    assert result.accepted.facts[0].validity == "rejected"
+    assert {issue.rawRef for issue in result.issues if issue.reason == "bad_type"} == {
+        "response.json#structured_output.defectCodeMatches[0].facts[0].reference.startLine",
+        "response.json#structured_output.defectCodeMatches[0].facts[0].reference.contentDigest",
+    }
+
+
 def test_unhashable_confidence_and_bool_lists_do_not_drop_neighbor():
     parsed = {
         "architecture": {"modules": [{"id": "m", "role": {}}]},

@@ -378,3 +378,58 @@ def test_zero_budget_restores_groups_after_first_pending_group(tmp_path):
     assert resumed.knowledge.partial is True
     assert resumed.knowledge.investigationRuns[0]["status"] == "complete"
     assert resumed.knowledge.defectCodeMatches[1].investigationStatus == "complete"
+
+
+def test_progress_counts_running_interrupted_and_resumed_tickets(tmp_path):
+    import json
+
+    import pytest
+
+    from bugfix_platform.agents.cartographer.investigation import investigate_groups
+    from tests.platform.test_investigation_batches import complete, request
+
+    root = tmp_path / "artifacts"
+    req = request(tmp_path / "repo", 3)
+    progress = root / "agent2" / "progress.json"
+
+    def interrupted(group):
+        journal = json.loads(progress.read_text(encoding="utf-8"))
+        assert journal["counts"]["planned"] == 3
+        assert journal["counts"]["launched"] == journal["counts"]["running"] == 2
+        assert journal["counts"]["pending"] == 1
+        assert journal["groups"][0]["callId"] == group.call_id
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        investigate_groups(req, interrupted, artifact_dir=root, group_size=2)
+
+    paused = investigate_groups(req, complete, artifact_dir=root, resume_dir=root, group_size=2, max_groups=0)
+    counts = paused.knowledge.investigationProgress["counts"]
+    assert counts["launched"] == counts["interrupted"] == 2
+    assert counts["pending"] == 1 and counts["running"] == 0
+    assert paused.knowledge.investigationProgress["launchedThisRun"] == 0
+    journal = json.loads(progress.read_text(encoding="utf-8"))
+    assert journal["groups"][0]["status"] == "interrupted"
+    assert journal["groups"][0]["counts"]["interrupted"] == 2
+
+    resumed = investigate_groups(req, complete, artifact_dir=root, resume_dir=root, group_size=2)
+    assert resumed.knowledge.investigationProgress["counts"] == {
+        "planned": 3, "launched": 3, "accepted": 3, "pending": 0, "running": 0,
+        "interrupted": 0, "complete": 3, "partial": 0, "failed": 0,
+    }
+    reused = investigate_groups(req, complete, artifact_dir=root, resume_dir=root, group_size=2)
+    assert reused.knowledge.investigationProgress["counts"] == resumed.knowledge.investigationProgress["counts"]
+    assert reused.knowledge.investigationProgress["launchedThisRun"] == 0
+    assert reused.knowledge.investigationProgress["reusedThisRun"] == 3
+
+
+def test_missing_credentials_do_not_count_as_sdk_launch_or_acceptance(tmp_path, monkeypatch):
+    from bugfix_platform.agents.cartographer.handoff import run_claude_cartography
+    from bugfix_platform.agents.cartographer.investigation import investigate_groups
+    from tests.platform.test_investigation_batches import request
+
+    monkeypatch.setattr("bugfix_platform.agents.cartographer.handoff.has_credentials", lambda: False)
+    result = investigate_groups(request(tmp_path / "repo", 2), run_claude_cartography, artifact_dir=tmp_path / "out")
+    counts = result.knowledge.investigationProgress["counts"]
+    assert counts["planned"] == counts["failed"] == 2
+    assert counts["launched"] == counts["accepted"] == 0

@@ -15,9 +15,12 @@ def find_business_envelope(
     scored: list[tuple[int, str, dict[str, Any]]] = []
     if isinstance(structured, dict) and structured:
         scored.append((_envelope_score(structured), "structured_output", structured))
+    elif isinstance(structured, str):
+        for ordinal, obj in enumerate(_extract_objects(structured)):
+            scored.append((_envelope_score(obj), f"structured_output.objects[{ordinal}]", obj))
     for index, text in enumerate(texts):
-        for obj in _extract_objects(text):
-            scored.append((_envelope_score(obj), f"texts[{index}]", obj))
+        for ordinal, obj in enumerate(_extract_objects(text)):
+            scored.append((_envelope_score(obj), f"texts[{index}].objects[{ordinal}]", obj))
     business = [row for row in scored if row[0] > 0]
     if not business:
         return None, "none"
@@ -35,6 +38,8 @@ def _envelope_score(obj: dict[str, Any]) -> int:
     matches = obj.get("defectCodeMatches")
     if isinstance(matches, list):
         score += 10 + sum(1 for item in matches if isinstance(item, dict) and item.get("defectId"))
+    elif "defectCodeMatches" in obj:
+        score += 1
     for key in ("architecture", "techStack", "conventions", "boundSkills", "partial"):
         if key in obj:
             score += 2

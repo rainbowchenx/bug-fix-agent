@@ -1297,12 +1297,24 @@ def test_cited_snippet_missing_from_file_does_not_enter_fix(tmp_path: Path):
     assert called["n"] == 0
 
 
-def test_multifile_patch_bundle_applies_complete_fix(tmp_path: Path):
+def test_multifile_patch_bundle_applies_complete_fix(tmp_path: Path, monkeypatch):
     import subprocess
+    from hashlib import sha256
+    from bugfix_platform.agents.analyst.report_store import publish_analysis_report
 
+    monkeypatch.setenv("BUGFIX_CODEGRAPH", "0")
     work = tmp_path / "repo"
     (work / "src").mkdir(parents=True)
     (work / "src" / "a.ts").write_text(_SNIPPET + "\n", encoding="utf-8")
+
+    def git(*args):
+        return subprocess.check_output(["git", "-C", str(work), *args]).decode("utf-8").strip()
+
+    git("init")
+    git("config", "user.name", "Test")
+    git("config", "user.email", "test@example.test")
+    git("add", "src/a.ts")
+    git("commit", "-m", "baseline")
 
     def fake_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         return AnalyzeResult(
@@ -1350,6 +1362,7 @@ def test_multifile_patch_bundle_applies_complete_fix(tmp_path: Path):
     assert ticket.patch.commitMessage == "fix: repair both files (D1)"
     bundle = Path(str(ticket.patch.path if ticket.patch else ""))
     assert bundle.is_file()
+    assert ticket.patch.bundleDigest == sha256(bundle.read_bytes()).hexdigest()
     text = bundle.read_text(encoding="utf-8", errors="replace")
     assert "src/a.ts" in text.replace("\\", "/")
     assert "src/helper.ts" in text.replace("\\", "/")
@@ -1369,6 +1382,13 @@ def test_multifile_patch_bundle_applies_complete_fix(tmp_path: Path):
     subprocess.run(["git", "apply", str(bundle)], cwd=check, check=True, capture_output=True)
     assert "helper" in (check / "src" / "a.ts").read_text(encoding="utf-8")
     assert (check / "src" / "helper.ts").is_file()
+
+    artifacts = tmp_path / "art"
+    publish_analysis_report(artifacts, report)
+    git("apply", "--index", str(bundle))
+    assert main(["commit", "--root", str(artifacts), "--defect-id", "D1"]) == 0
+    assert git("log", "-1", "--format=%s") == "fix: repair both files (D1)"
+    assert not git("status", "--porcelain")
 
 
 def test_check_log_survives_second_round(tmp_path: Path):

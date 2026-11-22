@@ -28,7 +28,7 @@ source (CSV/JSON/xlsx)
 |------|------|------|--------|
 | 契约 SSOT | `contracts/bugfix_contracts/` | Pydantic 校验三段 artifact；两边唯一共享代码 | ✅ |
 | Agent-1 | `agent1/bugfix_agent1/` + `agent1/skills/defect-batch-prepare/` | 图外：入口映射 → 蒸馏 / 筛选 / 分簇 → `defect-batch` | ✅ 规则管线 + skill |
-| Agent-2 | `platform/bugfix_platform/agents/cartographer/` + `sdk/` + `platform/skills/code-cartography/` | 调用方仓型 + 形态化架构图 + 路径软匹配（候选≤3；无 token 不得用入口文件填票）+ overlay skill + 可选 SDK 加厚仓图/弱匹配 → `code-knowledge` | 🟡 启发式加厚 + SDK 骨架 |
+| Agent-2 | `platform/bugfix_platform/agents/cartographer/` + `sdk/` + `platform/skills/code-cartography/` | 调用方仓型 + 形态化架构图 + 路径软匹配（候选≤3；无 token 不得用入口文件填票）+ overlay skill + 可选 SDK 加厚仓图/弱匹配 → `code-knowledge` | 逐票调查、有限补查和诊断已接入，真实 SDK 待验 |
 | Agent-3 | `platform/bugfix_platform/agents/analyst/` + `sdk/` | 全程 SDK 分析出完整报告；`--apply-fix` 才 worktree 改码（默认关） | 🟡 报告路径可用，改码默认关 |
 | 父编排 | `platform/bugfix_platform/workflow/` | LangGraph：`validate_batch→agent2→agent3` + 门禁（不含 Agent-1） | ✅ |
 | HTTP（S4） | `platform/bugfix_platform/http/` | FastAPI：`POST/GET /v1/runs`（入参 `defectBatch`）、`GET /health` | ✅ 兼容壳 |
@@ -295,7 +295,7 @@ SDK analyze 排障：
 
 ---
 
-## 关键数据契约（v0.1）
+## 关键数据契约（0.4.0）
 
 详文与样例：[`docs/contracts/v0.1/`](docs/contracts/v0.1/) · 代码 SSOT：`contracts/bugfix_contracts/`
 
@@ -321,6 +321,8 @@ raw-defects  ──Agent-1──►  defect-batch  ──Agent-2──►  code-
 - `cartographyProfile`、`repoRoots`、`techStack`、`architecture`、`specAtlas`
 - `boundSkills[]`：本次绑定的 cartography overlay（在前）+ 包内置 skill 名
 - `defectCodeMatches[]`：给 Agent-3 的**软定位**起点（可空 / 低置信）
+- SDK 模式的 `investigationProgress.counts` 和 `agent2/progress.json` 按唯一票统计阶段。已启动、已接受是过程计数，可以和完成、部分完成或失败重叠。续跑单独记录本次启动和复用的票数。
+- 组级 `parse-result.json` 记录字段诊断、原始响应引用与摘要。SDK 漏票时，在会话和预算允许的情况下最多请求一次、两轮收尾，补查响应单独保存。
 
 ### analysis-report（Agent-3 出口）
 
@@ -343,22 +345,18 @@ raw-defects  ──Agent-1──►  defect-batch  ──Agent-2──►  code-
 |----|------|
 | Agent-2 业务形态指纹样本仓 | 后续（CodeGraph ensure + MCP 已默认接入） |
 | Agent-3 真 MR / 本地集成冲突 | 后续（`--apply-fix` 已可出 patch 文件，默认关） |
-| LangGraph Server 原生部署（S4 增强） | 后续（现有 FastAPI 兼容壳） |
+| 部署环境的持久化与中断恢复 | 待现场验收 |
 | 生产 MCP 拉缺陷 | stub（现用 CSV/JSON/xlsx） |
 
 决策背景：[decision-followup](docs/superpowers/specs/2026-10-23-report-agent-decision-followup.md)
 
 ---
 
-## License
+## 反馈、续跑与提交
 
-MIT
+运行和发布范围见[当前验收状态](docs/architecture.md#验收状态)。需要继续处理历史版本的工单时，请从原始输入重新生成 `0.4.0` 产物。
 
-## 2026-11-16 证据质量优化
-
-三 Agent 生产产物契约升级至 `0.4.0`，请从原始票重新生成 Agent1/2/3 产物。完整原文与质量标签、Agent2 分组调查、结构化 claims/questions、完整反馈继承及报告模式二次执行见[执行自查](docs/superpowers/execution/2026-11-16-three-agent-quality-ledger.md)。
-
-只出报告续跑：`bugfix-platform feedback --root <产物目录> --file feedback.json`，再执行 `bugfix-platform resume --root <产物目录> --defect-id <票号> --execute`。未加 execute/apply-fix 时只预览；`--execute` 不授权改码。
+填写该轮产物中的 `feedback-form.md`，用 `bugfix-platform feedback --root <产物目录> --file <反馈表>` 导入。随后用 `bugfix-platform resume --root <产物目录> --defect-id <票号> --execute` 更新报告。默认只预览续跑决策，使用 `--apply-fix` 才授权生成候选补丁。
 
 候选补丁的 `patch.commitMessage` 由修复模型根据实际差异生成。验收逐票补丁后，在业务仓库暂存这张票的变更，再运行：
 
@@ -366,6 +364,10 @@ MIT
 bugfix-platform commit --root <产物目录> --defect-id <票号>
 ```
 
-命令核对暂存内容与候选补丁一致，使用报告里的提交信息创建本地 Git 提交，并返回 `commitSha`。提交目标为报告的 `workDir`，该目录须是 Git 仓库根目录。缺少模型提交信息时可重新生成候选。
+命令核对报告与最新逐票快照、候选补丁摘要及 Git 暂存内容，使用该轮的提交信息创建本地 Git 提交并返回 `commitSha`。提交目标须是快照记录的 Git 仓库根目录。缺少补丁摘要或模型提交信息的旧候选须重新生成。
 
 配置参见 `.env.example`：模型窗口/模态均是声明，不自动当已验证能力；Agent2 默认每组8票，支持整批新组数/时间预算及可选完成组缓存（缓存目录放在业务工作区外）。业务技能可通过显式目录或 `BUGFIX_SKILL_ALLOWLIST` 选择。真实模型 smoke 与业务效果须另行实测。
+
+## License
+
+MIT

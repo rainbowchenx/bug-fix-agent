@@ -48,7 +48,7 @@ from bugfix_platform.workflow.gates import (
     require_code_knowledge,
     require_defect_batch,
 )
-from bugfix_platform.workflow.persist import persist_artifact
+from bugfix_platform.workflow.persist import default_artifact_dir, persist_artifact
 from bugfix_platform.workflow.state import ThreeAgentState
 
 CartographerFn = Callable[..., CodeKnowledge]
@@ -100,7 +100,8 @@ def create_three_agent_graph(
             )
 
         dumped = batch.model_dump()
-        persist_artifact(state.get("artifact_dir"), "defect-batch.json", dumped)
+        artifact_dir = state.get("artifact_dir") or str(default_artifact_dir(state["work_dir"]))
+        persist_artifact(artifact_dir, "defect-batch.json", dumped)
 
         both_skip = bool(state.get("skip_agent2")) and bool(state.get("skip_agent3"))
         if both_skip:
@@ -108,6 +109,7 @@ def create_three_agent_graph(
             return Command(
                 update={
                     "defect_batch": dumped,
+                    "artifact_dir": artifact_dir,
                     "ok": True,
                     "stage": "done",
                     "error": None,
@@ -119,6 +121,7 @@ def create_three_agent_graph(
             return Command(
                 update={
                     "defect_batch": dumped,
+                    "artifact_dir": artifact_dir,
                     "ok": False,
                     "stage": "agent2",
                     "error": (
@@ -131,6 +134,7 @@ def create_three_agent_graph(
         return Command(
             update={
                 "defect_batch": dumped,
+                "artifact_dir": artifact_dir,
                 "ok": True,
                 "stage": "agent2",
                 "error": None,

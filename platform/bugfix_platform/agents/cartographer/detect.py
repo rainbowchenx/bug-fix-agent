@@ -129,14 +129,6 @@ def _has_typescript(dir_path: Path, files: list[str] | None = None) -> bool:
     return False
 
 
-def _readable(path: Path) -> bool:
-    try:
-        next(path.iterdir(), None)
-        return True
-    except OSError:
-        return False
-
-
 def _git_dir(dir_path: Path) -> Path | None:
     """解析 ``.git`` 目录（含 gitfile ``gitdir: …``）；失败返回 None。"""
     git = dir_path / ".git"

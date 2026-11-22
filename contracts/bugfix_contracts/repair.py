@@ -226,6 +226,7 @@ class PatchSet(BaseModel):
     patches: list[PatchFile] = Field(default_factory=list)
     replaces: Optional[str] = None
     bundlePath: Optional[str] = None
+    bundleDigest: Optional[str] = None
     baselineDigest: Optional[str] = None
 
     @model_validator(mode="after")
@@ -367,26 +368,6 @@ class AttemptRecord(BaseModel):
         if self.userAcceptance == "accepted" and not self.feedbackId:
             raise ValueError("accepted can only be written by feedback")
         return self
-
-
-class BatchManifest(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    schemaVersion: str = REPAIR_SCHEMA_VERSION
-    batchId: str = Field(min_length=1)
-    productLine: str = ""
-    mode: Literal["analyze-only", "generate-patch"] = "analyze-only"
-    inputCount: int = 0
-    repoIds: list[str] = Field(default_factory=list)
-
-
-class DefectRecord(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    defectKey: str = Field(min_length=1)
-    defectId: str = Field(min_length=1)
-    currentRevisionId: Optional[str] = None
-    latestAttemptId: Optional[str] = None
 
 
 def validate_attempt(data: Any) -> AttemptRecord:

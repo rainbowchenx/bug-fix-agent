@@ -1,6 +1,6 @@
 # Phase A — 可信闭环 Implementation Plan
 
-> 依据：[docs/superpowers/specs/2026-10-17-implementation-gap-analysis-and-roadmap.md](../specs/2026-10-17-implementation-gap-analysis-and-roadmap.md) §7 Phase A  
+> 历史 TypeScript 实施计划，基于当时的实现分析。现行流程见[当前项目架构](../../architecture.md)。
 > **Status:** Implemented (2026-10-17)
 
 **Goal:** 真实仓库上 clone → analyze → implement → static → verify → review → deliver 能稳定跑通；同仓多簇互不污染；零改动不开 MR；解析失败只拖垮本簇。

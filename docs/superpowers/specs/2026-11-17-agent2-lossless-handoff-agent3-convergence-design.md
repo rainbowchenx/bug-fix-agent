@@ -1,6 +1,6 @@
 # Agent2调查保全与Agent3反馈收敛方案
 
-日期：2026-11-17（Asia/Shanghai）。状态：2026-11-17完整复审已修订，待实施授权，**不开始实现**。基线：当前 `405b544`，产品实现来自 `3c5d8d7`。本方案只定义后续变更，文件、接口和测试均非已交付能力。
+本方案制定于 2026-11-17，当时的代码基线为 `405b544`。以下各节记录目标与验收要求，实际交付范围见[当前实现与验收状态](../../architecture.md#验收状态)。
 
 关联：[实施计划](../plans/2026-11-17-agent2-lossless-handoff-agent3-convergence-plan.md)、[三项目实测复评](../../field-eval/agent3/reviews/2026-11-17-three-project-real-run-assessment.md)、[统计](../../field-eval/agent3/reviews/2026-11-17-three-project-artifact-statistics.json)、[18票对照](../../field-eval/agent3/reviews/2026-11-17-three-project-ticket-comparison.csv)、[上一版方案](2026-11-16-three-agent-evidence-quality-design.md)、[上一版计划](../plans/2026-11-16-three-agent-evidence-quality-implementation-plan.md)。本次真实项目范围仅peitao、transport、hcp。
 

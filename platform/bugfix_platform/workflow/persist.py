@@ -11,8 +11,21 @@
 from __future__ import annotations
 
 import json
+import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
+from uuid import uuid4
+
+
+def default_artifact_dir(work_dir: Path | str) -> Path:
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    candidate = Path(work_dir) / ".bugfix-runs" / f"{stamp}-{uuid4().hex[:8]}"
+    try:
+        candidate.mkdir(parents=True, exist_ok=False)
+        return candidate.resolve()
+    except OSError:
+        return Path(tempfile.mkdtemp(prefix="bugfix-run-"))
 
 
 def persist_artifact(artifact_dir: Optional[str], filename: str, data: dict[str, Any]) -> Optional[Path]:

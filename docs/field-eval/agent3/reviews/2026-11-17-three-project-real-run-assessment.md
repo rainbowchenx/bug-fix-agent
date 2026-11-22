@@ -4,7 +4,7 @@
 
 本地已从 `5c5c2f9` 快进到远端 `405b544`；新增提交只有运行包，未改产品代码。运行声明版本为 `5c5c2f9`，包含昨日 `3c5d8d7` 的优化。只读解压到 `/tmp/bugfix-eval-20261117`，未执行包内脚本/pickle，也未调用真实模型。
 
-证据包：[本轮ZIP](../../../../bugfix-runs-2026-11-17-交付包.zip)，SHA256 `b46c82dcf401ef6c1d5cdf4da0cddde7b95c7ab6244670135855fa3c7596b3dd`。历史基线：[11-16复评](2026-11-16-three-agent-real-project-assessment.md)。验收依据：[优化方案](../../../superpowers/specs/2026-11-16-three-agent-evidence-quality-design.md)、[实施计划](../../../superpowers/plans/2026-11-16-three-agent-evidence-quality-implementation-plan.md)、[工程复审](../../../superpowers/execution/2026-11-17-three-agent-implementation-review.md)。
+证据包：[本轮ZIP](../../../../bugfix-runs-2026-11-17-交付包.zip)，SHA256 `b46c82dcf401ef6c1d5cdf4da0cddde7b95c7ab6244670135855fa3c7596b3dd`。历史基线：[11-16复评](2026-11-16-three-agent-real-project-assessment.md)。验收依据：[优化方案](../../../superpowers/specs/2026-11-16-three-agent-evidence-quality-design.md)、[实施计划](../../../superpowers/plans/2026-11-16-three-agent-evidence-quality-implementation-plan.md)、[当前实现与验收状态](../../../architecture.md#验收状态)。
 
 可复核产物：[统计JSON](2026-11-17-three-project-artifact-statistics.json)、[18票配对CSV](2026-11-17-three-project-ticket-comparison.csv)、[正式评分器复算](2026-11-17-official-score-recomputed.json)。归档内部路径以下均相对ZIP根目录。
 

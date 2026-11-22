@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Optional
 from uuid import uuid4
 
 from bugfix_contracts.repair import PatchFile, PatchSet, WorkspaceSnapshot
@@ -114,7 +114,7 @@ def collect_patch(
     delivery = "candidate" if patches else "none"
     if patches and not _patches_apply(baseline, patches):
         delivery = "diagnostic"
-    bundle_path = _write_bundle(archive_root, patches) if patches else None
+    bundle_path, bundle_digest = _write_bundle(archive_root, patches)
     if delivery == "candidate" and bundle_path and not _bundle_applies(baseline, Path(bundle_path)):
         delivery = "diagnostic"
     return PatchSet(
@@ -123,6 +123,7 @@ def collect_patch(
         baselineHead=snapshot.head,
         baselineDigest=workspace_digest(baseline),
         bundlePath=bundle_path,
+        bundleDigest=bundle_digest,
         patches=patches,
     )
 
@@ -165,12 +166,6 @@ def _copytree(src: Path, dest: Path) -> None:
             if name in _SKIP_FILES:
                 continue
             shutil.copy2(Path(dirpath) / name, target_dir / name)
-
-
-def _copy_file(src: Path, dest: Path) -> None:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    if src.is_file():
-        shutil.copy2(src, dest)
 
 
 def _unified_diff(left: Path, right: Path, rel: str) -> str:
@@ -259,7 +254,7 @@ def _lines_for_diff(text: str) -> list[str]:
     return lines
 
 
-def _write_bundle(archive_root: Path, patches: list[PatchFile]) -> str | None:
+def _write_bundle(archive_root: Path, patches: list[PatchFile]) -> tuple[str | None, str | None]:
     chunks: list[str] = []
     for item in patches:
         src = Path(item.archivePath)
@@ -270,11 +265,12 @@ def _write_bundle(archive_root: Path, patches: list[PatchFile]) -> str | None:
             chunk += "\n"
         chunks.append(chunk)
     if not chunks:
-        return None
+        return None, None
     dest = Path(archive_root) / "bundle.diff"
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_bytes("".join(chunks).encode("utf-8"))
-    return str(dest)
+    content = "".join(chunks).encode("utf-8")
+    dest.write_bytes(content)
+    return str(dest), hashlib.sha256(content).hexdigest()
 
 
 def _bundle_applies(baseline: Path, bundle: Path) -> bool:

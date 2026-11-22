@@ -172,11 +172,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "commit":
-        from bugfix_platform.workflow.commit import commit_candidate
+        from bugfix_platform.workflow.commit import AttemptStoreBusy, commit_candidate
 
         try:
             sha = commit_candidate(Path(args.root), args.defect_id)
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, AttemptStoreBusy) as exc:
             print(str(exc), file=sys.stderr)
             return 1
         print(json.dumps({"defectId": args.defect_id, "commitSha": sha}))

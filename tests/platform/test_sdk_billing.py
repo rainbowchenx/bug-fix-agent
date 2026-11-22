@@ -95,17 +95,22 @@ def test_billing_formats_turns_reason_cost():
     assert _billing(None, None, None) == ""
 
 
-def test_success_records_billing_in_artifact(monkeypatch):
-    _install_fake_query(monkeypatch, [_result()])
+def test_success_records_billing_in_artifact(monkeypatch, tmp_path):
+    prompts = _install_fake_query(monkeypatch, [_result(structured_output={
+        "architecture": {"summary": "enriched by stub"},
+        "defectCodeMatches": [{"defectId": "D1", "facts": ["examined calibration"]}],
+    })])
     knowledge = run_cartographer(
         work_dir=FIXTURES / "electron",
         defect_batch=_batch(),
         cartography_mode="sdk",
         cartography_profile="electron_node",
+        artifact_dir=tmp_path,
     )
     hints = [h for h in knowledge.secondaryHints if h.startswith("enrich=")]
     assert len(hints) == 1, knowledge.secondaryHints
     assert hints[0].startswith("enrich=sdk; turns=3; reason=completed; cost=$0.42"), hints[0]
+    assert len(prompts) == 1
 
 
 def test_max_turns_keeps_baseline_as_sdk_partial(monkeypatch):

@@ -1,8 +1,0 @@
-Date: 2026-11-17 (Asia/Shanghai)
-Command: py -3.12 -m pytest tests -q --tb=short -rs
-437 passed, 5 skipped in 141.78s (0:02:21)
-Exit: 0
-Skipped: 4 external historical CSV cases; 1 unavailable peitao repository case.
-CodeGraph tests included; no live model calls.
-Independent reviewer subset: 26 passed.
-Source diff whitespace checks: passed with cr-at-eol.

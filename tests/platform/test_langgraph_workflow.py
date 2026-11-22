@@ -37,7 +37,7 @@ def test_default_graph_compiles():
 def test_langgraph_e2e_invoke(tmp_path: Path):
     work = _mini_work(tmp_path)
     batch = defect_batch_from_hc1()
-    graph = create_three_agent_graph()
+    from bugfix_platform.workflow.langgraph_app import graph
     final = graph.invoke(
         {
             "work_dir": str(work),
@@ -58,6 +58,17 @@ def test_langgraph_e2e_invoke(tmp_path: Path):
     assert final["defect_batch"]["funnel"]["total"] == 50
     assert final["code_knowledge"]["cartographyProfile"] == "electron_node"
     assert final["analysis_report"]["summary"]["total"] >= 1
+    artifact_dir = Path(final["artifact_dir"])
+    assert artifact_dir.parent == work / ".bugfix-runs"
+    for name in ("defect-batch.json", "code-knowledge.json", "analysis-report.json", "analysis-report.md"):
+        assert (artifact_dir / name).is_file()
+    for ticket in final["analysis_report"]["tickets"]:
+        defect = artifact_dir / "defects" / ticket["defectId"]
+        latest = json.loads((defect / "latest.json").read_text(encoding="utf-8"))
+        assert latest["attemptId"] == ticket["attemptId"]
+        attempt = defect / "attempts" / latest["attemptId"]
+        assert (attempt / "analysis.json").is_file()
+        assert (attempt / "feedback-form.md").is_file()
 
 
 def test_langgraph_skip_agent2_and_3(tmp_path: Path):

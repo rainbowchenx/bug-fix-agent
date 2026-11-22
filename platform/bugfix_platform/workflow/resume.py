@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Callable
 
 from bugfix_contracts.analysis_report import AnalysisReport
-from bugfix_contracts.repair import InputRevision
+from bugfix_contracts.repair import InputRevision, TaskContext
 from bugfix_platform.agents.analyst.attempt_store import AttemptStoreBusy, store_lock
 from bugfix_platform.agents.analyst.sessions import SessionDecision
 
@@ -57,11 +57,13 @@ def _resume_locked(
         load_or_rebuild_analysis_report, merge_analysis_report, publish_analysis_report,
     )
     from bugfix_platform.agents.analyst.run import run_analyst
-    from bugfix_platform.agents.analyst.sessions import load_revision, resume_from_store
+    from bugfix_platform.agents.analyst.feedback import load_latest_feedback
+    from bugfix_platform.agents.analyst.sessions import (
+        choose_session, load_latest_attempt, load_revision, resume_from_store, write_session_decision,
+    )
 
     batch_path = base / "defect-batch.json"
     knowledge_path = base / "code-knowledge.json"
-    report_path = base / "analysis-report.json"
     batch = load_defect_batch(batch_path) if batch_path.is_file() else None
     if batch is not None and not any(t.defectId == defect_id for t in batch.tickets):
         raise ResumeRequestError(f"unknown defect: {defect_id}")
@@ -77,21 +79,34 @@ def _resume_locked(
             work_dir=knowledge.workDir,
             apply_fix=apply_fix,
         )
-    decision = resume_from_store(base, defect_id, revision_id)
-    if on_decision is not None:
-        on_decision(decision)
     if not apply_fix and not execute:
+        decision = resume_from_store(base, defect_id, revision_id)
+        if on_decision is not None:
+            on_decision(decision)
         return None
     assert knowledge is not None
     work_dir = previous.workDir if previous is not None else knowledge.workDir
-    revision = load_revision(base, defect_id, revision_id)
+    revision = load_revision(base, defect_id)
+    current_id = revision.revisionId if revision is not None else None
+    if revision_id is not None and revision_id != current_id:
+        raise ResumeRequestError(f"stale or unknown revision {revision_id}; current revision: {current_id or 'none'}")
+    latest = load_latest_attempt(base, defect_id)
+    if latest is None and (base / "defects" / defect_id / "latest.json").exists():
+        raise ResumeRequestError(f"cannot read latest attempt for {defect_id}")
+    parent_id = latest.attemptId if latest else None
+    if current_id is not None:
+        feedback = load_latest_feedback(base, defect_id, revision_id=current_id)
+        if feedback is None:
+            raise ResumeRequestError(f"cannot read feedback for revision {current_id}")
+        already_used = latest is not None and latest.revisionId == current_id
+        if feedback.attemptId and feedback.attemptId != parent_id and not already_used:
+            raise ResumeRequestError(f"stale feedback for attempt {feedback.attemptId}; current attempt: {parent_id or 'none'}")
+    decision = choose_session(TaskContext(defectId=defect_id, revision=revision), latest)
+    write_session_decision(base, defect_id, decision)
+    if on_decision is not None:
+        on_decision(decision)
     revisions = {defect_id: revision} if revision is not None else {}
     session_ids = {defect_id: decision.sessionId} if decision.sessionId else {}
-    from bugfix_platform.agents.analyst.feedback import load_latest_feedback
-    from bugfix_platform.agents.analyst.sessions import load_latest_attempt, select_resume_parent
-    feedback = load_latest_feedback(base, defect_id)
-    latest = load_latest_attempt(base, defect_id)
-    parent_id = select_resume_parent(latest, feedback, revision_id=revision_id)
     parent_attempt_ids = {defect_id: parent_id} if parent_id else {}
     report = run_analyst(
         work_dir=work_dir,

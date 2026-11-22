@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Optional
 
-from bugfix_contracts.repair import AttemptRecord, Feedback, InputRevision, TaskContext
+from bugfix_contracts.repair import AttemptRecord, InputRevision, TaskContext
 from bugfix_platform.agents.analyst.attempt_store import load_attempt
 
 SessionAction = Literal["resume", "fork", "new"]
@@ -47,13 +47,14 @@ def load_latest_attempt(root: Path, defect_id: str) -> Optional[AttemptRecord]:
         meta = json.loads(latest.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    path = meta.get("path")
-    if not path:
+    attempt_id = meta.get("attemptId") if isinstance(meta, dict) else None
+    if not isinstance(attempt_id, str) or attempt_id in {"", ".", ".."} or "/" in attempt_id or "\\" in attempt_id:
         return None
     try:
-        return load_attempt(Path(path))
+        attempt = load_attempt(latest.parent / "attempts" / attempt_id / "attempt.json")
     except (OSError, ValueError):
         return None
+    return attempt if attempt.attemptId == attempt_id and attempt.defectId == defect_id else None
 
 
 def load_revision(
@@ -106,28 +107,6 @@ def write_session_decision(root: Path, defect_id: str, decision: SessionDecision
         encoding="utf-8",
     )
     return dest
-
-
-def select_resume_parent(
-    latest: Optional[AttemptRecord],
-    feedback: Optional[Feedback],
-    *,
-    revision_id: Optional[str] = None,
-) -> Optional[str]:
-    """已消费的反馈不得把后续 resume 倒回旧父轮。"""
-    if latest is None:
-        return feedback.attemptId if feedback is not None else None
-    if revision_id:
-        return latest.attemptId
-    if feedback is None or not feedback.attemptId:
-        return latest.attemptId
-    if latest.attemptId == feedback.attemptId:
-        return latest.attemptId
-    if latest.parentAttemptId == feedback.attemptId:
-        return latest.attemptId
-    if feedback.feedbackId and latest.revisionId and str(feedback.feedbackId) in str(latest.revisionId):
-        return latest.attemptId
-    return feedback.attemptId
 
 
 def resume_from_store(

@@ -10,7 +10,7 @@
 
 **Tech Stack:** Python >=3.11、Pydantic >=2.7、现有 LangGraph/SDK 可选依赖、Git、pytest；首期不新增数据库。
 
-**Spec:** [修订设计](../specs/2026-11-15-agent3-repair-feedback-design.md)。依据：[复审记录](../../research/2026-11-15-agent3-design-review.md)、[讨论](../specs/2026-11-13-agent3-direction-discussion.md)。执行前必须同时阅读。
+**Spec:** [修订设计](../specs/2026-11-15-agent3-repair-feedback-design.md)。背景见[方向讨论](../specs/2026-11-13-agent3-direction-discussion.md)，当前交付状态见[当前实现与验收状态](../../architecture.md#验收状态)。
 
 ## 全局约束
 

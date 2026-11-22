@@ -3,13 +3,14 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal, Optional
 from pathlib import Path
 
 from bugfix_contracts import CodeKnowledge, DefectBatch
 from bugfix_contracts.code_knowledge import DefectCodeMatch
-from bugfix_platform.sdk.parse import parse_json_payload
 from bugfix_platform.sdk.credentials import has_credentials
 from bugfix_platform.sdk.codegraph import CODEGRAPH_MCP_TOOLS, CodeGraphStatus
 from bugfix_platform.sdk.skill_inject import InjectedSkill, cartography_skills_addon
@@ -19,8 +20,6 @@ CartographyMode = Literal["heuristic", "sdk"]
 
 # 提示词里带给模型的匹配池票上限。启发式 medium 也会进（需 SDK 浅确认）。
 MAX_PROMPT_TICKETS = 16
-# 旧名：行为已改为全匹配池，不再表示「仅弱票」。
-MAX_WEAK_PROMPT_TICKETS = MAX_PROMPT_TICKETS
 _MATCH_POOL = frozenset({"strict", "locatable_only", "needs_info"})
 # 无票数上下文时的兜底（兼容旧调用）；正常路径按票数预算。
 DEFAULT_CARTOGRAPHY_MAX_TURNS = 24
@@ -85,7 +84,6 @@ def cartography_turns_for_tickets(ticket_count: int) -> int:
 def resolve_cartography_max_turns(
     explicit: Optional[int] = None,
     *,
-    weak_ticket_count: Optional[int] = None,
     ticket_count: Optional[int] = None,
 ) -> Optional[int]:
     """Return SDK ``max_turns`` or ``None`` for unlimited.
@@ -94,7 +92,7 @@ def resolve_cartography_max_turns(
     - Request explicit ``<=0`` → unlimited
     - Env ``BUGFIX_CARTOGRAPHY_MAX_TURNS`` set to a positive int → absolute override
     - Env ``0`` / ``none`` / ``unlimited`` → unlimited
-    - Env empty + ``ticket_count`` / ``weak_ticket_count`` → ``base + per_ticket * n``
+    - Env empty + ``ticket_count`` → ``base + per_ticket * n``
     - Env empty + no ticket count → ``DEFAULT_CARTOGRAPHY_MAX_TURNS`` (compat)
     """
     if explicit is not None:
@@ -108,9 +106,8 @@ def resolve_cartography_max_turns(
         except ValueError:
             n = DEFAULT_CARTOGRAPHY_MAX_TURNS
         return None if n <= 0 else n
-    n = ticket_count if ticket_count is not None else weak_ticket_count
-    if n is not None:
-        return cartography_turns_for_tickets(n)
+    if ticket_count is not None:
+        return cartography_turns_for_tickets(ticket_count)
     return DEFAULT_CARTOGRAPHY_MAX_TURNS
 
 
@@ -129,12 +126,6 @@ def bash_command_allowed(command: str) -> tuple[bool, str]:
     return True, ""
 
 
-def _cartography_max_turns(default: int = 48) -> int:
-    """Deprecated helper kept for callers; prefer ``resolve_cartography_max_turns``."""
-    resolved = resolve_cartography_max_turns()
-    return default if resolved is None else resolved
-
-
 @dataclass
 class CartographyRequest:
     work_dir: str
@@ -149,6 +140,8 @@ class CartographyRequest:
     artifact_dir: Optional[str | Path] = None
     group_id: Optional[str] = None
     call_id: Optional[str] = None
+    deadline: float | None = None
+    input_digest: str = ""
 
 
 @dataclass
@@ -160,6 +153,9 @@ class CartographyResult:
     skill_reads: list[str] = field(default_factory=list)
     turns: Optional[int] = None
     cost: Optional[float] = None
+    launched_ids: list[str] | None = None
+    accepted_ids: list[str] | None = None
+    stop_reason: str | None = None
 
 
 CartographyRunner = Callable[[CartographyRequest], CartographyResult]
@@ -287,20 +283,13 @@ def _budget_exhausted(message: Any) -> bool:
     return subtype in _BUDGET_SUBTYPES or terminal in {"max_turns", "max_budget_usd"}
 
 
-def _parse_session_json(structured: Any, texts: list[str]) -> Optional[dict[str, Any]]:
+def _parse_session_json(structured: Any, texts: list[str], filename: str) -> tuple[dict[str, Any] | None, str]:
     from bugfix_platform.sdk.match_payload import find_business_envelope
 
-    envelope, _ref = find_business_envelope(structured=structured, texts=texts)
+    envelope, ref = find_business_envelope(structured=structured, texts=texts)
     if envelope is not None:
-        return envelope
-    parsed = parse_json_payload(structured)
-    if parsed is not None:
-        return parsed
-    for text in reversed(texts):
-        parsed = parse_json_payload(text)
-        if parsed is not None:
-            return parsed
-    return None
+        return envelope, f"{filename}#{ref.replace('texts[', 'parse_candidates[')}"
+    return None, filename
 
 
 def _billing(
@@ -328,6 +317,13 @@ class CartographyResponse:
     observed_paths: list[str] = field(default_factory=list)
     error: str | None = None
     recorder: Any = None
+    artifact_error: str | None = None
+    parsed_ref: str = "response.json"
+    repair_parsed: dict[str, Any] | None = None
+    repair_ref: str = "repair-response.json"
+    repair_ids: list[str] = field(default_factory=list)
+    repair_status: str | None = None
+    launched_ids: list[str] = field(default_factory=list)
 
 
 def query_cartography(
@@ -343,6 +339,7 @@ def query_cartography(
         return CartographyResponse(None, error=f"claude-agent-sdk not installed ({err}); fell back to heuristic")
 
     prompt_pairs = select_prompt_tickets(req)
+    prompt_ids = [ticket.defectId for ticket, _ in prompt_pairs]
     prompt = _build_prompt(req, prompt_pairs=prompt_pairs)
     model = req.model or os.environ.get("ANTHROPIC_MODEL") or None
     if req.injected_skills:
@@ -404,11 +401,26 @@ def query_cartography(
     terminal: str | None = None
     session_id: str | None = None
     budget_stop = False
+    cost_budget_stop = False
     skill_reads: set[str] = set()
     pending_skill_reads: dict[str, str] = {}
     observed_paths: list[str] = []
     pending_observe: dict[str, str] = {}
-    recorder = create_recorder(max_turns) if create_recorder is not None else None
+    recorder = None
+    artifact_error: str | None = None
+    launched_ids: list[str] = []
+    if create_recorder is not None:
+        try:
+            recorder = create_recorder(max_turns)
+        except OSError as err:
+            artifact_error = str(err)
+
+    def write_artifact(write: Callable[[], Any]) -> None:
+        nonlocal artifact_error
+        try:
+            write()
+        except OSError as err:
+            artifact_error = artifact_error or str(err)
 
     def _tool_event(block: Any) -> dict[str, Any]:
         payload = {
@@ -440,7 +452,8 @@ def query_cartography(
                 skill_reads.add(pending_skill_reads.pop(use_id))
 
     async def _drive(prompt_text: str, opts: Any) -> None:
-        nonlocal result_text, structured, turns, cost, terminal, session_id, budget_stop
+        nonlocal result_text, structured, turns, cost, terminal, session_id, budget_stop, cost_budget_stop
+        launched_ids.extend(prompt_ids)
         async for message in query(prompt=prompt_text, options=opts):
             observe_reads(message)
             text = _message_text(message)
@@ -449,7 +462,7 @@ def query_cartography(
             if recorder is not None:
                 kind = "result" if isinstance(message, ResultMessage) else "assistant"
                 tools = [_tool_event(b) for b in (getattr(message, "content", None) or [])]
-                recorder.append_event(
+                write_artifact(lambda: recorder.append_event(
                     {
                         "kind": kind,
                         "text": text,
@@ -457,7 +470,7 @@ def query_cartography(
                         "structured_output": getattr(message, "structured_output", None),
                         "is_error": bool(getattr(message, "is_error", False)),
                     }
-                )
+                ))
             if not isinstance(message, ResultMessage):
                 continue
             turns = message.num_turns
@@ -468,6 +481,7 @@ def query_cartography(
             result_text = message.result or ""
             if _budget_exhausted(message):
                 budget_stop = True
+                cost_budget_stop = terminal == "max_budget_usd" or message.subtype == "error_max_budget_usd"
                 continue
             if message.is_error:
                 raise RuntimeError(
@@ -478,10 +492,8 @@ def query_cartography(
         anyio.run(_drive, prompt, _make_options())
     except Exception as err:  # noqa: BLE001
         if recorder is not None:
-            recorder.append_event({"kind": "error", "text": str(err)})
-            candidates = [t for t in texts if t.strip()]
-            if structured is not None:
-                candidates.insert(0, json.dumps(structured, default=str))
+            write_artifact(lambda: recorder.append_event({"kind": "error", "text": str(err)}))
+            candidates = list(texts)
             try:
                 recorder.save_parse_inputs(candidates)
                 recorder.save_response(
@@ -492,19 +504,17 @@ def query_cartography(
                         "parse_candidates": candidates,
                     }
                 )
-            except OSError:
-                recorder.artifact_error = "unwritable"
-            recorder.fail("sdk_error", str(err))
+            except OSError as write_err:
+                artifact_error = artifact_error or str(write_err)
         if not budget_stop:
             return CartographyResponse(
                 None, terminal, budget_stop, turns, cost, sorted(skill_reads), observed_paths,
-                error=f"sdk cartography failed: {err}", recorder=recorder,
+                error=f"sdk cartography failed: {err}", recorder=recorder, artifact_error=artifact_error,
+                launched_ids=launched_ids,
             )
 
     if recorder is not None:
         candidates = list(texts)
-        if result_text:
-            candidates.append(result_text)
         try:
             recorder.save_parse_inputs(candidates)
             recorder.save_response(
@@ -513,43 +523,60 @@ def query_cartography(
                     "result_text": result_text,
                     "errors": [],
                     "parse_candidates": candidates,
+                    "turns": turns,
+                    "cost": cost,
+                    "terminal": terminal,
                 }
             )
         except OSError as err:
-            recorder.fail("artifact_error", str(err))
+            artifact_error = artifact_error or str(err)
 
-    parsed = _parse_session_json(structured, texts)
-    remaining_turns = None
-    if max_turns is not None and turns is not None:
-        remaining_turns = max(0, int(max_turns) - int(turns))
-    if remaining_turns is None:
-        salvage_turns = 2
-    else:
-        salvage_turns = min(2, remaining_turns)
-    if parsed is None and budget_stop and session_id and salvage_turns > 0:
+    parsed, parsed_ref = _parse_session_json(structured, texts, "response.json")
+    returned = Counter(investigated_ids_from_parsed(parsed))
+    missing = [defect_id for defect_id in prompt_ids if returned[defect_id] != 1]
+    repair_parsed, repair_ref, repair_status = None, "repair-response.json", None
+    remaining_turns = 2 if max_turns is None else max(0, max_turns - turns) if turns is not None else 0
+    salvage_turns = min(2, remaining_turns)
+    needs_repair = bool(missing) or parsed is None
+    if needs_repair:
+        repair_status = "no_session" if not session_id else "budget_exhausted"
+    can_repair = (needs_repair and session_id and salvage_turns > 0
+                  and terminal != "max_budget_usd" and not cost_budget_stop
+                  and (req.deadline is None or time.monotonic() < req.deadline))
+    repair_opts = _make_options(resume=session_id, turns=salvage_turns) if can_repair else None
+    if repair_opts is not None and getattr(repair_opts, "resume", None) != session_id:
+        repair_status = "unsupported_resume"
+        repair_opts = None
+    if repair_opts is not None:
         salvage_texts: list[str] = []
+        repair_structured: Any = None
+        repair_text = ""
+        repair_error: str | None = None
+        repair_usage: dict[str, Any] = {}
+        repair_status = "attempted"
 
         async def _salvage() -> None:
-            nonlocal structured, result_text, turns, cost, terminal
+            nonlocal repair_structured, repair_text, turns, repair_status
             async for message in query(
-                prompt=_SALVAGE_PROMPT,
-                options=_make_options(resume=session_id, turns=salvage_turns),
+                prompt=(_SALVAGE_PROMPT + "\nReturn only these defect IDs in defectCodeMatches: "
+                        + json.dumps(missing, ensure_ascii=False)),
+                options=repair_opts,
             ):
                 observe_reads(message)
                 text = _message_text(message)
                 if text.strip():
                     salvage_texts.append(text)
                     if recorder is not None:
-                        recorder.append_event({"kind": "salvage", "text": text})
+                        write_artifact(lambda: recorder.append_event({"kind": "salvage", "text": text}))
                 if not isinstance(message, ResultMessage):
                     continue
                 extra_turns = message.num_turns
-                if extra_turns is not None:
-                    turns = (turns or 0) + extra_turns
-                if message.total_cost_usd is not None:
-                    cost = (cost or 0.0) + float(message.total_cost_usd)
-                structured = message.structured_output
-                result_text = message.result or ""
+                repair_usage.update(turns=extra_turns, cost=message.total_cost_usd, terminal=message.terminal_reason)
+                turns = turns + extra_turns if turns is not None and extra_turns is not None else None
+                repair_structured = message.structured_output
+                repair_text = message.result or ""
+                if _budget_exhausted(message):
+                    repair_status = "budget_exhausted"
                 if message.is_error and not _budget_exhausted(message):
                     raise RuntimeError(
                         "; ".join(message.errors or [])
@@ -560,8 +587,12 @@ def query_cartography(
         try:
             anyio.run(_salvage)
         except Exception as salvage_err:  # noqa: BLE001
+            repair_error = str(salvage_err)
+            repair_status = "sdk_error"
             if recorder is not None:
-                recorder.append_event({"kind": "salvage_error", "text": str(salvage_err)})
+                write_artifact(lambda: recorder.append_event({"kind": "salvage_error", "text": str(salvage_err)}))
+        # Resumed cost may be cumulative, and a failed continuation may lack a terminal bill.
+        cost = None
         if recorder is not None:
             try:
                 if record_repair is not None:
@@ -569,20 +600,27 @@ def query_cartography(
                 recorder.save_response(
                     {
                         "phase": "format_repair",
-                        "structured_output": structured,
-                        "result_text": result_text,
+                        "structured_output": repair_structured,
+                        "result_text": repair_text,
                         "parse_candidates": salvage_texts,
-                    }
+                        "errors": [repair_error] if repair_error else [],
+                        **repair_usage,
+                    },
+                    repair=True,
                 )
             except OSError as err:
-                recorder.fail("artifact_error", str(err))
-        texts.extend(salvage_texts)
-        parsed = _parse_session_json(structured, texts)
+                artifact_error = artifact_error or str(err)
+        repair_parsed, repair_ref = _parse_session_json(repair_structured, salvage_texts, "repair-response.json")
+        if repair_status == "attempted":
+            repair_status = "returned" if repair_parsed is not None else "output_invalid"
 
     if budget_stop and not terminal:
         terminal = "max_turns"
     return CartographyResponse(
-        parsed, terminal, budget_stop, turns, cost, sorted(skill_reads), observed_paths, recorder=recorder,
+        parsed, terminal, budget_stop, turns, cost, sorted(skill_reads), observed_paths,
+        recorder=recorder, artifact_error=artifact_error, parsed_ref=parsed_ref,
+        repair_parsed=repair_parsed, repair_ref=repair_ref, repair_ids=missing,
+        repair_status=repair_status, launched_ids=launched_ids,
     )
 
 
@@ -724,9 +762,10 @@ def _investigation_complete(match: DefectCodeMatch) -> bool:
 def investigated_ids_from_parsed(parsed: dict[str, Any] | None) -> list[str]:
     """只把模型实际返回的票算作已调查，不把 prompt 列表整批记 complete。"""
     out: list[str] = []
-    for item in list((parsed or {}).get("defectCodeMatches") or []):
-        if isinstance(item, dict) and item.get("defectId"):
-            out.append(str(item["defectId"]))
+    items = (parsed or {}).get("defectCodeMatches")
+    for item in items if isinstance(items, list) else []:
+        if isinstance(item, dict) and isinstance(item.get("defectId"), str) and item["defectId"]:
+            out.append(item["defectId"])
     return out
 
 
@@ -779,24 +818,12 @@ def select_prompt_tickets(
     return (genuine + ambiguous + heuristic_hits)[:MAX_PROMPT_TICKETS]
 
 
-def select_weak_tickets(req: CartographyRequest) -> list[tuple[Any, Any]]:
-    """兼容旧名；等同 :func:`select_prompt_tickets`。"""
-    return select_prompt_tickets(req)
-
-
 def _build_prompt(
     req: CartographyRequest,
     *,
     prompt_pairs: list[tuple[Any, Any]] | None = None,
-    weak_pairs: list[tuple[Any, Any]] | None = None,
 ) -> str:
-    pairs = (
-        prompt_pairs
-        if prompt_pairs is not None
-        else weak_pairs
-        if weak_pairs is not None
-        else select_prompt_tickets(req)
-    )
+    pairs = prompt_pairs if prompt_pairs is not None else select_prompt_tickets(req)
     entries = list(req.baseline.architecture.entryPoints)
     pool_tickets = []
     pool_matches = []

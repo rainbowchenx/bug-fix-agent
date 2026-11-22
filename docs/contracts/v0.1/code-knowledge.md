@@ -1,6 +1,6 @@
 > 当前生产契约：0.4.0（2026-11-16）。目录保留原文档路径；旧 Agent 产物版本明确拒绝，请重新生成。
 
-# code-knowledge v0.1
+# code-knowledge 0.4.0
 
 **Producer:** Agent-2 (cartographer) · **Consumer:** Agent-3 only
 
@@ -9,6 +9,8 @@
 | `schemaVersion` | string | `"0.4.0"` |
 | `productLine` / `workDir` | string | |
 | `partial` | boolean | 探测/匹配不完整仍可校验通过 |
+| `investigationProgress` | object | SDK 分组调查的阶段计数、停止原因及本次启动和复用票数 |
+| `investigationRuns[]` | group records | 本次分组的状态、票数以及原始响应归档所对应的组和调用标识 |
 | `generatedAt` | ISO string | |
 | `repoRoots[]` | `{ path, gitHead?, fingerprint? }` | 多子仓；`path` 相对 workDir |
 | `cartographyProfile` | enum | `electron_node` \| `micro_frontend` \| `device_web` \| `unknown`。由平台入口传入，Agent-2 **不探测** |

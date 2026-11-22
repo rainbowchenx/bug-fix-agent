@@ -9,7 +9,6 @@ import pytest
 
 from bugfix_contracts.repair import REPAIR_SCHEMA_VERSION, AttemptRecord, Feedback
 from bugfix_platform.agents.analyst.attempt_store import save_attempt
-from bugfix_platform.agents.analyst.sessions import select_resume_parent
 from bugfix_platform.cli import main
 
 
@@ -176,24 +175,51 @@ def test_resume_reconciles_committed_snapshots(tmp_path: Path, monkeypatch, old_
     assert next(t for t in report["tickets"] if t["defectId"] == "D2")["attemptId"] == "a1"
 
 
-def test_resume_parent_does_not_roll_back_consumed_feedback():
-    feedback = Feedback(feedbackId="f1", defectId="D1", attemptId="a1", text="q1 answered")
-    first = AttemptRecord(
-        schemaVersion=REPAIR_SCHEMA_VERSION,
-        attemptId="a1",
-        defectId="D1",
-        execution="completed",
-        resolution="needs_information",
-    )
-    assert select_resume_parent(first, feedback) == "a1"
-    second = AttemptRecord(
-        schemaVersion=REPAIR_SCHEMA_VERSION,
-        attemptId="a2",
-        defectId="D1",
-        parentAttemptId="a1",
-        revisionId="D1:f1",
-        execution="completed",
-        resolution="needs_information",
-    )
-    assert select_resume_parent(second, feedback) == "a2"
-    assert select_resume_parent(second, feedback, revision_id="D1:f1") == "a2"
+def test_resume_cli_rejects_stale_revision_and_keeps_latest_parent(tmp_path, monkeypatch, capsys):
+    from bugfix_contracts import AnalysisReport
+    from bugfix_platform.agents.analyst.analysis_store import build_snapshot_from_entry, save_analysis_snapshot
+    from bugfix_platform.agents.analyst.feedback import import_feedback
+    from tests.platform.test_analysis_snapshots import _entry
+    from tests.platform.test_repair_entry import _batch, _knowledge
+
+    root = tmp_path / "out"
+    root.mkdir()
+    work = tmp_path / "repo"
+    work.mkdir()
+    (root / "defect-batch.json").write_text(_batch().model_dump_json(), encoding="utf-8")
+    (root / "code-knowledge.json").write_text(_knowledge(work).model_dump_json(), encoding="utf-8")
+
+    def save_round(attempt_id, *, revision_id=None, parent=None):
+        attempt = AttemptRecord(schemaVersion=REPAIR_SCHEMA_VERSION, defectId="D1", attemptId=attempt_id,
+                                parentAttemptId=parent, revisionId=revision_id, resolution="needs_information")
+        save_analysis_snapshot(root, attempt, build_snapshot_from_entry({**_entry(), "attemptId": attempt_id}))
+
+    save_round("a1")
+    for ident, expected in (("f1", "obsolete"), ("f2", "agreed")):
+        import_feedback(root, Feedback(defectId="D1", feedbackId=ident, attemptId="a1", expected=expected))
+    save_round("a2", revision_id="D1:f2", parent="a1")
+    save_round("a3", revision_id="D1:f2", parent="a2")
+
+    calls = []
+
+    def analyze(**kwargs):
+        calls.append(kwargs)
+        return AnalysisReport(schemaVersion="0.4.0", productLine="hc", workDir=str(work),
+                              generatedAt="2026-01-01", tickets=[])
+
+    monkeypatch.setattr("bugfix_platform.agents.analyst.run.run_analyst", analyze)
+    args = ["resume", "--root", str(root), "--defect-id", "D1"]
+    assert main(args + ["--revision-id", "D1:f1"]) == 0  # Historical preview is still available.
+    for mode in ("--execute", "--apply-fix"):
+        assert main(args + [mode, "--revision-id", "D1:f1"]) == 1
+    assert not calls
+    assert "current revision: D1:f2" in capsys.readouterr().err
+
+    assert main(args + ["--apply-fix", "--revision-id", "D1:f2"]) == 0
+    assert calls[-1]["revisions"]["D1"].expected == "agreed"
+    assert calls[-1]["parent_attempt_ids"] == {"D1": "a3"}
+
+    import_feedback(root, Feedback(defectId="D1", feedbackId="f3", attemptId="a2", expected="stale parent"))
+    assert main(args + ["--apply-fix"]) == 1
+    assert len(calls) == 1
+    assert "current attempt: a3" in capsys.readouterr().err

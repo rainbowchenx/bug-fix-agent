@@ -11,7 +11,6 @@ from bugfix_platform.sdk.cartography import (
     DEFAULT_CARTOGRAPHY_TURNS_PER_TICKET,
     DISALLOWED_TOOLS,
     MAX_PROMPT_TICKETS,
-    MAX_WEAK_PROMPT_TICKETS,
     CartographyRequest,
     CartographyResult,
     _SYSTEM_PROMPT,
@@ -220,7 +219,6 @@ def test_cartography_turns_scale_with_ticket_count(monkeypatch):
     assert cartography_turns_for_tickets(1) == 13
     assert cartography_turns_for_tickets(8) == 62
     assert resolve_cartography_max_turns(ticket_count=8) == 62
-    assert resolve_cartography_max_turns(weak_ticket_count=8) == 62  # alias
     # Absolute env still wins over ticket budget.
     monkeypatch.setenv("BUGFIX_CARTOGRAPHY_MAX_TURNS", "40")
     assert resolve_cartography_max_turns(ticket_count=8) == 40
@@ -348,7 +346,6 @@ def test_is_weak_match_includes_entry_only_false_medium():
     assert is_weak_match(empty, entries) is True
     assert is_weak_match(fake, entries) is True
     assert MAX_PROMPT_TICKETS == 16
-    assert MAX_WEAK_PROMPT_TICKETS == MAX_PROMPT_TICKETS
 
 
 def test_prompt_includes_heuristic_medium_tickets(tmp_path: Path):

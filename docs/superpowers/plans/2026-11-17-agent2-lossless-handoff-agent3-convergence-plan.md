@@ -1,8 +1,8 @@
 # Agent2调查保全与Agent3反馈收敛 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 本轮用户只授权文档，不执行以下步骤。
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-日期：2026-11-17。状态：2026-11-17完整复审已修订，待实施授权；未实现、未运行计划中的新测试。
+本计划制定于 2026-11-17。现有能力与待验事项以[当前实现与验收状态](../../architecture.md#验收状态)为准。
 
 **Goal:** 消除SDK局部异常导致整票调查丢失，并使用户补充后的Agent3能继承决定、收敛问题、进入有证据的修复尝试。
 
@@ -58,7 +58,7 @@ M1：Agent2保全与权限可靠；M2：首轮→填答→二轮真实入口消�
 下列目录均相对仓根。新类型统一在现有contracts/bugfix_contracts/{code_knowledge,repair,analysis_report}.py，新增模块遵从方案第3节。接口名称为本方案推荐，不是现有实现；调整签名必须同步本计划的调用方。
 
 - `normalize_sdk_match(item, *, requested_ids, raw_ref) -> MatchParseResult`返回accepted、issues、acceptedFields、rejectedFields；外层group解析先定位业务信封、按ID隔离歧义，并校验共享增强块。它不直接写业务文件。
-- `record_group_response(root, group_id, call_id, response) -> RawResponseRef` / `save_group_progress(root, progress) -> Path`。
+- `InvestigationRecorder.save_response` / `save_group_progress(root, progress) -> Path`。
 - `save_analysis_snapshot(root, attempt, snapshot, *, already_locked=False) -> AnalysisSnapshotRef` / `load_analysis_snapshot(root, defect_id, attempt_id) -> AnalysisSnapshot`。
 - `render_feedback_form(snapshot) -> str` / `parse_feedback_form(text, *, store) -> Feedback`。
 - `build_previous_attempt(root, defect_id, parent_attempt_id, current_snapshot, feedback) -> PreviousAttemptContext`。
@@ -80,7 +80,7 @@ M1：Agent2保全与权限可靠；M2：首轮→填答→二轮真实入口消�
 
 **Files:** Create platform/bugfix_platform/agents/cartographer/investigation_store.py；Modify platform/bugfix_platform/sdk/cartography.py、agents/cartographer/{run,investigation}.py；Test tests/platform/test_investigation_store.py。
 
-**Interfaces:** 使用T0 RawResponseRef/ParseIssue；record_group_response在任何parse/coerce之前执行，SDK结果带artifact引用传给调度器。
+**Interfaces:** 使用T0 RawResponseRef/ParseIssue；通过 InvestigationRecorder 在 parse/coerce 之前保存响应，SDK结果带artifact引用传给调度器。
 
 - [ ] 写失败测试：structured_output、全部解析候选文本、result/errors、一次格式修复前后均留独立记录；坏JSON/SDK流式异常之前已收到的消息仍有原文及诊断；原始记录不可写不得标已保存/写缓存。
 - [ ] 运行`py -3.12 -m pytest tests/platform/test_investigation_store.py -q`确认失败。
@@ -90,7 +90,7 @@ M1：Agent2保全与权限可靠；M2：首轮→填答→二轮真实入口消�
 
 ### T2：字段及候选隔离规范化
 
-**Files:** Create platform/bugfix_platform/sdk/match_payload.py；Modify sdk/cartography.py `_coerce_sdk_match`/`_merge_enrichment`及prompt；Test tests/platform/test_sdk_match_normalization.py、tests/platform/test_cartography_sdk.py。
+**Files:** Create platform/bugfix_platform/sdk/match_payload.py；Modify agents/cartographer/match_payload.py、handoff.py 及 SDK prompt；Test tests/platform/test_sdk_match_normalization.py、tests/platform/test_cartography_sdk.py。
 
 **Interfaces:** 消费T1 raw_ref，产出MatchParseResult；正式CodeKnowledge只接收类型合法内容和显式diagnostics，不从模型接收tool_observed。
 
@@ -211,7 +211,7 @@ M1：Agent2保全与权限可靠；M2：首轮→填答→二轮真实入口消�
 - [ ] S：真实SDK smoke通过。记录模型/SDK/CLI、输入模态、工具路由、解析和保全；若缺凭据/CLI条件，明确未通过而非“默认具备”。
 - [ ] B：真实项目评审通过。独立标注、固定分母、真实验收与成本可复算；70%目标是否采用需业务确认，不能由工程测试自动满足。
 
-当前全部未勾选；本轮仅写文档，不运行未来测试、不开始实现、不提交/推送。实施后分别报告E、S、B状态，真实材料不足只阻断对应验收，不能把整个工程任务停在“等待业务”也不能冒充整体交付成功。
+分别记录 E（工程）、S（真实 SDK）和 B（业务）验收结果。当前状态见[当前实现与验收状态](../../architecture.md#验收状态)。
 
 ## 文档自查
 

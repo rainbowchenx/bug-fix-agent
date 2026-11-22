@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional
 
 from bugfix_platform.http.models import CreateRunOptions, CreateRunRequest
 from bugfix_platform.http.store import artifact_paths, create_run_dir, update_meta, write_meta

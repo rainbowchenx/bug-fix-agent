@@ -16,17 +16,14 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Literal, Optional, Sequence, Union
-from uuid import uuid4
+from typing import Any, Callable, Literal, Optional, Sequence
 
 from bugfix_contracts.defect_batch import DefectBatchInput, load_defect_batch
 from bugfix_contracts import (
     AnalysisReport,
     CodeKnowledge,
     DefectBatch,
-    validate_defect_batch,
 )
 from bugfix_platform.sdk.fix import apply_fix_from_env
 from bugfix_platform.workflow.gates import ArtifactValidationError
@@ -36,7 +33,7 @@ from bugfix_platform.workflow.graph import (
     create_three_agent_graph,
     default_three_agent_graph,
 )
-from bugfix_platform.workflow.persist import persist_artifact
+from bugfix_platform.workflow.persist import default_artifact_dir, persist_artifact
 from bugfix_platform.workflow.state import ThreeAgentState
 
 WorkflowUpdateFn = Callable[[dict[str, Any]], None]
@@ -157,14 +154,7 @@ def run_three_agent_workflow(
     if extra_skill_dirs:
         initial["extra_skill_dirs"] = [str(p) for p in extra_skill_dirs]
     if artifact_dir is None:
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        candidate = Path(work_dir) / ".bugfix-runs" / f"{stamp}-{uuid4().hex[:8]}"
-        try:
-            candidate.mkdir(parents=True, exist_ok=True)
-            artifact_dir = candidate
-        except OSError:
-            import tempfile
-            artifact_dir = Path(tempfile.mkdtemp(prefix="bugfix-run-"))
+        artifact_dir = default_artifact_dir(work_dir)
     initial["artifact_dir"] = str(artifact_dir)
     if resume_dir is not None:
         initial["resume_dir"] = str(resume_dir)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from bugfix_contracts.defect_batch import RawDefect
 from bugfix_agent1.ingest.field_map import row_to_raw_dict

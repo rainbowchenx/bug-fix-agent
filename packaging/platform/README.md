@@ -73,6 +73,8 @@ CodeGraph（`@colbymchenry/codegraph`）默认开启：workDir 已有 `.codegrap
 
 `defect_batch` 必填——`source` 字段已废弃。约束：`skip_agent2` 必须同时 `skip_agent3`。
 
+省略 `artifact_dir` 时，每次运行在 `work_dir/.bugfix-runs/` 下创建独立产物目录。工作区无法写入时使用临时目录。返回的 `artifact_dir` 包含实际路径，生产部署可显式指向持久化目录以保留报告、逐票快照和反馈表。
+
 ## 目录
 
 ```text

@@ -239,32 +239,6 @@ def has_codegraph_index(root: str | Path) -> bool:
     return db.is_file() and db.stat().st_size > 0
 
 
-def detect_codegraph_signal(root: str | Path) -> bool:
-    """仓内是否已有 CodeGraph 痕迹（索引 / .mcp.json / CLAUDE 提及）。"""
-    path = Path(root)
-    if has_codegraph_index(path):
-        return True
-    mcp = path / ".mcp.json"
-    if mcp.is_file():
-        try:
-            text = mcp.read_text(encoding="utf-8", errors="ignore").lower()
-        except OSError:
-            text = ""
-        if "codegraph" in text:
-            return True
-    for name in ("CLAUDE.md", ".claude/CLAUDE.md"):
-        claude = path / name
-        if not claude.is_file():
-            continue
-        try:
-            text = claude.read_text(encoding="utf-8", errors="ignore")
-        except OSError:
-            continue
-        if "codegraph" in text.lower() or "code graph" in text.lower():
-            return True
-    return False
-
-
 def _path_is_git_repo(path: Path) -> bool:
     git = path / ".git"
     if git.is_dir():

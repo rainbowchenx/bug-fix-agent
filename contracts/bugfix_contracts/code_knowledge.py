@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from bugfix_contracts.common import CONTRACT_SCHEMA_VERSION, Confidence
 
@@ -160,6 +160,7 @@ class CodeKnowledge(BaseModel):
     productLine: str = Field(min_length=1)
     workDir: str = Field(min_length=1)
     investigationRuns: list[dict[str, Any]] = Field(default_factory=list)
+    investigationProgress: dict[str, Any] = Field(default_factory=dict)
     partial: bool = False
     generatedAt: str = Field(min_length=1)
     repoRoots: list[RepoRoot] = Field(default_factory=list)
@@ -183,6 +184,8 @@ class MatchParseResult(BaseModel):
     issues: list[ParseIssue] = Field(default_factory=list)
     acceptedFields: list[str] = Field(default_factory=list)
     rejectedFields: list[str] = Field(default_factory=list)
+    candidateRefs: list[str] = Field(default_factory=list)
+    factRefs: list[str] = Field(default_factory=list)
 
 
 def validate_code_knowledge(data: Any) -> CodeKnowledge:

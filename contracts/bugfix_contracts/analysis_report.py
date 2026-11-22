@@ -92,6 +92,7 @@ class PatchInfo(BaseModel):
     path: Optional[str] = None
     summary: Optional[str] = None
     commitMessage: Optional[str] = None
+    bundleDigest: Optional[str] = None
 
 
 class SuggestedVerify(BaseModel):

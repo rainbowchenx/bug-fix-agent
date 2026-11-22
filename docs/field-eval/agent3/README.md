@@ -187,10 +187,10 @@ transport 三张票的路径真值可直接复用 Agent-2 的 `bug-fix-测试专
 
 见[独立分析报告](reviews/2026-11-16-three-agent-real-project-assessment.md)、[24票复评表](reviews/2026-11-16-ticket-reassessment.csv)和[可复算统计](reviews/2026-11-16-artifact-statistics.json)。本批全程只出分析报告，不包含实际补丁与业务验收；独立复评纠正了部分汇总归因和陈旧评语。
 
-2026-11-16 用户补充：本批约256K非多模态模型为运行配置，Agent3只出报告为明确要求。边界已更新到复评报告，后续见[优化方案](../../superpowers/specs/2026-11-16-three-agent-evidence-quality-design.md)与[实施计划](../../superpowers/plans/2026-11-16-three-agent-evidence-quality-implementation-plan.md)。工程实现与验收记录见[执行自查](../../superpowers/execution/2026-11-16-three-agent-quality-ledger.md)，真实模型及业务复评单列待验。
+2026-11-16 用户补充：本批约256K非多模态模型为运行配置，Agent3只出报告为明确要求。边界已更新到复评报告，后续见[优化方案](../../superpowers/specs/2026-11-16-three-agent-evidence-quality-design.md)与[实施计划](../../superpowers/plans/2026-11-16-three-agent-evidence-quality-implementation-plan.md)。当前版本的运行范围和待验事项见[验收状态](../../architecture.md#验收状态)。
 
 ## 2026-11-17 三项目实测复评
 
 按用户范围仅评peitao、transport、hcp，共93原始票/18深度分析票。见[独立复评与交付判定](reviews/2026-11-17-three-project-real-run-assessment.md)、[配对CSV](reviews/2026-11-17-three-project-ticket-comparison.csv)、[统计JSON](reviews/2026-11-17-three-project-artifact-statistics.json)。正式评分计算已复核，但目录命中不等于根因正确，工程验收与实测交付分列。
 
-后续仅文档交付：[Agent2调查保全与Agent3反馈收敛方案](../../superpowers/specs/2026-11-17-agent2-lossless-handoff-agent3-convergence-design.md)及[实施计划](../../superpowers/plans/2026-11-17-agent2-lossless-handoff-agent3-convergence-plan.md)。工程计分见 `evals/eval_agent3.py` 的 `convergence_metrics`；70% 仍是待业务确认的提议，真实项目试点未执行前不得写成已通过。
+后续调整依据为[Agent2调查保全与Agent3反馈收敛方案](../../superpowers/specs/2026-11-17-agent2-lossless-handoff-agent3-convergence-design.md)及[实施计划](../../superpowers/plans/2026-11-17-agent2-lossless-handoff-agent3-convergence-plan.md)。工程计分见 `evals/eval_agent3.py` 的 `convergence_metrics`；70% 仍是待业务确认的提议，真实项目试点以[当前的验收范围](../../architecture.md#验收状态)为准。

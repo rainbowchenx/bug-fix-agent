@@ -37,7 +37,6 @@ Agent-3 的定位、根因、路由、验证、交付与报告字段，**优先�
 | [报告型分析 Agent 决策备忘](2026-10-23-report-agent-decision-memo.md) | 落地前 `Q-*` / `U-*` / `J-*` / `R-*`；Agent-3 拍板时对照，避免重复争议 |
 | [缺陷输入形态与来源契约](2026-10-22-defect-input-shape-and-source-contract.md) | 输入现实：`OBS-*` / `INV-*` / 无堆栈文本缺陷等；分析时不可假设「必有 stack」 |
 | [环境适配层与能力降级](2026-10-22-environment-adapter-and-capability-degradation.md) | `EnvironmentProfile`、`capabilities`、`L0..L3` 降级；验证不可用时如何降级（对接 D5） |
-| [实现缺口分析与路线图](2026-10-17-implementation-gap-analysis-and-roadmap.md) | 现状 vs 设计 vs 效果：`GAP-*`；哪些分析/修复能力已有代码可迁入 Agent-3 |
 | [本地 BugFix 设计](2026-10-14-local-bugfix-agent-design.md) | 双结局、GREEN、全自动无断点；与按条 worktree 的产品对齐 |
 | [Phase A 可信闭环](../plans/2026-10-17-phase-a-trusted-loop.md) | **worktree 隔离**、skills 挂载、零改动不开 MR 等已落地决策 |
 | [Phase B 修复真值](../plans/2026-10-18-phase-b-fix-truth.md) | baseline / `verifyLevel` / localization 注入等修复真值字段——报告与门禁可对照 |

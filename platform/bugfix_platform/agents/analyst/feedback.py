@@ -92,23 +92,32 @@ def _import_feedback_locked(root: Path, feedback: Feedback) -> InputRevision:
     return revision
 
 
-def load_latest_feedback(root: Path, defect_id: str) -> Optional[Feedback]:
+def load_latest_feedback(root: Path, defect_id: str, *, revision_id: str | None = None) -> Optional[Feedback]:
     folder = Path(root) / "defects" / defect_id / "feedback"
     if not folder.is_dir():
         return None
+    pointer = folder.parent / "feedback-latest.json"
+    if revision_id is None and pointer.is_file():
+        revision_id = json.loads(pointer.read_text(encoding="utf-8"))["revisionId"]
     files = sorted(folder.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
     for path in files:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        raw = payload.get("feedback") if isinstance(payload, dict) else None
+        if not isinstance(payload, dict):
+            continue
+        if revision_id is not None and (payload.get("revision") or {}).get("revisionId") != revision_id:
+            continue
+        raw = payload.get("feedback")
         if not isinstance(raw, dict):
             continue
         try:
-            return Feedback.model_validate(raw)
+            feedback = Feedback.model_validate(raw)
         except Exception:  # noqa: BLE001
             continue
+        if feedback.defectId == defect_id:
+            return feedback
     return None
 
 

@@ -7,7 +7,7 @@ HTTP 契约。
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Optional
 
 from bugfix_platform import __version__
 from bugfix_platform.http.models import (

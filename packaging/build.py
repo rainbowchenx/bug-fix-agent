@@ -123,7 +123,7 @@ def write_manifest(vendor: Path, label: str) -> None:
     )
 
 
-def build_agent1(skip_exe: bool = False) -> Path:
+def build_agent1() -> Path:
     """产出**只有 exe** 的 skill；源码不进交付包（单一真源在仓库里）。"""
     skill_src = ROOT / "agent1" / "skills" / AGENT1_SKILL
     stage = BUILD / "agent1-stage" / AGENT1_SKILL
@@ -156,28 +156,24 @@ def build_agent1(skip_exe: bool = False) -> Path:
     log(f"agent1: vendored {n_py} python files for the build")
 
     exe_name = "agent1.exe" if os.name == "nt" else "agent1"
-    if skip_exe:
-        if not (scripts / exe_name).exists():
-            raise SystemExit("agent1: --skip-exe but the staging tree has no prebuilt exe")
-    else:
-        _require_pyinstaller()
-        log("agent1: running PyInstaller (30-60s)")
-        stamp = BUILD / "pyinstaller"
-        env = dict(os.environ, PYTHONPATH=str(vendor))
-        subprocess.run(
-            agent1_pyinstaller_args(
-                entry=scripts / "entry.py",
-                vendor_json=vendor / "VENDOR.json",
-                dist=stamp / "dist",
-                work=stamp / "work",
-                spec=stamp,
-            ),
-            cwd=scripts, env=env, check=True,
-            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
-        )
-        built = stamp / "dist" / exe_name
-        shutil.copy2(built, scripts / exe_name)
-        log(f"agent1: {exe_name} {(scripts / exe_name).stat().st_size / 1e6:.1f} MB")
+    _require_pyinstaller()
+    log("agent1: running PyInstaller (30-60s)")
+    stamp = BUILD / "pyinstaller"
+    env = dict(os.environ, PYTHONPATH=str(vendor))
+    subprocess.run(
+        agent1_pyinstaller_args(
+            entry=scripts / "entry.py",
+            vendor_json=vendor / "VENDOR.json",
+            dist=stamp / "dist",
+            work=stamp / "work",
+            spec=stamp,
+        ),
+        cwd=scripts, env=env, check=True,
+        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+    )
+    built = stamp / "dist" / exe_name
+    shutil.copy2(built, scripts / exe_name)
+    log(f"agent1: {exe_name} {(scripts / exe_name).stat().st_size / 1e6:.1f} MB")
 
     _verify_agent1(scripts)
 
@@ -294,7 +290,6 @@ def _require_pyinstaller() -> None:
             "agent1: PyInstaller is not installed in this interpreter\n"
             f"  interpreter: {sys.executable}\n"
             '  fix: pip install -e ".[build]"     (or: pip install "pyinstaller>=6.10")\n'
-            '  or: python packaging/build.py agent1 --skip-exe   (assemble scripts only)'
         )
     log(f"agent1: PyInstaller {probe.stdout.strip()}")
 
@@ -509,7 +504,6 @@ def zip_tree(src: Path, dest: Path) -> None:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("target", nargs="?", choices=["all", "agent1", "platform"], default="all")
-    ap.add_argument("--skip-exe", action="store_true", help="agent1: 只组装脚本，不跑 PyInstaller")
     ap.add_argument(
         "--deliver-to",
         type=Path,
@@ -520,7 +514,7 @@ def main(argv: list[str] | None = None) -> int:
 
     DIST.mkdir(exist_ok=True)
     if args.target in ("all", "agent1"):
-        build_agent1(skip_exe=args.skip_exe)
+        build_agent1()
         if args.deliver_to is not None:
             sync_delivery(args.deliver_to)
     if args.target in ("all", "platform"):

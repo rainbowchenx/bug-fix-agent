@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, Literal, Optional, Union
 
@@ -14,7 +13,6 @@ from bugfix_contracts.defect_batch import (
     DefectBatch,
     DefectBatchInput,
     RawDefect,
-    validate_defect_batch,
 )
 from bugfix_agent1.defect_batch.prepare import prepare_defect_batch
 from bugfix_agent1.defect_batch.rules import ScreenProfile

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Literal
+from typing import Callable, Literal
 
 from bugfix_contracts.code_knowledge import (
     Architecture,
@@ -640,13 +640,19 @@ def filter_existing_candidates(
     architecture: Architecture | None = None,
     variant_by_id: dict[str, str | None] | None = None,
     stats: dict[str, int] | None = None,
+    on_drop: Callable[[str, int, str], None] | None = None,
 ) -> list[DefectCodeMatch]:
     """Drop missing/vacuum/fake-symbol/catalog/wrong-variant/duplicate candidates.
 
     ``stats``（可选）按原因累加被丢弃的候选数，调用方可以据此报账——否则
     「模型给了 3 个候选、交付里 0 个」在产物里看不出任何痕迹。
     """
-    root = Path(work_dir)
+    def reject(defect_id: str, index: int, reason: str) -> None:
+        _bump(stats, reason)
+        if on_drop is not None:
+            on_drop(defect_id, index, reason)
+
+    root = Path(work_dir).resolve()
     out: list[DefectCodeMatch] = []
     for m in matches:
         kept: list[MatchCandidate] = []
@@ -661,28 +667,31 @@ def filter_existing_candidates(
                 )
             )
         seen: set[Path] = set()
-        for c in m.candidates[:MAX_CANDIDATES]:
+        for index, c in enumerate(m.candidates):
+            if index >= MAX_CANDIDATES:
+                reject(m.defectId, index, "candidate_limit")
+                continue
             found = _resolve_candidate_path(root, c)
             if found is None:
-                _bump(stats, "missing")
+                reject(m.defectId, index, "missing")
                 continue
             resolved, cand = found
             if resolved in seen:
-                _bump(stats, "duplicate")
+                reject(m.defectId, index, "duplicate")
                 continue
             # 目录/索引类文件（路由表、壳、宿主）不是缺陷落点；判据用归一后的
             # 仓相对路径，所以必须排在 repoPath 回退之后。
             rel_work = _work_rel(cand)
             if _is_catalog_path(rel_work, architecture):
-                _bump(stats, "catalog")
+                reject(m.defectId, index, "catalog")
                 continue
             path_var = _path_variant(rel_work)
             if want_variant and path_var and want_variant != path_var:
-                _bump(stats, "variant")
+                reject(m.defectId, index, "variant")
                 continue
             reason = _reject_reason(resolved, cand, profile)
             if reason:
-                _bump(stats, reason)
+                reject(m.defectId, index, reason)
                 continue
             seen.add(resolved)
             kept.append(cand)
@@ -724,6 +733,8 @@ def _resolve_candidate_path(
     if not rel:
         return None
     repo = (candidate.repoPath or "").strip().replace("\\", "/")
+    if any(Path(part).anchor or ".." in Path(part).parts for part in (repo, rel)):
+        return None
     if repo in ("", "."):
         attempts: list[tuple[Path, bool]] = [(root / rel, False)]
     else:
@@ -733,19 +744,12 @@ def _resolve_candidate_path(
             resolved = path.resolve()
         except OSError:
             continue
-        if not resolved.is_file():
+        if not resolved.is_relative_to(root) or not resolved.is_file():
             continue
         if via_fallback:
             candidate = candidate.model_copy(update={"repoPath": "."})
         return resolved, candidate
     return None
-
-
-def _candidate_survives(
-    path: Path, candidate: MatchCandidate, profile: CartographyProfile | str | None
-) -> bool:
-    """Keep files that exist and are not vacuum / fake-symbol / empty device_web stubs."""
-    return _reject_reason(path, candidate, profile) is None
 
 
 def _reject_reason(

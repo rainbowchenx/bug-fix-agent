@@ -1,15 +1,21 @@
 """Interpret model observations and publish the Agent2 knowledge handoff."""
 from __future__ import annotations
 
+from collections import Counter
+from hashlib import sha256
+from importlib.metadata import PackageNotFoundError, version
 from typing import Any, Optional
 
 from bugfix_contracts import CodeKnowledge, validate_code_knowledge
-from bugfix_contracts.code_knowledge import DefectCodeMatch
+from bugfix_contracts.code_knowledge import DefectCodeMatch, ParseIssue
+from bugfix_platform.agents.cartographer.match_payload import (
+    GroupParseResult, normalize_group_matches, verify_fact_references,
+)
 from bugfix_platform.sdk.credentials import has_credentials
 from bugfix_platform.sdk.cartography import (
     CartographyMode, CartographyRequest, CartographyResult, CartographyRunner,
     _billing, annotate_investigation_coverage, cartography_mode_from_env,
-    investigated_ids_from_parsed, query_cartography, select_prompt_tickets,
+    query_cartography, select_prompt_tickets,
 )
 
 
@@ -68,6 +74,9 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
             "no Anthropic credentials in env (ANTHROPIC_API_KEY / "
             "ANTHROPIC_AUTH_TOKEN); fell back to heuristic"
         )
+        fallback.launched_ids = []
+        fallback.accepted_ids = []
+        fallback.stop_reason = "sdk_error"
         return fallback
 
     from uuid import uuid4
@@ -77,9 +86,15 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
     )
 
     def create_recorder(max_turns: int | None) -> InvestigationRecorder:
+        try:
+            sdk_version = version("claude-agent-sdk")
+        except PackageNotFoundError:
+            sdk_version = ""
         return InvestigationRecorder(
             req.artifact_dir, req.group_id or "ungrouped", req.call_id or uuid4().hex,
+            input_digest=req.input_digest or sha256(req.defect_batch.model_dump_json().encode()).hexdigest(),
             budget={"max_turns": max_turns},
+            sdk_version=sdk_version,
         )
 
     def record_repair(call_id: str, before: str, after: str) -> None:
@@ -92,12 +107,50 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
         create_recorder=create_recorder if req.artifact_dir else None,
         record_repair=record_repair if req.artifact_dir else None,
     )
-    parsed, budget_stop, terminal = response.parsed, response.budget_stop, response.terminal
+    budget_stop, terminal = response.budget_stop, response.terminal
     turns, cost = response.turns, response.cost
     recorder, observed_paths = response.recorder, response.observed_paths
     billing = _billing(turns, cost, terminal)
+    prompt_ids = [ticket.defectId for ticket, _ in select_prompt_tickets(req)]
+    group = GroupParseResult()
+    accepted_ids: list[str] = []
 
-    def finish(result: CartographyResult) -> CartographyResult:
+    def finish(result: CartographyResult, *, status: str = "saved", reason: str | None = None) -> CartographyResult:
+        artifact_error = response.artifact_error
+        if recorder is not None:
+            try:
+                recorder.finalize(
+                    status="artifact_error" if artifact_error else status,
+                    stop_reason="artifact_error" if artifact_error else reason or terminal or "completed",
+                    turns=turns, cost=cost, terminal=terminal,
+                    diagnostics={
+                        "repair": {"requestedIds": response.repair_ids, "status": response.repair_status},
+                        "issues": [
+                            issue.model_copy(update={"fieldPath": issue.fieldPath.split("#", 1)[-1]}).model_dump()
+                            for issue in group.issues
+                        ],
+                        "fieldRefs": group.field_refs,
+                        "elementRefs": {"candidates": group.candidate_refs, "facts": group.fact_refs},
+                        "issueCounts": dict(Counter(issue.reason for issue in group.issues)),
+                        "acceptedMatches": [match.model_dump() for match in group.accepted],
+                        "acceptedIds": accepted_ids,
+                        "launchedIds": response.launched_ids,
+                    },
+                )
+            except OSError as err:
+                artifact_error = artifact_error or str(err)
+        if artifact_error:
+            matches = [match.model_copy(update={
+                "storageStatus": "artifact_error",
+                "investigationStatus": (
+                    "partial" if match.investigationStatus == "complete" else match.investigationStatus
+                ),
+            }) for match in result.knowledge.defectCodeMatches]
+            result.knowledge = result.knowledge.model_copy(update={"partial": True, "defectCodeMatches": matches})
+            result.detail = "; ".join(part for part in (result.detail, f"artifact_error: {artifact_error}") if part)
+        result.launched_ids = response.launched_ids
+        result.accepted_ids = accepted_ids
+        result.stop_reason = "artifact_error" if artifact_error else reason or status
         result.skill_reads = response.skill_reads
         if result.turns is None:
             result.turns = turns
@@ -106,101 +159,94 @@ def run_claude_cartography(req: CartographyRequest) -> CartographyResult:
         return result
 
     if response.error:
+        group.issues.append(ParseIssue(fieldPath="response", reason="sdk_error", action="record",
+                                       rawRef=response.parsed_ref))
         result = heuristic_cartography(req)
         result.source = "sdk_fallback"
         result.detail = "; ".join(part for part in (response.error, billing) if part)
-        return finish(result)
+        return finish(result, status="sdk_error", reason="sdk_error")
 
-    if parsed is not None:
+    group = normalize_group_matches(response.parsed or {}, requested_ids=set(prompt_ids),
+                                    raw_ref=response.parsed_ref)
+    if response.parsed is None:
+        group.issues.append(ParseIssue(fieldPath="response", reason="no_business_envelope", action="reject",
+                                       rawRef=response.parsed_ref))
+    if response.repair_parsed is not None:
+        repair = normalize_group_matches(response.repair_parsed, requested_ids=set(response.repair_ids),
+                                         raw_ref=response.repair_ref)
+        group.accepted.extend(repair.accepted)
+        group.issues.extend(repair.issues)
+        group.field_refs.update(repair.field_refs)
+        group.candidate_refs.update(repair.candidate_refs)
+        group.fact_refs.update(repair.fact_refs)
+        if response.parsed is None:
+            group.shared = repair.shared
+    if req.investigation_only:
+        group.shared = {key: value for key, value in group.shared.items() if key == "partial"}
+
+    accepted_ids = [match.defectId for match in group.accepted
+                    if match.candidates or _has_investigation(match)]
+    investigated_ids = [match.defectId for match in group.accepted]
+    missing = set(prompt_ids) - set(investigated_ids)
+    if response.parsed is not None or response.repair_parsed is not None:
         drop_stats: dict[str, int] = {}
         try:
-            if req.investigation_only:
-                parsed = {k:v for k,v in parsed.items() if k in {"defectCodeMatches", "partial"}}
-            merged = _merge_enrichment(
-                req.baseline,
-                parsed,
-                tickets=req.defect_batch.tickets,
-                stats=drop_stats,
-            )
-            if budget_stop:
+            merged = _merge_enrichment(req.baseline, {}, tickets=req.defect_batch.tickets,
+                                       stats=drop_stats, group=group)
+            if missing or (budget_stop and response.repair_status != "returned"):
                 merged["partial"] = True
-            from bugfix_platform.agents.cartographer.match_payload import verify_fact_references
             knowledge = validate_code_knowledge(merged)
-            prompt_ids = [t.defectId for t, _ in select_prompt_tickets(req)]
-            verified = verify_fact_references(
-                req.work_dir,
-                list(knowledge.defectCodeMatches),
-                observed_paths=observed_paths,
-                repo_roots=list(req.baseline.repoRoots or []),
-            )
-            knowledge = knowledge.model_copy(
-                update={
-                    "defectCodeMatches": annotate_investigation_coverage(
-                        verified,
-                        prompt_ids=prompt_ids,
-                        investigated_ids=investigated_ids_from_parsed(parsed),
-                    )
-                }
-            )
         except Exception as err:  # noqa: BLE001
-            from bugfix_platform.agents.cartographer.match_payload import normalize_group_matches, verify_fact_references
-            allowed = {t.defectId for t in req.defect_batch.tickets}
-            group = normalize_group_matches(parsed or {}, requested_ids=allowed, raw_ref="sdk")
-            data = req.baseline.model_dump()
-            by_id = {m["defectId"]: m for m in data.get("defectCodeMatches") or []}
-            for match in group.accepted:
-                by_id[match.defectId] = match.model_dump()
-            data["defectCodeMatches"] = list(by_id.values())
-            data["partial"] = True
-            hints = list(data.get("secondaryHints") or [])
-            hints.append(f"internal_error:{err}")
-            data["secondaryHints"] = hints
-            try:
-                knowledge = validate_code_knowledge(data)
-                knowledge = knowledge.model_copy(
-                    update={
-                        "defectCodeMatches": verify_fact_references(
-                            req.work_dir,
-                            list(knowledge.defectCodeMatches),
-                            observed_paths=observed_paths,
-                            repo_roots=list(req.baseline.repoRoots or []),
-                        )
-                    }
-                )
-                detail = _with_drop_detail(billing, drop_stats)
-                if recorder is not None and recorder.artifact_error is None:
-                    recorder.finalize(status="saved", stop_reason="internal_error", turns=turns, cost=cost, terminal=terminal)
-                return finish(CartographyResult(
-                    ok=True, knowledge=knowledge, source="sdk",
-                    detail="; ".join(x for x in [detail, f"internal_error:{err}"] if x),
-                ))
-            except Exception:
-                if budget_stop:
-                    return finish(_sdk_keep_baseline(req, billing))
-                fallback = heuristic_cartography(req)
-                fallback.source = "sdk_fallback"
-                fallback.detail = f"enriched code-knowledge invalid: {err}" + (f"; {billing}" if billing else "")
-                return finish(fallback)
+            group.issues.append(ParseIssue(fieldPath="codeKnowledge", reason="internal_error", action="record",
+                                           rawRef=response.parsed_ref))
+            by_id = {match.defectId: match for match in req.baseline.defectCodeMatches}
+            by_id.update((match.defectId, match) for match in group.accepted)
+            knowledge = req.baseline.model_copy(update={
+                "defectCodeMatches": list(by_id.values()), "partial": True,
+            })
+            return finish(CartographyResult(
+                ok=True, knowledge=knowledge, source="sdk", detail=f"internal_error:{err}",
+            ), status="internal_error", reason="internal_error")
+
+        matches = {match.defectId: match for match in knowledge.defectCodeMatches}
+        for defect_id in prompt_ids:
+            matches.setdefault(defect_id, DefectCodeMatch(defectId=defect_id))
+        def diagnose_reference(defect_id: str, index: int) -> None:
+            refs = group.fact_refs.get(defect_id, [])
+            if index < len(refs):
+                ref = refs[index] + ".reference"
+                group.issues.append(ParseIssue(fieldPath=ref, reason="reference_not_verified",
+                                               action="record", rawRef=ref))
+
+        verified = verify_fact_references(
+            req.work_dir, list(matches.values()), observed_paths=observed_paths,
+            repo_roots=list(req.baseline.repoRoots or []),
+            on_unverified=diagnose_reference,
+        )
+        covered = annotate_investigation_coverage(
+            verified, prompt_ids=prompt_ids, investigated_ids=investigated_ids,
+        )
+        accepted_ids = [match.defectId for match in covered if match.defectId in accepted_ids
+                        and match.acceptanceStatus == "accepted" and (match.candidates or _has_investigation(match))]
+        partial = (bool(group.shared.get("partial")) or (budget_stop and response.repair_status != "returned")
+                   or any(match.investigationStatus != "complete" for match in covered if match.defectId in prompt_ids))
+        knowledge = knowledge.model_copy(update={"defectCodeMatches": covered, "partial": partial})
         detail = _with_drop_detail(billing, drop_stats)
-        if recorder is not None and recorder.artifact_error is None:
-            recorder.finalize(
-                status="saved",
-                stop_reason=terminal or "completed",
-                turns=turns,
-                cost=cost,
-                terminal=terminal,
-            )
-        return finish(CartographyResult(
-            ok=True, knowledge=knowledge, source="sdk", detail=detail or None
-        ))
+        return finish(CartographyResult(ok=True, knowledge=knowledge, source="sdk", detail=detail),
+                      reason="output_invalid" if missing else "partial" if knowledge.partial else "completed")
 
     if budget_stop:
-        return finish(_sdk_keep_baseline(req, billing))
+        return finish(_sdk_keep_baseline(req, billing), status="output_invalid", reason="output_invalid")
 
     fallback = heuristic_cartography(req)
     fallback.source = "sdk_fallback"
     fallback.detail = "sdk returned no parseable JSON cartography"
-    return finish(fallback)
+    return finish(fallback, status="output_invalid", reason="output_invalid")
+
+
+def _has_investigation(match: DefectCodeMatch) -> bool:
+    return any((match.facts, match.searchedScopes, match.hypotheses,
+                match.ruledOut, match.openQuestions, match.nextChecks))
 
 
 def _with_drop_detail(
@@ -223,15 +269,15 @@ def _merge_enrichment(
     tickets: list[Any] | None = None,
     *,
     stats: dict[str, int] | None = None,
+    group: GroupParseResult | None = None,
 ) -> dict[str, Any]:
-    from bugfix_platform.agents.cartographer.match_payload import normalize_group_matches
-
-    allowed = {t.defectId for t in tickets} if tickets is not None else {m.defectId for m in baseline.defectCodeMatches}
-    group = normalize_group_matches(parsed, requested_ids=allowed, raw_ref="sdk")
+    if group is None:
+        allowed = {t.defectId for t in tickets} if tickets is not None else {m.defectId for m in baseline.defectCodeMatches}
+        group = normalize_group_matches(parsed, requested_ids=allowed, raw_ref="sdk")
     for issue in group.issues:
-        _bump(stats, issue.reason)
-    parsed = dict(parsed)
-    parsed.update({k: v for k, v in group.shared.items() if v is not None})
+        if issue.action != "record":
+            _bump(stats, issue.reason)
+    parsed = group.shared
     data = baseline.model_dump()
     # Optional top-level overrides that stay within schema.
     # cartographyProfile is caller-supplied; never let the SDK reclassify.
@@ -277,22 +323,10 @@ def _merge_enrichment(
             cleaned = match.model_dump()
             orig = by_id.get(did) or {}
             for key in ("title", "clusterId"):
-                if not cleaned.get(key) and orig.get(key):
+                if orig.get(key):
                     cleaned[key] = orig[key]
             by_id[did] = cleaned
         data["defectCodeMatches"] = list(by_id.values())
-    if isinstance(group.shared.get("secondaryHints"), list):
-        parsed = {**parsed, "secondaryHints": group.shared["secondaryHints"]}
-    if isinstance(group.shared.get("techStack"), dict):
-        parsed = {**parsed, "techStack": group.shared["techStack"]}
-    if isinstance(group.shared.get("architecture"), dict):
-        parsed = {**parsed, "architecture": group.shared["architecture"]}
-    if isinstance(group.shared.get("conventions"), dict):
-        parsed = {**parsed, "conventions": group.shared["conventions"]}
-    if isinstance(group.shared.get("boundSkills"), list):
-        parsed = {**parsed, "boundSkills": group.shared["boundSkills"]}
-    if isinstance(group.shared.get("partial"), bool):
-        parsed = {**parsed, "partial": group.shared["partial"]}
     # Drop hallucinated paths (SDK or merge). Empty SDK tickets fall back to baseline.
     from bugfix_platform.agents.cartographer.match import (
         filter_existing_candidates,
@@ -312,6 +346,12 @@ def _merge_enrichment(
     variant_by_id = {
         t.defectId: ticket_variant(t) for t in (tickets or []) if getattr(t, "defectId", None)
     }
+    def diagnose_candidate(defect_id: str, index: int, reason: str) -> None:
+        refs = group.candidate_refs.get(defect_id, [])
+        if index < len(refs):
+            ref = refs[index]
+            group.issues.append(ParseIssue(fieldPath=ref, reason=reason, action="drop", rawRef=ref))
+
     merged_matches: list[dict[str, Any]] = []
     for match in filter_existing_candidates(
         baseline.workDir,
@@ -320,11 +360,12 @@ def _merge_enrichment(
         architecture=baseline.architecture,
         variant_by_id=variant_by_id or None,
         stats=stats,
+        on_drop=diagnose_candidate,
     ):
         if match.defectId in sdk_ids:
             if not match.candidates:
                 orig = baseline_by_id.get(match.defectId)
-                merged_matches.append((match if match.facts or match.searchedScopes else (orig or match)).model_dump())
+                merged_matches.append((match if _has_investigation(match) else (orig or match)).model_dump())
                 continue
             if match.confidence == "high":
                 match = match.model_copy(update={"confidence": "medium"})
@@ -349,26 +390,6 @@ def _merge_enrichment(
 def _bump(stats: dict[str, int] | None, key: str) -> None:
     if stats is not None:
         stats[key] = stats.get(key, 0) + 1
-
-
-def _coerce_sdk_match(
-    item: dict[str, Any], stats: dict[str, int] | None
-) -> dict[str, Any] | None:
-    """把模型条目收成契约允许的形状；实在不可用才返回 ``None``。"""
-    from bugfix_platform.agents.cartographer.match_payload import normalize_sdk_match
-
-    defect_id = str(item.get("defectId") or "")
-    result = normalize_sdk_match(
-        item,
-        requested_ids={defect_id} if defect_id else set(),
-        raw_ref=defect_id or "item",
-    )
-    for issue in result.issues:
-        _bump(stats, issue.reason)
-    if result.accepted is None:
-        return None
-    return result.accepted.model_dump()
-
 
 
 def _merge_modules(

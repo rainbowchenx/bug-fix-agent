@@ -763,6 +763,7 @@ def _run_fix_loop(
         bundle = attempt.patchSet.bundlePath or attempt.patchSet.patches[0].archivePath
         entry["patch"] = {
             "path": bundle,
+            "bundleDigest": attempt.patchSet.bundleDigest,
             "summary": "; ".join(
                 x
                 for x in [

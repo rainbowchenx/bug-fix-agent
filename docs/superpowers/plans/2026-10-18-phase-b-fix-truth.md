@@ -1,6 +1,6 @@
 # Phase B — 修复真值与报告质量
 
-> 依据：`docs/superpowers/specs/2026-10-17-implementation-gap-analysis-and-roadmap.md` §7 Phase B  
+> 历史 TypeScript 实施计划，基于当时的实现分析。现行流程见[当前项目架构](../../architecture.md)。
 > **Status:** Implemented (2026-10-18)
 
 **Goal:** `fixed[]` 能区分基线红与新增失败，并带上复现级别与可审计字段。

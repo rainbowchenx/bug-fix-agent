@@ -10,7 +10,6 @@
 - [报告型分析 Agent 设计](2026-10-23-report-agent-design.md) · [决策备忘](2026-10-23-report-agent-decision-memo.md)
 - [目标流水线设计](2026-10-22-target-pipeline-design.md) · [环境适配与降级](2026-10-22-environment-adapter-and-capability-degradation.md)
 - [缺陷输入形态与来源契约](2026-10-22-defect-input-shape-and-source-contract.md)
-- [实现缺口分析](2026-10-17-implementation-gap-analysis-and-roadmap.md)
 - [缺陷单多轮筛选与分簇设计](2026-10-30-defect-screen-cluster-design.md)
 - 调研：[SOTA](../../research/2026-10-14-sota-bugfix-agent-survey.md) · [Seer](../../research/2026-10-14-sentry-seer-autofix-deep-dive.md) · [WorkBuddy](../../research/2026-10-15-workbuddy-bugfix-expert-research.md)
 - 旧仓对照：`aiservice-for-monitor`（待读仓权限后补深潜，见 Agent-3 §1.2 / E6）
