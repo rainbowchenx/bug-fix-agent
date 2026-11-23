@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
+import os
 import shutil
+import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -34,6 +38,9 @@ def test_ensure_disabled(monkeypatch, tmp_path: Path):
     assert st.disabled is True
     assert st.ready is False
     assert st.mcp_servers(str(tmp_path)) == {}
+    options = st.mcp_option_kwargs(str(tmp_path))
+    assert options["strict_mcp_config"] is True
+    assert json.loads(options["mcp_servers"]) == {"mcpServers": {}}
 
 
 def test_ensure_uses_existing_index(monkeypatch, tmp_path: Path):
@@ -63,8 +70,7 @@ def test_ensure_uses_existing_index(monkeypatch, tmp_path: Path):
     assert str(tmp_path.resolve()) in st.roots
     mcp = st.mcp_servers(str(tmp_path))
     assert "codegraph" in mcp
-    assert mcp["codegraph"]["args"][:2] == ["serve", "--mcp"]
-    assert mcp["codegraph"]["args"][3] == str(tmp_path.resolve())
+    assert mcp["codegraph"]["args"][-4:] == ["serve", "--mcp", "-p", str(tmp_path.resolve())]
 
 
 def test_ensure_skips_empty_index_and_shell_workdir(monkeypatch, tmp_path: Path):
@@ -117,17 +123,65 @@ def test_init_creates_index(tmp_path: Path):
     assert st.root_stats[str(tmp_path.resolve())].get("files", 0) > 0
 
 
-def test_status_mcp_empty_when_not_ready():
+def test_status_uses_strict_empty_mcp_config_when_not_ready():
     st = CodeGraphStatus(ready=False, bin="/tmp/codegraph")
     assert st.mcp_servers("/tmp/proj") == {}
-    assert st.mcp_option_kwargs("/tmp/proj") == {}
+    options = st.mcp_option_kwargs("/tmp/proj")
+    assert options["strict_mcp_config"] is True
+    assert json.loads(options["mcp_servers"]) == {"mcpServers": {}}
 
 
-def test_mcp_option_kwargs_when_ready():
+def test_mcp_option_kwargs_when_ready(tmp_path):
     st = CodeGraphStatus(ready=True, bin="/usr/bin/codegraph")
-    kw = st.mcp_option_kwargs("/tmp/proj")
-    assert kw["mcp_servers"]["codegraph"]["args"][:2] == ["serve", "--mcp"]
+    kw = st.mcp_option_kwargs(str(tmp_path))
+    server = kw["mcp_servers"]["codegraph"]
+    assert server["args"][-4:] == ["serve", "--mcp", "-p", str(tmp_path.resolve())]
+    if os.name == "nt":
+        assert server["command"] == sys._base_executable
+        assert Path(server["args"][1]).name == "_codegraph_windows.py"
+        assert server["args"][2] == str(os.getpid())
+        assert server["args"][4] == st.bin
+    else:
+        assert server["command"] == st.bin
+        assert len(server["args"]) == 4
     assert kw["strict_mcp_config"] is True
+
+
+def test_cartography_keeps_strict_mcp_when_sdk_hooks_are_unsupported(tmp_path, monkeypatch):
+    from bugfix_platform.agents.cartographer import run_cartographer
+    from bugfix_platform.sdk.cartography import CartographyRequest, query_cartography
+    from tests.helpers import defect_batch_from_hc1, ensure_git_repo
+
+    ensure_git_repo(tmp_path)
+    batch = defect_batch_from_hc1()
+    monkeypatch.setenv("BUGFIX_CODEGRAPH", "0")
+    baseline = run_cartographer(work_dir=tmp_path, defect_batch=batch, cartography_mode="heuristic")
+    accepted_options = []
+
+    class Options:
+        def __init__(self, **kwargs):
+            if "hooks" in kwargs or "can_use_tool" in kwargs:
+                raise TypeError("hooks unsupported")
+            self.kwargs = kwargs
+
+    async def fake_query(*, prompt, options):
+        accepted_options.append(options.kwargs)
+        for message in ():
+            yield message
+
+    sdk = ModuleType("claude_agent_sdk")
+    sdk.ClaudeAgentOptions = Options
+    sdk.ResultMessage = object
+    sdk.query = fake_query
+    monkeypatch.setitem(sys.modules, "claude_agent_sdk", sdk)
+
+    query_cartography(CartographyRequest(
+        work_dir=str(tmp_path), defect_batch=batch, baseline=baseline,
+        codegraph=ensure_codegraph(tmp_path),
+    ))
+    assert len(accepted_options) == 1
+    assert accepted_options[0]["strict_mcp_config"] is True
+    assert json.loads(accepted_options[0]["mcp_servers"]) == {"mcpServers": {}}
 
 
 # ---------------------------------------------------------------------------

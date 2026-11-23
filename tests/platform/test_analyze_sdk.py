@@ -17,6 +17,7 @@ from bugfix_platform.sdk.analyze import (
     run_claude_analyze,
     select_ticket_spec_dirs,
 )
+from bugfix_platform.sdk.codegraph import ensure_codegraph
 from bugfix_platform.workflow import run_three_agent_workflow
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -504,6 +505,7 @@ def _install_fake_sdk(monkeypatch, options_cls, query_fn, result_message_cls):
 
 def test_resume_unsupported_records_degrade_and_starts_new(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("BUGFIX_CODEGRAPH", "0")
     payload = {
         "outcome": "plan_only",
         "rootCause": {"summary": "race in preview", "ruledOut": [], "openQuestions": [], "questions": [], "claims": []},
@@ -530,7 +532,9 @@ def test_resume_unsupported_records_degrade_and_starts_new(tmp_path: Path, monke
             self.kwargs = kwargs
 
     async def fake_query(*, prompt, options):
-        assert "resume" not in getattr(options, "kwargs", {})
+        assert "resume" not in options.kwargs
+        assert options.kwargs["strict_mcp_config"] is True
+        assert json.loads(options.kwargs["mcp_servers"]) == {"mcpServers": {}}
         yield Result()
 
     _install_fake_sdk(monkeypatch, Opts, fake_query, ResultMessage)
@@ -539,6 +543,7 @@ def test_resume_unsupported_records_degrade_and_starts_new(tmp_path: Path, monke
             work_dir=str(tmp_path),
             ticket=_sdk_ticket(),
             routed=_sdk_routed(),
+            codegraph=ensure_codegraph(tmp_path),
             resume_session_id="old-sess",
         )
     )

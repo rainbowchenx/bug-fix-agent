@@ -375,21 +375,18 @@ def query_cartography(
             "can_use_tool": _can_use_cartography_tool,
             "hooks": hooks,
         }
-        if cg is not None:
-            kwargs.update(cg.mcp_option_kwargs(req.work_dir))
+        kwargs.update((cg or CodeGraphStatus(ready=False)).mcp_option_kwargs(req.work_dir))
         if resume:
             kwargs["resume"] = resume
         try:
             return ClaudeAgentOptions(**kwargs)
         except TypeError:
             kwargs.pop("resume", None)
-            kwargs.pop("strict_mcp_config", None)
             kwargs.pop("hooks", None)
             kwargs["allowed_tools"] = [name for name in kwargs["allowed_tools"] if name != "Bash"]
             try:
                 return ClaudeAgentOptions(**kwargs)
             except TypeError:
-                kwargs.pop("mcp_servers", None)
                 kwargs.pop("can_use_tool", None)
                 return ClaudeAgentOptions(**kwargs)
 

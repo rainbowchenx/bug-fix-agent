@@ -178,23 +178,18 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
             "max_turns": turns if turns is not None else max_turns,
             "model": model,
         }
-        if req.codegraph is not None:
-            kwargs.update(req.codegraph.mcp_option_kwargs(req.work_dir))
+        kwargs.update((req.codegraph or CodeGraphStatus(ready=False)).mcp_option_kwargs(req.work_dir))
         resume_id = resume if resume is not None else req.resume_session_id
         if resume_id and allow_resume:
             kwargs["resume"] = resume_id
         try:
             return ClaudeAgentOptions(**kwargs)
         except TypeError:
-            if "resume" in kwargs:
-                option_notes.append("resume unsupported, starting new session")
+            if "resume" not in kwargs:
+                raise
+            option_notes.append("resume unsupported, starting new session")
             kwargs.pop("resume", None)
-            kwargs.pop("strict_mcp_config", None)
-            try:
-                return ClaudeAgentOptions(**kwargs)
-            except TypeError:
-                kwargs.pop("mcp_servers", None)
-                return ClaudeAgentOptions(**kwargs)
+            return ClaudeAgentOptions(**kwargs)
 
     texts: list[str] = []
     result_text = ""

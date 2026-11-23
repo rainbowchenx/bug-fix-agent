@@ -6,9 +6,13 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 from bugfix_contracts import CodeKnowledge, DefectBatch
 from bugfix_contracts.repair import InputRevision
 from bugfix_platform.agents.analyst import run_analyst
+from bugfix_platform.agents.analyst import workspace
+from bugfix_platform.agents.analyst.analysis_store import load_analysis_snapshot
 from bugfix_platform.cli import main
 from bugfix_platform.sdk.analyze import AnalyzeRequest, AnalyzeResult
 from bugfix_platform.sdk.fix import FixRequest, FixResult
@@ -726,7 +730,8 @@ def test_repo_path_reads_nested_repo_file(tmp_path: Path):
     assert called["n"] == 1
 
 
-def test_report_uses_namespaced_patchset_not_fixer_slug(tmp_path: Path):
+def test_report_uses_namespaced_patchset_not_fixer_slug(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(workspace.tempfile, "tempdir", str(tmp_path))
     work = tmp_path / "repo"
     (work / "src").mkdir(parents=True)
     (work / "src" / "a.ts").write_text("function handleFail() { return; }\n", encoding="utf-8")
@@ -768,6 +773,7 @@ def test_report_uses_namespaced_patchset_not_fixer_slug(tmp_path: Path):
         )
 
     def fake_fix(req: FixRequest) -> FixResult:
+        assert len(list(tmp_path.glob("bugfix-freeze-*"))) == 1
         Path(req.worktree_path, "src", "a.ts").write_text(
             "function handleFail() { throw e; }\n", encoding="utf-8"
         )
@@ -790,9 +796,20 @@ def test_report_uses_namespaced_patchset_not_fixer_slug(tmp_path: Path):
     assert path
     assert Path(path).name != "D1.patch"
     assert "OLD-SDK-PATCH" not in Path(path).read_text(encoding="utf-8", errors="replace")
+    assert not list(tmp_path.glob("bugfix-freeze-*"))
+    saved = load_analysis_snapshot(tmp_path / "art", "D1", report.tickets[0].attemptId)
+    assert saved.workspaceSnapshot.contentDigest
+    assert saved.workspaceSnapshot.freezeRoot is None
 
 
-def test_source_change_during_analyze_blocks_edit(tmp_path: Path):
+@pytest.mark.parametrize("apply_fix", [False, True])
+def test_source_change_during_analyze_blocks_edit(tmp_path: Path, monkeypatch, apply_fix):
+    monkeypatch.setattr(workspace.tempfile, "tempdir", str(tmp_path))
+    if not apply_fix:
+        def unexpected_copy(*_args):
+            pytest.fail("report mode copied the work directory")
+        monkeypatch.setattr(workspace, "_copytree", unexpected_copy)
+
     work = tmp_path / "repo"
     (work / "src").mkdir(parents=True)
     (work / "src" / "a.ts").write_text("function handleFail() { return; }\n", encoding="utf-8")
@@ -836,19 +853,22 @@ def test_source_change_during_analyze_blocks_edit(tmp_path: Path):
         called["n"] += 1
         return FixResult(ok=True, payload={"outcome": "patch_ready", "patch": {"path": "x"}})
 
-    run_analyst(
+    report = run_analyst(
         work_dir=work,
         defect_batch=_batch(),
         code_knowledge=_knowledge(work),
         analyze_fn=fake_analyze,
         fix_fn=fake_fix,
-        apply_fix=True,
+        apply_fix=apply_fix,
         artifact_dir=tmp_path / "art",
     )
     assert called["n"] == 0
+    assert "source changed after analyze" in report.tickets[0].localization.notes
+    assert not list(tmp_path.glob("bugfix-freeze-*"))
 
 
-def test_one_ticket_exception_does_not_stop_batch(tmp_path: Path):
+def test_one_ticket_exception_does_not_stop_batch(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(workspace.tempfile, "tempdir", str(tmp_path))
     work = tmp_path / "repo"
     (work / "src").mkdir(parents=True)
     (work / "src" / "a.ts").write_text("function handleFail() { return; }\n", encoding="utf-8")
@@ -910,6 +930,7 @@ def test_one_ticket_exception_does_not_stop_batch(tmp_path: Path):
     )
 
     def fake_analyze(req: AnalyzeRequest) -> AnalyzeResult:
+        assert len(list(tmp_path.glob("bugfix-freeze-*"))) == 1
         if req.ticket.defectId == "D1":
             raise RuntimeError("boom analyze")
         return AnalyzeResult(
@@ -932,12 +953,13 @@ def test_one_ticket_exception_does_not_stop_batch(tmp_path: Path):
         defect_batch=batch,
         code_knowledge=knowledge,
         analyze_fn=fake_analyze,
-        apply_fix=False,
+        apply_fix=True,
         artifact_dir=tmp_path / "art",
     )
     ids = {t.defectId: t.outcome for t in report.tickets}
     assert ids["D1"] == "other_blocked"
     assert ids["D2"] != "other_blocked" or report.tickets[1].rootCause.summary
+    assert not list(tmp_path.glob("bugfix-freeze-*"))
 
 
 def test_resume_keeps_other_tickets_and_round_report(tmp_path: Path, monkeypatch):

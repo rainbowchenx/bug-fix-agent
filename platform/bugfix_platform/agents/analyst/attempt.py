@@ -19,16 +19,26 @@ from bugfix_platform.agents.analyst.report import render_report
 from bugfix_platform.agents.analyst.route import route_ticket, slice_ticket
 from bugfix_platform.agents.analyst.sessions import load_latest_attempt
 from bugfix_platform.agents.analyst.workspace import (
-    capture_workspace,
     collect_patch,
     prepare_workspace,
     workspace_digest,
+    workspace_snapshot,
 )
 from bugfix_contracts import CodeKnowledge, is_match_pool
 from bugfix_contracts.code_knowledge import DefectCodeMatch
 from bugfix_contracts.defect_batch import BatchTicket
 from bugfix_contracts.analysis_report import TicketReport
-from bugfix_contracts.repair import REPAIR_SCHEMA_VERSION, AttemptRecord, EditDecision, Evidence, InputRevision, PatchSet, TaskContext, VerificationRun
+from bugfix_contracts.repair import (
+    REPAIR_SCHEMA_VERSION,
+    AttemptRecord,
+    EditDecision,
+    Evidence,
+    InputRevision,
+    PatchSet,
+    TaskContext,
+    VerificationRun,
+    WorkspaceSnapshot,
+)
 from bugfix_platform.sdk.analyze import AnalyzeRequest, AnalyzeRunner, resolve_analyze_max_turns
 from bugfix_platform.sdk.cartography import profile_reading_playbook
 from bugfix_platform.sdk.codegraph import CodeGraphStatus
@@ -59,31 +69,40 @@ class TicketAttemptInputs:
 
 
 def run_ticket_attempt(raw: BatchTicket, inputs: TicketAttemptInputs) -> dict[str, Any]:
-    rev_map, sess_map, parent_map = inputs.revisions, inputs.sessions, inputs.parents
+    revision = inputs.revisions.get(raw.defectId)
+    ticket = _promote_after_revision(_ticket_with_revision(raw, revision), revision)
+    if not is_match_pool(ticket.pool):
+        entry = _sideline_entry(ticket)
+        return _persist_ticket_entry(
+            inputs.out_dir,
+            entry,
+            _attempt_from_entry(
+                entry, revision=revision, session_id=inputs.sessions.get(ticket.defectId)
+            ),
+            already_locked=inputs.locked,
+        )
+    with workspace_snapshot(Path(inputs.work_dir), freeze=inputs.want_fix) as snapshot:
+        return _run_matched_ticket(ticket, inputs, revision, snapshot)
+
+
+def _run_matched_ticket(
+    ticket: BatchTicket,
+    inputs: TicketAttemptInputs,
+    revision: InputRevision | None,
+    snapshot: WorkspaceSnapshot,
+) -> dict[str, Any]:
+    sess_map, parent_map = inputs.sessions, inputs.parents
     out_dir, locked, work_dir = inputs.out_dir, inputs.locked, inputs.work_dir
     match_by_id, code_knowledge = inputs.matches, inputs.knowledge
     runner, injected, cg_status = inputs.runner, inputs.injected, inputs.codegraph
     want_fix, fixer, fix_fn, fix_skills = inputs.want_fix, inputs.fixer, inputs.fix_fn, inputs.fix_skills
     spec_atlas = code_knowledge.specAtlas.model_dump()
-    revision = rev_map.get(raw.defectId)
-    ticket = _promote_after_revision(_ticket_with_revision(raw, revision), revision)
-    if not is_match_pool(ticket.pool):
-        entry = _sideline_entry(ticket)
-        return _persist_ticket_entry(
-            out_dir,
-            entry,
-            _attempt_from_entry(
-                entry, revision=revision, session_id=sess_map.get(ticket.defectId)
-            ),
-            already_locked=locked,
-        )
     routed = route_ticket(ticket, match_by_id.get(ticket.defectId))
     entry: dict[str, Any] = {
         "defectId": ticket.defectId,
         "ticket": slice_ticket(ticket),
         **routed,
     }
-    snapshot = capture_workspace(Path(work_dir))
     analyze_session: Optional[str] = None
     previous_payload = None
     parent_attempt = parent_map.get(ticket.defectId)
@@ -398,7 +417,7 @@ def run_ticket_attempt(raw: BatchTicket, inputs: TicketAttemptInputs) -> dict[st
         attempt,
         already_locked=locked,
         revision=revision,
-        workspace=snapshot,
+        workspace=snapshot.model_copy(update={"freezeRoot": None}),
         resolutions=resolutions,
         previous_ledger=(previous_payload or {}).get("questionLedger") or (previous_payload or {}).get("openQuestions"),
         round_ledger=round_ledger,

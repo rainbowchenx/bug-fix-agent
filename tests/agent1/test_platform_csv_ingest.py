@@ -55,6 +55,17 @@ def test_describle_alias_listed():
     assert "defectTitle" in FIELD_ALIASES["title"]
 
 
+def test_module_name_csv_maps_to_test_module(tmp_path: Path):
+    source = tmp_path / "tickets.csv"
+    source.write_text(
+        "defectId,defectTitle,testModule,moduleName\n"
+        "D1,预览黑屏,,控件\n"
+        "D2,播放卡顿,播放器,控件\n",
+        encoding="utf-8",
+    )
+    assert [defect.testModule for defect in load_platform_csv(source)] == ["控件", "播放器"]
+
+
 def test_field_map_irdms_chinese_row():
     """iRDMS 缺陷拉取的中文导出：单号 / 模块 / 级别。
 

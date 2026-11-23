@@ -6,11 +6,13 @@ import difflib
 import hashlib
 import os
 import shutil
+import stat
 import subprocess
 import tempfile
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Iterator, Optional
 from uuid import uuid4
 
 from bugfix_contracts.repair import PatchFile, PatchSet, WorkspaceSnapshot
@@ -18,8 +20,8 @@ from bugfix_contracts.repair import PatchFile, PatchSet, WorkspaceSnapshot
 from bugfix_platform.workspace_fingerprint import _SKIP_COPY, _SKIP_FILES, _list_source_files, workspace_digest
 
 
-def capture_workspace(repo_root: Path) -> WorkspaceSnapshot:
-    """采集 HEAD、dirty 和内容摘要。源目录只读；同时冻结一份输入副本。"""
+def capture_workspace(repo_root: Path, *, freeze: bool = True) -> WorkspaceSnapshot:
+    """采集 HEAD、dirty 和内容摘要，可选冻结输入副本。"""
     root = Path(repo_root)
     head = (_git_out(root, "rev-parse", "HEAD") or "").strip() or None
     porcelain = _git_out(root, "status", "--porcelain") or ""
@@ -36,28 +38,56 @@ def capture_workspace(repo_root: Path) -> WorkspaceSnapshot:
         else:
             dirty.append(path)
     digest = workspace_digest(root)
-    freeze = Path(tempfile.mkdtemp(prefix="bugfix-freeze-"))
-    _copytree(root, freeze)
-    freeze_digest = workspace_digest(freeze)
-    if digest and freeze_digest != digest:
-        shutil.rmtree(freeze, ignore_errors=True)
-        raise RuntimeError("source changed while freezing snapshot")
-    return WorkspaceSnapshot(
+    snapshot = WorkspaceSnapshot(
         repoId=str(root.resolve()),
         head=head,
         dirty=dirty,
         untracked=untracked,
         contentDigest=digest,
         capturedAt=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        freezeRoot=str(freeze),
     )
+    if not freeze:
+        return snapshot
+
+    frozen = Path(tempfile.mkdtemp(prefix="bugfix-freeze-"))
+    try:
+        _copytree(root, frozen)
+        if workspace_digest(frozen) != digest:
+            raise RuntimeError("source changed while freezing snapshot")
+        snapshot.freezeRoot = str(frozen)
+    except BaseException:
+        _remove_freeze(frozen)
+        raise
+    return snapshot
+
+
+@contextmanager
+def workspace_snapshot(repo_root: Path, *, freeze: bool) -> Iterator[WorkspaceSnapshot]:
+    """将输入副本的生命周期限制在当前尝试。"""
+    snapshot = capture_workspace(repo_root, freeze=freeze)
+    try:
+        yield snapshot
+    finally:
+        if snapshot.freezeRoot:
+            _remove_freeze(Path(snapshot.freezeRoot))
+
+
+def _remove_freeze(frozen: Path) -> None:
+    def retry_readonly(remove, path, exc_info):
+        error = exc_info[1]
+        if os.name != "nt" or not isinstance(error, PermissionError):
+            raise error
+        os.chmod(path, stat.S_IWRITE)
+        remove(path)
+
+    shutil.rmtree(frozen, onerror=retry_readonly)
 
 
 def prepare_workspace(snapshot: WorkspaceSnapshot, destination: Path) -> Path:
     """把已登记基线重放到隔离目录并校验，不改源仓、不回读捕获后的源目录。"""
-    src = Path(snapshot.freezeRoot) if snapshot.freezeRoot else Path(snapshot.repoId)
-    if not src.is_dir():
+    if not snapshot.freezeRoot or not Path(snapshot.freezeRoot).is_dir():
         raise RuntimeError("frozen snapshot missing; refuse live recopy")
+    src = Path(snapshot.freezeRoot)
     dest = Path(destination)
     if dest.exists():
         shutil.rmtree(dest)

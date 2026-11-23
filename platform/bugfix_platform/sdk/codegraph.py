@@ -18,6 +18,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional, Sequence
@@ -105,25 +106,34 @@ class CodeGraphStatus:
         if not self.ready or not self.bin:
             return {}
         default = self.mcp_default_root() or str(Path(work_dir).resolve())
+        command = self.bin
+        args = ["serve", "--mcp", "-p", default]
+        if os.name == "nt":
+            from bugfix_platform.sdk._codegraph_windows import process_creation_time
+
+            # Use the base interpreter directly to avoid the Windows venv
+            # redirector between Claude and the stdio launcher.
+            command = sys._base_executable or sys.executable
+            launcher = Path(__file__).with_name("_codegraph_windows.py")
+            args = ["-I", str(launcher), str(os.getpid()), str(process_creation_time()), self.bin, *args]
         return {
             "codegraph": {
                 "type": "stdio",
-                "command": self.bin,
-                "args": ["serve", "--mcp", "-p", default],
+                "command": command,
+                "args": args,
                 "env": {"CODEGRAPH_TELEMETRY": os.environ.get("CODEGRAPH_TELEMETRY", "0")},
             }
         }
 
     def mcp_option_kwargs(self, work_dir: str) -> dict[str, Any]:
-        """Merge into ``ClaudeAgentOptions``; empty when MCP cannot be mounted.
-
-        Sets ``mcp_servers`` plus ``strict_mcp_config`` so the session only sees
-        the CodeGraph server we started, not the user's global MCP mix.
-        """
+        """Restrict the session to CodeGraph, or to zero servers when unavailable."""
         servers = self.mcp_servers(work_dir)
-        if not servers:
-            return {}
-        return {"mcp_servers": servers, "strict_mcp_config": True}
+        # The SDK omits --mcp-config for an empty dict. Inline JSON explicitly
+        # supplies an empty config to the CLI in strict mode.
+        return {
+            "mcp_servers": servers or '{"mcpServers": {}}',
+            "strict_mcp_config": True,
+        }
 
 
 def codegraph_enabled() -> bool:

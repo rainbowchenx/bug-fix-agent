@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import os
+import stat
 import subprocess
 from pathlib import Path
 
+import pytest
+
+from bugfix_platform.agents.analyst import workspace
 from bugfix_platform.agents.analyst.workspace import capture_workspace, prepare_workspace
 
 
@@ -83,6 +88,36 @@ def test_capture_digest_includes_clean_tracked_files(tmp_path: Path):
     subprocess.run(["git", "-C", str(repo), "commit", "-m", "b2"], check=True, capture_output=True)
     second = capture_workspace(repo)
     assert first.contentDigest != second.contentDigest
+
+
+def test_capture_removes_partial_freeze_when_copy_fails(tmp_path: Path, monkeypatch):
+    repo = _init_repo(tmp_path / "repo")
+    monkeypatch.setattr(workspace.tempfile, "tempdir", str(tmp_path))
+
+    def fail_copy(_src, dest):
+        (dest / "partial").write_text("partial copy", encoding="utf-8")
+        raise OSError("copy failed")
+
+    monkeypatch.setattr(workspace, "_copytree", fail_copy)
+    with pytest.raises(OSError, match="copy failed"):
+        capture_workspace(repo)
+    assert not list(tmp_path.glob("bugfix-freeze-*"))
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows read-only files block deletion")
+def test_freeze_cleanup_handles_readonly_files_on_windows(tmp_path: Path, monkeypatch):
+    repo = _init_repo(tmp_path / "repo")
+    monkeypatch.setattr(workspace.tempfile, "tempdir", str(tmp_path))
+    source = repo / "src" / "a.ts"
+    source.chmod(stat.S_IREAD)
+    try:
+        with workspace.workspace_snapshot(repo, freeze=True) as snapshot:
+            frozen = Path(snapshot.freezeRoot)
+            assert not (frozen / "src" / "a.ts").stat().st_mode & stat.S_IWRITE
+        assert not frozen.exists()
+        assert not source.stat().st_mode & stat.S_IWRITE
+    finally:
+        source.chmod(stat.S_IWRITE)
 
 
 def test_snapshot_uses_same_exclusions_as_frozen_copy(tmp_path):

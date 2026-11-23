@@ -33,7 +33,7 @@ FIELD_ALIASES: dict[str, list[str]] = {
     # one export ships both, with `所属模块` blank on every open ticket.
     # `模块` is what the iRDMS export calls it (comma-joined path, e.g.
     # `结构,校正工具,接收卡`).
-    "testModule": ["testModule", "测试模块", "所属模块", "模块"],
+    "testModule": ["testModule", "测试模块", "所属模块", "模块", "moduleName"],
     "fieldType": ["defectType", "类型", "缺陷类型", "type", "fieldType"],
     "severity": ["severityName", "severity", "严重级别", "级别"],
     "createdAt": ["createDate", "createdAt", "创建时间"],
