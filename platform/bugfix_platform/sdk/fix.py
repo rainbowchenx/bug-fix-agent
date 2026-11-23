@@ -134,14 +134,17 @@ def run_claude_fix(req: FixRequest) -> FixResult:
     texts: list[str] = []
 
     async def _run() -> None:
+        terminal_error: str | None = None
         async for message in query(prompt=prompt, options=options):
             if isinstance(message, ResultMessage):
                 if message.is_error:
-                    raise RuntimeError(
-                        "; ".join(message.errors or []) or message.result or "fix SDK error"
-                    )
+                    if terminal_error is None:
+                        terminal_error = "; ".join(message.errors or []) or message.result or "fix SDK error"
+                    continue
                 if isinstance(message.result, str) and message.result.strip():
                     texts.append(message.result)
+        if terminal_error is not None:
+            raise RuntimeError(terminal_error)
 
     try:
         anyio.run(_run)

@@ -503,6 +503,40 @@ def _install_fake_sdk(monkeypatch, options_cls, query_fn, result_message_cls):
     monkeypatch.setitem(sys.modules, "claude_agent_sdk", fake)
 
 
+@pytest.mark.parametrize("salvage", [False, True])
+def test_analyze_drains_sdk_error_before_returning_failure(tmp_path, monkeypatch, salvage):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    drained = []
+
+    class ResultMessage:
+        session_id = "test-session"
+        structured_output = None
+        result = ""
+        subtype = ""
+        terminal_reason = ""
+        is_error = True
+        errors = ["model service rejected the request"]
+
+    async def fake_query(*, prompt, options):
+        result = ResultMessage()
+        if salvage and "resume" not in options:
+            result.subtype = "error_max_turns"
+            yield result
+            return
+        yield result
+        # Code after the terminal frame runs only if the caller drains the stream.
+        drained.append(True)
+
+    _install_fake_sdk(monkeypatch, dict, fake_query, ResultMessage)
+    result = run_claude_analyze(AnalyzeRequest(
+        work_dir=str(tmp_path), ticket=_sdk_ticket(), routed=_sdk_routed(),
+    ))
+    assert drained == [True]
+    assert result.source == "sdk_fallback"
+    if not salvage:
+        assert "model service rejected the request" in result.detail
+
+
 def test_resume_unsupported_records_degrade_and_starts_new(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     monkeypatch.setenv("BUGFIX_CODEGRAPH", "0")

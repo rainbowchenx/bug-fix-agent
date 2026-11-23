@@ -227,6 +227,7 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
 
     async def _drive(prompt_text: str, opts: Any) -> None:
         nonlocal result_text, structured, session_id, budget_stop
+        terminal_error: str | None = None
         async for message in query(prompt=prompt_text, options=opts):
             observe_reads(message)
             text = _message_text(message)
@@ -240,10 +241,11 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
             if _budget_exhausted(message):
                 budget_stop = True
                 continue
-            if message.is_error:
-                raise RuntimeError(
-                    "; ".join(message.errors or []) or message.result or "analyze SDK error"
-                )
+            if message.is_error and terminal_error is None:
+                terminal_error = "; ".join(message.errors or []) or message.result or "analyze SDK error"
+        # Let the SDK close its transport on the same event loop before surfacing a result error.
+        if terminal_error is not None:
+            raise RuntimeError(terminal_error)
 
     try:
         anyio.run(_drive, prompt, _make_options())
@@ -267,6 +269,7 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
 
         async def _salvage() -> None:
             nonlocal structured, result_text
+            terminal_error: str | None = None
             async for message in query(
                 prompt=_SALVAGE_PROMPT,
                 options=_make_options(resume=session_id, turns=2),
@@ -279,12 +282,10 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
                     continue
                 structured = message.structured_output
                 result_text = message.result or ""
-                if message.is_error and not _budget_exhausted(message):
-                    raise RuntimeError(
-                        "; ".join(message.errors or [])
-                        or message.result
-                        or "analyze salvage error"
-                    )
+                if message.is_error and terminal_error is None and not _budget_exhausted(message):
+                    terminal_error = "; ".join(message.errors or []) or message.result or "analyze salvage error"
+            if terminal_error is not None:
+                raise RuntimeError(terminal_error)
 
         try:
             anyio.run(_salvage)

@@ -31,6 +31,28 @@ def _install_fake_sdk(monkeypatch, options_cls, query_fn, result_message_cls):
     monkeypatch.setitem(sys.modules, "claude_agent_sdk", fake)
 
 
+def test_fix_drains_sdk_error_before_returning_failure(tmp_path, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    drained = []
+
+    class ResultMessage:
+        is_error = True
+        errors = ["model service rejected the request"]
+        result = ""
+
+    async def fake_query(*, prompt, options):
+        yield ResultMessage()
+        drained.append(True)
+
+    _install_fake_sdk(monkeypatch, dict, fake_query, ResultMessage)
+    result = run_claude_fix(FixRequest(
+        work_dir=str(tmp_path), worktree_path=str(tmp_path), ticket=_ticket(), analysis={},
+    ))
+    assert drained == [True]
+    assert result.source == "sdk_fallback"
+    assert "model service rejected the request" in result.detail
+
+
 def test_run_claude_fix_keeps_edits_and_review_without_git(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     work = tmp_path / "copy"
