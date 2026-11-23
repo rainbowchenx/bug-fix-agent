@@ -104,6 +104,8 @@ def enqueue_run(
                 call_kwargs["cartography_profile"] = opts.cartographyProfile
             if opts.skillsDirs:
                 call_kwargs["extra_skill_dirs"] = list(opts.skillsDirs)
+            if opts.agent3McpTools:
+                call_kwargs["agent3_mcp_tools"] = list(opts.agent3McpTools)
             # 内置 LangGraph runner：渐进落盘 + 阶段流式。
             # 测试注入的 workflow_fn 可能不接受这些 kwargs。
             if workflow_fn is None:

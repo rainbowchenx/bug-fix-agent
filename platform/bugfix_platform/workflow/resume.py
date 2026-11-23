@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Sequence
 
 from bugfix_contracts.analysis_report import AnalysisReport
 from bugfix_contracts.repair import InputRevision, TaskContext
@@ -24,9 +24,10 @@ def resume_defect(
     execute: bool = False,
     apply_fix: bool = False,
     on_decision: Callable[[SessionDecision], None] | None = None,
+    agent3_mcp_tools: Sequence[str] = (),
 ) -> AnalysisReport | None:
     with store_lock(root):
-        return _resume_locked(root, defect_id, revision_id, apply_fix, execute, on_decision)
+        return _resume_locked(root, defect_id, revision_id, apply_fix, execute, on_decision, agent3_mcp_tools)
 
 
 def import_run_feedback(root: Path, source: Path) -> InputRevision:
@@ -49,6 +50,7 @@ def import_run_feedback(root: Path, source: Path) -> InputRevision:
 def _resume_locked(
     base: Path, defect_id: str, revision_id: str | None, apply_fix: bool, execute: bool,
     on_decision: Callable[[SessionDecision], None] | None,
+    agent3_mcp_tools: Sequence[str],
 ) -> AnalysisReport | None:
     """预览会话决策；execute 只分析，apply-fix 显式授权编辑。"""
     from bugfix_contracts.code_knowledge import validate_code_knowledge
@@ -119,6 +121,7 @@ def _resume_locked(
         parent_attempt_ids=parent_attempt_ids,
         artifact_dir=base,
         already_locked=True,
+        agent3_mcp_tools=agent3_mcp_tools,
     )
     dumped = report.model_dump()
     round_dir = base / "rounds"

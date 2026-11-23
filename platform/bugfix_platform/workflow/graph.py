@@ -234,6 +234,8 @@ def create_three_agent_graph(
         }
         if state.get("analyze_mode"):
             call_kwargs["analyze_mode"] = state["analyze_mode"]
+        if state.get("agent3_mcp_tools"):
+            call_kwargs["agent3_mcp_tools"] = state["agent3_mcp_tools"]
         if state.get("extra_skill_dirs"):
             call_kwargs["extra_skill_dirs"] = state["extra_skill_dirs"]
         if state.get("artifact_dir"):

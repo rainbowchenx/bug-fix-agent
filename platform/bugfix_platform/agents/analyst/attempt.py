@@ -43,6 +43,7 @@ from bugfix_platform.sdk.analyze import AnalyzeRequest, AnalyzeRunner, resolve_a
 from bugfix_platform.sdk.cartography import profile_reading_playbook
 from bugfix_platform.sdk.codegraph import CodeGraphStatus
 from bugfix_platform.sdk.fix import FixRequest, FixRunner
+from bugfix_platform.sdk.project_mcp import ProjectMcp
 from bugfix_platform.sdk.skill_inject import InjectedSkill
 
 
@@ -59,6 +60,7 @@ class TicketAttemptInputs:
     runner: AnalyzeRunner
     injected: Sequence[InjectedSkill]
     codegraph: CodeGraphStatus
+    project_mcp: ProjectMcp
     want_fix: bool
     fixer: FixRunner | None
     fix_fn: FixRunner | None
@@ -150,6 +152,7 @@ def _run_matched_ticket(
                 apply_fix=want_fix,
                 spec_atlas=spec_atlas,
                 codegraph=cg_status,
+                project_mcp=inputs.project_mcp,
                 investigation=match_by_id[ticket.defectId].model_dump() if ticket.defectId in match_by_id else {},
                 resume_session_id=sess_map.get(ticket.defectId),
                 previous_attempt=previous_payload,
@@ -278,6 +281,7 @@ def _run_matched_ticket(
                     apply_fix=want_fix,
                     spec_atlas=spec_atlas,
                     codegraph=cg_status,
+                    project_mcp=inputs.project_mcp,
                     investigation=match_by_id[ticket.defectId].model_dump() if ticket.defectId in match_by_id else {},
                     resume_session_id=analyze_session or sess_map.get(ticket.defectId),
                     previous_attempt={
@@ -380,6 +384,7 @@ def _run_matched_ticket(
             fixer=fixer,
             fix_fn=fix_fn,
             fix_skills=fix_skills,
+            project_mcp=inputs.project_mcp,
             out_dir=out_dir,
             snapshot=snapshot,
             revision=revision,
@@ -620,6 +625,7 @@ def _run_fix_loop(
     fixer: FixRunner,
     fix_fn: Optional[FixRunner],
     fix_skills: tuple,
+    project_mcp: ProjectMcp,
     out_dir: Optional[str],
     snapshot: Any,
     revision: Optional[InputRevision],
@@ -654,6 +660,7 @@ def _run_fix_loop(
                 worktree_path=str(wt),
                 artifact_dir=out_dir,
                 injected_skills=fix_skills,
+                project_mcp=project_mcp,
             )
         )
         last_payload.clear()

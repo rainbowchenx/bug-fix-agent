@@ -37,6 +37,7 @@ class ThreeAgentState(TypedDict):
     ]
     extra_skill_dirs: NotRequired[list[str]]
     """Agent-2/3 额外 overlay skill 根目录（与仓内 / .bugfix 合并；overlay 优先）。"""
+    agent3_mcp_tools: NotRequired[list[str]]
 
     # --- 渐进产物（Pydantic 模型的 dict 形态） ---
     defect_batch: dict[str, Any]

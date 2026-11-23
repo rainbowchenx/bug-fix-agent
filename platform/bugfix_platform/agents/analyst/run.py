@@ -12,6 +12,7 @@ from bugfix_contracts.repair import InputRevision
 from bugfix_platform.sdk.analyze import AnalyzeRunner, analyze_mode_from_env, create_analyze_runner
 from bugfix_platform.sdk.codegraph import ensure_codegraph
 from bugfix_platform.sdk.fix import FixRunner, apply_fix_from_env, create_fix_runner
+from bugfix_platform.sdk.project_mcp import load_project_mcp
 from bugfix_platform.sdk.skill_inject import discover_analyze_skills, discover_fix_skills
 from bugfix_platform.agents.analyst.attempt import (
     TicketAttemptInputs, _attempt_from_entry, _exception_entry, _persist_ticket_entry,
@@ -28,6 +29,7 @@ def run_analyst(
     apply_fix: Optional[bool] = None,
     analyze_mode: Optional[str] = None,
     extra_skill_dirs: Optional[Sequence[str | Path]] = None,
+    agent3_mcp_tools: Sequence[str] = (),
     analyze_fn: Optional[AnalyzeRunner] = None,
     fix_fn: Optional[FixRunner] = None,
     analyze_limit: Optional[int] = None,
@@ -60,6 +62,7 @@ def run_analyst(
         apply_fix: 是否跑第二段改码；``None`` 时看 ``BUGFIX_APPLY_FIX``。
         analyze_mode: ``heuristic`` / ``sdk``；``None`` 时看环境变量。
         extra_skill_dirs: 与 Agent-2 相同的仓特异性 skill 根目录。
+        agent3_mcp_tools: 本次允许的业务 MCP 工具全名，按仓内 .mcp.json 查找服务器。
         analyze_fn: 可注入的 ``AnalyzeRunner``（测试用）。
         fix_fn: 可注入的 ``FixRunner``（测试用）。
         analyze_limit: 最多 analyze 几张票。
@@ -75,6 +78,7 @@ def run_analyst(
     from bugfix_platform.sdk.runtime_profile import runtime_profile, skill_discovery
     work_dir = str(work_dir)
     want_fix = apply_fix_from_env(apply_fix)
+    project_mcp = load_project_mcp(work_dir, code_knowledge.repoRoots, agent3_mcp_tools)
     match_by_id = {m.defectId: m for m in code_knowledge.defectCodeMatches}
     injected = discover_analyze_skills(
         work_dir,
@@ -116,6 +120,7 @@ def run_analyst(
             revisions=rev_map, sessions=sess_map, parents=parent_map,
             matches=match_by_id, knowledge=code_knowledge, runner=runner,
             injected=injected, codegraph=cg_status, want_fix=want_fix,
+            project_mcp=project_mcp,
             fixer=fixer, fix_fn=fix_fn, fix_skills=fix_skills, remaining=remaining,
             analyze_sources=analyze_sources, skill_reads=skill_reads,
         )

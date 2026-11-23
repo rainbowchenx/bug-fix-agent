@@ -14,6 +14,7 @@ Agent-1 的 ``prepare-batch`` / ``apply-review`` 在 ``bugfix-agent``，不在�
 from __future__ import annotations
 
 from bugfix_contracts.env import load_env_file
+from bugfix_platform.sdk.project_mcp import ProjectMcpConfigError
 
 import argparse
 import json
@@ -35,6 +36,7 @@ def _cmd_resume(
     revision_id: str | None,
     apply_fix: bool = False,
     execute: bool = False,
+    agent3_mcp_tools: list[str] | None = None,
 ) -> int:
     from bugfix_platform.workflow.resume import (
         AttemptStoreBusy, ResumeRequestError, SessionDecision, resume_defect,
@@ -48,8 +50,8 @@ def _cmd_resume(
 
     try:
         resume_defect(Path(root), defect_id, revision_id, apply_fix=apply_fix,
-                      execute=execute, on_decision=print_decision)
-    except (AttemptStoreBusy, ResumeRequestError) as err:
+                      execute=execute, on_decision=print_decision, agent3_mcp_tools=agent3_mcp_tools or ())
+    except (AttemptStoreBusy, ResumeRequestError, ProjectMcpConfigError) as err:
         print(str(err), file=sys.stderr)
         return 1
     return 0
@@ -146,6 +148,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Run the next analyze/edit/check turn after writing the session decision",
     )
+    for command in (run_p, resume_p):
+        command.add_argument(
+            "--agent3-mcp-tool", action="append", default=[], metavar="MCP_TOOL",
+            help="Approve an exact mcp__<server>__<tool> from the business repo for this Agent 3 run (repeatable)",
+        )
 
     commit_p = sub.add_parser("commit", help="Commit a staged Agent-3 candidate locally")
     commit_p.add_argument("--root", required=True, help="Artifact / report root")
@@ -186,12 +193,14 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_feedback(args.root, args.file)
 
     if args.cmd == "resume":
+        mcp_kwargs = {"agent3_mcp_tools": args.agent3_mcp_tool} if args.agent3_mcp_tool else {}
         return _cmd_resume(
             args.root,
             args.defect_id,
             args.revision_id,
             apply_fix=bool(getattr(args, "apply_fix", False)),
             execute=bool(args.execute),
+            **mcp_kwargs,
         )
 
     if args.cmd != "run":  # pragma: no cover
@@ -212,6 +221,7 @@ def main(argv: list[str] | None = None) -> int:
         cartography_mode=args.cartography_mode,
         cartography_profile=args.cartography_profile,
         extra_skill_dirs=args.skills_dirs,
+        agent3_mcp_tools=args.agent3_mcp_tool,
         artifact_dir=args.out_dir,
         resume_dir=getattr(args, "resume_dir", None),
         ticket_ids=[x for x in (args.ticket_ids or "").split(",") if x] or None,

@@ -7,6 +7,7 @@ import ctypes
 import os
 import subprocess
 import sys
+from collections.abc import Callable
 from ctypes import wintypes
 from pathlib import Path
 
@@ -87,7 +88,7 @@ def _join_session_job() -> None:
     # exits, including when Claude kills it. All children inherit membership.
 
 
-def _start_codegraph(command: list[str]) -> subprocess.Popen:
+def start_stdio(command: list[str]) -> subprocess.Popen:
     executable = None
     env = None
     args: str | list[str] = command
@@ -95,15 +96,12 @@ def _start_codegraph(command: list[str]) -> subprocess.Popen:
         executable = str(Path(os.environ["SystemRoot"]) / "System32" / "cmd.exe")
         # Pass paths through quoted environment expansions to avoid interpreting
         # characters such as &, % or ! as cmd syntax in the executable or repo path.
-        env = {
-            **os.environ,
-            "_BUGFIX_CODEGRAPH_EXECUTABLE": command[0],
-            "_BUGFIX_CODEGRAPH_ROOT": command[-1],
-        }
-        args = (
-            f'"{executable}" /d /s /v:off /c '
-            '""%_BUGFIX_CODEGRAPH_EXECUTABLE%" serve --mcp -p "%_BUGFIX_CODEGRAPH_ROOT%""'
-        )
+        if any(any(char in arg for char in ('"', '\r', '\n')) for arg in command):
+            raise OSError("MCP batch-file arguments cannot contain quotes or line breaks")
+        variables = {f"_BUGFIX_MCP_ARG_{i}": arg for i, arg in enumerate(command)}
+        env = {**os.environ, **variables}
+        quoted = " ".join(f'"%{name}%"' for name in variables)
+        args = f'"{executable}" /d /s /v:off /c "{quoted}"'
     return subprocess.Popen(
         args,
         executable=executable,
@@ -115,7 +113,9 @@ def _start_codegraph(command: list[str]) -> subprocess.Popen:
     )
 
 
-def _run(owner_pid: int, owner_created: int, command: list[str]) -> int:
+def run_in_session_job(
+    owner_pid: int, owner_created: int, start: Callable[[], subprocess.Popen],
+) -> int:
     parent_pid = os.getppid()
     launcher_created = process_creation_time()
     watches: list[int] = []
@@ -135,7 +135,7 @@ def _run(owner_pid: int, owner_created: int, command: list[str]) -> int:
                 return 0
 
         _join_session_job()
-        child = _start_codegraph(command)
+        child = start()
         child_handle = _winapi.OpenProcess(_SYNCHRONIZE, False, child.pid)
         watches.append(child_handle)
         result = _winapi.WaitForMultipleObjects(watches, False, _winapi.INFINITE)
@@ -149,7 +149,9 @@ def _run(owner_pid: int, owner_created: int, command: list[str]) -> int:
 
 if __name__ == "__main__":
     try:
-        raise SystemExit(_run(int(sys.argv[1]), int(sys.argv[2]), sys.argv[3:]))
+        raise SystemExit(run_in_session_job(
+            int(sys.argv[1]), int(sys.argv[2]), lambda: start_stdio(sys.argv[3:]),
+        ))
     except OSError as error:
         print(f"CodeGraph MCP launcher: {error}", file=sys.stderr)
         raise SystemExit(1) from None

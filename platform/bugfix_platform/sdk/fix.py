@@ -6,13 +6,14 @@ import json
 import os
 import re
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional
 
 from bugfix_contracts.defect_batch import BatchTicket
 from bugfix_platform.sdk.credentials import has_credentials
 from bugfix_platform.sdk.parse import parse_json_payload
+from bugfix_platform.sdk.project_mcp import ProjectMcp
 from bugfix_platform.sdk.skill_inject import InjectedSkill, fix_skills_addon
 from bugfix_platform.sdk.skills import skills_system_addon
 
@@ -31,6 +32,7 @@ class FixRequest:
     max_turns: int = 16
     model: Optional[str] = None
     injected_skills: tuple[InjectedSkill, ...] = ()
+    project_mcp: ProjectMcp = field(default_factory=ProjectMcp)
 
 
 @dataclass
@@ -121,16 +123,6 @@ def run_claude_fix(req: FixRequest) -> FixResult:
         system_prompt = _FIX_SYSTEM_PROMPT + skills_system_addon(
             ("hierarchical-localization", "systematic-debugging")
         )
-    options = ClaudeAgentOptions(
-        cwd=req.worktree_path,
-        system_prompt=system_prompt,
-        allowed_tools=list(FIX_TOOLS),
-        disallowed_tools=list(DISALLOWED_TOOLS),
-        permission_mode="dontAsk",
-        max_turns=req.max_turns,
-        model=model,
-    )
-
     texts: list[str] = []
 
     async def _run() -> None:
@@ -147,6 +139,16 @@ def run_claude_fix(req: FixRequest) -> FixResult:
             raise RuntimeError(terminal_error)
 
     try:
+        options = ClaudeAgentOptions(
+            cwd=req.worktree_path,
+            system_prompt=system_prompt,
+            allowed_tools=[*FIX_TOOLS, *req.project_mcp.tools],
+            disallowed_tools=list(DISALLOWED_TOOLS),
+            permission_mode="dontAsk",
+            max_turns=req.max_turns,
+            model=model,
+            **req.project_mcp.sdk_options(req.worktree_path),
+        )
         anyio.run(_run)
     except Exception as err:  # noqa: BLE001
         return FixResult(

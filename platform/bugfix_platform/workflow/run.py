@@ -83,6 +83,7 @@ def run_three_agent_workflow(
         Literal["electron_node", "micro_frontend", "device_web", "unknown"]
     ] = None,
     extra_skill_dirs: Optional[Sequence[str | Path]] = None,
+    agent3_mcp_tools: Sequence[str] = (),
     agent2: Optional[CartographerFn] = None,
     agent3: Optional[AnalystFn] = None,
     artifact_dir: Optional[str | Path] = None,
@@ -153,6 +154,8 @@ def run_three_agent_workflow(
         initial["cartography_profile"] = cartography_profile
     if extra_skill_dirs:
         initial["extra_skill_dirs"] = [str(p) for p in extra_skill_dirs]
+    if agent3_mcp_tools:
+        initial["agent3_mcp_tools"] = list(agent3_mcp_tools)
     if artifact_dir is None:
         artifact_dir = default_artifact_dir(work_dir)
     initial["artifact_dir"] = str(artifact_dir)

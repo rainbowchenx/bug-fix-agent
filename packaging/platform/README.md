@@ -54,6 +54,8 @@ Agent-2 默认把匹配池票都送进 enrich（启发式 medium 也过，标 `h
 
 CodeGraph（`@colbymchenry/codegraph`）默认开启：workDir 已有 `.codegraph/` 则挂 MCP；没有则 `codegraph init -y` 再建。`BUGFIX_CODEGRAPH=0` 关掉；`BUGFIX_CODEGRAPH_INIT=0` 只用不自动建。
 
+LangGraph 运行输入可通过 `agent3_mcp_tools` 声明本次授权的业务 MCP 工具，例如 `["mcp__business_docs__search"]`。Agent 3 从 `work_dir` 和已发现业务仓根的 `.mcp.json` 读取对应服务器定义。当前运行只授权列出的工具，服务器名须在这些仓根中唯一。stdio 服务器从其配置所在的仓根启动，改码时使用对应的隔离副本。`BUGFIX_CODEGRAPH=0` 只关闭 CodeGraph，业务 MCP 授权和 Skill 注入照常生效。批准工具前请确认自己信任该仓内的服务器命令或地址。
+
 `enrich=sdk_fallback` 只表示 LLM 没跑成：缺凭据 / 没装 `claude-agent-sdk` / 进程崩溃 / 成功结束但 JSON 不合契约。
 
 ## 调用

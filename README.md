@@ -151,10 +151,13 @@ stdout 会打印摘要：`ok` / `stage` / `funnel` / `profile` / `summary`。
 | `--cartography-profile electron_node\|micro_frontend\|device_web\|unknown` | Agent-2 仓型（调用方给定，不探测；省略则为 `unknown`） |
 | `--cartography-mode heuristic\|sdk` | Agent-2 enrich 模式 |
 | `--skills-dir DIR` | Agent-2/3 注入仓特异性 skill（可重复；overlay 优先于包内置；见 `docs/prompts/agent2/`） |
+| `--agent3-mcp-tool MCP_TOOL` | 为本次 Agent 3 运行授权一个业务 MCP 工具，可重复传入 |
 | `--analyze-mode heuristic\|sdk` | Agent-3 enrich 模式（产品路径是 sdk；heuristic 留给无 key 测试） |
 | `--apply-fix` | Agent-3 在完整报告之后跑 worktree 改码（默认关） |
 | `--skip-agent2` / `--skip-agent3` | 调试跳过；`skip-agent2` 必须与 `skip-agent3` 同开（Agent-3 依赖 code-knowledge） |
 | `--open-mr` | 仅改报告 `integrateMode` 标志；**必须同时 `--apply-fix`**；当前不会真正开 MR |
+
+Agent 3 使用 SDK 模式时，可为本次运行批准业务仓 `.mcp.json` 中的具体工具。CLI 使用 `--agent3-mcp-tool mcp__business_docs__search`，HTTP 使用 `options.agent3McpTools`，Python 库和 LangGraph 输入使用 `agent3_mcp_tools`。工具名列表默认为空。
 
 ### 3）HTTP 服务（S4）
 

@@ -12,6 +12,7 @@ from bugfix_contracts.defect_batch import BatchTicket
 from bugfix_platform.sdk.parse import parse_json_payload
 from bugfix_platform.sdk.credentials import has_credentials
 from bugfix_platform.sdk.codegraph import CODEGRAPH_MCP_TOOLS, CodeGraphStatus
+from bugfix_platform.sdk.project_mcp import ProjectMcp
 from bugfix_platform.sdk.skill_inject import InjectedSkill, analyze_skills_addon
 from bugfix_platform.sdk.skills import skills_system_addon
 
@@ -45,6 +46,7 @@ class AnalyzeRequest:
     investigation: Optional[dict[str, Any]] = None
     resume_session_id: Optional[str] = None
     previous_attempt: Optional[dict[str, Any]] = None
+    project_mcp: ProjectMcp = field(default_factory=ProjectMcp)
 
 
 @dataclass
@@ -172,13 +174,13 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         kwargs: dict[str, Any] = {
             "cwd": req.work_dir,
             "system_prompt": system_prompt,
-            "allowed_tools": analyze_allowed_tools(req.codegraph),
+            "allowed_tools": [*analyze_allowed_tools(req.codegraph), *req.project_mcp.tools],
             "disallowed_tools": list(DISALLOWED_TOOLS),
             "permission_mode": "dontAsk",
             "max_turns": turns if turns is not None else max_turns,
             "model": model,
         }
-        kwargs.update((req.codegraph or CodeGraphStatus(ready=False)).mcp_option_kwargs(req.work_dir))
+        kwargs.update(req.project_mcp.sdk_options(req.work_dir, req.codegraph))
         resume_id = resume if resume is not None else req.resume_session_id
         if resume_id and allow_resume:
             kwargs["resume"] = resume_id

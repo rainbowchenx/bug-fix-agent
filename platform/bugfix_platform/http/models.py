@@ -15,6 +15,10 @@ class CreateRunOptions(BaseModel):
         default_factory=list,
         description="Agent-2/3 overlay skill roots; overlay outranks package SOP",
     )
+    agent3McpTools: list[str] = Field(
+        default_factory=list,
+        description="Exact repository MCP tool names approved for this Agent 3 run",
+    )
     skipAgent2: bool = False
     skipAgent3: bool = False
     openMr: bool = False
