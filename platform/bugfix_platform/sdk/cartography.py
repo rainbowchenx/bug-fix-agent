@@ -13,6 +13,7 @@ from bugfix_contracts import CodeKnowledge, DefectBatch
 from bugfix_contracts.code_knowledge import DefectCodeMatch
 from bugfix_platform.sdk.credentials import has_credentials
 from bugfix_platform.sdk.codegraph import CODEGRAPH_MCP_TOOLS, CodeGraphStatus
+from bugfix_platform.sdk.model_env import model_from_env, sdk_options_env
 from bugfix_platform.sdk.skill_inject import InjectedSkill, cartography_skills_addon
 from bugfix_platform.sdk.skills import skills_system_addon
 
@@ -199,7 +200,14 @@ def _cartography_hooks() -> dict[str, list[Any]]:
                 }
         return {}
 
-    return {"PreToolUse": [HookMatcher(matcher="Bash", hooks=[pre_tool_use], on_failure="block")]}
+    # 老版本 CLI（如 Nexas 自带的 2.1.314）不认 hook 的 onFailure 字段，
+    # 传了会让 initialize 直接失败。按版本决定要不要带上这层保护。
+    from bugfix_platform.sdk.claude_cli import hook_on_failure_supported
+
+    matcher_kwargs: dict[str, Any] = {"matcher": "Bash", "hooks": [pre_tool_use]}
+    if hook_on_failure_supported():
+        matcher_kwargs["on_failure"] = "block"
+    return {"PreToolUse": [HookMatcher(**matcher_kwargs)]}
 
 
 async def _can_use_cartography_tool(
@@ -341,7 +349,7 @@ def query_cartography(
     prompt_pairs = select_prompt_tickets(req)
     prompt_ids = [ticket.defectId for ticket, _ in prompt_pairs]
     prompt = _build_prompt(req, prompt_pairs=prompt_pairs)
-    model = req.model or os.environ.get("ANTHROPIC_MODEL") or None
+    model = model_from_env(req.model)
     if req.injected_skills:
         system_prompt = _SYSTEM_PROMPT + cartography_skills_addon(req.injected_skills)
     else:
@@ -378,6 +386,8 @@ def query_cartography(
         kwargs.update((cg or CodeGraphStatus(ready=False)).mcp_option_kwargs(req.work_dir))
         if resume:
             kwargs["resume"] = resume
+        # 平台注入 OPENAI_*、SDK 只认 ANTHROPIC_*，在 spawn 时按次覆盖。
+        kwargs = sdk_options_env(kwargs)
         try:
             return ClaudeAgentOptions(**kwargs)
         except TypeError:
@@ -388,7 +398,12 @@ def query_cartography(
                 return ClaudeAgentOptions(**kwargs)
             except TypeError:
                 kwargs.pop("can_use_tool", None)
-                return ClaudeAgentOptions(**kwargs)
+                try:
+                    return ClaudeAgentOptions(**kwargs)
+                except TypeError:
+                    # 老版本 SDK 不认 cli_path；去掉后走它自己的 CLI 查找。
+                    kwargs.pop("cli_path", None)
+                    return ClaudeAgentOptions(**kwargs)
 
     texts: list[str] = []
     result_text = ""

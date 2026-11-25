@@ -49,9 +49,13 @@ class ProjectMcp:
             }
 
         options["mcp_servers"] = {**servers, **builtin}
-        options["hooks"] = {"PreToolUse": [HookMatcher(
-            matcher="mcp__.*", hooks=[check_tool], on_failure="block",
-        )]}
+        # 老版本 CLI 不认 onFailure，传了会让 initialize 直接失败。
+        from bugfix_platform.sdk.claude_cli import hook_on_failure_supported
+
+        matcher_kwargs: dict[str, Any] = {"matcher": "mcp__.*", "hooks": [check_tool]}
+        if hook_on_failure_supported():
+            matcher_kwargs["on_failure"] = "block"
+        options["hooks"] = {"PreToolUse": [HookMatcher(**matcher_kwargs)]}
         return options
 
 

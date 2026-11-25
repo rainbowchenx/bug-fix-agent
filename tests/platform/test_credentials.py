@@ -15,6 +15,7 @@ from bugfix_platform.sdk.credentials import credentials_env_name, has_credential
 _KEYS = (
     "ANTHROPIC_API_KEY",
     "ANTHROPIC_AUTH_TOKEN",
+    "OPENAI_API_KEY",
     "BUGFIX_CARTOGRAPHY_MODE",
     "BUGFIX_ANALYZE_MODE",
 )
@@ -35,6 +36,10 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         ({"ANTHROPIC_API_KEY": "a", "ANTHROPIC_AUTH_TOKEN": "b"}, "ANTHROPIC_API_KEY"),
         # `.env` 里留 `KEY=` 的空占位不算凭据
         ({"ANTHROPIC_API_KEY": "   "}, None),
+        # 平台注入的 OpenAI 变量同样算凭据（运行时会映射成 ANTHROPIC_AUTH_TOKEN）
+        ({"OPENAI_API_KEY": "sk-platform"}, "OPENAI_API_KEY"),
+        # 原生 Anthropic 优先于平台注入
+        ({"OPENAI_API_KEY": "sk-p", "ANTHROPIC_AUTH_TOKEN": "bearer-n"}, "ANTHROPIC_AUTH_TOKEN"),
     ],
 )
 def test_credentials_env_name(monkeypatch, env, expected):
@@ -44,7 +49,9 @@ def test_credentials_env_name(monkeypatch, env, expected):
     assert has_credentials() is (expected is not None)
 
 
-@pytest.mark.parametrize("name", ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"])
+@pytest.mark.parametrize(
+    "name", ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY"]
+)
 def test_either_credential_auto_enables_sdk(monkeypatch, name):
     monkeypatch.setenv(name, "x")
     assert cartography_mode_from_env(None) == "sdk"

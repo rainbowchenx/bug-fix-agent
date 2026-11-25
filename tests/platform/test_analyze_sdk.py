@@ -697,3 +697,55 @@ def test_skill_read_requires_successful_tool_result(tmp_path,monkeypatch,relativ
     assert run_claude_analyze(req).skill_reads==[]
     failed[0]=False
     assert run_claude_analyze(req).skill_reads==[str(skill_path.resolve())]
+
+
+def test_parse_reports_contract_rejection_reason():
+    """JSON 合法但违反契约时，要把原因说出来。
+
+    以前 `_normalize_payload` 抛的 ValueError 被吞成 None，上层统一报
+    "sdk returned no parseable JSON analysis" —— 明明解析到了合法 JSON，
+    查日志却往"模型没输出 JSON"这个错误方向走。
+    """
+    dup = {
+        "rootCause": {
+            "summary": "x",
+            "claims": [
+                {"claimId": "c1", "statement": "a", "role": "fact",
+                 "status": "supported", "evidenceRefs": ["candidate:1"]},
+                {"claimId": "c1", "statement": "b", "role": "fact",
+                 "status": "supported", "evidenceRefs": ["candidate:1"]},
+            ],
+            "questions": [],
+        }
+    }
+    notes: list[str] = []
+    assert parse_analyze_payload(dup, notes) is None
+    assert len(notes) == 1
+    assert "duplicate claimId" in notes[0]
+    # 明确说是"被契约拒绝"，不是"没解析到 JSON"
+    assert "rejected by contract" in notes[0]
+
+
+def test_parse_no_note_when_input_is_not_json():
+    """非 JSON 输入不产生契约拒绝记录 —— 两者必须能区分开。"""
+    notes: list[str] = []
+    assert parse_analyze_payload("这里没有任何 JSON", notes) is None
+    assert notes == []
+
+
+def test_parse_unknown_claim_reference_reported():
+    bad = {
+        "rootCause": {
+            "summary": "x",
+            "claims": [],
+            "questions": [
+                {"id": "q1", "kind": "verification", "reason": "r",
+                 "relatedClaimIds": ["c9"], "requestedEvidence": "e",
+                 "category": "fact", "status": "open",
+                 "predecessorId": None, "newEvidenceRefs": []}
+            ],
+        }
+    }
+    notes: list[str] = []
+    assert parse_analyze_payload(bad, notes) is None
+    assert "question references unknown claim" in notes[0]

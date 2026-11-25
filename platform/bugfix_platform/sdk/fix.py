@@ -12,6 +12,7 @@ from typing import Any, Callable, Literal, Optional
 
 from bugfix_contracts.defect_batch import BatchTicket
 from bugfix_platform.sdk.credentials import has_credentials
+from bugfix_platform.sdk.model_env import model_from_env, sdk_options_env
 from bugfix_platform.sdk.parse import parse_json_payload
 from bugfix_platform.sdk.project_mcp import ProjectMcp
 from bugfix_platform.sdk.skill_inject import InjectedSkill, fix_skills_addon
@@ -116,7 +117,7 @@ def run_claude_fix(req: FixRequest) -> FixResult:
         )
 
     prompt = _build_fix_prompt(req)
-    model = req.model or os.environ.get("ANTHROPIC_MODEL") or None
+    model = model_from_env(req.model)
     if req.injected_skills:
         system_prompt = _FIX_SYSTEM_PROMPT + fix_skills_addon(req.injected_skills)
     else:
@@ -140,14 +141,18 @@ def run_claude_fix(req: FixRequest) -> FixResult:
 
     try:
         options = ClaudeAgentOptions(
-            cwd=req.worktree_path,
-            system_prompt=system_prompt,
-            allowed_tools=[*FIX_TOOLS, *req.project_mcp.tools],
-            disallowed_tools=list(DISALLOWED_TOOLS),
-            permission_mode="dontAsk",
-            max_turns=req.max_turns,
-            model=model,
-            **req.project_mcp.sdk_options(req.worktree_path),
+            **sdk_options_env(
+                {
+                    "cwd": req.worktree_path,
+                    "system_prompt": system_prompt,
+                    "allowed_tools": [*FIX_TOOLS, *req.project_mcp.tools],
+                    "disallowed_tools": list(DISALLOWED_TOOLS),
+                    "permission_mode": "dontAsk",
+                    "max_turns": req.max_turns,
+                    "model": model,
+                    **req.project_mcp.sdk_options(req.worktree_path),
+                }
+            )
         )
         anyio.run(_run)
     except Exception as err:  # noqa: BLE001

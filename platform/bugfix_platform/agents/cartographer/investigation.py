@@ -40,9 +40,14 @@ def _complete(knowledge: CodeKnowledge, ids: list[str]) -> bool:
 
 
 def _identity(req: CartographyRequest) -> dict:
+    from bugfix_platform.sdk.model_env import sdk_env_overrides
+
+    # 平台注入的 OPENAI_* 会映射成 ANTHROPIC_*，缓存 key 必须算上映射结果，
+    # 否则换了模型/网关仍会命中旧缓存。
+    effective = {**os.environ, **sdk_env_overrides()}
     return {
         "workspace": workspace_digest(Path(req.work_dir)),
-        "model": req.model or os.environ.get("ANTHROPIC_MODEL"),
+        "model": req.model or effective.get("ANTHROPIC_MODEL"),
         "skills": [(s.repoId, s.name, hashlib.sha256(s.skill_md.read_bytes()).hexdigest())
                    for s in req.injected_skills],
         "turns": req.max_turns,
@@ -53,7 +58,7 @@ def _identity(req: CartographyRequest) -> dict:
             "conventions": req.baseline.conventions.model_dump(),
             "specAtlas": req.baseline.specAtlas.model_dump(),
         },
-        "config": {k: os.environ.get(k) for k in (
+        "config": {k: effective.get(k) for k in (
             "ANTHROPIC_BASE_URL", "BUGFIX_CARTOGRAPHY_MAX_TURNS",
             "BUGFIX_CARTOGRAPHY_BASE_TURNS", "BUGFIX_CARTOGRAPHY_TURNS_PER_TICKET",
             "BUGFIX_MODEL_CONTEXT_WINDOW", "BUGFIX_MODEL_MODALITIES",

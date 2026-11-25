@@ -12,6 +12,7 @@ from bugfix_contracts.defect_batch import BatchTicket
 from bugfix_platform.sdk.parse import parse_json_payload
 from bugfix_platform.sdk.credentials import has_credentials
 from bugfix_platform.sdk.codegraph import CODEGRAPH_MCP_TOOLS, CodeGraphStatus
+from bugfix_platform.sdk.model_env import model_from_env, sdk_options_env
 from bugfix_platform.sdk.project_mcp import ProjectMcp
 from bugfix_platform.sdk.skill_inject import InjectedSkill, analyze_skills_addon
 from bugfix_platform.sdk.skills import skills_system_addon
@@ -135,8 +136,8 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
     if not has_credentials():
         return _blocked_analyze(
             req,
-            "no Anthropic credentials in env (ANTHROPIC_API_KEY / "
-            "ANTHROPIC_AUTH_TOKEN)",
+            "no credentials in env (ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN, "
+            "or platform-injected OPENAI_API_KEY)",
         )
 
     try:
@@ -146,7 +147,7 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         return _blocked_analyze(req, f"claude-agent-sdk not installed ({err})")
 
     prompt = _build_prompt(req)
-    model = req.model or os.environ.get("ANTHROPIC_MODEL") or None
+    model = model_from_env(req.model)
     if req.injected_skills:
         system_prompt = _SYSTEM_PROMPT + analyze_skills_addon(req.injected_skills)
     else:
@@ -184,6 +185,9 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         resume_id = resume if resume is not None else req.resume_session_id
         if resume_id and allow_resume:
             kwargs["resume"] = resume_id
+        # 平台注入 OPENAI_*、SDK 只认 ANTHROPIC_*，在 spawn 时按次覆盖。
+        # 同时补 cli_path（包里不带 356 MB 的 claude.exe）。
+        kwargs = sdk_options_env(kwargs)
         try:
             return ClaudeAgentOptions(**kwargs)
         except TypeError:
@@ -191,7 +195,12 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
                 raise
             option_notes.append("resume unsupported, starting new session")
             kwargs.pop("resume", None)
-            return ClaudeAgentOptions(**kwargs)
+            try:
+                return ClaudeAgentOptions(**kwargs)
+            except TypeError:
+                # 老版本 SDK 不认 cli_path；去掉后走它自己的 CLI 查找。
+                kwargs.pop("cli_path", None)
+                return ClaudeAgentOptions(**kwargs)
 
     texts: list[str] = []
     result_text = ""
@@ -265,8 +274,12 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         elif not budget_stop:
             return finish(_blocked_analyze(req, f"sdk analyze failed: {err}"))
 
-    parsed = _parse_session_json(structured, texts + [result_text])
-    if parsed is None and budget_stop and session_id:
+    reject_notes: list[str] = []
+    parsed = _parse_session_json(structured, texts + [result_text], reject_notes)
+    # salvage 不再只在 budget_stop 时触发：模型正常回合里输出一份「JSON 合法但
+    # 不合契约」的分析（典型是 duplicate claimId）同样值得再问一次 —— 那是一次
+    # 已经付过费的会话，直接判死太浪费。
+    if parsed is None and session_id:
         salvage_texts: list[str] = []
 
         async def _salvage() -> None:
@@ -293,10 +306,22 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
             anyio.run(_salvage)
         except Exception:  # noqa: BLE001
             pass
-        parsed = _parse_session_json(structured, texts + salvage_texts + [result_text])
+        retry_notes: list[str] = []
+        parsed = _parse_session_json(
+            structured, texts + salvage_texts + [result_text], retry_notes
+        )
+        reject_notes = retry_notes or reject_notes
+        if parsed is not None:
+            # 首次输出违规、salvage 才拿到合规内容 —— 记下来，好统计这类频率。
+            option_notes.append("salvaged after first response was unusable")
 
     if parsed is None:
-        return finish(_blocked_analyze(req, "sdk returned no parseable JSON analysis"))
+        detail = "sdk returned no parseable JSON analysis"
+        if reject_notes:
+            # 说清楚到底是「没给 JSON」还是「给了但违反契约」。
+            unique = list(dict.fromkeys(reject_notes))
+            detail = "sdk analysis unusable: " + "; ".join(unique[:2])
+        return finish(_blocked_analyze(req, detail))
 
     root_shape = (parsed or {}).get("rootCause") or {}
     if not isinstance(root_shape.get("questions"), list) or not isinstance(root_shape.get("claims"), list):
@@ -340,22 +365,40 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
     )
 
 
-def parse_analyze_payload(raw: Any) -> Optional[dict[str, Any]]:
+def parse_analyze_payload(raw: Any, notes: Optional[list[str]] = None) -> Optional[dict[str, Any]]:
+    """解析一份模型输出；失败返回 ``None``，并把原因追加到 ``notes``。
+
+    失败分两类，**必须区分开**，否则日志会误导：
+
+    - ``不是 JSON``：模型根本没按格式输出
+    - ``JSON 合法但不合契约``：``normalize_root()`` 抛的
+      ``duplicate claimId`` / ``question references unknown claim`` /
+      ``Claim`` 的 ValidationError
+
+    第二类以前和第一类一样报 ``no parseable JSON``，实际是结构违规 ——
+    查日志时会往"模型没输出 JSON"这个错误方向走。
+    """
     parsed = parse_json_payload(raw)
     if parsed is None:
         return None
     try:
         return _normalize_payload(parsed)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as err:
+        if notes is not None:
+            reason = f"{type(err).__name__}: {err}"
+            # 一行就够，别把整份 payload 塞进诊断
+            notes.append(f"parsed JSON rejected by contract ({reason.splitlines()[0][:160]})")
         return None
 
 
-def _parse_session_json(structured: Any, texts: list[str]) -> Optional[dict[str, Any]]:
-    parsed = parse_analyze_payload(structured)
+def _parse_session_json(
+    structured: Any, texts: list[str], notes: Optional[list[str]] = None
+) -> Optional[dict[str, Any]]:
+    parsed = parse_analyze_payload(structured, notes)
     if parsed is not None:
         return parsed
     for text in reversed(texts):
-        parsed = parse_analyze_payload(text)
+        parsed = parse_analyze_payload(text, notes)
         if parsed is not None:
             return parsed
     return None
