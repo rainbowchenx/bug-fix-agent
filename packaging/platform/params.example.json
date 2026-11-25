@@ -1,0 +1,41 @@
+// Nexas OS 任务参数模板。
+//
+// 用法：把本文件拷到一个固定位置（比如 D:/nexas/params/transport.json），
+// 改好下面的路径，然后在 Nexas 对话框里**只填这个文件的路径**：
+//
+//     D:/nexas/params/transport.json
+//
+// 平台会在你的输入后面追加两千多字符的安全说明和文件传递说明，
+// 那几个是噪音——本图的入口只取第一个存在的路径，后面的内容一律忽略。
+//
+// 相对路径按本文件所在目录解析。
+
+{
+  // 【必需】Agent-1 产出的 defect-batch JSON。
+  "defect_batch": "E:/work/defect-batch.json",
+
+  // 【建议】被分析的业务代码根。留空则用 Nexas 任务里配的「业务项目根」。
+  // 必须是 git 仓，或包含 git 仓的父目录。
+  "work_dir": "E:/repos/transport",
+
+  // 产线标识。留空则从 defect_batch.productLine 取。
+  "product_line": "PJ14PD20260423284",
+
+  // 【强烈建议】仓型。不给会退化成 unknown，路径匹配基本失效，结果没价值。
+  // 可选：device_web / micro_frontend / electron_node
+  "cartography_profile": "device_web",
+
+  // 分析方式。留空则看 .env 里有没有 ANTHROPIC 凭据，有就 sdk，没有就 heuristic。
+  // 可选：sdk / heuristic
+  "cartography_mode": "sdk",
+  "analyze_mode": "sdk",
+
+  // 只跑指定的票。留空/删掉则跑全部。
+  "ticket_ids": ["BGCM2026102708222"],
+
+  // 是否真改码。默认 false，只出分析方案。
+  "apply_fix": false
+
+  // 产物目录。留空则 <work_dir>/.bugfix-runs/<时间戳>-<随机>。
+  // "artifact_dir": "E:/work/bugfix-output"
+}

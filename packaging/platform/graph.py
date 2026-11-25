@@ -1,38 +1,394 @@
-"""平台入口：zip 根级 ``graph.py``。
+"""Nexas OS 平台入口：zip 根级 ``graph.py``。
 
-公司 agent 平台要求 zip 根目录存在 ``graph.py``，并暴露
-``build_graph()`` / ``graph`` / ``main()`` 三者之一。这里三个都给。
+## 设计原则：所有参数都是"路径"
 
-真正的图定义在 ``bugfix_platform/workflow/langgraph_app.py``，此处只做转发——
-不要在两边各写一份 StateGraph，否则漂移后平台和本地跑的不是同一张图。
+本入口只认一件事——**一个参数文件**。用户输入（``state["input"]``）写的是该文件的
+路径，其余所有参数（defect-batch 路径、工作区、产线、仓型……）都写在那个文件里。
+参数文件本身也是路径，不是 JSON 字符串。
 
-注意：**不要**在这里挂 ``InMemorySaver``。持久化由平台 Server 负责。
+这样做的原因：Nexas 会把平台自己的说明文字追加到用户输入后面（安全策略、文件传递
+说明，两千多字符），任何"输入即 JSON"的假设都会被这些后缀破坏。路径模型对追加
+文字免疫——取第一行或第一个存在的路径就够了。
+
+    input: "E:/work/task-params.json"
+             ↓ 读取
+    {
+      "defect_batch": "E:/work/defect-batch.json",   ← 也可以是相对路径
+      "work_dir":     "E:/repos/transport",
+      "product_line": "PJ14PD20260423284",
+      "cartography_profile": "device_web"
+    }
+             ↓ run_three_agent_workflow()
+    analysis-report
+             ↓ 投影
+    {summary, result, ok}
+
+## 参数文件字段
+
+===================  ==========  ==========================================
+字段                 必需        说明
+===================  ==========  ==========================================
+defect_batch         是          Agent-1 产物 JSON 的路径
+work_dir             否          业务代码根；缺省用 runner 的 cwd
+product_line         否          缺省取 defect_batch.productLine
+posture              否          alpha / beta，默认 beta
+cartography_profile  否          强烈建议给；缺省 unknown 会明显降质
+cartography_mode     否          sdk / heuristic
+analyze_mode         否          sdk / heuristic
+ticket_ids           否          字符串数组，只跑这些票
+apply_fix            否          默认关（只出方案不改码）
+artifact_dir         否          产物目录；缺省 <work_dir>/.bugfix-runs/<时间戳>
+===================  ==========  ==========================================
+
+所有路径字段都支持相对路径——相对于**参数文件所在目录**解析，其次相对于 cwd。
+
+## 为什么不需要 input_schema.json
+
+客户端可以用 ``{"input_field": "xxx"}`` 把用户输入映射到某个 state 字段，但值仍然
+是字符串。既然我们本来就只读一个路径，默认的 ``input`` 字段就够用。
+
+## 关于出图
+
+本文件只有一个 ``run_workflow`` 节点。Nexas 的 AST 解析器会把这张**外层包装图**
+画出来；真正的 Agent-2→3 五节点编排在 ``bugfix_platform/workflow/langgraph_app.py``
+里，AST 静态扫描跟不过去。这是已知取舍：先保证能跑出结果。
+
+不要在这里加 ``from __future__ import annotations``——Nexas 的 runner 没把模块注册
+进 ``sys.modules``，``get_type_hints()`` 解析不了字符串注解，``TypedDict`` 定义会
+直接炸 ``NameError``。
 """
 
-from __future__ import annotations
+import json
+import os
+import re
+import traceback
+from pathlib import Path
+from typing import Any, NotRequired, TypedDict
 
-# 平台只负责 import 这个模块，不会替我们读 zip 里的 .env；不在这里读，
-# 那个文件就是摆设（实测：import 后 ANTHROPIC_API_KEY 仍是 None，mode=heuristic）。
-# load_env_file 幂等，且**已存在的真实环境变量优先**——平台「模型管理」注入的值
-# 不会被仓里的 .env 覆盖。
+from langgraph.graph import END, START, StateGraph
+
+# 平台不会替我们读 zip 里的 .env；不在这里调，那个文件就是摆设。
+# load_env_file 幂等，且已存在的真实环境变量优先——平台「模型管理」注入的
+# 值不会被仓里的 .env 覆盖。
 from bugfix_contracts.env import load_env_file
 
 load_env_file()
 
-from bugfix_platform.workflow.langgraph_app import graph  # noqa: E402
+# SDK 的 Python 代码随包分发（0.5 MB），但那个 356 MB 的 claude.exe 不带 ——
+# Nexas 自己就有一份。这里找到它并塞进 PATH，SDK 的 _find_cli() 才解析得到。
+# 找不到也不报错：后续 SDK 调用会自己给出清晰的 ImportError/解析失败信息。
+from bugfix_platform.sdk.claude_cli import ensure_claude_cli_on_path  # noqa: E402
 
-__all__ = ["graph", "build_graph", "main"]
+_CLAUDE_CLI = ensure_claude_cli_on_path()
+
+# 客户端从 outputs 里挑这两个字段展示。summary 进任务卡片，result 进结果面板。
+SUMMARY_MAX = 200
+RESULT_MAX = 20000
+
+# 参数文件里允许出现的键。其余忽略，避免拼错字段静默生效。
+_PATH_KEYS = ("defect_batch", "work_dir", "artifact_dir")
+_KNOWN_KEYS = frozenset(
+    {
+        "defect_batch",
+        "work_dir",
+        "product_line",
+        "posture",
+        "cartography_profile",
+        "cartography_mode",
+        "analyze_mode",
+        "ticket_ids",
+        "apply_fix",
+        "artifact_dir",
+    }
+)
+
+
+class NexasState(TypedDict):
+    """外层包装图的 state。
+
+    ``input`` 必须声明——LangGraph 会丢弃未声明的键，不声明的话节点里根本
+    看不到用户输入。
+    """
+
+    input: NotRequired[str]
+    summary: NotRequired[str]
+    result: NotRequired[str]
+    ok: NotRequired[bool]
+    error: NotRequired[str]
+
+
+# ---------------------------------------------------------------------------
+# 输入解析：从用户输入里取参数文件路径
+# ---------------------------------------------------------------------------
+
+
+def _user_paths(text: str) -> list[str]:
+    """从用户输入里摘出候选路径，按出现顺序。
+
+    Nexas 会在用户输入后面追加平台说明（含大量中文和反斜杠），所以不能整体
+    当路径用。做法是逐行找"像路径"的片段：
+
+    - 去掉首尾引号/空白
+    - 必须含路径分隔符或盘符
+    - 不含换行
+    """
+    found: list[str] = []
+    for raw in (text or "").splitlines():
+        line = raw.strip().strip('"').strip("'").strip("`").strip()
+        if not line or len(line) > 400:
+            continue
+        # 盘符开头 / POSIX 绝对路径 / 含分隔符的相对路径
+        if re.match(r"^[A-Za-z]:[\\/]", line) or line.startswith(("/", "\\")):
+            found.append(line)
+        elif ("\\" in line or "/" in line) and " " not in line:
+            found.append(line)
+    return found
+
+
+def _candidates(text: str) -> list[Path]:
+    """把候选路径展开成绝对路径列表（相对 cwd 解析）。"""
+    out: list[Path] = []
+    for raw in _user_paths(text):
+        p = Path(raw).expanduser()
+        out.append(p if p.is_absolute() else (Path.cwd() / p))
+    return out
+
+
+def _find_params_file(text: str) -> Path:
+    """定位参数文件。
+
+    依次尝试：输入里的每个候选路径 → 若指向目录则找其中的 params.json /
+    task-params.json / input.json。找到一个存在的就返回。
+    """
+    tried: list[str] = []
+    for cand in _candidates(text):
+        tried.append(str(cand))
+        if cand.is_file():
+            return cand
+        if cand.is_dir():
+            for name in ("params.json", "task-params.json", "input.json", "args.json"):
+                nested = cand / name
+                if nested.is_file():
+                    return nested
+            tried.extend(str(cand / n) for n in ("params.json", "task-params.json", "input.json"))
+
+    detail = "\n".join(f"  · {t}" for t in tried) or "  （输入里没有找到任何路径）"
+    raise ValueError(
+        "没有找到参数文件。用户输入应当是一个 JSON 文件的路径，例如：\n"
+        "  E:/work/task-params.json\n"
+        f"尝试过：\n{detail}\n"
+        f"当前工作目录：{Path.cwd()}"
+    )
+
+
+def _load_params(path: Path) -> dict[str, Any]:
+    """读参数文件。支持带 BOM、单行注释（``//``）的宽松 JSON。"""
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except OSError as err:
+        raise ValueError(f"读取参数文件失败：{path}：{err}") from err
+
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as err:
+        # 允许 // 开头整行注释，方便人手工维护这个文件
+        stripped = "\n".join(
+            ln for ln in text.splitlines() if not ln.lstrip().startswith("//")
+        )
+        try:
+            data = json.loads(stripped)
+        except json.JSONDecodeError:
+            raise ValueError(
+                f"参数文件不是合法 JSON：{path}（第 {err.lineno} 行第 {err.colno} 列）"
+            ) from err
+
+    if not isinstance(data, dict):
+        raise ValueError(f"参数文件顶层必须是 JSON 对象：{path}")
+    return data
+
+
+def _resolve_paths(params: dict[str, Any], base: Path) -> dict[str, Any]:
+    """把参数文件里的相对路径按参数文件所在目录解析成绝对路径。"""
+    out = dict(params)
+    for key in _PATH_KEYS:
+        raw = out.get(key)
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        p = Path(raw.strip()).expanduser()
+        if not p.is_absolute():
+            p = base / p
+        out[key] = str(p.resolve())
+    return out
+
+
+def _default_work_dir() -> str:
+    """缺省工作区：runner 被 spawn 时的 cwd。
+
+    Nexas 用 ``t.cwd || e.workspace`` 作为 spawn 的 cwd（业务项目根），并把同一个值
+    写进 state.workspacePath。所以进程的 cwd 就是我们想要的业务代码根。
+    """
+    return str(Path.cwd())
+
+
+def _validate(params: dict[str, Any]) -> None:
+    """启动前把明显缺的东西一次性报清楚，别让下游报一堆无关的校验错。"""
+    problems: list[str] = []
+
+    db = params.get("defect_batch")
+    if not db:
+        problems.append("缺少 defect_batch（defect-batch JSON 的路径）")
+    elif not Path(str(db)).is_file():
+        problems.append(f"defect_batch 指向的文件不存在：{db}")
+
+    wd = params.get("work_dir")
+    if wd and not Path(str(wd)).is_dir():
+        problems.append(f"work_dir 不是目录：{wd}")
+
+    unknown = set(params) - _KNOWN_KEYS
+    if unknown:
+        problems.append(f"参数文件里有无法识别的字段（拼错了？）：{sorted(unknown)}")
+
+    if problems:
+        raise ValueError("\n".join(f"  · {p}" for p in problems))
+
+
+# ---------------------------------------------------------------------------
+# 节点
+# ---------------------------------------------------------------------------
+
+
+def run_workflow(state: NexasState) -> dict[str, Any]:
+    """读参数文件 → 跑 Agent-2→3 → 把结果投影成客户端能展示的两个字段。"""
+    from bugfix_platform.workflow import run_three_agent_workflow
+
+    body = state.get("input") or ""
+
+    try:
+        params_path = _find_params_file(body)
+        params = _resolve_paths(_load_params(params_path), params_path.parent)
+    except Exception as err:  # noqa: BLE001
+        return _failure(f"入参解析失败：{err}")
+
+    params.setdefault("work_dir", _default_work_dir())
+
+    try:
+        _validate(params)
+    except Exception as err:  # noqa: BLE001
+        return _failure(f"参数校验失败（{params_path}）：\n{err}")
+
+    try:
+        result = run_three_agent_workflow(
+            work_dir=params["work_dir"],
+            product_line=params.get("product_line") or "unknown",
+            defect_batch=params["defect_batch"],
+            posture=params.get("posture") or "beta",
+            apply_fix=params.get("apply_fix"),
+            analyze_mode=params.get("analyze_mode"),
+            cartography_mode=params.get("cartography_mode"),
+            cartography_profile=params.get("cartography_profile"),
+            ticket_ids=params.get("ticket_ids"),
+            artifact_dir=params.get("artifact_dir"),
+        )
+    except Exception as err:  # noqa: BLE001 — 任何异常都要变成可读结果，不能崩在图里
+        detail = f"{type(err).__name__}: {err}\n{traceback.format_exc(limit=5)}"
+        return _failure(f"编排执行失败：{err}", detail)
+
+    return _project(result)
+
+
+def _project(result: Any) -> dict[str, Any]:
+    """把 ``ThreeAgentWorkflowResult`` 投影成客户端会读的字段。"""
+    ok = bool(getattr(result, "ok", False))
+    stage = getattr(result, "stage", "?")
+    error = getattr(result, "error", None)
+    artifacts = getattr(result, "artifacts", None)
+    report = getattr(artifacts, "analysis_report", None) if artifacts else None
+    knowledge = getattr(artifacts, "code_knowledge", None) if artifacts else None
+    batch = getattr(artifacts, "defect_batch", None) if artifacts else None
+
+    lines: list[str] = []
+    lines.append(f"状态：{'成功' if ok else '失败'}（stage={stage}）")
+    if error:
+        lines.append(f"原因：{error}")
+    if batch is not None:
+        lines.append(f"缺陷批次：{len(getattr(batch, 'tickets', []) or [])} 张票")
+    if knowledge is not None:
+        lines.append(f"仓型：{getattr(knowledge, 'cartographyProfile', '?')}")
+    if report is not None:
+        summary = getattr(report, "summary", None)
+        if summary is not None:
+            total = getattr(summary, "total", 0)
+            by_outcome = getattr(summary, "byOutcome", {}) or {}
+            lines.append(f"分析结果：{total} 张票")
+            for outcome, count in sorted(by_outcome.items()):
+                lines.append(f"  · {outcome}: {count}")
+        for ticket in (getattr(report, "tickets", []) or [])[:10]:
+            defect_id = getattr(ticket, "defectId", "?")
+            outcome = getattr(ticket, "outcome", None) or getattr(ticket, "analysisStatus", "?")
+            lines.append(f"  - {defect_id}: {outcome}")
+        artifact_dir = getattr(result, "artifact_dir", None)
+        if artifact_dir:
+            lines.append(f"产物目录：{artifact_dir}")
+
+    text = "\n".join(lines)
+    head = lines[0]
+    if error:
+        head = f"{head} — {error}"
+
+    return {
+        "summary": head[:SUMMARY_MAX],
+        "result": text[:RESULT_MAX],
+        "ok": ok,
+    }
+
+
+def _failure(message: str, detail: str = "") -> dict[str, Any]:
+    """失败也要写 summary/result——否则客户端只能看到一个空白任务。"""
+    text = message if not detail else f"{message}\n\n{detail[:RESULT_MAX]}"
+    return {
+        "summary": message[:SUMMARY_MAX],
+        "result": text[:RESULT_MAX],
+        "ok": False,
+    }
+
+
+# ---------------------------------------------------------------------------
+# 图
+# ---------------------------------------------------------------------------
+
+
+def _compile():
+    """构造并编译外层包装图。"""
+    g = StateGraph(NexasState)
+    g.add_node("run_workflow", run_workflow)
+    g.add_edge(START, "run_workflow")
+    g.add_edge("run_workflow", END)
+    return g.compile()
 
 
 def build_graph():
-    """返回已编译的父级 StateGraph（Agent-2 → Agent-3）。"""
+    """返回已编译的外层包装图。
+
+    必须返回**同一个**编译产物：``langgraph_runner.py`` 会在拿到图之后从
+    ``.builder`` 重新 compile 注入 checkpointer，对象不唯一会导致行为和图定义
+    脱节。所以这里复用模块级 ``graph``，不每次新建。
+    """
     return graph
 
 
+# 模块级 graph：Nexas 的 load_graph() 先找 build_graph()，没有才用这个。
+# 两个都给，平台和本地脚本都能用。
+graph = _compile()
+
+
 def main() -> int:
-    """平台若无 ``graph`` 属性时回退到 ``main()``；这里不做实际工作。"""
-    print("bugfix-agent: use `graph` / `build_graph()`; run via LangGraph Server.")
-    return 0
+    """本地/兜底入口：``python graph.py <参数文件路径>``。"""
+    import sys
+
+    body = sys.argv[1] if len(sys.argv) > 1 else ""
+    out = graph.invoke({"input": body})
+    print(json.dumps(out, ensure_ascii=False, indent=2))
+    return 0 if out.get("ok") else 1
 
 
 if __name__ == "__main__":

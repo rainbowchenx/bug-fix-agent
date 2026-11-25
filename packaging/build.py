@@ -35,6 +35,7 @@ import sys
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 PKG = Path(__file__).resolve().parent
@@ -374,7 +375,9 @@ def build_platform() -> Path:
     n_skills = sum(1 for p in (out / "skills").iterdir() if p.is_dir() and (p / "SKILL.md").is_file())
     log(f"platform: {n_skills} skills")
 
-    for name in ("graph.py", "langgraph.json", "requirements.txt"):
+    vendor_claude_sdk_code(out)
+
+    for name in ("graph.py", "langgraph.json", "requirements.txt", "params.example.json"):
         shutil.copy2(PKG / "platform" / name, out / name)
     shutil.copy2(ROOT / ".env.example", out / ".env.example")
     shutil.copy2(PKG / "platform" / "README.md", out / "README.md")
@@ -402,19 +405,86 @@ def build_platform() -> Path:
     return zip_path
 
 
+def vendor_claude_sdk_code(out: Path) -> None:
+    """把 ``claude_agent_sdk`` 的**纯 Python 代码**打进包，排除 356 MB 的 ``claude.exe``。
+
+    为什么这么做：
+
+    - Artifactory 上 ``claude_agent_sdk-*.whl``（179 MB）需要认证，内网 pip 装不下来
+      （401），而且平台装依赖失败只 warn 不报错 —— 结果就是"导入成功、SDL 用不了"。
+    - 这个 wheel 里 357 MB 有 356 MB 是 ``_bundled/claude.exe``，纯代码只有 0.5 MB。
+    - Nexas OS 自带 ``resources/code-sprite-cli/claude.exe``，运行时找得到。
+
+    所以：代码随包走，CLI 用宿主的。``bugfix_platform/sdk/claude_cli.py`` 负责定位。
+    """
+    try:
+        import claude_agent_sdk as sdk
+    except ImportError:
+        log("platform: claude-agent-sdk not installed in build env; skipping vendor")
+        return
+
+    src = Path(sdk.__file__).parent
+    dest = out / "claude_agent_sdk"
+    shutil.copytree(
+        src,
+        dest,
+        ignore=shutil.ignore_patterns("_bundled", "__pycache__", "*.pyc", "*.pyo"),
+    )
+    # dist-info 也带上：handoff.py 用 importlib.metadata.version("claude-agent-sdk") 写诊断信息。
+    dist_info = src.parent / f"claude_agent_sdk-{_sdk_version(sdk)}.dist-info"
+    if dist_info.is_dir():
+        shutil.copytree(
+            dist_info,
+            out / dist_info.name,
+            ignore=shutil.ignore_patterns("RECORD", "*.pyc"),
+        )
+    size_kb = sum(p.stat().st_size for p in dest.rglob("*") if p.is_file()) / 1024
+    log(f"platform: vendored claude_agent_sdk code ({size_kb:.0f} KB, bundled CLI excluded)")
+
+
+def _sdk_version(sdk_module: Any) -> str:
+    try:
+        from importlib.metadata import version
+
+        return version("claude-agent-sdk")
+    except Exception:  # noqa: BLE001
+        return getattr(sdk_module, "__version__", "0")
+
+
 def _verify_platform(staging: Path) -> None:
+    """从暂存树单独验证平台包。
+
+    根 ``graph.py`` 是给 Nexas OS 用的**外层包装图**（一个节点，把用户输入的
+    字符串适配成父图要求的完整 state），真正的 Agent-2→3 编排在
+    ``bugfix_platform/workflow/langgraph_app.py``。所以这里既要验证包装图能
+    加载，也要验证真正的父图还在、且 Agent-1 没有泄漏进来。
+    """
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+    # 关键：把暂存树放最前面，验证用的是**包内的** claude_agent_sdk，
+    # 不是构建机 site-packages 里那份。否则 vendor 漏了也会"验过"。
     code = (
         "import sys; sys.path.insert(0, r'%s');"
         "from graph import graph, build_graph;"
         "assert build_graph() is graph, 'build_graph() must return the same compiled graph';"
         "assert hasattr(graph, 'invoke'), 'graph is not compiled (missing invoke)';"
-        "nodes = set(graph.get_graph().nodes);"
+        "wrapper = set(graph.get_graph().nodes);"
+        "assert 'run_workflow' in wrapper, f'unexpected wrapper nodes: {sorted(wrapper)}';"
+        # 真正的父图必须还在——包装层只是适配器，不能把编排丢了。
+        "from bugfix_platform.workflow.langgraph_app import graph as parent;"
+        "nodes = set(parent.get_graph().nodes);"
         "assert {'agent2', 'agent3'} <= nodes, f'unexpected nodes: {sorted(nodes)}';"
         "assert 'agent1' not in nodes, 'agent1 must stay outside the graph';"
         "import bugfix_platform;"
         "assert 'bugfix_agent1' not in sys.modules, 'agent1 leaked into platform build';"
-        "print('  ok: graph builds, nodes =', sorted(nodes))"
+        # vendor 的 SDK 必须来自暂存树，且不带 356 MB 的 bundled CLI。
+        "import claude_agent_sdk as sdk;"
+        "assert sdk.__file__.startswith(sys.path[0]), f'sdk not vendored: {sdk.__file__}';"
+        "from pathlib import Path;"
+        "bundled = Path(sdk.__file__).parent / '_bundled';"
+        "assert not bundled.exists(), 'bundled claude.exe must not ship (356 MB)';"
+        "from claude_agent_sdk._internal.transport.subprocess_cli import SubprocessCLITransport;"
+        "print('  ok: wrapper + parent graph build, wrapper =', sorted(wrapper), '| parent =', sorted(nodes));"
+        "print('  ok: claude_agent_sdk vendored without bundled CLI')"
     ) % staging
     subprocess.run([sys.executable, "-B", "-c", code], check=True, cwd=ROOT, env=env)
 

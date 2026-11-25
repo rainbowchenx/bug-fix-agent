@@ -4,6 +4,45 @@ pydantic>=2.7
 langgraph>=1.0
 
 # SDK 模式用（BUGFIX_CARTOGRAPHY_MODE / BUGFIX_ANALYZE_MODE = sdk，或有凭据时自动）。
-# 不装也不会崩——会退化 heuristic，并在产物里写 enrich=sdk_fallback; <原因>；
-# 但那样平台永远跑不到 LLM，所以正常部署应当装上。
-claude-agent-sdk>=0.1
+#
+# claude-agent-sdk 本身**不在这里**——它的代码随包分发（打包时 vendor 进
+# claude_agent_sdk/ 目录，只含 0.5 MB 纯 Python，不含 356 MB 的 claude.exe）。
+# 原因：Artifactory 上那个 179 MB 的 wheel 需要认证（401），内网 pip 装不下来；
+# 而平台装依赖失败只 warn 不报错，表现就是"导入成功、SDK 用不了"。
+# CLI（claude.exe）用宿主 Nexas 自带的那份，见 bugfix_platform/sdk/claude_cli.py。
+#
+# 下面这些是 SDK 的运行时依赖，必须显式列出。客户端（Nexas OS）装这个文件的
+# 方式是：先过滤掉 base venv 里已有的 langgraph / langchain-core /
+# langgraph-checkpoint-sqlite / python-dotenv，再对剩下的执行
+# `pip install --no-deps`。`--no-deps` 不解析依赖树，列了什么才装什么。
+#
+# SDK 的 __init__.py 顶层就 import jsonschema 和 mcp.types，所以 jsonschema /
+# mcp 都不能少，且它们的传递依赖（attrs/referencing/rpds-py/pywin32/...）要一并列出。
+#
+# base venv 已有（勿重复列）：
+#   anyio httpx2 pydantic typing-extensions typing-inspection
+#   truststore h11 idna annotated-types
+# base venv 变了（比如挪掉 anyio）就要重新算一次。
+#
+# pywin32 不能漏：mcp/os/win32/utilities.py 顶层 import pywintypes，
+# 它在 Windows 上是 mcp.server.stdio 的硬依赖，少了同样 ImportError。
+# ---------------------------------------------------------------------------
+
+jsonschema>=4.20
+jsonschema-specifications
+referencing
+rpds-py
+attrs
+mcp>=1.23
+mcp-types
+pywin32
+pyjwt[crypto]
+cryptography
+cffi
+pycparser
+python-multipart
+sse-starlette
+starlette
+uvicorn
+opentelemetry-api
+click
