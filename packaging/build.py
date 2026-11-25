@@ -377,7 +377,10 @@ def build_platform() -> Path:
 
     vendor_claude_sdk_code(out)
 
-    for name in ("graph.py", "langgraph.json", "requirements.txt", "params.example.json"):
+    for name in (
+        "graph.py", "langgraph.json", "requirements.txt", "params.example.json",
+        "resume.example.json", "feedback.example.json",
+    ):
         shutil.copy2(PKG / "platform" / name, out / name)
     shutil.copy2(ROOT / ".env.example", out / ".env.example")
     shutil.copy2(PKG / "platform" / "README.md", out / "README.md")

@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from bugfix_platform.agents.analyst import route_ticket
 from bugfix_contracts import (
     ANALYSIS_REPORT_SCHEMA_VERSION,
@@ -10,6 +12,41 @@ from bugfix_contracts import (
 )
 from bugfix_platform.workflow import run_three_agent_workflow
 from tests.helpers import defect_batch_from_hc1
+
+
+@pytest.mark.parametrize(("overrides", "fields"), [
+    ({}, ()),
+    ({"product_line": "hc", "posture": "alpha"}, ()),
+    ({"product_line": "other"}, ("productLine",)),
+    ({"posture": "beta"}, ("posture",)),
+    ({"product_line": "other", "posture": "beta"}, ("productLine", "posture")),
+])
+def test_workflow_checks_batch_settings(tmp_path, overrides, fields):
+    batch = defect_batch_from_hc1()
+    result = run_three_agent_workflow(
+        work_dir=tmp_path, defect_batch=batch, skip_agent2=True, skip_agent3=True,
+        artifact_dir=tmp_path / "out", **overrides,
+    )
+    assert result.ok is (not fields)
+    assert result.artifacts.defect_batch == batch
+    if fields:
+        assert result.stage == "agent2"
+        for field in fields:
+            assert f"does not match defect-batch {field}=" in result.error
+
+
+def test_direct_graph_rejects_conflicting_settings_before_agent2(tmp_path):
+    from bugfix_platform.workflow import create_three_agent_graph
+
+    def unexpected_agent2(**kwargs):
+        pytest.fail("Agent2 launched with conflicting defect-batch settings")
+
+    result = create_three_agent_graph(agent2=unexpected_agent2).invoke({
+        "work_dir": str(tmp_path), "artifact_dir": str(tmp_path / "out"),
+        "defect_batch": defect_batch_from_hc1().model_dump(), "product_line": "wrong",
+    })
+    assert result["ok"] is False
+    assert "does not match defect-batch productLine" in result["error"]
 
 
 def test_workflow_e2e(tmp_path: Path):

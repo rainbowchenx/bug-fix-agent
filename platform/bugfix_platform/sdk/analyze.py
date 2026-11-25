@@ -9,12 +9,12 @@ from pathlib import Path
 from typing import Any, Callable, Literal, Optional
 
 from bugfix_contracts.defect_batch import BatchTicket
-from bugfix_platform.sdk.parse import parse_json_payload
+from bugfix_platform.sdk.parse import budget_exhausted, message_text, parse_json_payload
 from bugfix_platform.sdk.credentials import has_credentials
 from bugfix_platform.sdk.codegraph import CODEGRAPH_MCP_TOOLS, CodeGraphStatus
 from bugfix_platform.sdk.model_env import model_from_env, sdk_options_env
 from bugfix_platform.sdk.project_mcp import ProjectMcp
-from bugfix_platform.sdk.skill_inject import InjectedSkill, analyze_skills_addon
+from bugfix_platform.sdk.skill_inject import InjectedSkill, analyze_skills_addon, repair_skill_addon
 from bugfix_platform.sdk.skills import skills_system_addon
 from bugfix_platform.sdk.trace import open_recorder
 
@@ -23,7 +23,6 @@ AnalyzeMode = Literal["heuristic", "sdk"]
 ANALYZE_TOOLS = ["Read", "Glob", "Grep"]
 DISALLOWED_TOOLS = ["Edit", "Write", "Bash", "NotebookEdit", "MultiEdit"]
 _CATALOG_ROLES = frozenset({"shell", "host", "route_table"})
-_BUDGET_SUBTYPES = frozenset({"error_max_turns", "error_max_budget_usd"})
 _SALVAGE_PROMPT = (
     "Stop exploring. Return the JSON analysis object now. Incomplete is OK. "
     "Do not edit files."
@@ -49,6 +48,7 @@ class AnalyzeRequest:
     resume_session_id: Optional[str] = None
     previous_attempt: Optional[dict[str, Any]] = None
     project_mcp: ProjectMcp = field(default_factory=ProjectMcp)
+    repair_skill: InjectedSkill | None = None
     artifact_dir: Optional[str] = None
     """产物根；给了就往 ``<artifact_dir>/logs/`` 写 SDK 轨迹（见 :mod:`trace`）。"""
 
@@ -165,6 +165,9 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
                 "monorepo-workspace",
             )
         )
+    system_prompt += repair_skill_addon(req.repair_skill)
+    if req.project_mcp.full_access:
+        system_prompt += "\nUse the available project MCP tools and Claude Code plugins when relevant. The analysis phase remains read-only for repository files."
     max_turns = resolve_analyze_max_turns(req.max_turns)
 
     option_notes: list[str] = []
@@ -178,13 +181,14 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         kwargs: dict[str, Any] = {
             "cwd": req.work_dir,
             "system_prompt": system_prompt,
-            "allowed_tools": [*analyze_allowed_tools(req.codegraph), *req.project_mcp.tools],
+            "allowed_tools": [*analyze_allowed_tools(req.codegraph), *req.project_mcp.allowed_tools()],
             "disallowed_tools": list(DISALLOWED_TOOLS),
             "permission_mode": "dontAsk",
             "max_turns": turns if turns is not None else max_turns,
             "model": model,
         }
         kwargs.update(req.project_mcp.sdk_options(req.work_dir, req.codegraph))
+        kwargs.update(recorder.sdk_options(ClaudeAgentOptions))
         resume_id = resume if resume is not None else req.resume_session_id
         if resume_id and allow_resume:
             kwargs["resume"] = resume_id
@@ -215,8 +219,7 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
     read_paths: list[str] = []
     pending_reads: dict[str, str] = {}
 
-    # 轨迹：全量落 artifact_dir/logs/agent3-<defectId>.jsonl，
-    # 同时往 stdout 打每轮一行的进度摘要（客户端 logText 读的就是 stdout）。
+    ticket_ids = [req.ticket.defectId]
     recorder = open_recorder(
         req.artifact_dir,
         f"agent3-{req.ticket.defectId}",
@@ -248,14 +251,14 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
             if use_id in pending_skill_reads and not getattr(block, "is_error", False) and getattr(block, "content", None):
                 skill_reads.append(pending_skill_reads.pop(use_id))
 
-    async def _drive(prompt_text: str, opts: Any) -> None:
+    async def _drive(prompt_text: str, opts: Any, phase: str = "analysis") -> None:
         nonlocal result_text, structured, session_id, budget_stop
+        recorder.begin(phase, prompt_text, tickets=ticket_ids)
         terminal_error: str | None = None
         async for message in query(prompt=prompt_text, options=opts):
-            if recorder is not None:
-                recorder.message(message)
+            recorder.message(message)
             observe_reads(message)
-            text = _message_text(message)
+            text = message_text(message)
             if text.strip():
                 texts.append(text)
             if not isinstance(message, ResultMessage):
@@ -263,7 +266,7 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
             session_id = getattr(message, "session_id", None) or session_id
             structured = message.structured_output
             result_text = message.result or ""
-            if _budget_exhausted(message):
+            if budget_exhausted(message):
                 budget_stop = True
                 continue
             if message.is_error and terminal_error is None:
@@ -275,14 +278,16 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
     try:
         anyio.run(_drive, prompt, _make_options())
     except Exception as err:  # noqa: BLE001
+        recorder.error(err)
         from bugfix_platform.sdk.runtime_profile import modality_error
         if modality_error(str(err)):
             return finish(_blocked_analyze(req, "model modality configuration mismatch; image not analyzed; " + str(err)))
         if req.resume_session_id and not budget_stop:
             option_notes.append(f"session inaccessible: {err}; starting new session")
             try:
-                anyio.run(_drive, prompt, _make_options(allow_resume=False))
+                anyio.run(_drive, prompt, _make_options(allow_resume=False), "analysis retry")
             except Exception as err2:  # noqa: BLE001
+                recorder.error(err2)
                 if not budget_stop:
                     return finish(_blocked_analyze(req, f"sdk analyze failed: {err2}"))
         elif not budget_stop:
@@ -298,28 +303,30 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
 
         async def _salvage() -> None:
             nonlocal structured, result_text
+            recorder.begin("analysis salvage", _SALVAGE_PROMPT, tickets=ticket_ids)
             terminal_error: str | None = None
             async for message in query(
                 prompt=_SALVAGE_PROMPT,
                 options=_make_options(resume=session_id, turns=2),
             ):
+                recorder.message(message)
                 observe_reads(message)
-                text = _message_text(message)
+                text = message_text(message)
                 if text.strip():
                     salvage_texts.append(text)
                 if not isinstance(message, ResultMessage):
                     continue
                 structured = message.structured_output
                 result_text = message.result or ""
-                if message.is_error and terminal_error is None and not _budget_exhausted(message):
+                if message.is_error and terminal_error is None and not budget_exhausted(message):
                     terminal_error = "; ".join(message.errors or []) or message.result or "analyze salvage error"
             if terminal_error is not None:
                 raise RuntimeError(terminal_error)
 
         try:
             anyio.run(_salvage)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as err:  # noqa: BLE001
+            recorder.error(err)
         retry_notes: list[str] = []
         parsed = _parse_session_json(
             structured, texts + salvage_texts + [result_text], retry_notes
@@ -345,10 +352,10 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
                 "Return the same analysis with rootCause.claims and rootCause.questions arrays. "
                 "Do not invent certainty. Classify unresolved blockers and preserve user target. "
                 + json.dumps(parsed, ensure_ascii=False),
-                _make_options(resume=session_id, turns=2))
+                _make_options(resume=session_id, turns=2), "analysis format repair")
             parsed = _parse_session_json(structured, texts + [result_text])
-        except Exception:
-            pass
+        except Exception as err:
+            recorder.error(err)
         root_shape = (parsed or {}).get("rootCause") or {}
         if not isinstance(root_shape.get("questions"), list) or not isinstance(root_shape.get("claims"), list):
             blocked = _blocked_analyze(req, "analysis incomplete: missing structured claims/questions after format repair")
@@ -374,9 +381,9 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         detail_bits.append("partial=true; reason=max_turns")
     detail_bits.extend(option_notes)
     detail = "; ".join(detail_bits) or None
-    return AnalyzeResult(
-        ok=True, payload=merged, source="sdk", detail=detail, session_id=session_id, skill_reads=list(dict.fromkeys(skill_reads)), read_paths=list(dict.fromkeys(read_paths))
-    )
+    return finish(AnalyzeResult(
+        ok=True, payload=merged, source="sdk", detail=detail, session_id=session_id,
+    ))
 
 
 def parse_analyze_payload(raw: Any, notes: Optional[list[str]] = None) -> Optional[dict[str, Any]]:
@@ -416,31 +423,6 @@ def _parse_session_json(
         if parsed is not None:
             return parsed
     return None
-
-
-def _message_text(message: Any) -> str:
-    result = getattr(message, "result", None)
-    if isinstance(result, str) and result.strip():
-        return result
-    content = getattr(message, "content", None)
-    if isinstance(content, str):
-        return content
-    if not isinstance(content, list):
-        return ""
-    bits: list[str] = []
-    for block in content:
-        text = getattr(block, "text", None)
-        if isinstance(text, str):
-            bits.append(text)
-        elif isinstance(block, dict) and isinstance(block.get("text"), str):
-            bits.append(block["text"])
-    return "\n".join(bits)
-
-
-def _budget_exhausted(message: Any) -> bool:
-    subtype = str(getattr(message, "subtype", "") or "")
-    terminal = str(getattr(message, "terminal_reason", "") or "")
-    return subtype in _BUDGET_SUBTYPES or terminal in {"max_turns", "max_budget_usd"}
 
 
 def _normalize_payload(data: dict[str, Any]) -> dict[str, Any]:
@@ -547,7 +529,7 @@ def _with_live_snippet(work_dir: str, cand: dict[str, Any]) -> dict[str, Any]:
         return out
     body = path.read_text(encoding="utf-8", errors="replace")
     symbol = str(out.get("symbol") or "").strip()
-    frag = _fragment_around(body, symbol) if symbol else ""
+    frag = extract_source_fragment(body, symbol)
     if frag:
         out["snippet"] = frag
         out["snippetSource"] = "extracted"
@@ -564,7 +546,7 @@ def _candidate_path(work_dir: str, cand: dict[str, Any]) -> Path | None:
         return None
 
 
-def _fragment_around(body: str, symbol: str, window: int = 8) -> str:
+def extract_source_fragment(body: str, symbol: str, window: int = 8) -> str:
     if not symbol:
         return ""
     lines = body.splitlines()

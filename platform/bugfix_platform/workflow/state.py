@@ -24,8 +24,8 @@ class ThreeAgentState(TypedDict):
 
     # --- 运行入参（invoke 时一次性写入） ---
     work_dir: str
-    product_line: str
-    posture: Literal["alpha", "beta"]
+    product_line: NotRequired[str | None]
+    posture: NotRequired[Literal["alpha", "beta"] | None]
     open_mr: bool
     apply_fix: NotRequired[bool]
     skip_agent2: bool
@@ -38,6 +38,8 @@ class ThreeAgentState(TypedDict):
     extra_skill_dirs: NotRequired[list[str]]
     """Agent-2/3 额外 overlay skill 根目录（与仓内 / .bugfix 合并；overlay 优先）。"""
     agent3_mcp_tools: NotRequired[list[str]]
+    project_integrations: NotRequired[bool]
+    repair_skill_path: NotRequired[str | None]
 
     # --- 渐进产物（Pydantic 模型的 dict 形态） ---
     defect_batch: dict[str, Any]

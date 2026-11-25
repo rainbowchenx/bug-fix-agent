@@ -55,20 +55,34 @@ Nexas 会把平台自己的说明文字（安全策略、跨设备文件传递�
 
 | 字段 | 必需 | 说明 |
 |---|---|---|
+| `action` | 否 | 默认 `run`。填写 `resume` 时按下节指定首轮产物和票号。 |
 | `defect_batch` | **是** | Agent-1 产物 JSON 的路径 |
 | `work_dir` | 否 | 业务代码根；缺省用 runner 的 cwd（= Nexas 里配的「业务项目根」） |
-| `product_line` | 否 | 缺省取 `defect_batch.productLine` |
-| `posture` | 否 | `alpha` / `beta`，默认 `beta` |
+| `product_line` | 否 | 提供时须和 `defect_batch.productLine` 一致 |
+| `posture` | 否 | 提供 `alpha` / `beta` 时须和 `defect_batch.posture` 一致 |
 | `cartography_profile` | 否 | `device_web` / `micro_frontend` / `electron_node`；**不给会明显降质** |
 | `cartography_mode` | 否 | `sdk` / `heuristic` |
 | `analyze_mode` | 否 | `sdk` / `heuristic` |
 | `ticket_ids` | 否 | 字符串数组，只跑这些票 |
 | `apply_fix` | 否 | 默认关（只出方案，不改码） |
 | `artifact_dir` | 否 | 缺省 `<work_dir>/.bugfix-runs/<时间戳>-<随机>` |
+| `trace_mode` | 否 | `summary`（默认）、`detailed`（实时正文和工具）、`off` |
+| `repair_skill` | 否 | 本次任务的用户修复 Skill 文件，或直接含有 `SKILL.md` 的目录。使用时需要 Agent3 SDK 模式和凭据。 |
+| `project_integrations` | 否 | `true` 时启用完整项目 MCP 和已安装的 Claude Code 插件。默认 `false`。 |
 
 所有路径字段支持相对路径，相对**参数文件所在目录**解析。文件支持 `//` 整行注释。
 
 字段拼错会直接报错（不会静默忽略），报错信息里列出无法识别的键。
+
+### 导入反馈并续跑 Agent3
+
+复制 [resume.example.json](resume.example.json)，填写 `artifact_dir` 为首轮产物目录，填写 `defect_id` 为首轮已有尝试的票号。在 Nexas 输入这份参数文件的路径。续跑从首轮产物读取业务仓、缺陷批次和 Agent2 的知识，不需要再传 `work_dir` 或 `defect_batch`。
+
+`feedback_file` 支持 [反馈 JSON](feedback.example.json) 或填写后的 `feedback-form.md`，相对路径以续跑参数文件所在目录为准。JSON 中的 `defectId` 须与 `defect_id` 一致。如果提供 `attemptId`，它必须指向该票最新尝试。省略 `feedback_file` 可使用已导入的反馈，此时也可用 `revision_id` 核对所用版本。续跑会更新首轮目录里的汇总报告并保留逐轮结果。
+
+设置 `repair_skill` 后，Agent3 会把该文件正文放进独立的必用指令区，直接传给分析和实际修复的 SDK 会话。同名项目 Skill 继续单独加载，用户修复指导优先。无法读取、正文为空或选择启发式模式时会报错。保持 `apply_fix: false` 可先看修复方案，设为 `true` 才能通过证据门槛后生成隔离补丁。报告的 `skillDiscovery` 用 `source: user_repair` 标记此 Skill，实际是否遵循仍可用报告和轨迹复核。
+
+`project_integrations: true` 适用于首跑和续跑的 SDK 会话。它加载工作根及发现的子仓中的全部 `.mcp.json` 服务，无须逐工具列白名单，并启用 Claude Code 用户、项目与本地配置以及同账号适用的已安装插件。插件目录从 `CLAUDE_CONFIG_DIR` 或用户的 `~/.claude` 找到。同名子仓 MCP 获得独立别名。Claude Code 自身的组织策略和服务认证仍生效。此开关会允许业务 MCP 和插件执行其自身操作，适用于信任这些配置的公司工作区。
 
 ### 输出
 
@@ -81,6 +95,8 @@ Nexas 会把平台自己的说明文字（安全策略、跨设备文件传递�
 
 产物本身（`analysis-report.json` / `code-knowledge.json` / 逐票快照）落在
 `artifact_dir`。
+
+设置 `"trace_mode": "detailed"` 后，任务日志实时显示模型可见正文、工具调用及结果预览、Agent2 补查和 Agent3 补救。宿主日志容量有限，达到上限后可在 `artifact_dir/logs/` 查看逐会话 JSONL。详细轨迹包含请求、未截断的模型可见正文和工具返回，以及结构化结果，可能含业务源码或附件数据。结果面板显示 Markdown 报告，超长时可从产物目录打开完整的 `analysis-report.md`。
 
 ## 模型配置
 

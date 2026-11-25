@@ -13,7 +13,8 @@ from bugfix_platform.sdk.analyze import AnalyzeRunner, analyze_mode_from_env, cr
 from bugfix_platform.sdk.codegraph import ensure_codegraph
 from bugfix_platform.sdk.fix import FixRunner, apply_fix_from_env, create_fix_runner
 from bugfix_platform.sdk.project_mcp import load_project_mcp
-from bugfix_platform.sdk.skill_inject import discover_analyze_skills, discover_fix_skills
+from bugfix_platform.sdk.credentials import has_credentials
+from bugfix_platform.sdk.skill_inject import discover_analyze_skills, discover_fix_skills, load_repair_skill
 from bugfix_platform.agents.analyst.attempt import (
     TicketAttemptInputs, _attempt_from_entry, _exception_entry, _persist_ticket_entry,
     _ticket_with_revision, _write_markdown_report, run_ticket_attempt,
@@ -30,6 +31,8 @@ def run_analyst(
     analyze_mode: Optional[str] = None,
     extra_skill_dirs: Optional[Sequence[str | Path]] = None,
     agent3_mcp_tools: Sequence[str] = (),
+    project_integrations: bool = False,
+    repair_skill_path: str | Path | None = None,
     analyze_fn: Optional[AnalyzeRunner] = None,
     fix_fn: Optional[FixRunner] = None,
     analyze_limit: Optional[int] = None,
@@ -78,7 +81,11 @@ def run_analyst(
     from bugfix_platform.sdk.runtime_profile import runtime_profile, skill_discovery
     work_dir = str(work_dir)
     want_fix = apply_fix_from_env(apply_fix)
-    project_mcp = load_project_mcp(work_dir, code_knowledge.repoRoots, agent3_mcp_tools)
+    project_mcp = load_project_mcp(work_dir, code_knowledge.repoRoots, agent3_mcp_tools, full_access=project_integrations)
+    repair_skill = load_repair_skill(repair_skill_path) if repair_skill_path is not None else None
+    mode = analyze_mode_from_env(analyze_mode if analyze_mode is not None or repair_skill is None else "sdk")
+    if repair_skill is not None and (mode != "sdk" or (analyze_fn is None and not has_credentials())):
+        raise ValueError("repair_skill requires Agent3 SDK mode and model credentials")
     match_by_id = {m.defectId: m for m in code_knowledge.defectCodeMatches}
     injected = discover_analyze_skills(
         work_dir,
@@ -86,7 +93,7 @@ def run_analyst(
         extra_dirs=extra_skill_dirs,
     )
     bound_skills = list(dict.fromkeys(s.name for s in injected))[:40]
-    runner = analyze_fn or create_analyze_runner(analyze_mode_from_env(analyze_mode))
+    runner = analyze_fn or create_analyze_runner(mode)
     fixer: Optional[FixRunner] = None
     fix_skills: tuple = ()
     if want_fix:
@@ -121,6 +128,7 @@ def run_analyst(
             matches=match_by_id, knowledge=code_knowledge, runner=runner,
             injected=injected, codegraph=cg_status, want_fix=want_fix,
             project_mcp=project_mcp,
+            repair_skill=repair_skill,
             fixer=fixer, fix_fn=fix_fn, fix_skills=fix_skills, remaining=remaining,
             analyze_sources=analyze_sources, skill_reads=skill_reads,
         )
@@ -156,9 +164,16 @@ def run_analyst(
         for tr in tickets:
             by_outcome[tr["outcome"]] = by_outcome.get(tr["outcome"], 0) + 1
 
+        skill_details = skill_discovery(work_dir, code_knowledge.repoRoots, injected, skill_reads)
+        if repair_skill is not None:
+            skill_details.append({
+                "source": "user_repair", "name": repair_skill.name,
+                "path": str(repair_skill.skill_md), "selected": True,
+                "applied": False, "reason": "required in SDK prompts; application not independently verified",
+            })
         report = {
             "runtimeProfile": runtime_profile().model_dump(),
-            "skillDiscovery": skill_discovery(work_dir, code_knowledge.repoRoots, injected, skill_reads),
+            "skillDiscovery": skill_details,
             "schemaVersion": ANALYSIS_REPORT_SCHEMA_VERSION,
             "productLine": defect_batch.productLine,
             "workDir": work_dir,

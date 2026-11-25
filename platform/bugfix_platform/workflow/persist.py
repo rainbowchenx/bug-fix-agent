@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import Any, Optional
 from uuid import uuid4
 
+from bugfix_platform.agents.analyst.report import render_analysis_markdown as render_analysis_markdown
+
 
 def default_artifact_dir(work_dir: Path | str) -> Path:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")

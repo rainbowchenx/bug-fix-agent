@@ -29,11 +29,11 @@ class CreateRunRequest(BaseModel):
     """Agent-2→3 run request. Agent-1 defect-batch is prepared outside LangGraph."""
 
     workDir: str = Field(min_length=1)
-    productLine: str = Field(min_length=1)
+    productLine: str | None = Field(default=None, min_length=1, description="Must match defectBatch.productLine if supplied")
     defectBatch: Union[str, dict[str, Any]] = Field(
         description="Path to defect-batch.json, or inline defect-batch object"
     )
-    posture: Literal["alpha", "beta"] = "beta"
+    posture: Literal["alpha", "beta"] | None = Field(default=None, description="Must match defectBatch.posture if supplied")
     options: CreateRunOptions = Field(default_factory=CreateRunOptions)
 
 

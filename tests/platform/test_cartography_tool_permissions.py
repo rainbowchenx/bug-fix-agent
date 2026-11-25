@@ -28,14 +28,18 @@ def test_write_bash_denied_before_execution():
         assert "blocked" in reason
 
 
-def test_options_install_pretooluse_hook():
+@pytest.mark.parametrize("supported", [False, True])
+def test_options_install_pretooluse_hook(monkeypatch, supported):
+    from bugfix_platform.sdk import claude_cli
+
+    monkeypatch.setattr(claude_cli, "hook_on_failure_supported", lambda: supported)
     hooks = _cartography_hooks()
     if not hooks:
         assert "Bash" not in cartography_allowed_tools()
         pytest.skip("claude-agent-sdk missing; Bash not enabled without PreToolUse hook")
     matcher = hooks["PreToolUse"][0]
     assert matcher.matcher == "Bash"
-    assert matcher.on_failure == "block"
+    assert matcher.on_failure == ("block" if supported else None)
     assert matcher.hooks
     assert "Bash" not in cartography_allowed_tools()
 

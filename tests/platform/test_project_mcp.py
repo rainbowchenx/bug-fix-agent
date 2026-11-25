@@ -24,10 +24,88 @@ def write_mcp(root: Path, servers: dict) -> None:
     (root / ".mcp.json").write_text(json.dumps({"mcpServers": servers}), encoding="utf-8")
 
 
-@pytest.mark.parametrize("enable_graph", [False, True])
-def test_agent3_keeps_approved_business_mcp_and_skills(tmp_path, monkeypatch, enable_graph):
-    from bugfix_platform.agents.analyst import run as analyst_run
+def test_full_integrations_load_all_repo_servers_and_installed_plugins(tmp_path, monkeypatch):
+    work = tmp_path / "work"
+    nested = work / "nested"
+    nested.mkdir(parents=True)
+    write_mcp(work, {"docs": {"type": "http", "url": "https://example.invalid/mcp"}})
+    write_mcp(nested, {"docs": {"command": "node", "args": ["server.js"]}, "extra": {"command": "extra"}})
+    config = tmp_path / "claude"
+    registry = config / "plugins" / "installed_plugins.json"
+    registry.parent.mkdir(parents=True)
+    user_plugin, project_plugin, other_plugin = [tmp_path / name for name in ("user", "project", "other")]
+    for plugin in (user_plugin, project_plugin, other_plugin):
+        plugin.mkdir()
+    registry.write_text(json.dumps({
+        "version": 2,
+        "plugins": {
+            "preview@company": [
+                {"scope": "user", "installPath": str(user_plugin)},
+                {"scope": "project", "projectPath": str(nested), "installPath": str(project_plugin)},
+            ],
+            "other@company": [
+                {"scope": "local", "projectPath": str(tmp_path), "installPath": str(other_plugin)},
+            ],
+        },
+    }), encoding="utf-8")
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(config))
+    project = load_project_mcp(work, [RepoRoot(path="nested")], full_access=True)
+    isolated = tmp_path / "isolated"
+    options = project.sdk_options(str(isolated))
+    assert options["strict_mcp_config"] is False
+    assert options["setting_sources"] == ["user", "project", "local"]
+    assert options["plugins"] == [{"type": "local", "path": str(project_plugin)}]
+    assert options["add_dirs"] == [str(isolated / "nested")]
+    assert {"docs", "extra"} < set(options["mcp_servers"])
+    alias, = set(options["mcp_servers"]) - {"docs", "extra"}
+    assert alias.startswith("docs-")
+    assert options["mcp_servers"][alias]["args"][-3:] == [str(isolated / "nested"), "node", "server.js"]
+    assert f"mcp__{alias}__*" in project.allowed_tools()
+    approve = options["can_use_tool"]
+    assert anyio.run(approve, "mcp__a-native-plugin__new-tool", {}, None).behavior == "allow"
+    assert anyio.run(approve, "Skill", {}, None).behavior == "allow"
+    assert anyio.run(approve, "Bash", {}, None).behavior == "deny"
 
+
+def test_agent2_sdk_receives_full_integrations(tmp_path, monkeypatch):
+    from claude_agent_sdk import ResultMessage
+
+    import claude_agent_sdk
+    from bugfix_platform.sdk.cartography import query_cartography
+    from tests.platform.test_investigation_batches import request
+
+    work = tmp_path / "repo"
+    work.mkdir()
+    write_mcp(work, {"docs": {"type": "http", "url": "https://example.invalid/mcp"}})
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "empty"))
+    project = load_project_mcp(work, [], full_access=True)
+    seen = []
+
+    async def query(*, prompt, options):
+        seen.append(options)
+        yield ResultMessage(
+            subtype="success", duration_ms=1, duration_api_ms=1,
+            is_error=False, num_turns=1, session_id="s",
+            structured_output={"defectCodeMatches": [{"defectId": "0"}]},
+        )
+
+    monkeypatch.setattr(claude_agent_sdk, "query", query)
+    req = request(work, 1)
+    req.project_mcp = project
+    result = query_cartography(req)
+    assert result.parsed is not None
+    assert seen[0].strict_mcp_config is False
+    assert "mcp__docs__*" in seen[0].allowed_tools and "Bash" in seen[0].disallowed_tools
+    assert seen[0].permission_mode == "default"
+
+
+@pytest.mark.parametrize("enable_graph", [False, True])
+@pytest.mark.parametrize("hook_on_failure", [False, True])
+def test_agent3_keeps_approved_business_mcp_and_skills(tmp_path, monkeypatch, enable_graph, hook_on_failure):
+    from bugfix_platform.agents.analyst import run as analyst_run
+    from bugfix_platform.sdk import claude_cli
+
+    monkeypatch.setattr(claude_cli, "hook_on_failure_supported", lambda: hook_on_failure)
     work = tmp_path / "project"
     skill = work / ".claude" / "skills" / "business-rule" / "SKILL.md"
     skill.parent.mkdir(parents=True)
@@ -74,7 +152,7 @@ def test_agent3_keeps_approved_business_mcp_and_skills(tmp_path, monkeypatch, en
     assert TOOL in options["allowed_tools"]
     assert (CODEGRAPH in options["allowed_tools"]) == enable_graph
     hook = options["hooks"]["PreToolUse"][0]
-    assert hook.on_failure == "block"
+    assert getattr(hook, "on_failure", None) == ("block" if hook_on_failure else None)
     callback = hook.hooks[0]
     assert anyio.run(callback, {"tool_name": TOOL}, None, None) == {}
     denied = anyio.run(callback, {"tool_name": "mcp__business_docs__write"}, None, None)

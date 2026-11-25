@@ -14,18 +14,11 @@ Nexas OS 自己就带了一份 ``claude.exe``（``resources/code-sprite-cli/clau
 ## 查找顺序
 
 1. **显式环境变量** ``BUGFIX_CLAUDE_CLI`` —— 手工指定，最高优先级
-2. **PATH 里的 claude.exe** —— 用户自己装过 Claude Code 的情况
-3. **SDK 自带的 bundled** —— 如果有
-4. **向上遍历父进程提权目录** —— 从当前进程往上找 ``Nexas OS.exe``、
-   ``Electron.exe`` 之类，取它所在目录下的 ``resources/code-sprite-cli/claude.exe``
+2. **宿主 CLI** —— 先从 runner 位置查找，再通过父进程定位宿主应用
+3. **PATH 里的 Claude Code**
+4. **SDK 自带的 CLI** —— 从已安装的 ``claude_agent_sdk/_bundled`` 查找
 
-第 4 条是关键：Nexas 用 ``t.cwd || e.workspace`` 作为 spawn 的 cwd，但不会把
-executable 路径写进环境变量，所以只能顺着父进程链往上找。
-
-## 副作用
-
-找到后会写进 ``os.environ["PATH"]`` 的前面 —— SDK 的 ``_find_cli`` 只认
-PATH 里的绝对路径条目。这样 SDK 自己就能解析到，不用打补丁改它的内部逻辑。
+SDK 会话显式使用解析出的路径。Nexas 入口另外提供 PATH 兼容路径。
 """
 
 from __future__ import annotations
@@ -36,6 +29,7 @@ import re
 import shutil
 import subprocess
 import sys
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Optional
 
@@ -301,13 +295,18 @@ def find_claude_cli() -> Optional[Path]:
         if from_shim is not None:
             return from_shim
 
-    # ④ SDK 自带
     try:
-        bundled = Path(__file__).parent / "_bundled" / _EXE_NAME
+        sdk = find_spec("claude_agent_sdk")
+    except (ImportError, ValueError):
+        # The optional SDK may be missing or represented by a test stub.
+        return None
+    if sdk is None or not sdk.submodule_search_locations:
+        return None
+    executable = _EXE_NAME if sys.platform == "win32" else "claude"
+    for directory in sdk.submodule_search_locations:
+        bundled = Path(directory) / "_bundled" / executable
         if _is_file(bundled):
             return bundled.resolve()
-    except OSError:
-        pass
 
     return None
 

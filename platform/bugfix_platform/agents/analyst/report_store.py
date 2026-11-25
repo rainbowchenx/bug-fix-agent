@@ -137,11 +137,8 @@ def publish_analysis_report(root: Path, report: AnalysisReport, *, already_locke
     from contextlib import nullcontext
 
     from bugfix_platform.agents.analyst.attempt_store import store_lock
-    from bugfix_platform.agents.analyst.report import render_report
+    from bugfix_platform.agents.analyst.report import render_analysis_markdown
 
     with nullcontext() if already_locked else store_lock(root):
         atomic_write_report(root / "analysis-report.json", report.model_dump_json(indent=2))
-        atomic_write_report(
-            root / "analysis-report.md",
-            render_report({"batchId": report.productLine, "tickets": report.model_dump()["tickets"]}),
-        )
+        atomic_write_report(root / "analysis-report.md", render_analysis_markdown(report))

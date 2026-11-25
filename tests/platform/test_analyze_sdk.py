@@ -503,6 +503,37 @@ def _install_fake_sdk(monkeypatch, options_cls, query_fn, result_message_cls):
     monkeypatch.setitem(sys.modules, "claude_agent_sdk", fake)
 
 
+def test_analyze_success_prints_final_trace_summary(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("BUGFIX_TRACE", "1")
+    ticket = _sdk_ticket()
+
+    class AssistantMessage:
+        content = []
+
+    class ResultMessage:
+        session_id = "test-session"
+        structured_output = _sdk_routed()
+        result = ""
+        subtype = ""
+        terminal_reason = ""
+        is_error = False
+
+    async def fake_query(*, prompt, options):
+        yield AssistantMessage()
+        yield ResultMessage()
+
+    _install_fake_sdk(monkeypatch, dict, fake_query, ResultMessage)
+    result = run_claude_analyze(AnalyzeRequest(
+        work_dir=str(tmp_path), ticket=ticket, routed=_sdk_routed(), artifact_dir=str(tmp_path),
+    ))
+
+    assert result.ok
+    assert capsys.readouterr().out.splitlines() == ["[agent3] turn 1"]
+    trace = tmp_path / "logs" / f"agent3-{ticket.defectId}.jsonl"
+    assert json.loads(trace.read_text(encoding="utf-8").splitlines()[-1])["kind"] == "result"
+
+
 @pytest.mark.parametrize("salvage", [False, True])
 def test_analyze_drains_sdk_error_before_returning_failure(tmp_path, monkeypatch, salvage):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
@@ -535,6 +566,43 @@ def test_analyze_drains_sdk_error_before_returning_failure(tmp_path, monkeypatch
     assert result.source == "sdk_fallback"
     if not salvage:
         assert "model service rejected the request" in result.detail
+
+
+def test_detailed_analyze_records_salvage(tmp_path, monkeypatch, capsys):
+    from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ResultMessage, TextBlock
+
+    from bugfix_platform.sdk.trace import trace_output
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    ticket = _sdk_ticket()
+    payload = _sdk_routed()
+    payload["rootCause"]["summary"] = "Salvaged root cause"
+
+    async def query(*, prompt, options):
+        assert options.include_partial_messages
+        if options.resume:
+            yield AssistantMessage(content=[TextBlock(text="Reformatting the report")], model="m")
+        yield ResultMessage(
+            subtype="success", duration_ms=1, duration_api_ms=1, is_error=False,
+            num_turns=1, session_id="s1", structured_output=payload if options.resume else None,
+        )
+
+    _install_fake_sdk(monkeypatch, ClaudeAgentOptions, query, ResultMessage)
+    with trace_output("detailed"):
+        result = run_claude_analyze(AnalyzeRequest(
+            work_dir=str(tmp_path), ticket=ticket, routed=_sdk_routed(), artifact_dir=str(tmp_path),
+        ))
+
+    assert result.ok and "salvaged" in result.detail
+    live = capsys.readouterr()
+    assert f"analysis salvage [{ticket.defectId}]" in live.err
+    assert "Reformatting the report" in live.err
+    path = tmp_path / "logs" / f"agent3-{ticket.defectId}.jsonl"
+    events = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert [event["phase"] for event in events if event["kind"] == "request"] == [
+        "analysis", "analysis salvage",
+    ]
+    assert events[-1]["structuredOutput"] == payload
 
 
 def test_resume_unsupported_records_degrade_and_starts_new(tmp_path: Path, monkeypatch):

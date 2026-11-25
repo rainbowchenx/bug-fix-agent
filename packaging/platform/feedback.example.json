@@ -1,0 +1,8 @@
+{
+  "feedbackId": "BGCM2026102708222-feedback-01",
+  "defectId": "BGCM2026102708222",
+  "kind": "supplement_fact",
+  "steps": "进入回放页，切换设备后再次点击播放。",
+  "observed": "首次进入时正常，切换设备后无法播放。",
+  "text": "以上现象已在公司测试环境复现。"
+}

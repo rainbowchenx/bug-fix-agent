@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+import re
 from typing import Callable, Sequence
 
 from bugfix_contracts.analysis_report import AnalysisReport
@@ -25,25 +26,55 @@ def resume_defect(
     apply_fix: bool = False,
     on_decision: Callable[[SessionDecision], None] | None = None,
     agent3_mcp_tools: Sequence[str] = (),
+    feedback_file: Path | None = None,
+    repair_skill_path: str | Path | None = None,
+    project_integrations: bool = False,
+    analyze_mode: str | None = None,
 ) -> AnalysisReport | None:
+    _require_file_id(defect_id)
+    if feedback_file is not None and (revision_id is not None or not (execute or apply_fix)):
+        raise ResumeRequestError("feedback_file requires execution and cannot be combined with revision_id")
     with store_lock(root):
-        return _resume_locked(root, defect_id, revision_id, apply_fix, execute, on_decision, agent3_mcp_tools)
+        return _resume_locked(
+            root, defect_id, revision_id, apply_fix, execute, on_decision, agent3_mcp_tools,
+            feedback_file, repair_skill_path, project_integrations, analyze_mode,
+        )
 
 
 def import_run_feedback(root: Path, source: Path) -> InputRevision:
     """导入一份反馈 JSON 或填写后的 Markdown 表，按 feedbackId 幂等。"""
+    with store_lock(Path(root)):
+        return _import_feedback_file(root, source)
+
+
+def _require_file_id(value: str) -> None:
+    if not value or value in {".", ".."} or re.search(r'[<>:"/\\|?*\x00-\x1f]', value):
+        raise ResumeRequestError(f"Invalid artifact identifier: {value!r}")
+
+
+def _import_feedback_file(
+    root: Path, source: Path, *, defect_id: str | None = None, attempt_id: str | None = None,
+) -> InputRevision:
     from bugfix_contracts.repair import Feedback
     from bugfix_platform.agents.analyst.feedback import import_feedback
-    from bugfix_platform.agents.analyst.feedback_document import import_filled_form
+    from bugfix_platform.agents.analyst.feedback_document import archive_feedback_form, parse_feedback_form
 
-    src = source
-    text = src.read_text(encoding="utf-8")
-    with store_lock(Path(root)):
-        if src.suffix.lower() in {".md", ".markdown"} or "BUGFIX_FEEDBACK_FORM" in text:
-            revision = import_filled_form(root, text, already_locked=True)
-        else:
-            feedback = Feedback.model_validate(json.loads(text))
-            revision = import_feedback(Path(root), feedback, already_locked=True)
+    text = source.read_text(encoding="utf-8-sig")
+    form = source.suffix.lower() in {".md", ".markdown"} or "BUGFIX_FEEDBACK_FORM" in text
+    feedback = parse_feedback_form(text, store=root) if form else Feedback.model_validate(json.loads(text))
+    _require_file_id(feedback.defectId)
+    _require_file_id(feedback.feedbackId)
+    if defect_id is not None and feedback.defectId != defect_id:
+        raise ResumeRequestError(f"feedback defectId {feedback.defectId!r} does not match {defect_id!r}")
+    if feedback.attemptId:
+        _require_file_id(feedback.attemptId)
+        if attempt_id is not None and feedback.attemptId != attempt_id:
+            raise ResumeRequestError(f"stale feedback for attempt {feedback.attemptId}; current attempt: {attempt_id}")
+    if attempt_id is not None and not feedback.attemptId:
+        feedback = feedback.model_copy(update={"attemptId": attempt_id})
+    revision = import_feedback(Path(root), feedback, already_locked=True)
+    if form:
+        archive_feedback_form(root, feedback, text)
     return revision
 
 
@@ -51,6 +82,10 @@ def _resume_locked(
     base: Path, defect_id: str, revision_id: str | None, apply_fix: bool, execute: bool,
     on_decision: Callable[[SessionDecision], None] | None,
     agent3_mcp_tools: Sequence[str],
+    feedback_file: Path | None,
+    repair_skill_path: str | Path | None,
+    project_integrations: bool,
+    analyze_mode: str | None,
 ) -> AnalysisReport | None:
     """预览会话决策；execute 只分析，apply-fix 显式授权编辑。"""
     from bugfix_contracts.code_knowledge import validate_code_knowledge
@@ -88,14 +123,19 @@ def _resume_locked(
         return None
     assert knowledge is not None
     work_dir = previous.workDir if previous is not None else knowledge.workDir
-    revision = load_revision(base, defect_id)
-    current_id = revision.revisionId if revision is not None else None
-    if revision_id is not None and revision_id != current_id:
-        raise ResumeRequestError(f"stale or unknown revision {revision_id}; current revision: {current_id or 'none'}")
     latest = load_latest_attempt(base, defect_id)
     if latest is None and (base / "defects" / defect_id / "latest.json").exists():
         raise ResumeRequestError(f"cannot read latest attempt for {defect_id}")
     parent_id = latest.attemptId if latest else None
+    if feedback_file is not None:
+        if parent_id is None:
+            raise ResumeRequestError(f"no initial Agent3 attempt to attach feedback for {defect_id}")
+        revision = _import_feedback_file(base, feedback_file, defect_id=defect_id, attempt_id=parent_id)
+    else:
+        revision = load_revision(base, defect_id)
+    current_id = revision.revisionId if revision is not None else None
+    if revision_id is not None and revision_id != current_id:
+        raise ResumeRequestError(f"stale or unknown revision {revision_id}; current revision: {current_id or 'none'}")
     if current_id is not None:
         feedback = load_latest_feedback(base, defect_id, revision_id=current_id)
         if feedback is None:
@@ -122,6 +162,9 @@ def _resume_locked(
         artifact_dir=base,
         already_locked=True,
         agent3_mcp_tools=agent3_mcp_tools,
+        repair_skill_path=repair_skill_path,
+        project_integrations=project_integrations,
+        analyze_mode=analyze_mode,
     )
     dumped = report.model_dump()
     round_dir = base / "rounds"

@@ -1,0 +1,11 @@
+{
+  "action": "resume",
+  "artifact_dir": "E:/work/bugfix-output",
+  "defect_id": "BGCM2026102708222",
+  "feedback_file": "./feedback.example.json",
+  "repair_skill": "E:/work/user-repair/SKILL.md",
+  "project_integrations": true,
+  "analyze_mode": "sdk",
+  "apply_fix": false,
+  "trace_mode": "detailed"
+}

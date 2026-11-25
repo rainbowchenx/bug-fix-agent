@@ -5,6 +5,32 @@ import re
 from typing import Any, Optional
 
 _JSON_FENCE = re.compile(r"```(?:json)?\s*([\s\S]*?)```", re.I)
+_BUDGET_SUBTYPES = frozenset({"error_max_turns", "error_max_budget_usd"})
+
+
+def message_text(message: Any) -> str:
+    result = getattr(message, "result", None)
+    if isinstance(result, str) and result.strip():
+        return result
+    content = getattr(message, "content", None)
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    bits: list[str] = []
+    for block in content:
+        text = getattr(block, "text", None)
+        if isinstance(text, str):
+            bits.append(text)
+        elif isinstance(block, dict) and isinstance(block.get("text"), str):
+            bits.append(block["text"])
+    return "\n".join(bits)
+
+
+def budget_exhausted(message: Any) -> bool:
+    subtype = str(getattr(message, "subtype", "") or "")
+    terminal = str(getattr(message, "terminal_reason", "") or "")
+    return subtype in _BUDGET_SUBTYPES or terminal in {"max_turns", "max_budget_usd"}
 
 
 def parse_json_payload(raw: Any) -> Optional[dict[str, Any]]:

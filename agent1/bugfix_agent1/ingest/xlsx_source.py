@@ -36,17 +36,6 @@ def _cell(v: Any) -> str:
     return str(v).strip()
 
 
-def xlsx_headers(path: str | Path, sheet: str | None = None) -> list[str]:
-    """返回工作簿第一行的表头（含空列）。"""
-    openpyxl = _require_openpyxl()
-    wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
-    try:
-        ws = wb[sheet] if sheet else wb[wb.sheetnames[0]]
-        return [_cell(c.value) for c in next(ws.iter_rows(min_row=1, max_row=1))]
-    finally:
-        wb.close()
-
-
 def load_xlsx_defects(
     path: str | Path,
     *,

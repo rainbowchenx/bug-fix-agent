@@ -53,7 +53,11 @@ def test_fix_drains_sdk_error_before_returning_failure(tmp_path, monkeypatch):
     assert "model service rejected the request" in result.detail
 
 
-def test_run_claude_fix_keeps_edits_and_review_without_git(tmp_path: Path, monkeypatch):
+def test_run_claude_fix_keeps_edits_and_review_without_git(tmp_path: Path, monkeypatch, capsys):
+    from claude_agent_sdk.types import AssistantMessage, TextBlock
+
+    from bugfix_platform.sdk.trace import trace_output
+
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     work = tmp_path / "copy"
     (work / "src").mkdir(parents=True)
@@ -80,21 +84,27 @@ def test_run_claude_fix_keeps_edits_and_review_without_git(tmp_path: Path, monke
             self.cwd = kwargs.get("cwd")
 
     async def fake_query(*, prompt, options):
+        assert options.kwargs["include_partial_messages"]
         Path(options.cwd, "src", "a.ts").write_text(
             "function handleFail() { throw e; }\n", encoding="utf-8"
         )
+        yield AssistantMessage(content=[TextBlock(text="Updating the failure handler")], model="m")
         yield Result()
 
     _install_fake_sdk(monkeypatch, Opts, fake_query, ResultMessage)
-    result = run_claude_fix(
-        FixRequest(
-            work_dir=str(tmp_path / "repo"),
-            ticket=_ticket(),
-            analysis={"proposedFix": {"summary": "rethrow"}},
-            worktree_path=str(work),
-            artifact_dir=str(tmp_path / "art"),
+    with trace_output("detailed"):
+        result = run_claude_fix(
+            FixRequest(
+                work_dir=str(tmp_path / "repo"),
+                ticket=_ticket(),
+                analysis={"proposedFix": {"summary": "rethrow"}},
+                worktree_path=str(work),
+                artifact_dir=str(tmp_path / "art"),
+            )
         )
-    )
+    live = capsys.readouterr()
+    assert "repair [D1]" in live.err
+    assert "Updating the failure handler" in live.err
     assert result.ok
     assert result.source == "sdk"
     assert result.detail != "fix session produced empty diff"

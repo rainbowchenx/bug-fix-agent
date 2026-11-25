@@ -8,7 +8,9 @@
 from __future__ import annotations
 
 import sys
+from importlib.machinery import ModuleSpec
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -82,6 +84,31 @@ def test_cli_path_option_empty_when_not_found(monkeypatch):
 
     monkeypatch.setattr(mod, "find_claude_cli", lambda: None)
     assert mod.cli_path_option() == {}
+
+
+@pytest.mark.parametrize(("platform", "executable"), [("win32", "claude.exe"), ("linux", "claude")])
+def test_bundled_sdk_cli_used_for_options_and_hook_probe(tmp_path, monkeypatch, platform, executable):
+    import bugfix_platform.sdk.claude_cli as mod
+
+    sdk = tmp_path / "claude_agent_sdk"
+    cli = sdk / "_bundled" / executable
+    cli.parent.mkdir(parents=True)
+    cli.touch()
+    spec = ModuleSpec("claude_agent_sdk", loader=None, is_package=True)
+    spec.submodule_search_locations = [str(sdk)]
+    monkeypatch.setattr(mod, "find_spec", lambda name: spec if name == spec.name else None)
+    monkeypatch.setattr(mod, "_cli_beside_runner", lambda: None)
+    monkeypatch.setattr(mod, "_from_process_tree", lambda: None)
+    monkeypatch.setattr(mod.shutil, "which", lambda name: None)
+    monkeypatch.setattr(mod.sys, "platform", platform)
+    assert mod.cli_path_option() == {"cli_path": str(cli.resolve())}
+
+    def version(command, **kwargs):
+        assert command == [str(cli.resolve()), "--version"]
+        return SimpleNamespace(returncode=0, stdout="2.1.326 (Claude Code)", stderr="")
+
+    monkeypatch.setattr(mod.subprocess, "run", version)
+    assert mod.cli_supports_hook_on_failure() is True
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="需要真实 claude.exe 做版本探测")

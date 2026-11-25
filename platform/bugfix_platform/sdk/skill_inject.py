@@ -55,7 +55,7 @@ PACKAGE_FIX_SKILLS = (
     "monorepo-workspace",
 )
 _SOURCE_RANK = {"explicit": 0, "bugfix": 1, "claude_dir": 2, "package": 3}
-SkillSource = Literal["package", "claude_dir", "bugfix", "explicit"]
+SkillSource = Literal["package", "claude_dir", "bugfix", "explicit", "user_repair"]
 
 
 @dataclass(frozen=True)
@@ -118,6 +118,32 @@ def discover_fix_skills(
         repo_roots=repo_roots,
         extra_dirs=extra_dirs,
         profile=FIX_PROFILE,
+    )
+
+
+def load_repair_skill(path: str | Path) -> InjectedSkill:
+    """Load the single user-selected repair instruction without repository merging."""
+    source = Path(path)
+    if source.is_dir():
+        source /= "SKILL.md"
+    try:
+        skill = _load_skill(source, source="user_repair", repo_id="user")
+    except UnicodeError as err:
+        raise ValueError(f"repair_skill must be UTF-8: {source}") from err
+    if skill is None or not skill.body.strip():
+        raise ValueError(f"repair_skill must be a readable, non-empty Skill: {source}")
+    return skill
+
+
+def repair_skill_addon(skill: InjectedSkill | None) -> str:
+    if skill is None:
+        return ""
+    return (
+        f"\n\n## Required user repair Skill — {skill.name}\n"
+        "Apply these user instructions to planning and repair whenever relevant. "
+        "They take precedence over project and package Skills, within this Agent's phase, "
+        "evidence and output requirements. Explain any material instruction that cannot be applied.\n\n"
+        + skill.body.strip()
     )
 
 

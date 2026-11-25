@@ -39,7 +39,9 @@ from bugfix_contracts.repair import (
     VerificationRun,
     WorkspaceSnapshot,
 )
-from bugfix_platform.sdk.analyze import AnalyzeRequest, AnalyzeRunner, resolve_analyze_max_turns
+from bugfix_platform.sdk.analyze import (
+    AnalyzeRequest, AnalyzeRunner, extract_source_fragment, resolve_analyze_max_turns,
+)
 from bugfix_platform.sdk.cartography import profile_reading_playbook
 from bugfix_platform.sdk.codegraph import CodeGraphStatus
 from bugfix_platform.sdk.fix import FixRequest, FixRunner
@@ -61,6 +63,7 @@ class TicketAttemptInputs:
     injected: Sequence[InjectedSkill]
     codegraph: CodeGraphStatus
     project_mcp: ProjectMcp
+    repair_skill: InjectedSkill | None
     want_fix: bool
     fixer: FixRunner | None
     fix_fn: FixRunner | None
@@ -153,6 +156,7 @@ def _run_matched_ticket(
                 spec_atlas=spec_atlas,
                 codegraph=cg_status,
                 project_mcp=inputs.project_mcp,
+                repair_skill=inputs.repair_skill,
                 investigation=match_by_id[ticket.defectId].model_dump() if ticket.defectId in match_by_id else {},
                 resume_session_id=sess_map.get(ticket.defectId),
                 previous_attempt=previous_payload,
@@ -283,6 +287,7 @@ def _run_matched_ticket(
                     spec_atlas=spec_atlas,
                     codegraph=cg_status,
                     project_mcp=inputs.project_mcp,
+                    repair_skill=inputs.repair_skill,
                     investigation=match_by_id[ticket.defectId].model_dump() if ticket.defectId in match_by_id else {},
                     resume_session_id=analyze_session or sess_map.get(ticket.defectId),
                     previous_attempt={
@@ -386,6 +391,7 @@ def _run_matched_ticket(
             fix_fn=fix_fn,
             fix_skills=fix_skills,
             project_mcp=inputs.project_mcp,
+            repair_skill=inputs.repair_skill,
             out_dir=out_dir,
             snapshot=snapshot,
             revision=revision,
@@ -627,6 +633,7 @@ def _run_fix_loop(
     fix_fn: Optional[FixRunner],
     fix_skills: tuple,
     project_mcp: ProjectMcp,
+    repair_skill: InjectedSkill | None,
     out_dir: Optional[str],
     snapshot: Any,
     revision: Optional[InputRevision],
@@ -662,6 +669,7 @@ def _run_fix_loop(
                 artifact_dir=out_dir,
                 injected_skills=fix_skills,
                 project_mcp=project_mcp,
+                repair_skill=repair_skill,
             )
         )
         last_payload.clear()
@@ -961,7 +969,7 @@ def _persist_candidate_snippets(work_dir: Path, entry: dict[str, Any]) -> dict[s
         if not cited and path.is_file():
             body = path.read_text(encoding="utf-8", errors="replace")
             symbol = str(item.get("symbol") or "").strip()
-            frag = _fragment_around_symbol(body, symbol)
+            frag = extract_source_fragment(body, symbol)
             if frag:
                 item["snippet"] = frag
                 item["snippetSource"] = "extracted"
@@ -971,18 +979,6 @@ def _persist_candidate_snippets(work_dir: Path, entry: dict[str, Any]) -> dict[s
     loc["candidates"] = filled
     entry["localization"] = loc
     return entry
-
-
-def _fragment_around_symbol(body: str, symbol: str, window: int = 8) -> str:
-    if not symbol:
-        return ""
-    lines = body.splitlines()
-    for i, line in enumerate(lines):
-        if symbol not in line:
-            continue
-        chunk = [ln for ln in lines[i : i + window] if ln.strip()]
-        return "\n".join(chunk).strip()[:400]
-    return ""
 
 
 def _exception_entry(ticket: BatchTicket, err: BaseException) -> dict[str, Any]:

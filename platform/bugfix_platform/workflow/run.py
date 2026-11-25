@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional, Sequence
@@ -70,9 +69,9 @@ class ThreeAgentWorkflowResult:
 def run_three_agent_workflow(
     *,
     work_dir: str | Path,
-    product_line: str,
     defect_batch: DefectBatchInput,
-    posture: Literal["alpha", "beta"] = "beta",
+    product_line: str | None = None,
+    posture: Literal["alpha", "beta"] | None = None,
     open_mr: bool = False,
     apply_fix: Optional[bool] = None,
     skip_agent2: bool = False,
@@ -84,6 +83,8 @@ def run_three_agent_workflow(
     ] = None,
     extra_skill_dirs: Optional[Sequence[str | Path]] = None,
     agent3_mcp_tools: Sequence[str] = (),
+    project_integrations: bool = False,
+    repair_skill_path: str | Path | None = None,
     agent2: Optional[CartographerFn] = None,
     agent3: Optional[AnalystFn] = None,
     artifact_dir: Optional[str | Path] = None,
@@ -96,6 +97,7 @@ def run_three_agent_workflow(
     """父编排入口：校验 defect-batch → Agent-2 → Agent-3。
 
     - ``defect_batch``：图外 Agent-1 产物（路径 / dict / ``DefectBatch``）。
+    - ``product_line`` / ``posture``：可选的批次一致性校验，分析使用批次里的值。
     - ``cartography_profile``：Agent-2 仓型（调用方给定，不探测）。
     - ``extra_skill_dirs``：Agent-2/3 额外 overlay skill 根目录（两边共用，overlay 优先）。
     - ``artifact_dir``：每个门禁成功后渐进写 JSON。
@@ -142,6 +144,8 @@ def run_three_agent_workflow(
         "skip_agent2": skip_agent2,
         "skip_agent3": skip_agent3,
         "defect_batch": batch.model_dump(),
+        "project_integrations": project_integrations,
+        "repair_skill_path": str(repair_skill_path) if repair_skill_path is not None else None,
         "ok": True,
         "stage": "agent2",
         "error": None,

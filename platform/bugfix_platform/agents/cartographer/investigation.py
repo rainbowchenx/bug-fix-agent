@@ -53,6 +53,7 @@ def _identity(req: CartographyRequest) -> dict:
         "turns": req.max_turns,
         "profile": req.baseline.cartographyProfile,
         "protocol": INVESTIGATION_PROTOCOL,
+        **({"projectIntegrations": True} if req.project_mcp.full_access else {}),
         "navigation": {
             "architecture": req.baseline.architecture.model_dump(),
             "conventions": req.baseline.conventions.model_dump(),

@@ -15,7 +15,7 @@ from bugfix_platform.sdk.credentials import has_credentials
 from bugfix_platform.sdk.model_env import model_from_env, sdk_options_env
 from bugfix_platform.sdk.parse import parse_json_payload
 from bugfix_platform.sdk.project_mcp import ProjectMcp
-from bugfix_platform.sdk.skill_inject import InjectedSkill, fix_skills_addon
+from bugfix_platform.sdk.skill_inject import InjectedSkill, fix_skills_addon, repair_skill_addon
 from bugfix_platform.sdk.skills import skills_system_addon
 from bugfix_platform.sdk.trace import open_recorder
 
@@ -35,6 +35,7 @@ class FixRequest:
     model: Optional[str] = None
     injected_skills: tuple[InjectedSkill, ...] = ()
     project_mcp: ProjectMcp = field(default_factory=ProjectMcp)
+    repair_skill: InjectedSkill | None = None
 
 
 @dataclass
@@ -125,9 +126,11 @@ def run_claude_fix(req: FixRequest) -> FixResult:
         system_prompt = _FIX_SYSTEM_PROMPT + skills_system_addon(
             ("hierarchical-localization", "systematic-debugging")
         )
+    system_prompt += repair_skill_addon(req.repair_skill)
+    if req.project_mcp.full_access:
+        system_prompt += "\nUse the available project MCP tools and Claude Code plugins when relevant. Keep repairs in the supplied isolated worktree."
     texts: list[str] = []
 
-    # 轨迹：全量落 artifact_dir/logs/agent3-fix-<defectId>.jsonl + stdout 进度摘要。
     trace = open_recorder(
         req.artifact_dir,
         f"agent3-fix-{req.ticket.defectId}",
@@ -135,10 +138,10 @@ def run_claude_fix(req: FixRequest) -> FixResult:
     )
 
     async def _run() -> None:
+        trace.begin("repair", prompt, tickets=[req.ticket.defectId])
         terminal_error: str | None = None
         async for message in query(prompt=prompt, options=options):
-            if trace is not None:
-                trace.message(message)
+            trace.message(message)
             if isinstance(message, ResultMessage):
                 if message.is_error:
                     if terminal_error is None:
@@ -155,25 +158,27 @@ def run_claude_fix(req: FixRequest) -> FixResult:
                 {
                     "cwd": req.worktree_path,
                     "system_prompt": system_prompt,
-                    "allowed_tools": [*FIX_TOOLS, *req.project_mcp.tools],
+                    "allowed_tools": [*FIX_TOOLS, *req.project_mcp.allowed_tools()],
                     "disallowed_tools": list(DISALLOWED_TOOLS),
                     "permission_mode": "dontAsk",
                     "max_turns": req.max_turns,
                     "model": model,
                     **req.project_mcp.sdk_options(req.worktree_path),
+                    **trace.sdk_options(ClaudeAgentOptions),
                 }
             )
         )
         anyio.run(_run)
     except Exception as err:  # noqa: BLE001
-        trace.close()
+        trace.error(err)
         return FixResult(
             ok=False,
             source="sdk_fallback",
             detail=f"sdk fix failed: {err}",
             payload={},
         )
-    trace.close()
+    finally:
+        trace.close()
 
     review = _parse_semantic_review(texts)
     payload: dict[str, Any] = {
@@ -193,7 +198,7 @@ def run_claude_fix(req: FixRequest) -> FixResult:
 
 _FIX_SYSTEM_PROMPT = """You are Agent-3 fix editor.
 Apply the proposed fix already written in the analysis JSON.
-Use Edit/Write only. Minimal diff. Do not expand scope.
+Use Edit/Write for file changes. Minimal diff. Do not expand scope.
 Stay inside proposedFix.targetFiles unless a file you read proves another file is required.
 Do not commit, push, or run tests. Do not invent extra features.
 IRON LAW: if the analysis has no real root cause, make no edits.

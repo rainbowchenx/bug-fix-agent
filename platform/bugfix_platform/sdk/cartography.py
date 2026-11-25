@@ -14,6 +14,8 @@ from bugfix_contracts.code_knowledge import DefectCodeMatch
 from bugfix_platform.sdk.credentials import has_credentials
 from bugfix_platform.sdk.codegraph import CODEGRAPH_MCP_TOOLS, CodeGraphStatus
 from bugfix_platform.sdk.model_env import model_from_env, sdk_options_env
+from bugfix_platform.sdk.parse import budget_exhausted, message_text
+from bugfix_platform.sdk.project_mcp import ProjectMcp
 from bugfix_platform.sdk.skill_inject import InjectedSkill, cartography_skills_addon
 from bugfix_platform.sdk.skills import skills_system_addon
 from bugfix_platform.sdk.trace import open_recorder
@@ -32,7 +34,6 @@ DEFAULT_CARTOGRAPHY_BASE_TURNS = 6
 DEFAULT_CARTOGRAPHY_TURNS_PER_TICKET = 7
 # 候选集完全相同的票达到这个数，说明打分并列、路径 token 没区分度（假 medium）。
 SHARED_SIGNATURE_MIN_TICKETS = 3
-_BUDGET_SUBTYPES = frozenset({"error_max_turns", "error_max_budget_usd"})
 _SALVAGE_PROMPT = (
     "Stop exploring. Based only on what you already observed, return the JSON "
     "enrich object now. Incomplete is OK; set partial=true. Do not follow "
@@ -144,6 +145,7 @@ class CartographyRequest:
     call_id: Optional[str] = None
     deadline: float | None = None
     input_digest: str = ""
+    project_mcp: ProjectMcp = field(default_factory=ProjectMcp)
 
 
 @dataclass
@@ -267,31 +269,6 @@ def _norm_rel(rel: str) -> str:
     return rel.replace("\\", "/").lstrip("./").lower()
 
 
-def _message_text(message: Any) -> str:
-    result = getattr(message, "result", None)
-    if isinstance(result, str) and result.strip():
-        return result
-    content = getattr(message, "content", None)
-    if isinstance(content, str):
-        return content
-    if not isinstance(content, list):
-        return ""
-    bits: list[str] = []
-    for block in content:
-        text = getattr(block, "text", None)
-        if isinstance(text, str):
-            bits.append(text)
-        elif isinstance(block, dict) and isinstance(block.get("text"), str):
-            bits.append(block["text"])
-    return "\n".join(bits)
-
-
-def _budget_exhausted(message: Any) -> bool:
-    subtype = str(getattr(message, "subtype", "") or "")
-    terminal = str(getattr(message, "terminal_reason", "") or "")
-    return subtype in _BUDGET_SUBTYPES or terminal in {"max_turns", "max_budget_usd"}
-
-
 def _parse_session_json(structured: Any, texts: list[str], filename: str) -> tuple[dict[str, Any] | None, str]:
     from bugfix_platform.sdk.match_payload import find_business_envelope
 
@@ -362,6 +339,11 @@ def query_cartography(
                 "hierarchical-localization",
             )
         )
+    if req.project_mcp.full_access:
+        system_prompt += (
+            "\nUse the available project MCP tools and Claude Code plugins when relevant. "
+            "Configured MCP services may be remote. Keep repository analysis read-only."
+        )
     max_turns = resolve_cartography_max_turns(
         req.max_turns, ticket_count=len(prompt_pairs)
     )
@@ -369,22 +351,23 @@ def query_cartography(
     cg = req.codegraph
 
     def _make_options(*, resume: str | None = None, turns: Optional[int] = None) -> Any:
-        hooks = _cartography_hooks()
+        hooks = None if req.project_mcp.full_access else _cartography_hooks()
         tools = cartography_allowed_tools()
         if not hooks:
             tools = [name for name in tools if name != "Bash"]
         kwargs: dict[str, Any] = {
             "cwd": req.work_dir,
             "system_prompt": system_prompt,
-            "allowed_tools": tools,
-            "disallowed_tools": list(DISALLOWED_TOOLS),
+            "allowed_tools": [*tools, *req.project_mcp.allowed_tools()],
+            "disallowed_tools": [*DISALLOWED_TOOLS, "Bash"] if req.project_mcp.full_access else list(DISALLOWED_TOOLS),
             "permission_mode": "dontAsk",
             "max_turns": turns if turns is not None else max_turns,
             "model": model,
             "can_use_tool": _can_use_cartography_tool,
             "hooks": hooks,
         }
-        kwargs.update((cg or CodeGraphStatus(ready=False)).mcp_option_kwargs(req.work_dir))
+        kwargs.update(req.project_mcp.sdk_options(req.work_dir, cg))
+        kwargs.update(trace.sdk_options(ClaudeAgentOptions))
         if resume:
             kwargs["resume"] = resume
         # 平台注入 OPENAI_*、SDK 只认 ANTHROPIC_*，在 spawn 时按次覆盖。
@@ -392,6 +375,8 @@ def query_cartography(
         try:
             return ClaudeAgentOptions(**kwargs)
         except TypeError:
+            if req.project_mcp.full_access:
+                raise
             kwargs.pop("resume", None)
             kwargs.pop("hooks", None)
             kwargs["allowed_tools"] = [name for name in kwargs["allowed_tools"] if name != "Bash"]
@@ -428,9 +413,6 @@ def query_cartography(
         except OSError as err:
             artifact_error = str(err)
 
-    # 轨迹：全量落 artifact_dir/logs/agent2-<groupId>.jsonl，同时往 stdout 打
-    # 每轮一行的进度摘要。Agent-2 一次会话覆盖一组票（默认 8 张），所以文件名
-    # 只能带 groupId，带不了单票 ID。
     trace = open_recorder(
         req.artifact_dir,
         f"agent2-{req.group_id or 'group'}",
@@ -475,12 +457,12 @@ def query_cartography(
 
     async def _drive(prompt_text: str, opts: Any) -> None:
         nonlocal result_text, structured, turns, cost, terminal, session_id, budget_stop, cost_budget_stop
+        trace.begin("investigation", prompt_text, tickets=prompt_ids)
         launched_ids.extend(prompt_ids)
         async for message in query(prompt=prompt_text, options=opts):
-            if trace is not None:
-                trace.message(message)
+            trace.message(message)
             observe_reads(message)
-            text = _message_text(message)
+            text = message_text(message)
             if text.strip():
                 texts.append(text)
             if recorder is not None:
@@ -503,7 +485,7 @@ def query_cartography(
             session_id = getattr(message, "session_id", None) or session_id
             structured = message.structured_output
             result_text = message.result or ""
-            if _budget_exhausted(message):
+            if budget_exhausted(message):
                 budget_stop = True
                 cost_budget_stop = terminal == "max_budget_usd" or message.subtype == "error_max_budget_usd"
                 continue
@@ -515,6 +497,7 @@ def query_cartography(
     try:
         anyio.run(_drive, prompt, _make_options())
     except Exception as err:  # noqa: BLE001
+        trace.error(err)
         if recorder is not None:
             write_artifact(lambda: recorder.append_event({"kind": "error", "text": str(err)}))
             candidates = list(texts)
@@ -582,13 +565,15 @@ def query_cartography(
 
         async def _salvage() -> None:
             nonlocal repair_structured, repair_text, turns, repair_status
-            async for message in query(
-                prompt=(_SALVAGE_PROMPT + "\nReturn only these defect IDs in defectCodeMatches: "
-                        + json.dumps(missing, ensure_ascii=False)),
-                options=repair_opts,
-            ):
+            repair_prompt = (
+                _SALVAGE_PROMPT + "\nReturn only these defect IDs in defectCodeMatches: "
+                + json.dumps(missing, ensure_ascii=False)
+            )
+            trace.begin("investigation follow-up", repair_prompt, tickets=missing)
+            async for message in query(prompt=repair_prompt, options=repair_opts):
+                trace.message(message)
                 observe_reads(message)
-                text = _message_text(message)
+                text = message_text(message)
                 if text.strip():
                     salvage_texts.append(text)
                     if recorder is not None:
@@ -600,9 +585,9 @@ def query_cartography(
                 turns = turns + extra_turns if turns is not None and extra_turns is not None else None
                 repair_structured = message.structured_output
                 repair_text = message.result or ""
-                if _budget_exhausted(message):
+                if budget_exhausted(message):
                     repair_status = "budget_exhausted"
-                if message.is_error and not _budget_exhausted(message):
+                if message.is_error and not budget_exhausted(message):
                     raise RuntimeError(
                         "; ".join(message.errors or [])
                         or message.result
@@ -612,6 +597,7 @@ def query_cartography(
         try:
             anyio.run(_salvage)
         except Exception as salvage_err:  # noqa: BLE001
+            trace.error(salvage_err)
             repair_error = str(salvage_err)
             repair_status = "sdk_error"
             if recorder is not None:

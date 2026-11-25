@@ -147,7 +147,7 @@ stdout 会打印摘要：`ok` / `stage` / `funnel` / `profile` / `summary`。
 
 | 参数 | 含义 |
 |------|------|
-| `--posture alpha\|beta` | beta 时非 Open/New 更易进 `excluded` |
+| `--product-line` / `--posture alpha\|beta` | 可省略。提供时须与 `defect-batch.json` 中的 `productLine` / `posture` 一致。要改变批次的产品线或筛选模式，重新运行 Agent1 的 `prepare-batch`。 |
 | `--cartography-profile electron_node\|micro_frontend\|device_web\|unknown` | Agent-2 仓型（调用方给定，不探测；省略则为 `unknown`） |
 | `--cartography-mode heuristic\|sdk` | Agent-2 enrich 模式 |
 | `--skills-dir DIR` | Agent-2/3 注入仓特异性 skill（可重复；overlay 优先于包内置；见 `docs/prompts/agent2/`） |
@@ -289,6 +289,8 @@ bugfix-platform run ... --analyze-mode heuristic --out-dir /tmp/out
 # 段失败时看 stdout 的 stage / error（agent2|agent3）
 # 注入假 Agent 做单测：run_three_agent_workflow(..., agent2=..., agent3=...)
 ```
+
+给 `bugfix-platform run` 或 `resume` 加 `--trace-mode detailed`，可在终端实时查看模型正文、工具调用和结果预览、补查或补救，以及最终 Markdown 报告。终端进度和报告走 stderr，stdout 保持 JSON。完整可见 SDK 会话写到产物目录的 `logs/*.jsonl`，可能含业务源码和附件数据。默认 `summary`，可用 `--trace-mode off` 关闭，也可通过 `BUGFIX_TRACE` 设置默认值。Nexas 使用参数文件里的 `"trace_mode": "detailed"`。
 
 SDK analyze 排障：
 

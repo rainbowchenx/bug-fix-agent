@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from bugfix_contracts.env import load_env_file
 from bugfix_platform.sdk.project_mcp import ProjectMcpConfigError
+from bugfix_platform.sdk.trace import TraceMode, trace_output
+from bugfix_platform.workflow.persist import render_analysis_markdown
 
 import argparse
 import json
@@ -37,6 +39,7 @@ def _cmd_resume(
     apply_fix: bool = False,
     execute: bool = False,
     agent3_mcp_tools: list[str] | None = None,
+    trace_mode: TraceMode | None = None,
 ) -> int:
     from bugfix_platform.workflow.resume import (
         AttemptStoreBusy, ResumeRequestError, SessionDecision, resume_defect,
@@ -49,8 +52,13 @@ def _cmd_resume(
         ))
 
     try:
-        resume_defect(Path(root), defect_id, revision_id, apply_fix=apply_fix,
-                      execute=execute, on_decision=print_decision, agent3_mcp_tools=agent3_mcp_tools or ())
+        with trace_output(trace_mode) as display:
+            report = resume_defect(
+                Path(root), defect_id, revision_id, apply_fix=apply_fix, execute=execute,
+                on_decision=print_decision, agent3_mcp_tools=agent3_mcp_tools or (),
+            )
+            if display.mode == "detailed" and report is not None:
+                display.write("\n" + render_analysis_markdown(report))
     except (AttemptStoreBusy, ResumeRequestError, ProjectMcpConfigError) as err:
         print(str(err), file=sys.stderr)
         return 1
@@ -72,13 +80,13 @@ def main(argv: list[str] | None = None) -> int:
         help="LangGraph Agent-2→3 (requires defect-batch from prepare-batch / skill)",
     )
     run_p.add_argument("--work-dir", required=True)
-    run_p.add_argument("--product-line", required=True)
+    run_p.add_argument("--product-line", help="If supplied, must match defect-batch.productLine")
     run_p.add_argument(
         "--defect-batch",
         required=True,
         help="Path to defect-batch.json from Agent-1 prepare-batch",
     )
-    run_p.add_argument("--posture", choices=["alpha", "beta"], default="beta")
+    run_p.add_argument("--posture", choices=["alpha", "beta"], help="If supplied, must match defect-batch.posture")
     run_p.add_argument("--open-mr", action="store_true")
     run_p.add_argument(
         "--apply-fix",
@@ -150,6 +158,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     for command in (run_p, resume_p):
         command.add_argument(
+            "--trace-mode", choices=["off", "summary", "detailed"],
+            help="SDK progress on stderr; defaults to BUGFIX_TRACE or summary",
+        )
+        command.add_argument(
             "--agent3-mcp-tool", action="append", default=[], metavar="MCP_TOOL",
             help="Approve an exact mcp__<server>__<tool> from the business repo for this Agent 3 run (repeatable)",
         )
@@ -194,6 +206,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "resume":
         mcp_kwargs = {"agent3_mcp_tools": args.agent3_mcp_tool} if args.agent3_mcp_tool else {}
+        if args.trace_mode is not None:
+            mcp_kwargs["trace_mode"] = args.trace_mode
         return _cmd_resume(
             args.root,
             args.defect_id,
@@ -208,24 +222,27 @@ def main(argv: list[str] | None = None) -> int:
 
     from bugfix_platform.workflow import run_three_agent_workflow
 
-    result = run_three_agent_workflow(
-        work_dir=args.work_dir,
-        product_line=args.product_line,
-        defect_batch=args.defect_batch,
-        posture=args.posture,
-        open_mr=args.open_mr,
-        apply_fix=True if args.apply_fix else None,
-        skip_agent2=args.skip_agent2,
-        skip_agent3=args.skip_agent3,
-        analyze_mode=args.analyze_mode,
-        cartography_mode=args.cartography_mode,
-        cartography_profile=args.cartography_profile,
-        extra_skill_dirs=args.skills_dirs,
-        agent3_mcp_tools=args.agent3_mcp_tool,
-        artifact_dir=args.out_dir,
-        resume_dir=getattr(args, "resume_dir", None),
-        ticket_ids=[x for x in (args.ticket_ids or "").split(",") if x] or None,
-    )
+    with trace_output(args.trace_mode) as display:
+        result = run_three_agent_workflow(
+            work_dir=args.work_dir,
+            product_line=args.product_line,
+            defect_batch=args.defect_batch,
+            posture=args.posture,
+            open_mr=args.open_mr,
+            apply_fix=True if args.apply_fix else None,
+            skip_agent2=args.skip_agent2,
+            skip_agent3=args.skip_agent3,
+            analyze_mode=args.analyze_mode,
+            cartography_mode=args.cartography_mode,
+            cartography_profile=args.cartography_profile,
+            extra_skill_dirs=args.skills_dirs,
+            agent3_mcp_tools=args.agent3_mcp_tool,
+            artifact_dir=args.out_dir,
+            resume_dir=getattr(args, "resume_dir", None),
+            ticket_ids=[x for x in (args.ticket_ids or "").split(",") if x] or None,
+        )
+        if display.mode == "detailed" and result.artifacts.analysis_report is not None:
+            display.write("\n" + render_analysis_markdown(result.artifacts.analysis_report))
     payload = {
         "ok": result.ok,
         "stage": result.stage,

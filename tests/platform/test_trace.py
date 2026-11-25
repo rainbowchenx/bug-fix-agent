@@ -14,14 +14,17 @@ from pathlib import Path
 import pytest
 from claude_agent_sdk import (
     AssistantMessage,
+    ClaudeAgentOptions,
     ResultMessage,
+    StreamEvent,
     TextBlock,
     ThinkingBlock,
     ToolResultBlock,
     ToolUseBlock,
+    UserMessage,
 )
 
-from bugfix_platform.sdk.trace import TraceRecorder, trace_enabled
+from bugfix_platform.sdk.trace import TraceRecorder, trace_output
 
 
 def _result(**kw) -> ResultMessage:
@@ -155,7 +158,9 @@ def test_trace_enabled_default_on(monkeypatch, value, expected):
         monkeypatch.delenv("BUGFIX_TRACE", raising=False)
     else:
         monkeypatch.setenv("BUGFIX_TRACE", value)
-    assert trace_enabled() is expected
+    recorder = TraceRecorder(None, "demo")
+    assert recorder.enabled is expected
+    recorder.close()
 
 
 def test_noisy_thinking_tokens_dropped(tmp_path):
@@ -170,3 +175,67 @@ def test_noisy_thinking_tokens_dropped(tmp_path):
     records = _lines(tmp_path / "demo.jsonl")
     assert all(r["kind"] != "system" or r["subtype"] != "thinking_tokens" for r in records)
     assert any(r["kind"] == "system" and r["subtype"] == "init" for r in records)
+
+
+def test_detailed_trace_streams_text_once_and_records_full_results(tmp_path, capsys):
+    file_contents = "源码内容\n" * 1500
+    structured = {"rootCause": {"summary": "race in preview"}}
+
+    with trace_output("detailed"):
+        rec = TraceRecorder(tmp_path, "demo", tag="[agent3]")
+        assert rec.sdk_options(ClaudeAgentOptions) == {"include_partial_messages": True}
+        rec.begin("analysis", "Inspect the preview", tickets=["D1"])
+        rec.message(StreamEvent(uuid="event", session_id="s1", event={
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {"type": "text_delta", "text": "Reading preview"},
+        }))
+        live = capsys.readouterr()
+        assert "Reading preview" in live.err
+        assert live.out == ""
+
+        rec.message(AssistantMessage(content=[
+            TextBlock(text="Reading preview now."),
+            ThinkingBlock(thinking="internal", signature="s"),
+            ToolUseBlock(id="r1", name="Read", input={"file_path": "src/preview.ts"}),
+        ], model="m"))
+        rec.message(UserMessage(content=[ToolResultBlock(
+            tool_use_id="r1", content=file_contents, is_error=False,
+        )]))
+        rec.message(_result(structured_output=structured))
+        assert rec._turn_tools == [] and rec._turn_thinking == 0
+        rec.close()
+
+    live = capsys.readouterr()
+    assert live.out == ""
+    assert " now." in live.err and "Reading preview" not in live.err
+    assert "→ Read · src/preview.ts" in live.err and "← Read · ok" in live.err
+    assert "internal" not in live.err
+    events = _lines(tmp_path / "demo.jsonl")
+    assert [event["kind"] for event in events] == [
+        "request", "text_delta", "text", "tool_use", "tool_result", "result",
+    ]
+    assert events[0]["tickets"] == ["D1"]
+    assert events[-2]["content"] == file_contents
+    assert events[-1]["structuredOutput"] == structured
+
+
+def test_nexas_display_budget_is_shared_and_does_not_limit_files(tmp_path, capsys):
+    body = "文" * 10000
+    with trace_output("detailed", nexas=True):
+        for name in ("agent2-g1", "agent3-D1"):
+            recorder = TraceRecorder(tmp_path, name)
+            recorder.begin("analysis", "prompt", tickets=["D1"])
+            for _ in range(10):
+                recorder.message(AssistantMessage(content=[TextBlock(text=body)], model="m"))
+            recorder.close()
+        follow_up = TraceRecorder(tmp_path, "follow-up")
+        follow_up.begin("analysis salvage", "repair prompt", tickets=["D1"])
+        follow_up.close()
+
+    live = capsys.readouterr()
+    assert live.err == ""
+    assert len(live.out.encode("utf-8")) < 64 * 1024
+    assert live.out.count("Live output limit reached") == 1
+    assert live.out.index("analysis salvage [D1]") > live.out.index("Live output limit reached")
+    assert _lines(tmp_path / "agent3-D1.jsonl")[-1]["text"] == body

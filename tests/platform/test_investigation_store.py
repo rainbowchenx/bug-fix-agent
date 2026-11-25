@@ -376,11 +376,12 @@ def test_sdk_format_repair_preserves_initial_response(tmp_path, monkeypatch):
     assert repaired["result_text"] == '{"defectCodeMatches": []}'
 
 
-def test_sdk_success_repairs_only_missing_or_ambiguous_tickets(tmp_path, monkeypatch):
+def test_sdk_success_repairs_only_missing_or_ambiguous_tickets(tmp_path, monkeypatch, capsys):
     import claude_agent_sdk
     from claude_agent_sdk.types import ResultMessage
 
     from bugfix_platform.agents.cartographer.investigation import investigate_groups
+    from bugfix_platform.sdk.trace import trace_output
     from tests.platform.test_investigation_batches import request
 
     work = tmp_path / "repo"
@@ -410,7 +411,16 @@ def test_sdk_success_repairs_only_missing_or_ambiguous_tickets(tmp_path, monkeyp
     calls = []
 
     async def query(*, prompt, options):
+        from claude_agent_sdk import StreamEvent
+
+        assert options.include_partial_messages
         calls.append((prompt, options.resume, options.max_turns))
+        if options.resume:
+            yield StreamEvent(uuid="delta", session_id="offline", event={
+                "type": "content_block_delta",
+                "index": 0,
+                "delta": {"type": "text_delta", "text": "Checking the missing tickets"},
+            })
         yield ResultMessage(
             subtype="success", duration_ms=3, duration_api_ms=3, is_error=False,
             num_turns=1 if options.resume else 3, session_id="offline",
@@ -422,7 +432,16 @@ def test_sdk_success_repairs_only_missing_or_ambiguous_tickets(tmp_path, monkeyp
     monkeypatch.setattr(claude_agent_sdk, "query", query)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     artifacts = tmp_path / "out"
-    result = investigate_groups(request(work, 3), run_claude_cartography, artifact_dir=artifacts)
+    with trace_output("detailed"):
+        result = investigate_groups(request(work, 3), run_claude_cartography, artifact_dir=artifacts)
+    live = capsys.readouterr()
+    assert "investigation follow-up [1, 2]" in live.err
+    assert "Checking the missing tickets" in live.err
+    trace_path, = (artifacts / "logs").glob("agent2-*.jsonl")
+    events = [json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines()]
+    follow_up = [event for event in events if event["phase"] == "investigation follow-up"]
+    assert follow_up[0]["tickets"] == ["1", "2"]
+    assert follow_up[-1]["text"].endswith(json.dumps(repaired))
     matches = {match.defectId: match for match in result.knowledge.defectCodeMatches}
     assert len(calls) == 2
     assert calls[1][1:] == ("offline", 2)

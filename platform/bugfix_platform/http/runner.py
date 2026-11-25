@@ -117,10 +117,11 @@ def enqueue_run(
                     }
                 )
             result = fn(**call_kwargs)
+            batch = result.artifacts.defect_batch
             # 即便跳过了渐进落盘（注入桩 / 旧路径），收尾也要保证产物在盘上。
-            if result.artifacts.defect_batch:
+            if batch:
                 (art_dir / "defect-batch.json").write_text(
-                    result.artifacts.defect_batch.model_dump_json(indent=2), encoding="utf-8"
+                    batch.model_dump_json(indent=2), encoding="utf-8"
                 )
             if result.artifacts.code_knowledge:
                 (art_dir / "code-knowledge.json").write_text(
@@ -137,11 +138,9 @@ def enqueue_run(
                 status="succeeded" if result.ok else "failed",
                 stage=result.stage,
                 error=result.error,
-                funnel=(
-                    result.artifacts.defect_batch.funnel
-                    if result.artifacts.defect_batch
-                    else None
-                ),
+                productLine=batch.productLine if batch else request.productLine,
+                posture=batch.posture if batch else request.posture,
+                funnel=batch.funnel if batch else None,
                 profile=(
                     result.artifacts.code_knowledge.cartographyProfile
                     if result.artifacts.code_knowledge

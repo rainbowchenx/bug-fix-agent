@@ -18,8 +18,9 @@
   // 必须是 git 仓，或包含 git 仓的父目录。
   "work_dir": "E:/repos/transport",
 
-  // 产线标识。留空则从 defect_batch.productLine 取。
-  "product_line": "PJ14PD20260423284",
+  // 可选的批次核对字段。启用时须和 defect_batch 对应的字段一致。
+  // "product_line": "PJ14PD20260423284",
+  // "posture": "alpha",
 
   // 【强烈建议】仓型。不给会退化成 unknown，路径匹配基本失效，结果没价值。
   // 可选：device_web / micro_frontend / electron_node
@@ -34,8 +35,17 @@
   "ticket_ids": ["BGCM2026102708222"],
 
   // 是否真改码。默认 false，只出分析方案。
-  "apply_fix": false
+  "apply_fix": false,
 
   // 产物目录。留空则 <work_dir>/.bugfix-runs/<时间戳>-<随机>。
-  // "artifact_dir": "E:/work/bugfix-output"
+  // "artifact_dir": "E:/work/bugfix-output",
+
+  // 可选的本次任务专用用户修复 Skill 文件或目录。
+  // "repair_skill": "E:/work/user-repair/SKILL.md",
+
+  // 放开项目 MCP 全部工具，并加载当前 Claude Code 账号与项目的插件。
+  // "project_integrations": true,
+
+  // 详细模式实时显示模型正文和关键工具事件。可选 off / summary / detailed。
+  "trace_mode": "summary"
 }

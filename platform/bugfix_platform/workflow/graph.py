@@ -103,6 +103,26 @@ def create_three_agent_graph(
         artifact_dir = state.get("artifact_dir") or str(default_artifact_dir(state["work_dir"]))
         persist_artifact(artifact_dir, "defect-batch.json", dumped)
 
+        mismatches = [
+            f"{name}={supplied!r} does not match defect-batch {field}={expected!r}"
+            for name, field, supplied, expected in (
+                ("product_line", "productLine", state.get("product_line"), batch.productLine),
+                ("posture", "posture", state.get("posture"), batch.posture),
+            )
+            if supplied is not None and supplied != expected
+        ]
+        if mismatches:
+            return Command(
+                update={
+                    "defect_batch": dumped,
+                    "artifact_dir": artifact_dir,
+                    "ok": False,
+                    "stage": "agent2",
+                    "error": ". ".join(mismatches),
+                },
+                goto=END,
+            )
+
         both_skip = bool(state.get("skip_agent2")) and bool(state.get("skip_agent3"))
         if both_skip:
             # 调试路径：只校验 ingress batch，不跑 2/3。
@@ -158,6 +178,8 @@ def create_three_agent_graph(
             call_kwargs["extra_skill_dirs"] = state["extra_skill_dirs"]
         if state.get("cartography_profile"):
             call_kwargs["cartography_profile"] = state["cartography_profile"]
+        if state.get("project_integrations"):
+            call_kwargs["project_integrations"] = True
         if state.get("artifact_dir"):
             call_kwargs["artifact_dir"] = state["artifact_dir"]
         if state.get("resume_dir"):
@@ -236,6 +258,10 @@ def create_three_agent_graph(
             call_kwargs["analyze_mode"] = state["analyze_mode"]
         if state.get("agent3_mcp_tools"):
             call_kwargs["agent3_mcp_tools"] = state["agent3_mcp_tools"]
+        if state.get("project_integrations"):
+            call_kwargs["project_integrations"] = True
+        if state.get("repair_skill_path"):
+            call_kwargs["repair_skill_path"] = state["repair_skill_path"]
         if state.get("extra_skill_dirs"):
             call_kwargs["extra_skill_dirs"] = state["extra_skill_dirs"]
         if state.get("artifact_dir"):

@@ -30,6 +30,7 @@ from bugfix_contracts import (
 )
 from bugfix_contracts.code_knowledge import Architecture, CartographyProfile, SpecAtlas, SpecEntry
 from bugfix_platform.agents.cartographer.handoff import create_cartography_runner
+from bugfix_platform.sdk.project_mcp import load_project_mcp
 from bugfix_platform.sdk.cartography import (
     CartographyRequest,
     CartographyRunner,
@@ -49,6 +50,7 @@ def run_cartographer(
     cartography_profile: Optional[str] = None,
     artifact_dir: Optional[str | Path] = None,
     resume_dir: Optional[str | Path] = None,
+    project_integrations: bool = False,
     ticket_ids: Optional[Sequence[str]] = None,
 ) -> CodeKnowledge:
     """Agent-2 公开入口：产出供 Agent-3 消费的 ``code-knowledge``。
@@ -192,6 +194,7 @@ def run_cartographer(
             injected_skills=tuple(injected),
             codegraph=cg_status,
             artifact_dir=persist_root,
+        project_mcp=load_project_mcp(work_dir, repo_roots, full_access=project_integrations),
         )
     import os
     if cartography_fn is None and cartography_mode_from_env(cartography_mode) == "sdk":
@@ -201,9 +204,9 @@ def run_cartographer(
             runner,
             group_size=int(os.environ.get("BUGFIX_INVESTIGATION_GROUP_SIZE", "8")),
             max_groups=int(os.environ["BUGFIX_INVESTIGATION_MAX_GROUPS"]) if os.environ.get("BUGFIX_INVESTIGATION_MAX_GROUPS") else None,
-            cache_dir=os.environ.get("BUGFIX_INVESTIGATION_CACHE_DIR"),
+            cache_dir=None if project_integrations else os.environ.get("BUGFIX_INVESTIGATION_CACHE_DIR"),
             artifact_dir=persist_root,
-            resume_dir=resume_dir or persist_root,
+            resume_dir=None if project_integrations else resume_dir or persist_root,
             ticket_ids=list(ticket_ids) if ticket_ids is not None else None,
         )
     else:

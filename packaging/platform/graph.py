@@ -30,14 +30,15 @@
 ===================  ==========  ==========================================
 defect_batch         是          Agent-1 产物 JSON 的路径
 work_dir             否          业务代码根；缺省用 runner 的 cwd
-product_line         否          缺省取 defect_batch.productLine
-posture              否          alpha / beta，默认 beta
+product_line         否          提供时须和 defect_batch.productLine 一致
+posture              否          提供时须和 defect_batch.posture 一致
 cartography_profile  否          强烈建议给；缺省 unknown 会明显降质
 cartography_mode     否          sdk / heuristic
 analyze_mode         否          sdk / heuristic
 ticket_ids           否          字符串数组，只跑这些票
 apply_fix            否          默认关（只出方案不改码）
 artifact_dir         否          产物目录；缺省 <work_dir>/.bugfix-runs/<时间戳>
+trace_mode           否          off / summary / detailed
 ===================  ==========  ==========================================
 
 所有路径字段都支持相对路径——相对于**参数文件所在目录**解析，其次相对于 cwd。
@@ -59,7 +60,6 @@ artifact_dir         否          产物目录；缺省 <work_dir>/.bugfix-runs/
 """
 
 import json
-import os
 import re
 import traceback
 from pathlib import Path
@@ -78,16 +78,19 @@ load_env_file()
 # Nexas 自己就有一份。这里找到它并塞进 PATH，SDK 的 _find_cli() 才解析得到。
 # 找不到也不报错：后续 SDK 调用会自己给出清晰的 ImportError/解析失败信息。
 from bugfix_platform.sdk.claude_cli import ensure_claude_cli_on_path  # noqa: E402
+from bugfix_platform.sdk.trace import trace_output  # noqa: E402
+from bugfix_platform.workflow.persist import render_analysis_markdown  # noqa: E402
 
-_CLAUDE_CLI = ensure_claude_cli_on_path()
+ensure_claude_cli_on_path()
 
 # 客户端从 outputs 里挑这两个字段展示。summary 进任务卡片，result 进结果面板。
 SUMMARY_MAX = 200
 RESULT_MAX = 20000
 
-# 参数文件里允许出现的键。其余忽略，避免拼错字段静默生效。
-_PATH_KEYS = ("defect_batch", "work_dir", "artifact_dir")
-_KNOWN_KEYS = frozenset(
+# 参数文件里允许出现的键。未知字段报错。
+_PATH_KEYS = ("defect_batch", "work_dir", "artifact_dir", "feedback_file", "repair_skill")
+_COMMON_KEYS = {"action", "artifact_dir", "trace_mode", "analyze_mode", "apply_fix", "repair_skill", "project_integrations"}
+_RUN_KEYS = _COMMON_KEYS | frozenset(
     {
         "defect_batch",
         "work_dir",
@@ -95,12 +98,10 @@ _KNOWN_KEYS = frozenset(
         "posture",
         "cartography_profile",
         "cartography_mode",
-        "analyze_mode",
         "ticket_ids",
-        "apply_fix",
-        "artifact_dir",
     }
 )
+_RESUME_KEYS = _COMMON_KEYS | {"defect_id", "feedback_file", "revision_id"}
 
 
 class NexasState(TypedDict):
@@ -234,22 +235,56 @@ def _validate(params: dict[str, Any]) -> None:
     """启动前把明显缺的东西一次性报清楚，别让下游报一堆无关的校验错。"""
     problems: list[str] = []
 
-    db = params.get("defect_batch")
-    if not db:
-        problems.append("缺少 defect_batch（defect-batch JSON 的路径）")
-    elif not Path(str(db)).is_file():
-        problems.append(f"defect_batch 指向的文件不存在：{db}")
+    action = params.get("action", "run")
+    if action not in ("run", "resume"):
+        raise ValueError("action 必须是 run 或 resume")
 
-    wd = params.get("work_dir")
-    if wd and not Path(str(wd)).is_dir():
-        problems.append(f"work_dir 不是目录：{wd}")
+    for key in _PATH_KEYS:
+        if key in params and (not isinstance(params[key], str) or not params[key].strip()):
+            problems.append(f"{key} 必须是非空路径")
+    if action == "resume":
+        root = params.get("artifact_dir")
+        if not isinstance(root, str) or not root or not Path(root).is_dir():
+            problems.append("resume 的 artifact_dir 必须指向首轮产物目录")
+        for key in ("defect_id", "revision_id"):
+            if key == "defect_id" or key in params:
+                if not isinstance(params.get(key), str) or not params[key].strip():
+                    problems.append(f"resume 的 {key} 必须是非空字符串")
+        feedback = params.get("feedback_file")
+        if isinstance(feedback, str) and not Path(feedback).is_file():
+            problems.append(f"feedback_file 指向的文件不存在：{feedback}")
+        if "feedback_file" in params and "revision_id" in params:
+            problems.append("feedback_file 与 revision_id 不能同时使用")
+    else:
+        db = params.get("defect_batch")
+        if not isinstance(db, str) or not db or not Path(db).is_file():
+            problems.append("defect_batch 必须指向已有的 defect-batch JSON")
+        wd = params.get("work_dir")
+        if isinstance(wd, str) and not Path(wd).is_dir():
+            problems.append(f"work_dir 不是目录：{wd}")
 
-    unknown = set(params) - _KNOWN_KEYS
+    unknown = set(params) - (_RESUME_KEYS if action == "resume" else _RUN_KEYS)
     if unknown:
         problems.append(f"参数文件里有无法识别的字段（拼错了？）：{sorted(unknown)}")
+    if "trace_mode" in params and params["trace_mode"] not in ("off", "summary", "detailed"):
+        problems.append("trace_mode 必须是 off、summary 或 detailed")
+    for key in ("project_integrations", "apply_fix"):
+        if key in params and not isinstance(params[key], bool):
+            problems.append(f"{key} 必须是布尔值")
+    if "analyze_mode" in params and params["analyze_mode"] not in ("sdk", "heuristic"):
+        problems.append("analyze_mode 必须是 sdk 或 heuristic")
+    if params.get("repair_skill") and params.get("analyze_mode") == "heuristic":
+        problems.append("repair_skill 需要 Agent3 SDK 模式")
 
     if problems:
         raise ValueError("\n".join(f"  · {p}" for p in problems))
+    if path := params.get("repair_skill"):
+        from bugfix_platform.sdk.credentials import has_credentials
+        from bugfix_platform.sdk.skill_inject import load_repair_skill
+
+        load_repair_skill(path)
+        if not has_credentials():
+            raise ValueError("repair_skill 需要 Agent3 SDK 模型凭据")
 
 
 # ---------------------------------------------------------------------------
@@ -258,9 +293,7 @@ def _validate(params: dict[str, Any]) -> None:
 
 
 def run_workflow(state: NexasState) -> dict[str, Any]:
-    """读参数文件 → 跑 Agent-2→3 → 把结果投影成客户端能展示的两个字段。"""
-    from bugfix_platform.workflow import run_three_agent_workflow
-
+    """读取参数文件，首跑或续跑后返回 Nexas 展示字段。"""
     body = state.get("input") or ""
 
     try:
@@ -269,34 +302,63 @@ def run_workflow(state: NexasState) -> dict[str, Any]:
     except Exception as err:  # noqa: BLE001
         return _failure(f"入参解析失败：{err}")
 
-    params.setdefault("work_dir", _default_work_dir())
-
     try:
         _validate(params)
     except Exception as err:  # noqa: BLE001
         return _failure(f"参数校验失败（{params_path}）：\n{err}")
 
     try:
-        result = run_three_agent_workflow(
-            work_dir=params["work_dir"],
-            product_line=params.get("product_line") or "unknown",
-            defect_batch=params["defect_batch"],
-            posture=params.get("posture") or "beta",
-            apply_fix=params.get("apply_fix"),
-            analyze_mode=params.get("analyze_mode"),
-            cartography_mode=params.get("cartography_mode"),
-            cartography_profile=params.get("cartography_profile"),
-            ticket_ids=params.get("ticket_ids"),
-            artifact_dir=params.get("artifact_dir"),
-        )
+        with trace_output(params.get("trace_mode"), nexas=True) as display:
+            result = _execute(params)
     except Exception as err:  # noqa: BLE001 — 任何异常都要变成可读结果，不能崩在图里
         detail = f"{type(err).__name__}: {err}\n{traceback.format_exc(limit=5)}"
         return _failure(f"编排执行失败：{err}", detail)
 
-    return _project(result)
+    return _project(result, detailed=display.mode == "detailed", resumed_ticket=params.get("defect_id"))
 
 
-def _project(result: Any) -> dict[str, Any]:
+def _execute(params: dict[str, Any]):
+    from bugfix_platform.workflow import run_three_agent_workflow
+
+    shared = {
+        "analyze_mode": params.get("analyze_mode"),
+        "repair_skill_path": params.get("repair_skill"),
+        "project_integrations": params.get("project_integrations", False),
+    }
+    if params.get("action") == "resume":
+        from bugfix_platform.workflow.resume import resume_defect
+        from bugfix_platform.workflow.run import ThreeAgentWorkflowResult, WorkflowArtifacts
+
+        root = Path(params["artifact_dir"])
+        feedback = params.get("feedback_file")
+        report = resume_defect(
+            root,
+            params["defect_id"],
+            params.get("revision_id"),
+            execute=True,
+            apply_fix=params.get("apply_fix", False),
+            feedback_file=Path(feedback) if feedback else None,
+            **shared,
+        )
+        return ThreeAgentWorkflowResult(
+            ok=True, stage="done", artifacts=WorkflowArtifacts(analysis_report=report), artifact_dir=str(root),
+        )
+
+    return run_three_agent_workflow(
+        work_dir=params.get("work_dir") or _default_work_dir(),
+        product_line=params.get("product_line"),
+        defect_batch=params["defect_batch"],
+        posture=params.get("posture"),
+        apply_fix=params.get("apply_fix"),
+        cartography_mode=params.get("cartography_mode"),
+        cartography_profile=params.get("cartography_profile"),
+        ticket_ids=params.get("ticket_ids"),
+        artifact_dir=params.get("artifact_dir"),
+        **shared,
+    )
+
+
+def _project(result: Any, *, detailed: bool = False, resumed_ticket: str | None = None) -> dict[str, Any]:
     """把 ``ThreeAgentWorkflowResult`` 投影成客户端会读的字段。"""
     ok = bool(getattr(result, "ok", False))
     stage = getattr(result, "stage", "?")
@@ -310,6 +372,8 @@ def _project(result: Any) -> dict[str, Any]:
     lines.append(f"状态：{'成功' if ok else '失败'}（stage={stage}）")
     if error:
         lines.append(f"原因：{error}")
+    if resumed_ticket:
+        lines.append(f"Agent3 续跑票号：{resumed_ticket}")
     if batch is not None:
         lines.append(f"缺陷批次：{len(getattr(batch, 'tickets', []) or [])} 张票")
     if knowledge is not None:
@@ -326,11 +390,20 @@ def _project(result: Any) -> dict[str, Any]:
             defect_id = getattr(ticket, "defectId", "?")
             outcome = getattr(ticket, "outcome", None) or getattr(ticket, "analysisStatus", "?")
             lines.append(f"  - {defect_id}: {outcome}")
-        artifact_dir = getattr(result, "artifact_dir", None)
-        if artifact_dir:
-            lines.append(f"产物目录：{artifact_dir}")
+    artifact_dir = getattr(result, "artifact_dir", None)
+    if artifact_dir:
+        lines.append(f"产物目录：{artifact_dir}")
+        if detailed:
+            lines.append(f"会话记录：{Path(artifact_dir) / 'logs'}")
 
     text = "\n".join(lines)
+    if detailed and report is not None:
+        report_text = "\n\n" + render_analysis_markdown(report)
+        available = max(0, RESULT_MAX - len(text))
+        if len(report_text) > available:
+            footer = "\n\n报告预览已截断，完整报告见产物目录的 analysis-report.md。"
+            report_text = report_text[:max(0, available - len(footer))].rstrip() + footer
+        text += report_text
     head = lines[0]
     if error:
         head = f"{head} — {error}"

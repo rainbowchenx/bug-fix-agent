@@ -5,6 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from bugfix_contracts.analysis_report import AnalysisReport
+
+
+def render_analysis_markdown(report: AnalysisReport) -> str:
+    return render_report({"batchId": report.productLine, "tickets": report.model_dump()["tickets"]})
+
 
 def render_report(report: dict[str, Any]) -> str:
     tickets = list(report.get("tickets") or [])
@@ -28,6 +34,12 @@ def render_report(report: dict[str, Any]) -> str:
             lines.append(f"  currentTarget: {target}")
         for attachment in item.get('attachments') or []:
             lines.append(f"  attachment: {attachment.get('ref')} available={attachment.get('availability')} read={attachment.get('read')}")
+        for candidate in (item.get("localization") or {}).get("candidates") or []:
+            path = candidate.get("path", "")
+            repo = candidate.get("repoPath")
+            location = f"{repo}/{path}" if repo and repo != "." else path
+            symbol = candidate.get("symbol")
+            lines.append(f"  location: {location}" + (f" ({symbol})" if symbol else ""))
         cause = ""
         root = item.get("rootCause")
         if isinstance(root, dict):
@@ -38,6 +50,13 @@ def render_report(report: dict[str, Any]) -> str:
             lines.append(f"  claim [{claim.get('status')}]: {claim.get('statement')}")
         for question in (root or {}).get("questions") or []:
             lines.append(f"  question [{question.get('kind')}]: {question.get('reason')}; need {question.get('requestedEvidence', '')}")
+        proposal = item.get("proposedFix") or {}
+        if proposal.get("summary"):
+            lines.append(f"  proposedFix: {proposal['summary']}")
+        for step in proposal.get("steps") or []:
+            lines.append(f"    - {step}")
+        if proposal.get("targetFiles"):
+            lines.append(f"  targetFiles: {', '.join(proposal['targetFiles'])}")
         patch = item.get("patch") if isinstance(item.get("patch"), dict) else {}
         patch_path = (patch or {}).get("path")
         if patch_path:
