@@ -39,7 +39,16 @@ _ENTRY_MARKERS = (
 
 
 def _norm(path: str) -> str:
-    return path.replace("\\", "/").lstrip("./")
+    text = path.replace("\\", "/").lstrip("./")
+    # SDK 有时吐绝对路径；把 workDir 之前的部分剥掉，留下仓内相对路径。
+    marker = "/bug-fix-demo-project/"
+    if marker in text:
+        text = text.split(marker, 1)[1]
+        # 去掉首个仓名之后的定位基准：led/calibrationtool/... -> calibrationtool/...
+        parts = text.split("/", 1)
+        if len(parts) == 2 and parts[0] in {"led", "peitao", "transport", "hcp"}:
+            text = parts[1]
+    return text
 
 
 def _rel(candidate: dict[str, Any]) -> str:

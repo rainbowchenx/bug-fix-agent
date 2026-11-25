@@ -34,11 +34,13 @@ workDir + defect-batch + cartographyProfile
   → match tickets using architecture indexes + title tokens
     (do not fill tickets with architecture entryPoints when no path token hit)
   → ensure CodeGraph (use `.codegraph/` or `codegraph init -y`; mount MCP)
-  → optional SDK enrich (CodeGraph MCP + Read/Glob/Grep + read-only Bash;
+  → optional SDK enrich (CodeGraph MCP + Read/Glob/Grep; no Bash —
+     `cartography_allowed_tools()` strips it from allowed_tools and `dontAsk`
+     denies unapproved calls;
      prefer codegraph_explore; prompt all match-pool tickets, weak first, cap 16;
      heuristic medium marked unverified / demoted;
-     max_turns = base + per_ticket × n, default 6+2×n)
-  → on max_turns: salvage JSON from the stream / one resume turn; keep baseline
+     max_turns = base + per_ticket × n, default 6+7×n)
+  → on max_turns: salvage JSON from the stream / up to 2 resume turns; keep baseline
   → validate_code_knowledge → code-knowledge.json
 ```
 
