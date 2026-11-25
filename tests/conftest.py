@@ -1,4 +1,4 @@
-"""全局测试守卫：测试永远不碰真实模型凭据。
+"""全局测试守卫：测试永远不碰真实模型凭据，也不 spawn 真实 CodeGraph。
 
 起因是一次真实事故：`load_env_file()` 不传参在仓根跑了一次，把 `.env` 里的
 `ANTHROPIC_*` 灌进整个 pytest 进程；后面 `test_langgraph_e2e_invoke` 直接
@@ -7,13 +7,24 @@
 
 所以这里在**每个用例开始前**清掉凭据与模式开关。用例想要环境变量，自己用
 `monkeypatch.setenv` 设——那发生在 fixture 之后，不受影响。
+
+CodeGraph 同理：`ensure_codegraph()` 每次会串行 spawn
+`codegraph init`（约 19s）+ `codegraph status`（约 11~25s）。测试用的
+`tmp_path` 迷你仓索引出来是 `files=0`，本来就走 `index-truncated` 分支，
+这些子进程对断言零价值，却把整套测试从分钟级拖到 40 分钟级。
+默认按 `BUGFIX_CODEGRAPH=0` 短路；要跑真实 CLI 的用例自己
+`monkeypatch.delenv` 打开，或整轮用 `BUGFIX_TEST_CODEGRAPH=1 pytest`。
 """
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
+
+_FLAGS = ("1", "true", "yes", "on")
+_KEEP_CODEGRAPH = (os.environ.get("BUGFIX_TEST_CODEGRAPH") or "").strip().lower() in _FLAGS
 
 _LEAKY = (
     "ANTHROPIC_API_KEY",
@@ -59,3 +70,11 @@ def _plant_fixture_git_markers() -> None:
 def _no_live_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in _LEAKY:
         monkeypatch.delenv(key, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _no_live_codegraph(monkeypatch: pytest.MonkeyPatch) -> None:
+    """默认关掉真实 CodeGraph；`BUGFIX_TEST_CODEGRAPH=1` 时保留环境原样。"""
+    if _KEEP_CODEGRAPH:
+        return
+    monkeypatch.setenv("BUGFIX_CODEGRAPH", "0")

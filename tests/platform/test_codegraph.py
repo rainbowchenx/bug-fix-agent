@@ -106,9 +106,11 @@ def test_ensure_skips_empty_index_and_shell_workdir(monkeypatch, tmp_path: Path)
 
 
 @pytest.mark.skipif(shutil.which("codegraph") is None, reason="codegraph CLI not installed")
-def test_init_creates_index(tmp_path: Path):
+def test_init_creates_index(tmp_path: Path, monkeypatch):
     from tests.helpers import ensure_git_repo
 
+    # conftest 默认 BUGFIX_CODEGRAPH=0 提速；这条要真 CLI 行为，显式打开。
+    monkeypatch.delenv("BUGFIX_CODEGRAPH", raising=False)
     ensure_git_repo(tmp_path)
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "a.ts").write_text("export const x = 1;\n", encoding="utf-8")
