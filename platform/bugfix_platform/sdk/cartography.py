@@ -16,6 +16,7 @@ from bugfix_platform.sdk.codegraph import CODEGRAPH_MCP_TOOLS, CodeGraphStatus
 from bugfix_platform.sdk.model_env import model_from_env, sdk_options_env
 from bugfix_platform.sdk.skill_inject import InjectedSkill, cartography_skills_addon
 from bugfix_platform.sdk.skills import skills_system_addon
+from bugfix_platform.sdk.trace import open_recorder
 
 CartographyMode = Literal["heuristic", "sdk"]
 
@@ -427,6 +428,15 @@ def query_cartography(
         except OSError as err:
             artifact_error = str(err)
 
+    # 轨迹：全量落 artifact_dir/logs/agent2-<groupId>.jsonl，同时往 stdout 打
+    # 每轮一行的进度摘要。Agent-2 一次会话覆盖一组票（默认 8 张），所以文件名
+    # 只能带 groupId，带不了单票 ID。
+    trace = open_recorder(
+        req.artifact_dir,
+        f"agent2-{req.group_id or 'group'}",
+        tag="[agent2]",
+    )
+
     def write_artifact(write: Callable[[], Any]) -> None:
         nonlocal artifact_error
         try:
@@ -467,6 +477,8 @@ def query_cartography(
         nonlocal result_text, structured, turns, cost, terminal, session_id, budget_stop, cost_budget_stop
         launched_ids.extend(prompt_ids)
         async for message in query(prompt=prompt_text, options=opts):
+            if trace is not None:
+                trace.message(message)
             observe_reads(message)
             text = _message_text(message)
             if text.strip():
@@ -519,6 +531,7 @@ def query_cartography(
             except OSError as write_err:
                 artifact_error = artifact_error or str(write_err)
         if not budget_stop:
+            trace.close()
             return CartographyResponse(
                 None, terminal, budget_stop, turns, cost, sorted(skill_reads), observed_paths,
                 error=f"sdk cartography failed: {err}", recorder=recorder, artifact_error=artifact_error,
@@ -628,6 +641,7 @@ def query_cartography(
 
     if budget_stop and not terminal:
         terminal = "max_turns"
+    trace.close()
     return CartographyResponse(
         parsed, terminal, budget_stop, turns, cost, sorted(skill_reads), observed_paths,
         recorder=recorder, artifact_error=artifact_error, parsed_ref=parsed_ref,

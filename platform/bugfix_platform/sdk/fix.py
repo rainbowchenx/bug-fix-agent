@@ -17,6 +17,7 @@ from bugfix_platform.sdk.parse import parse_json_payload
 from bugfix_platform.sdk.project_mcp import ProjectMcp
 from bugfix_platform.sdk.skill_inject import InjectedSkill, fix_skills_addon
 from bugfix_platform.sdk.skills import skills_system_addon
+from bugfix_platform.sdk.trace import open_recorder
 
 FIX_TOOLS = ["Read", "Glob", "Grep", "Edit", "Write"]
 DISALLOWED_TOOLS = ["Bash", "NotebookEdit"]
@@ -126,9 +127,18 @@ def run_claude_fix(req: FixRequest) -> FixResult:
         )
     texts: list[str] = []
 
+    # 轨迹：全量落 artifact_dir/logs/agent3-fix-<defectId>.jsonl + stdout 进度摘要。
+    trace = open_recorder(
+        req.artifact_dir,
+        f"agent3-fix-{req.ticket.defectId}",
+        tag="[agent3-fix]",
+    )
+
     async def _run() -> None:
         terminal_error: str | None = None
         async for message in query(prompt=prompt, options=options):
+            if trace is not None:
+                trace.message(message)
             if isinstance(message, ResultMessage):
                 if message.is_error:
                     if terminal_error is None:
@@ -156,12 +166,14 @@ def run_claude_fix(req: FixRequest) -> FixResult:
         )
         anyio.run(_run)
     except Exception as err:  # noqa: BLE001
+        trace.close()
         return FixResult(
             ok=False,
             source="sdk_fallback",
             detail=f"sdk fix failed: {err}",
             payload={},
         )
+    trace.close()
 
     review = _parse_semantic_review(texts)
     payload: dict[str, Any] = {

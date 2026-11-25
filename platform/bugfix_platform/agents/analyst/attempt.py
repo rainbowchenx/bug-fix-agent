@@ -156,6 +156,7 @@ def _run_matched_ticket(
                 investigation=match_by_id[ticket.defectId].model_dump() if ticket.defectId in match_by_id else {},
                 resume_session_id=sess_map.get(ticket.defectId),
                 previous_attempt=previous_payload,
+                artifact_dir=out_dir,
             )
         )
         inputs.skill_reads.update(result.skill_reads)

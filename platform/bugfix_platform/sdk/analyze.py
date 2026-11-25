@@ -16,6 +16,7 @@ from bugfix_platform.sdk.model_env import model_from_env, sdk_options_env
 from bugfix_platform.sdk.project_mcp import ProjectMcp
 from bugfix_platform.sdk.skill_inject import InjectedSkill, analyze_skills_addon
 from bugfix_platform.sdk.skills import skills_system_addon
+from bugfix_platform.sdk.trace import open_recorder
 
 AnalyzeMode = Literal["heuristic", "sdk"]
 
@@ -48,6 +49,8 @@ class AnalyzeRequest:
     resume_session_id: Optional[str] = None
     previous_attempt: Optional[dict[str, Any]] = None
     project_mcp: ProjectMcp = field(default_factory=ProjectMcp)
+    artifact_dir: Optional[str] = None
+    """产物根；给了就往 ``<artifact_dir>/logs/`` 写 SDK 轨迹（见 :mod:`trace`）。"""
 
 
 @dataclass
@@ -212,9 +215,18 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
     read_paths: list[str] = []
     pending_reads: dict[str, str] = {}
 
+    # 轨迹：全量落 artifact_dir/logs/agent3-<defectId>.jsonl，
+    # 同时往 stdout 打每轮一行的进度摘要（客户端 logText 读的就是 stdout）。
+    recorder = open_recorder(
+        req.artifact_dir,
+        f"agent3-{req.ticket.defectId}",
+        tag="[agent3]",
+    )
+
     def finish(result: AnalyzeResult) -> AnalyzeResult:
         result.skill_reads = list(dict.fromkeys(skill_reads))
         result.read_paths = list(dict.fromkeys(read_paths))
+        recorder.close()
         return result
 
     def observe_reads(message: Any) -> None:
@@ -240,6 +252,8 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         nonlocal result_text, structured, session_id, budget_stop
         terminal_error: str | None = None
         async for message in query(prompt=prompt_text, options=opts):
+            if recorder is not None:
+                recorder.message(message)
             observe_reads(message)
             text = _message_text(message)
             if text.strip():
