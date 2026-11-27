@@ -26,6 +26,20 @@ def render_report(report: dict[str, Any]) -> str:
         resolution = item.get("resolution") or item.get("outcome") or ""
         lines.append(f"- {did}: {resolution}")
         lines.append(f"  analysis: {item.get('analysisStatus', 'not_executed')}; actionability: {item.get('actionability') or {}}")
+        if usage := item.get("analysisUsage"):
+            lines.append(
+                f"  analysisUsage: turns={usage['turns']} ({usage['turnReports']}/{usage['sdkCalls']} SDK calls); "
+                f"tokens in={usage['inputTokens']} out={usage['outputTokens']} "
+                f"cache_read={usage['cacheReadTokens']} cache_write={usage['cacheWriteTokens']} "
+                f"({usage['usageReports']}/{usage['sdkCalls']} SDK calls); "
+                f"Read requests={usage['readRequests']} blocked={usage['readBlocked']} executed={usage['readCalls']} "
+                f"lines={usage['readResultLines']} bytes={usage['readResultBytes']}"
+            )
+            for name, key in (("CodeGraph", "codeGraph"), ("Grep/Glob", "grepGlob")):
+                lines.append(
+                    f"  {name} requests={usage[key + 'Requests']} blocked={usage[key + 'Blocked']} "
+                    f"executed={usage[key + 'Calls']}"
+                )
         attempt_id = item.get("attemptId") or ""
         if attempt_id:
             lines.append(f"  feedbackForm: defects/{did}/attempts/{attempt_id}/feedback-form.md")

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -19,7 +18,7 @@ from bugfix_contracts.code_knowledge import (
 )
 from bugfix_contracts.common import Confidence
 
-from bugfix_platform.sdk.match_payload import normalize_observed_path
+from bugfix_platform.sdk.match_payload import git_head, normalize_observed_path, verify_code_reference
 
 _ALLOWED_SOURCE = {"codegraph", "grep", "heuristic", "claude_md", "model_reported"}
 _ALLOWED_CONF: set[str] = {"high", "medium", "low"}
@@ -421,17 +420,11 @@ def verify_fact_references(
         for index, fact in enumerate(match.facts):
             ref = fact.reference
             validity = "rejected" if fact.validity == "rejected" else "unverified"
-            if validity != "rejected" and ref is not None and ref.snippet and ref.path:
-                path = _safe_repo_file(root, ref.repoId, ref.path)
-                if path is not None:
-                    try:
-                        content = path.read_bytes()
-                    except OSError:
-                        content = b""
-                    digest = hashlib.sha256(content).hexdigest()
-                    if ref.snippet in content.decode("utf-8", errors="replace") and _version_matches(ref, digest, heads, root=root):
-                        validity = "reference_verified"
-                        ref = ref.model_copy(update={"contentDigest": digest})
+            if validity != "rejected" and ref is not None:
+                checked = verify_code_reference(root, ref, heads=heads)
+                if checked is not None:
+                    validity = "reference_verified"
+                    ref = checked
             if ref is not None and validity == "unverified" and on_unverified is not None:
                 on_unverified(match.defectId, index)
             facts.append(fact.model_copy(update={"validity": validity, "reference": ref, "source": "model_reported"}))
@@ -449,79 +442,22 @@ def verify_fact_references(
     return out
 
 
-def _safe_repo_file(root: Path, repo_id: str, rel: str) -> Path | None:
-    base = root if repo_id in {".", ""} else (root / str(repo_id)).resolve()
-    if repo_id not in {".", ""}:
-        try:
-            base.relative_to(root)
-        except ValueError:
-            return None
-    try:
-        candidate = (base / rel).resolve()
-        candidate.relative_to(base)
-    except (OSError, ValueError):
-        return None
-    if not candidate.is_file():
-        return None
-    return candidate
-
-
-def _version_matches(
-    ref: CodeReference,
-    digest: str,
-    heads: dict[str, str],
-    *,
-    root: Path,
-) -> bool:
-    if ref.revision:
-        repo_key = "." if ref.repoId in {".", ""} else normalize_observed_path(ref.repoId)
-        expected = heads.get(repo_key)
-        if expected is None:
-            repo_base = root if repo_key == "." else (root / repo_key)
-            expected = _git_head(repo_base)
-        if expected is None or ref.revision != expected:
-            return False
-    if ref.contentDigest:
-        declared = str(ref.contentDigest)
-        if declared not in {digest, digest[: len(declared)]}:
-            return False
-    return True
-
-
 def _repo_heads(root: Path, repo_roots: list[Any] | None) -> dict[str, str]:
     heads: dict[str, str] = {}
-    root_head = _git_head(root)
+    root_head = git_head(root)
     if root_head:
         heads["."] = root_head
     for item in repo_roots or []:
         path = getattr(item, "path", None) or (item.get("path") if isinstance(item, dict) else None)
-        git_head = getattr(item, "gitHead", None) or (item.get("gitHead") if isinstance(item, dict) else None)
-        if path and git_head:
-            heads[normalize_observed_path(str(path)) or "."] = str(git_head)
+        declared_head = getattr(item, "gitHead", None) or (item.get("gitHead") if isinstance(item, dict) else None)
+        if path and declared_head:
+            heads[normalize_observed_path(str(path)) or "."] = str(declared_head)
         elif path:
             repo_path = root / str(path)
-            discovered = _git_head(repo_path)
+            discovered = git_head(repo_path)
             if discovered:
                 heads[normalize_observed_path(str(path)) or "."] = discovered
     return heads
-
-
-def _git_head(start: Path) -> str | None:
-    cur = start
-    for _ in range(8):
-        git = cur / ".git" / "HEAD"
-        if git.is_file():
-            text = git.read_text(encoding="utf-8").strip()
-            if text.startswith("ref:"):
-                ref = cur / ".git" / text.split(":", 1)[1].strip()
-                if ref.is_file():
-                    return ref.read_text(encoding="utf-8").strip()[:40]
-                return text
-            return text[:40]
-        if cur.parent == cur:
-            break
-        cur = cur.parent
-    return None
 
 
 def _candidate_rel(repo_id: str, path: str) -> str:

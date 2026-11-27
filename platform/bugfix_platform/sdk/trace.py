@@ -94,7 +94,7 @@ def _int(value: Any) -> int:
     return value if isinstance(value, int) and value > 0 else 0
 
 
-def _usage_totals(usage: Any) -> dict[str, int]:
+def usage_totals(usage: Any) -> dict[str, int]:
     """``ResultMessage.usage`` → 归一化的 token 计数。
 
     兼容网关把 ``AssistantMessage.usage`` 全填 0，会话级用量只在
@@ -120,7 +120,7 @@ def _usage_totals(usage: Any) -> dict[str, int]:
 
 def format_usage(usage: Any, cost: Any = None) -> str:
     """``tok in=90.9k out=23.7k cache=693.8k cost=$1.43`` —— 一行说明这次花了多少。"""
-    totals = _usage_totals(usage)
+    totals = usage_totals(usage)
     return _format_totals(totals, cost)
 
 
@@ -458,7 +458,7 @@ class TraceRecorder:
             usage = getattr(block, "usage", None)
             cost = getattr(block, "total_cost_usd", None)
             turns = getattr(block, "num_turns", None)
-            totals = _usage_totals(usage)
+            totals = usage_totals(usage)
             self._sessions += 1
             if isinstance(turns, int) and turns > 0:
                 self._sdk_turns += turns

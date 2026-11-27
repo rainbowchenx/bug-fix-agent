@@ -8,7 +8,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Literal, Optional
 
+from bugfix_contracts.analysis_report import AnalysisUsage
 from bugfix_contracts.defect_batch import BatchTicket
+from bugfix_contracts.repair import AnalysisToolHistory
+from bugfix_platform.sdk.analyze_evidence import select_investigation
+from bugfix_platform.sdk.analyze_tools import AnalysisTools
 from bugfix_platform.sdk.parse import budget_exhausted, message_text, parse_json_payload
 from bugfix_platform.sdk.credentials import has_credentials
 from bugfix_platform.sdk.codegraph import CODEGRAPH_MCP_TOOLS, CodeGraphStatus
@@ -49,6 +53,8 @@ class AnalyzeRequest:
     previous_attempt: Optional[dict[str, Any]] = None
     project_mcp: ProjectMcp = field(default_factory=ProjectMcp)
     repair_skill: InjectedSkill | None = None
+    source_digest: str | None = None
+    tool_history: AnalysisToolHistory | None = None
     artifact_dir: Optional[str] = None
     """产物根；给了就往 ``<artifact_dir>/logs/`` 写 SDK 轨迹（见 :mod:`trace`）。"""
 
@@ -63,6 +69,8 @@ class AnalyzeResult:
     session_id: Optional[str] = None
     skill_reads: list[str] = field(default_factory=list)
     read_paths: list[str] = field(default_factory=list)
+    usage: AnalysisUsage | None = None
+    tool_history: AnalysisToolHistory | None = None
 
 
 AnalyzeRunner = Callable[[AnalyzeRequest], AnalyzeResult]
@@ -149,7 +157,15 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
     except ImportError as err:
         return _blocked_analyze(req, f"claude-agent-sdk not installed ({err})")
 
-    prompt = _build_prompt(req)
+    investigation = _select_investigation(req)
+    prompt = _build_prompt(req, investigation=investigation)
+    tools = AnalysisTools(
+        req.work_dir,
+        graph_ready=bool(req.codegraph and req.codegraph.ready),
+        source_digest=req.source_digest,
+        full_read_paths=[*(str(skill.skill_md) for skill in req.injected_skills), *(req.ticket.attachmentRefs or [])],
+    )
+    tools.usage.reusedReferences = len(investigation.get("verifiedReferences", []))
     model = model_from_env(req.model)
     if req.injected_skills:
         system_prompt = _SYSTEM_PROMPT + analyze_skills_addon(req.injected_skills)
@@ -171,13 +187,15 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
     max_turns = resolve_analyze_max_turns(req.max_turns)
 
     option_notes: list[str] = []
+    tool_history = req.tool_history
 
     def _make_options(
         *,
         resume: str | None = None,
         turns: Optional[int] = None,
         allow_resume: bool = True,
-    ) -> Any:
+        output_only: bool = False,
+    ) -> tuple[Any, str | None]:
         kwargs: dict[str, Any] = {
             "cwd": req.work_dir,
             "system_prompt": system_prompt,
@@ -188,6 +206,8 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
             "model": model,
         }
         kwargs.update(req.project_mcp.sdk_options(req.work_dir, req.codegraph))
+        if hooks := tools.hooks(output_only=output_only):
+            kwargs.setdefault("hooks", {}).setdefault("PreToolUse", []).extend(hooks)
         kwargs.update(recorder.sdk_options(ClaudeAgentOptions))
         resume_id = resume if resume is not None else req.resume_session_id
         if resume_id and allow_resume:
@@ -196,29 +216,24 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         # 同时补 cli_path（包里不带 356 MB 的 claude.exe）。
         kwargs = sdk_options_env(kwargs)
         try:
-            return ClaudeAgentOptions(**kwargs)
+            return ClaudeAgentOptions(**kwargs), kwargs.get("resume")
         except TypeError:
             if "resume" not in kwargs:
                 raise
             option_notes.append("resume unsupported, starting new session")
             kwargs.pop("resume", None)
             try:
-                return ClaudeAgentOptions(**kwargs)
+                return ClaudeAgentOptions(**kwargs), kwargs.get("resume")
             except TypeError:
                 # 老版本 SDK 不认 cli_path；去掉后走它自己的 CLI 查找。
                 kwargs.pop("cli_path", None)
-                return ClaudeAgentOptions(**kwargs)
+                return ClaudeAgentOptions(**kwargs), kwargs.get("resume")
 
     texts: list[str] = []
     result_text = ""
     structured: Any = None
     session_id: str | None = None
     budget_stop = False
-    skill_reads: list[str] = []
-    pending_skill_reads: dict[str, str] = {}
-    read_paths: list[str] = []
-    pending_reads: dict[str, str] = {}
-
     ticket_ids = [req.ticket.defectId]
     recorder = open_recorder(
         req.artifact_dir,
@@ -227,37 +242,39 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
     )
 
     def finish(result: AnalyzeResult) -> AnalyzeResult:
-        result.skill_reads = list(dict.fromkeys(skill_reads))
-        result.read_paths = list(dict.fromkeys(read_paths))
+        result.read_paths = sorted(tools.read_paths)
+        result.skill_reads = sorted(
+            str(path) for skill in req.injected_skills
+            if str(path := skill.skill_md.resolve()) in tools.read_paths
+        )
+        result.usage = tools.usage
+        if tool_history and tool_history.sessionId == result.session_id:
+            result.tool_history = tool_history
         recorder.close()
         return result
 
-    def observe_reads(message: Any) -> None:
-        for block in getattr(message, "content", []) or []:
-            if getattr(block, "name", None) == "Read":
-                params = getattr(block, "input", {}) or {}
-                ref = params.get("file_path")
-                if ref:
-                    path = Path(ref)
-                    if not path.is_absolute():
-                        path = Path(req.work_dir) / path
-                    resolved = str(path.resolve())
-                    pending_reads[str(getattr(block, "id", ""))] = resolved
-                    if any(resolved == str(s.skill_md.resolve()) for s in req.injected_skills):
-                        pending_skill_reads[str(getattr(block, "id", ""))] = resolved
-            use_id = str(getattr(block, "tool_use_id", ""))
-            if use_id in pending_reads and not getattr(block, "is_error", False) and getattr(block, "content", None):
-                read_paths.append(pending_reads.pop(use_id))
-            if use_id in pending_skill_reads and not getattr(block, "is_error", False) and getattr(block, "content", None):
-                skill_reads.append(pending_skill_reads.pop(use_id))
+    async def _messages(prompt_text: str, query_options: tuple[Any, str | None]):
+        nonlocal tool_history
+        opts, resumed_session = query_options
+        tools.begin_query(resumed_session, tool_history)
+        tools.usage.sdkCalls += 1
+        try:
+            async for message in query(prompt=prompt_text, options=opts):
+                recorder.message(message)
+                tools.observe(message)
+                if isinstance(message, ResultMessage):
+                    tools.observe_result(message)
+                    if result_session := getattr(message, "session_id", None):
+                        tool_history = tools.history(result_session)
+                yield message
+        finally:
+            tools.finish_query()
 
-    async def _drive(prompt_text: str, opts: Any, phase: str = "analysis") -> None:
+    async def _drive(prompt_text: str, opts: tuple[Any, str | None], phase: str = "analysis") -> None:
         nonlocal result_text, structured, session_id, budget_stop
         recorder.begin(phase, prompt_text, tickets=ticket_ids)
         terminal_error: str | None = None
-        async for message in query(prompt=prompt_text, options=opts):
-            recorder.message(message)
-            observe_reads(message)
+        async for message in _messages(prompt_text, opts):
             text = message_text(message)
             if text.strip():
                 texts.append(text)
@@ -302,20 +319,18 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         salvage_texts: list[str] = []
 
         async def _salvage() -> None:
-            nonlocal structured, result_text
+            nonlocal structured, result_text, session_id
             recorder.begin("analysis salvage", _SALVAGE_PROMPT, tickets=ticket_ids)
             terminal_error: str | None = None
-            async for message in query(
-                prompt=_SALVAGE_PROMPT,
-                options=_make_options(resume=session_id, turns=2),
+            async for message in _messages(
+                _SALVAGE_PROMPT, _make_options(resume=session_id, turns=2, output_only=True),
             ):
-                recorder.message(message)
-                observe_reads(message)
                 text = message_text(message)
                 if text.strip():
                     salvage_texts.append(text)
                 if not isinstance(message, ResultMessage):
                     continue
+                session_id = getattr(message, "session_id", None) or session_id
                 structured = message.structured_output
                 result_text = message.result or ""
                 if message.is_error and terminal_error is None and not budget_exhausted(message):
@@ -352,7 +367,7 @@ def run_claude_analyze(req: AnalyzeRequest) -> AnalyzeResult:
                 "Return the same analysis with rootCause.claims and rootCause.questions arrays. "
                 "Do not invent certainty. Classify unresolved blockers and preserve user target. "
                 + json.dumps(parsed, ensure_ascii=False),
-                _make_options(resume=session_id, turns=2), "analysis format repair")
+                _make_options(resume=session_id, turns=2, output_only=True), "analysis format repair")
             parsed = _parse_session_json(structured, texts + [result_text])
         except Exception as err:
             recorder.error(err)
@@ -617,20 +632,22 @@ def _merge_with_routed(
 
 _SYSTEM_PROMPT = """You are Agent-3 defect analyst.
 Tools: Read, Glob, Grep, and CodeGraph MCP when mounted. Do NOT edit files or run shell.
-When CodeGraph is ready (codegraph_explore / codegraph_node / callers / callees),
-the first symbol or call-flow tool call MUST be codegraph_explore (or callers/callees).
-CodeGraph is navigation, not source of truth. After it returns a path or symbol you
-MUST Read the current file in the worktree before citing it as evidence. Do not treat
-graph excerpts as the live source. Fall back to Grep/Read/Glob only when CodeGraph is
-unavailable or empty.
-Ground claims in files you actually Read after graph navigation.
-Prefer Agent-2 architecture map and soft-start paths first, then follow imports/callers
-from those paths to name the likely fix locus. Do not assume Agent-2 already found
-the root cause. Heuristic-only soft-start paths are unverified token hits — confirm
-with CodeGraph (or re-Grep) before trusting them; empty or weak matches mean you
-may Glob/Grep yourself.
-If ticketSpecDirs is non-empty, Read that directory's index/README (or one key md);
-do not read the whole specAtlas tree.
+Start with the ticket's upstreamInvestigation and previousAttempt when present.
+Choose the smallest unanswered question that could change the root cause or repair.
+Reuse verifiedReferences as live source quotations. The application rechecked their
+file revision/digest and text; their claims still need causal reasoning.
+For a known location, reuse the supplied snippet or Read only the needed range
+(offset and limit, up to 80 lines). Read another range only for a new question.
+When a symbol, line range or call-flow edge is unknown, use CodeGraph first in the
+ticket's repository. Use codegraph_explore for discovery or callers/callees for a
+specific missing edge. Treat graph output as navigation; cite a live snippet.
+Use path-scoped Grep/Glob only if the graph is unavailable or did not answer the question.
+Start with at most one focused graph query and two or three local source ranges.
+Expand only for a specific unresolved blocker. Once evidence supports a conclusion
+or a specific request for missing information, stop searching and return the JSON.
+Heuristic paths and unverified claims are leads. Reuse relevant ruledOut findings
+when the source and assumptions still hold. A routing catalog is a navigation aid.
+Read relevant project guidance or a selected spec index when it affects the ticket.
 Shell / host / route_table files are catalogs, not fix loci.
 Repo-specific injected skills (if attached) have HIGHEST PRIORITY over package SOP:
 follow their read order, test/dev conventions, module aliases, and product-line naming.
@@ -657,9 +674,10 @@ Respect the current expected behavior, especially user-confirmed changes. Do not
 replace a confirmed removal requirement by fixing a different behavior. Separate
 incidental robustness findings from this ticket's causal claims. If requirements
 conflict, explain the conflict rather than changing the target.
-Each localization.candidates[] item MUST include path and a snippet (verbatim 1-8
-lines from a file you Read) of the failing fragment, plus why that fragment causes
-the reported failure. Optional: symbol, excerpt. Omitting snippet is a locator only
+Each localization.candidates[] item MUST include path and a verbatim 1–8 line snippet
+from a verifiedReference, an applicable prior verified quotation on unchanged source,
+or a live range you Read. Explain why the fragment matters to the reported failure.
+Optional: symbol, excerpt. Omitting snippet is a locator only
 and is not enough to authorize an edit.
 outcome must be one of:
 patch_ready, plan_only, needs_test_env, needs_ticket_info, needs_design_input,
@@ -730,46 +748,61 @@ def select_ticket_spec_dirs(
     return out
 
 
-def _build_prompt(req: AnalyzeRequest) -> str:
+def _select_investigation(req: AnalyzeRequest) -> dict[str, Any]:
+    return select_investigation(req.work_dir, req.investigation or {}, req.routed)
+
+
+def _build_prompt(req: AnalyzeRequest, *, investigation: dict[str, Any] | None = None) -> str:
     t = req.ticket
     soft = req.routed.get("localization") or {}
     apply_flag = "true" if req.apply_fix else "false"
     cg = req.codegraph
     cg_line = (
-        cg.prompt_roots_line()
+        cg.prompt_roots_line(include_guidance=False)
         if cg is not None
         else "codeGraph: unavailable — use Grep/Read/Glob only"
     )
-    ticket_specs = select_ticket_spec_dirs(req.spec_atlas, req.architecture, req.routed)
+    if investigation is None:
+        investigation = _select_investigation(req)
+    upstream_block = f"upstreamInvestigation: {json.dumps(investigation, ensure_ascii=False)}\n" if investigation else ""
+    if notes := soft.get("notes"):
+        upstream_block += f"matchGap: {notes}\n"
 
-    # 上游调查是 Agent-2 的产出，已经定位过文件和符号。它是**起点**而不是参考：
-    # 重复发现同样的东西会白烧预算（实测首轮 25 轮撞顶，其中 5 次 codegraph
-    # 探索、3 次读同一个上游已点名的文件）。
-    upstream_block = ""
-    investigation = req.investigation or {}
-    if investigation:
-        upstream_block = (
-            "upstreamInvestigation: "
-            f"{json.dumps(investigation, ensure_ascii=False)}\n"
-            "上面是 Agent-2 的定位结果：已点名的 path/symbol 直接读，不必重新搜索。"
-            "它标为 conditional / unverified 的部分仍需你验证——不要当成既定事实。\n"
-        )
-    # matchGap 是路由层的诊断（例如 no_path_token_overlap），与上游调查有无无关。
-    # softStartLocalization.candidates 与 upstreamInvestigation.candidates 逐字相同，
-    # 所以只保留这一条 notes，不重复整份候选列表。
-    soft_notes = soft.get("notes") if isinstance(soft, dict) else ""
-    if soft_notes:
-        upstream_block += f"matchGap: {soft_notes}\n"
-
-    # 首轮没有 previousAttempt，此时输出 `previousAttempt: {}` 再加一条
-    # "If previousAttempt.analysisRef.path exists" 只会制造死指令。
     previous_block = ""
     if req.previous_attempt:
         previous_block = (
             f"previousAttempt: {json.dumps(req.previous_attempt, ensure_ascii=False)}\n"
-            "If previousAttempt.analysisRef.path exists, Read it when you need the full first-round record. "
-            "Do not drop confirmed answers or CURRENT ACCEPTANCE TARGET in any summary.\n"
+            "Carry forward unaffected conclusions, question IDs and confirmed answers. "
+            "Only investigate evidence affected by the new feedback, the current acceptance target, "
+            "or source drift on a relevant path. If there is no material change, summarize using existing evidence. "
+            "Consult analysisRef only for a specific missing detail.\n"
         )
+        if req.previous_attempt.get("closingPass"):
+            previous_block += "Close only the listed convergence violations and open questions.\n"
+    architecture = req.architecture or {}
+    candidates = investigation.get("candidates", []) + investigation.get("verifiedReferences", [])
+    ticket_specs = select_ticket_spec_dirs(req.spec_atlas, architecture, {"localization": {"candidates": candidates}})
+    paths = [
+        "/".join(part for part in (item.get("repoPath", "."), item["path"]) if part != ".").replace("\\", "/")
+        for item in candidates
+    ]
+    modules = architecture.get("modules") or []
+    relevant_modules = [
+        module for module in modules
+        if (prefix := (module.get("path") or "").replace("\\", "/").rstrip("/"))
+        and any(path == prefix or path.startswith(prefix + "/") for path in paths)
+    ]
+    targeted = bool(investigation.get("verifiedReferences")) or any(
+        item.get("symbol") and item.get("source") in {"codegraph", "grep"} for item in candidates
+    )
+    navigation = {
+        "summary": str(architecture.get("summary") or "")[:500],
+        "modules": relevant_modules[:4],
+    }
+    if not targeted and not req.previous_attempt:
+        navigation["entryPoints"] = (architecture.get("entryPoints") or [])[:3]
+        if not paths:
+            navigation["modules"] = modules[:4]
 
     return (
         "Analyze this defect and return the JSON object described in the system prompt.\n\n"
@@ -784,14 +817,13 @@ def _build_prompt(req: AnalyzeRequest) -> str:
         f"inputQuality: {t.inputQuality.model_dump_json()}\n"
         f"observed: {t.observed}\n"
         f"CURRENT ACCEPTANCE TARGET: {t.expected}\n"
-        f"expected: {t.expected}\n"
         f"steps: {t.steps}\n"
+        f"attachmentRefs: {json.dumps(t.attachmentRefs or [], ensure_ascii=False)}\n"
         f"expectQuality: {t.expectQuality}\n"
         f"injectedSkills: {json.dumps([s.name for s in req.injected_skills], ensure_ascii=False)}\n"
         f"cartographyProfile: {req.cartography_profile}\n"
-        f"readingPlaybook: {req.reading_playbook}\n"
-        f"architectureMap: {json.dumps(req.architecture or {}, ensure_ascii=False)}\n"
-        f"specAtlas: {json.dumps(req.spec_atlas or {}, ensure_ascii=False)}\n"
+        f"architectureMap: {json.dumps(navigation, ensure_ascii=False)}\n"
+        f"{req.reading_playbook if not targeted and not req.previous_attempt else ''}\n"
         f"ticketSpecDirs: {json.dumps(ticket_specs, ensure_ascii=False)}\n"
         f"{cg_line}\n"
         f"{upstream_block}"

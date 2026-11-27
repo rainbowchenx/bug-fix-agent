@@ -51,11 +51,10 @@ def test_analyze_prompt_includes_architecture_map():
     assert "src/Config" in prompt
     assert "device_web" in prompt
     assert "叠加位置交互" in prompt
-    assert "follow" in _SYSTEM_PROMPT.lower()
-    assert "soft-start" in _SYSTEM_PROMPT.lower() or "soft start" in _SYSTEM_PROMPT.lower()
+    assert "Start with the ticket's upstreamInvestigation" in _SYSTEM_PROMPT
     assert ANALYZE_TOOLS == ["Read", "Glob", "Grep"]
-    assert "MUST Read" in _SYSTEM_PROMPT
-    assert "already Read" not in _SYSTEM_PROMPT
+    assert "Reuse verifiedReferences as live source quotations" in _SYSTEM_PROMPT
+    assert "Read only the needed range" in _SYSTEM_PROMPT
     assert "newEvidenceRefs" in _SYSTEM_PROMPT
     assert "candidate:1" in _SYSTEM_PROMPT
 
@@ -83,7 +82,7 @@ def test_analyze_prompt_uses_effective_observed_not_legacy_duplicate():
     assert "原始现象全文XYZ" not in prompt
 
 
-def test_analyze_prompt_includes_spec_atlas_and_ticket_spec_dirs():
+def test_analyze_prompt_includes_only_ticket_spec_dirs():
     from bugfix_contracts.defect_batch import BatchTicket
 
     ticket = BatchTicket(
@@ -122,7 +121,8 @@ def test_analyze_prompt_includes_spec_atlas_and_ticket_spec_dirs():
         },
     )
     prompt = _build_prompt(req)
-    assert "specAtlas" in prompt
+    assert "specAtlas" not in prompt
+    assert "HCBPortal/frontend" not in prompt
     assert "HCBVideo/frontend" in prompt
     assert "ticketSpecDirs" in prompt
     dirs = select_ticket_spec_dirs(
@@ -817,3 +817,91 @@ def test_parse_unknown_claim_reference_reported():
     notes: list[str] = []
     assert parse_analyze_payload(bad, notes) is None
     assert "question references unknown claim" in notes[0]
+
+
+def test_ticket_usage_and_bounded_tool_policy_include_salvage(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from claude_agent_sdk import HookMatcher
+    from bugfix_platform.sdk.analyze import DEFAULT_ANALYZE_MAX_TURNS
+    from bugfix_platform.sdk.codegraph import CodeGraphStatus
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    graph_tool = "mcp__codegraph__codegraph_explore"
+    attempts = []
+
+    class ResultMessage:
+        session_id = "test-session"
+        result = ""
+        terminal_reason = ""
+        is_error = False
+
+        def __init__(self, *, usage, turns, structured_output=None, subtype=""):
+            self.usage = usage
+            self.num_turns = turns
+            self.structured_output = structured_output
+            self.subtype = subtype
+
+    def event(**block):
+        return SimpleNamespace(content=[SimpleNamespace(**block)])
+
+    async def query(*, prompt, options):
+        attempts.append(options["max_turns"])
+        hook = options["hooks"]["PreToolUse"][-1].hooks[0]
+
+        async def use(tool, params, tool_id):
+            result = await hook({"tool_name": tool, "tool_input": params}, tool_id, None)
+            return result.get("hookSpecificOutput", {})
+
+        read = {"file_path": "src/a.py", "offset": 30}
+        if options.get("resume"):
+            assert (await use("Read", read, "salvage-denied"))["permissionDecision"] == "deny"
+            yield ResultMessage(usage={"prompt_tokens": 5, "completion_tokens": 7}, turns=1,
+                                structured_output=_sdk_routed())
+            return
+
+        fallback = {"path": "src", "pattern": "save"}
+        assert (await use("Grep", fallback, "grep-denied"))["permissionDecision"] == "deny"
+        search = {"task": "Locate save"}
+        assert await use(graph_tool, search, "g") == {}
+        yield event(name=graph_tool, id="g", input=search)
+        yield event(tool_use_id="g", is_error=False, content="No match")
+        assert (await use(graph_tool, search, "g-duplicate"))["permissionDecision"] == "deny"
+        assert await use("Grep", fallback, "grep") == {}
+        yield event(tool_use_id="grep", is_error=False, content="src/a.py")
+
+        effective = (await use("Read", read, "r"))["updatedInput"]
+        assert effective == {**read, "limit": 80}
+        yield event(name="Read", id="r", input=effective)
+        body = "first\n第二行"
+        yield event(tool_use_id="r", is_error=False, content=[{"type": "text", "text": body}])
+        assert (await use("Read", effective, "r-duplicate"))["permissionDecision"] == "deny"
+        assert await use("Read", {**effective, "offset": 120}, "r-pending") == {}
+        yield ResultMessage(usage={"input_tokens": 20, "output_tokens": 4, "cache_read_input_tokens": 100},
+                            turns=4, subtype="error_max_turns")
+
+    _install_fake_sdk(monkeypatch, dict, query, ResultMessage)
+    import claude_agent_sdk
+    claude_agent_sdk.HookMatcher = HookMatcher
+    result = run_claude_analyze(AnalyzeRequest(
+        str(tmp_path), _sdk_ticket(), _sdk_routed(),
+        codegraph=CodeGraphStatus(ready=True, roots=[str(tmp_path)]),
+    ))
+    assert result.ok
+    assert attempts == [DEFAULT_ANALYZE_MAX_TURNS, 2]
+    usage = result.usage
+    assert (usage.sdkResults, usage.turns, usage.inputTokens, usage.outputTokens, usage.cacheReadTokens) == (2, 5, 25, 11, 100)
+    assert (usage.readCalls, usage.readResultLines, usage.readResultBytes) == (1, 2, len("first\n第二行".encode()))
+    assert usage.duplicateReadsBlocked == 1
+    assert (usage.readRequests, usage.readBlocked, usage.readCalls) == (4, 2, 1)
+    assert (usage.codeGraphRequests, usage.codeGraphBlocked, usage.codeGraphCalls) == (2, 1, 1)
+    assert (usage.grepGlobRequests, usage.grepGlobBlocked, usage.grepGlobCalls) == (2, 1, 1)
+
+
+def test_disconnected_codegraph_allows_scoped_search(tmp_path):
+    from types import SimpleNamespace
+    from bugfix_platform.sdk.analyze_tools import AnalysisTools
+
+    tools = AnalysisTools(str(tmp_path), graph_ready=True, full_read_paths=["attachment.png"])
+    tools.observe(SimpleNamespace(subtype="init", data={"mcp_servers": [{"name": "codegraph", "status": "failed"}]}))
+    assert tools.before_tool({"tool_name": "Glob", "tool_input": {"path": "src", "pattern": "*.py"}}) == {}
+    assert tools.before_tool({"tool_name": "Read", "tool_input": {"file_path": "attachment.png"}}) == {}

@@ -103,9 +103,38 @@ class SuggestedVerify(BaseModel):
     commands: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class AnalysisUsage(BaseModel):
+    sdkCalls: int = 0
+    sdkResults: int = 0
+    turnReports: int = 0
+    usageReports: int = 0
+    turns: int = 0
+    inputTokens: int = 0
+    outputTokens: int = 0
+    cacheReadTokens: int = 0
+    cacheWriteTokens: int = 0
+    readCalls: int = 0
+    readRequests: int = 0
+    readBlocked: int = 0
+    readResultLines: int = 0
+    readResultBytes: int = 0
+    duplicateReadsBlocked: int = 0
+    codeGraphCalls: int = 0
+    codeGraphRequests: int = 0
+    codeGraphBlocked: int = 0
+    grepGlobCalls: int = 0
+    grepGlobRequests: int = 0
+    grepGlobBlocked: int = 0
+    reusedReferences: int = 0
+
+    def plus(self, other: AnalysisUsage) -> AnalysisUsage:
+        return AnalysisUsage(**{key: value + getattr(other, key) for key, value in self.model_dump().items()})
+
+
 class TicketReport(BaseModel):
     attemptId: Optional[str] = None
     analysisStatus: Literal["completed", "incomplete", "not_executed"] = "not_executed"
+    analysisUsage: Optional[AnalysisUsage] = None
     actionability: dict[str, Any] = Field(default_factory=dict)
     attachments: list[dict[str, Any]] = Field(default_factory=list)
     model_config = ConfigDict(extra="ignore")

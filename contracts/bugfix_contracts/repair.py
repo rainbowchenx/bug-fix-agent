@@ -335,6 +335,29 @@ class TaskContext(BaseModel):
     analysisIncomplete: bool = False
 
 
+class AnalysisReadRange(BaseModel):
+    path: str
+    digest: str
+    offset: int = Field(ge=1)
+    limit: int = Field(ge=1)
+
+
+class AnalysisSearchRecord(BaseModel):
+    key: str
+    scope: str
+    digest: str
+    codeGraph: bool = False
+
+
+class AnalysisToolHistory(BaseModel):
+    sessionId: str
+    workDir: str
+    sourceDigest: Optional[str] = None
+    reads: list[AnalysisReadRange] = Field(default_factory=list)
+    queries: list[AnalysisSearchRecord] = Field(default_factory=list)
+    graphTried: bool = False
+
+
 class AttemptRecord(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -354,6 +377,7 @@ class AttemptRecord(BaseModel):
     checks: list[VerificationRun] = Field(default_factory=list)
     evidence: list[Evidence] = Field(default_factory=list)
     sessionId: Optional[str] = None
+    analysisToolHistory: Optional[AnalysisToolHistory] = None
     cost: Optional[dict[str, Any]] = None
     analysisRef: Optional[AnalysisSnapshotRef] = None
     analysisDigest: Optional[str] = None

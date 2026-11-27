@@ -113,6 +113,10 @@ Nexas 追加的平台说明（跨设备文件传递、安全策略等）会被�
 产物本身（`analysis-report.json` / `code-knowledge.json` / 逐票快照）落在
 `artifact_dir`。
 
+Agent3 SDK 分析优先使用在当前工作树重新核对过的 Agent2 源码引用。缺少定位或调用关系时先用 CodeGraph，再按需在相关目录补查。内置 `Read` 对普通源码每次最多返回 80 行。恢复同一个 SDK 会话后，文件摘要一致的已读范围可以复用。搜索按查询范围核对源码摘要，范围内的源码有变化时允许重新搜索。未指定 CodeGraph 项目目录时使用工作区摘要。
+
+`analysis-report.json` 每票的 `analysisUsage` 记录本轮 Agent3 分析的 SDK 轮次、输入/输出及缓存 token，以及 `Read`、CodeGraph、Grep/Glob 的请求（`*Requests`）、拦截（`*Blocked`）和实际执行（`*Calls`）。实际执行以 SDK 返回结果为准，包含执行后报错；中断而未返回结果的请求仍保留在请求数中。报告还记录 `Read` 成功返回的文本行数和 UTF-8 字节数。统计包含分析补救与收尾轮，`turnReports`、`usageReports` 和 `sdkCalls` 可用于识别用量上报不完整的情况。
+
 #### 进 `output_files` 的三份产物
 
 任务跑完会把下面三份（存在才发）复制到 Nexas 的数据目录并登记：

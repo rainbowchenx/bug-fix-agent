@@ -109,6 +109,9 @@ def _run_matched_ticket(
         **routed,
     }
     analyze_session: Optional[str] = None
+    usage = None
+    tool_history = None
+    resume_session = sess_map.get(ticket.defectId)
     previous_payload = None
     parent_attempt = parent_map.get(ticket.defectId)
     parent_explicit = parent_attempt is not None
@@ -139,6 +142,15 @@ def _run_matched_ticket(
                     f"parent snapshot missing or corrupt for {ticket.defectId}/{parent_attempt}: {err}"
                 ) from err
             previous_payload = None
+        if resume_session:
+            from bugfix_platform.agents.analyst.attempt_store import load_attempt
+
+            try:
+                parent = load_attempt(Path(out_dir) / "defects" / ticket.defectId / "attempts" / parent_attempt / "attempt.json")
+                if parent.sessionId == resume_session:
+                    tool_history = parent.analysisToolHistory
+            except (OSError, ValueError):
+                pass  # Older or unavailable history leaves exploration available.
     if inputs.remaining is None or inputs.remaining > 0:
         result = runner(
             AnalyzeRequest(
@@ -158,19 +170,25 @@ def _run_matched_ticket(
                 project_mcp=inputs.project_mcp,
                 repair_skill=inputs.repair_skill,
                 investigation=match_by_id[ticket.defectId].model_dump() if ticket.defectId in match_by_id else {},
-                resume_session_id=sess_map.get(ticket.defectId),
+                resume_session_id=resume_session,
+                source_digest=snapshot.contentDigest,
+                tool_history=tool_history,
                 previous_attempt=previous_payload,
                 artifact_dir=out_dir,
             )
         )
         inputs.skill_reads.update(result.skill_reads)
         entry.update(result.payload)
+        usage = result.usage
+        if usage is not None:
+            entry["analysisUsage"] = usage.model_dump()
         entry["analysisStatus"] = ("incomplete" if result.source == "sdk_fallback" else "completed" if result.source == "sdk" else "not_executed")
         read_refs={str(Path(p).resolve()) for p in result.read_paths}
         entry["attachments"]=[{"ref":ref, "availability":"available" if (Path(work_dir)/ref).is_file() else "unknown",
             "read":str((Path(work_dir)/ref).resolve()) in read_refs} for ref in ticket.attachmentRefs or []]
         inputs.analyze_sources.append(result.source)
         analyze_session = result.session_id
+        tool_history = result.tool_history
         _note = " ".join(str(result.detail or "").split())
         if _note:
             print(
@@ -289,15 +307,23 @@ def _run_matched_ticket(
                     project_mcp=inputs.project_mcp,
                     repair_skill=inputs.repair_skill,
                     investigation=match_by_id[ticket.defectId].model_dump() if ticket.defectId in match_by_id else {},
-                    resume_session_id=analyze_session or sess_map.get(ticket.defectId),
+                    resume_session_id=analyze_session or resume_session,
+                    source_digest=None if drifted else snapshot.contentDigest,
+                    tool_history=None if drifted else tool_history,
                     previous_attempt={
                         **previous_payload,
                         "closingPass": True,
                         "violations": conv.violations,
                         "openQuestions": [q.model_dump() for q in conv.openQuestions],
                     },
+                    artifact_dir=out_dir,
                 )
             )
+            if close.usage is not None:
+                usage = close.usage if usage is None else usage.plus(close.usage)
+                entry["analysisUsage"] = usage.model_dump()
+            if close.session_id:
+                analyze_session, tool_history = close.session_id, close.tool_history
             close_root = close.payload.get("rootCause") if isinstance(close.payload.get("rootCause"), dict) else {}
             for key in ("proposedFix", "localization", "outcome"):
                 if key in close.payload:
@@ -374,7 +400,7 @@ def _run_matched_ticket(
         decision = EditDecision.model_validate(
             {**decision.model_dump(), "allowed": True}
         )
-    session_id = analyze_session or sess_map.get(ticket.defectId)
+    session_id = analyze_session or resume_session
     if want_fix and fixer is not None and decision.allowed and entry.get("outcome") in (
         "plan_only",
         "patch_ready",
@@ -423,6 +449,8 @@ def _run_matched_ticket(
             evidence=list(ctx.evidence),
             parent_attempt_id=parent_attempt,
         )
+    if tool_history and not drifted and tool_history.sessionId == attempt.sessionId:
+        attempt = attempt.model_copy(update={"analysisToolHistory": tool_history})
     return _persist_ticket_entry(
         out_dir,
         entry,

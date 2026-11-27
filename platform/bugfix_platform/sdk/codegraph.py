@@ -74,7 +74,7 @@ class CodeGraphStatus:
                 return path
         return self.roots[0] if self.roots else None
 
-    def prompt_roots_line(self) -> str:
+    def prompt_roots_line(self, *, include_guidance: bool = True) -> str:
         """给模型看的 projectPath 清单（含文件数）。"""
         if not self.ready:
             return "codeGraph: unavailable — use Grep/Read/Glob only"
@@ -92,10 +92,15 @@ class CodeGraphStatus:
                 bits.append(f"{path}[{extra}]{mark}")
             else:
                 bits.append(f"{path}{mark}")
-        return (
+        roots_line = (
             f"codeGraph: ready (cli {self.version or 'unknown'}); "
             f"projectPaths={json.dumps(bits, ensure_ascii=False)}; "
-            "pass projectPath for the ticket's repo. "
+            "pass projectPath for the ticket's repo."
+        )
+        if not include_guidance:
+            return roots_line
+        return roots_line + (
+            " "
             "ALWAYS use codegraph_explore when you need to search code — "
             "never replace it with a series of Grep/Glob calls, which return "
             "file lists and raw lines instead of symbol flow. "

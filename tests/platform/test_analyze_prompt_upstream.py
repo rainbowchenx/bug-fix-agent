@@ -10,11 +10,9 @@
 
 from __future__ import annotations
 
-import json
+from hashlib import sha256
 
-import pytest
-
-from bugfix_platform.sdk.analyze import _build_prompt, AnalyzeRequest
+from bugfix_platform.sdk.analyze import _SYSTEM_PROMPT, _build_prompt, _select_investigation, AnalyzeRequest
 from bugfix_platform.sdk.codegraph import CodeGraphStatus
 
 
@@ -52,9 +50,8 @@ def test_upstream_investigation_is_framed_as_starting_point():
     req = _req(investigation={"candidates": [{"path": "a.vue", "symbol": "save"}]})
     text = _build_prompt(req)
     assert "upstreamInvestigation:" in text
-    # 明确说明可直接读、但要验证 conditional 部分
-    assert "直接读" in text
-    assert "不要当成既定事实" in text
+    assert "a.vue" in text and "save" in text
+    assert "Heuristic paths and unverified claims are leads" in _SYSTEM_PROMPT
 
 
 def test_empty_investigation_omits_the_block():
@@ -79,6 +76,40 @@ def test_previous_attempt_block_only_when_present():
     text = _build_prompt(_req(previous_attempt={"analysisRef": {"path": "x.json"}}))
     assert "previousAttempt:" in text
     assert "x.json" in text
+    assert "Only investigate evidence affected by the new feedback" in text
+    assert "Carry forward unaffected conclusions" in text
+
+
+def test_agent2_verified_reference_is_reused_only_while_current(tmp_path):
+    repo = tmp_path / "app"
+    repo.mkdir()
+    path = repo / "store.py"
+    snippet = "return state.pending"
+    path.write_text(snippet, encoding="utf-8")
+    req = _req(work_dir=str(tmp_path), investigation={
+        "candidates": [
+            {"path": f"heuristic{i}.py", "source": "heuristic"} for i in range(4)
+        ] + [{"repoPath": "app", "path": "store.py", "symbol": "save", "source": "codegraph"}],
+        "facts": [{"claim": "Uses pending state", "validity": "reference_verified", "reference": {
+            "repoId": "app", "path": "store.py", "snippet": snippet,
+            "contentDigest": sha256(path.read_bytes()).hexdigest(),
+        }}],
+        "nextChecks": ["Check who calls save"],
+        "ruledOut": ["CSS"],
+    }, architecture={"entryPoints": ["unrelated-entry.py"]}, spec_atlas={"bindings": ["unrelated-binding"]})
+    packet = _select_investigation(req)
+    assert len(packet["candidates"]) == 3
+    assert packet["candidates"][0]["path"] == "store.py"
+    assert packet["verifiedReferences"][0]["snippet"] == snippet
+    assert packet["nextChecks"] == ["Check who calls save"]
+    assert packet["ruledOut"] == ["CSS"]
+    prompt = _build_prompt(req)
+    assert "unrelated-entry.py" not in prompt
+    assert "unrelated-binding" not in prompt
+    path.write_text(f"# Changed since Agent2\n{snippet}", encoding="utf-8")
+    stale = _select_investigation(req)
+    assert "verifiedReferences" not in stale
+    assert stale["unverifiedClaims"] == ["Uses pending state"]
 
 
 def test_codegraph_hint_keeps_explore_mandatory():

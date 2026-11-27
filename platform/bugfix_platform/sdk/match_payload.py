@@ -1,9 +1,12 @@
 """Read the cartography response envelope and SDK tool observations."""
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any, Optional
+
+from bugfix_contracts.code_knowledge import CodeReference
 
 
 def find_business_envelope(
@@ -153,3 +156,79 @@ def repo_relative_path(work_dir: str, raw: str) -> str | None:
 
 def normalize_observed_path(path: str) -> str:
     return str(path or "").replace("\\", "/").lstrip("./")
+
+
+def verify_code_reference(
+    root: Path, ref: CodeReference, *, heads: dict[str, str] | None = None,
+) -> CodeReference | None:
+    """Return the quotation with its actual file digest after checking live source."""
+    if not ref.snippet:
+        return None
+    path = _safe_repo_file(root, ref.repoId, ref.path)
+    if path is None:
+        return None
+    try:
+        content = path.read_bytes()
+        digest = hashlib.sha256(content).hexdigest()
+        if ref.snippet in content.decode("utf-8", errors="replace") and _version_matches(ref, digest, heads or {}, root=root):
+            return ref.model_copy(update={"contentDigest": digest})
+    except OSError:
+        pass
+    return None
+
+
+def _safe_repo_file(root: Path, repo_id: str, rel: str) -> Path | None:
+    base = root if repo_id in {".", ""} else (root / str(repo_id)).resolve()
+    if repo_id not in {".", ""}:
+        try:
+            base.relative_to(root)
+        except ValueError:
+            return None
+    try:
+        candidate = (base / rel).resolve()
+        candidate.relative_to(base)
+    except (OSError, ValueError):
+        return None
+    if not candidate.is_file():
+        return None
+    return candidate
+
+
+def _version_matches(
+    ref: CodeReference,
+    digest: str,
+    heads: dict[str, str],
+    *,
+    root: Path,
+) -> bool:
+    if ref.revision:
+        repo_key = "." if ref.repoId in {".", ""} else normalize_observed_path(ref.repoId)
+        expected = heads.get(repo_key)
+        if expected is None:
+            repo_base = root if repo_key == "." else (root / repo_key)
+            expected = git_head(repo_base)
+        if expected is None or ref.revision != expected:
+            return False
+    if ref.contentDigest:
+        declared = str(ref.contentDigest)
+        if declared not in {digest, digest[: len(declared)]}:
+            return False
+    return True
+
+
+def git_head(start: Path) -> str | None:
+    cur = start
+    for _ in range(8):
+        git = cur / ".git" / "HEAD"
+        if git.is_file():
+            text = git.read_text(encoding="utf-8").strip()
+            if text.startswith("ref:"):
+                ref = cur / ".git" / text.split(":", 1)[1].strip()
+                if ref.is_file():
+                    return ref.read_text(encoding="utf-8").strip()[:40]
+                return text
+            return text[:40]
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    return None
