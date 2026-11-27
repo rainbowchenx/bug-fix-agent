@@ -741,6 +741,36 @@ def _build_prompt(req: AnalyzeRequest) -> str:
         else "codeGraph: unavailable — use Grep/Read/Glob only"
     )
     ticket_specs = select_ticket_spec_dirs(req.spec_atlas, req.architecture, req.routed)
+
+    # 上游调查是 Agent-2 的产出，已经定位过文件和符号。它是**起点**而不是参考：
+    # 重复发现同样的东西会白烧预算（实测首轮 25 轮撞顶，其中 5 次 codegraph
+    # 探索、3 次读同一个上游已点名的文件）。
+    upstream_block = ""
+    investigation = req.investigation or {}
+    if investigation:
+        upstream_block = (
+            "upstreamInvestigation: "
+            f"{json.dumps(investigation, ensure_ascii=False)}\n"
+            "上面是 Agent-2 的定位结果：已点名的 path/symbol 直接读，不必重新搜索。"
+            "它标为 conditional / unverified 的部分仍需你验证——不要当成既定事实。\n"
+        )
+    # matchGap 是路由层的诊断（例如 no_path_token_overlap），与上游调查有无无关。
+    # softStartLocalization.candidates 与 upstreamInvestigation.candidates 逐字相同，
+    # 所以只保留这一条 notes，不重复整份候选列表。
+    soft_notes = soft.get("notes") if isinstance(soft, dict) else ""
+    if soft_notes:
+        upstream_block += f"matchGap: {soft_notes}\n"
+
+    # 首轮没有 previousAttempt，此时输出 `previousAttempt: {}` 再加一条
+    # "If previousAttempt.analysisRef.path exists" 只会制造死指令。
+    previous_block = ""
+    if req.previous_attempt:
+        previous_block = (
+            f"previousAttempt: {json.dumps(req.previous_attempt, ensure_ascii=False)}\n"
+            "If previousAttempt.analysisRef.path exists, Read it when you need the full first-round record. "
+            "Do not drop confirmed answers or CURRENT ACCEPTANCE TARGET in any summary.\n"
+        )
+
     return (
         "Analyze this defect and return the JSON object described in the system prompt.\n\n"
         f"defectId: {t.defectId}\n"
@@ -764,12 +794,8 @@ def _build_prompt(req: AnalyzeRequest) -> str:
         f"specAtlas: {json.dumps(req.spec_atlas or {}, ensure_ascii=False)}\n"
         f"ticketSpecDirs: {json.dumps(ticket_specs, ensure_ascii=False)}\n"
         f"{cg_line}\n"
-        f"upstreamInvestigation: {json.dumps(req.investigation or {}, ensure_ascii=False)}\n"
-        f"softStartLocalization: {json.dumps(soft, ensure_ascii=False)}\n"
-        f"matchGap: {(soft.get('notes') if isinstance(soft, dict) else '') or ''}\n"
+        f"{upstream_block}"
         f"routerOutcomeHint: {req.routed.get('outcome')}\n"
         f"applyFix: {apply_flag}\n"
-        f"previousAttempt: {json.dumps(req.previous_attempt or {}, ensure_ascii=False)}\n"
-        "If previousAttempt.analysisRef.path exists, Read it when you need the full first-round record. "
-        "Do not drop confirmed answers or CURRENT ACCEPTANCE TARGET in any summary.\n"
+        f"{previous_block}"
     )

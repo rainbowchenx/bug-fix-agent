@@ -24,32 +24,46 @@ export.csv ──> defect-batch.json ──> validate_batch ──> agent2 ─�
 | `langgraph.json` | ➖ 仅给 LangGraph Server 用，Nexas **不读** |
 | `pyproject.toml` | ➖ Nexas **不读** |
 
-## 调用方式：所有参数走路径
+## 调用方式：路径或直接 JSON
 
 根 `graph.py` 不是父图的转发壳，而是一层**适配器**——Nexas 只会把用户输入的
 **一个字符串**塞进 state，而父图要求完整的 `defect_batch` / `work_dir` 等字段。
 
-约定很简单：**用户输入 = 一个参数 JSON 文件的路径**，所有参数都写在那份文件里，
-路径字段也一律是路径字符串。
+两种写法都接受，**顺序是：先试内联 JSON，不成立再当路径**。
+
+### 写法一：直接贴 JSON（推荐，Dify 直传用这个）
 
 ```
 用户输入：
-    E:/work/task-params.json
-
-参数文件 task-params.json：
     {
       "defect_batch": "E:/work/defect-batch.json",
       "work_dir":     "E:/repos/transport",
-      "product_line": "PJ14PD20260423284",
       "cartography_profile": "device_web"
     }
 ```
 
-### 为什么是路径而不是内容
+Nexas 追加的平台说明（跨设备文件传递、安全策略等）会被忽略——本图从第一个
+`{` 开始按括号配对截取，配对结束即停，后面的文字一律不读。所以「输入即 JSON」
+在这里是安全的。
 
-Nexas 会把平台自己的说明文字（安全策略、跨设备文件传递说明，两千多字符）
-**追加到用户输入后面**。任何"输入即 JSON"的假设都会被这些后缀破坏。
-路径模型对此免疫：取第一个存在的路径就够了，后面的噪音不影响。
+### 写法二：给参数文件的路径
+
+```
+用户输入：
+    E:/work/task-params.json
+```
+
+参数文件内容与写法一相同。相对路径按**参数文件所在目录**解析；内联 JSON 没有
+文件目录，相对路径按 **cwd**（= 「业务项目根」）解析。
+
+### 为什么内联 JSON 现在可行
+
+早先只支持路径，是因为担心 Nexas 追加的两千多字符说明会破坏 JSON 解析。
+按括号配对截取之后这个担心不成立：解析器只读到第一个完整的顶层对象为止，
+追加内容根本进不了 `json.loads`。
+
+**注意**：Windows 路径在 JSON 里要么用正斜杠（`E:/work/x.json`），要么用
+合法的 `\\` 转义。直接写 `E:\work\x.json` 是非法 JSON。
 
 ### 参数文件字段
 
@@ -65,7 +79,7 @@ Nexas 会把平台自己的说明文字（安全策略、跨设备文件传递�
 | `analyze_mode` | 否 | `sdk` / `heuristic` |
 | `ticket_ids` | 否 | 字符串数组，只跑这些票 |
 | `apply_fix` | 否 | 默认关（只出方案，不改码） |
-| `artifact_dir` | 否 | 缺省 `<work_dir>/.bugfix-runs/<时间戳>-<随机>` |
+| `artifact_dir` | 否 | 缺省 `run` 落 `<work_dir>/.bugfix-runs/<时间戳>`，并写 `LATEST` 指针；`resume` 缺省读该指针 |
 | `trace_mode` | 否 | `summary`（默认）、`detailed`（实时正文和工具）、`off` |
 | `repair_skill` | 否 | 本次任务的用户修复 Skill 文件，或直接含有 `SKILL.md` 的目录。使用时需要 Agent3 SDK 模式和凭据。 |
 | `project_integrations` | 否 | `true` 时启用完整项目 MCP 和已安装的 Claude Code 插件。默认 `false`。 |
@@ -76,7 +90,9 @@ Nexas 会把平台自己的说明文字（安全策略、跨设备文件传递�
 
 ### 导入反馈并续跑 Agent3
 
-复制 [resume.example.json](resume.example.json)，填写 `artifact_dir` 为首轮产物目录，填写 `defect_id` 为首轮已有尝试的票号。在 Nexas 输入这份参数文件的路径。续跑从首轮产物读取业务仓、缺陷批次和 Agent2 的知识，不需要再传 `work_dir` 或 `defect_batch`。
+复制 [resume.example.json](resume.example.json)，填写 `defect_id` 为首轮已有尝试的票号。`artifact_dir` 可以省略——`run` 跑完会在 `<work_dir>/.bugfix-runs/LATEST` 记下实际目录，`resume` 缺省读它。要续跑更早的批次才需要显式指定。续跑从首轮产物读取业务仓、缺陷批次和 Agent2 的知识，不需要再传 `defect_batch`。
+
+**票级补充信息不用写在参数里。** 首轮会在 `<artifact_dir>/defects/<票号>/feedback-form.md` 生成一份表单，用户在 `ANSWER` 标记之间填完保存即可。`resume` 时若未显式提供 `feedback` / `feedback_file`，会读取该票的表单；表单空白则按普通续跑处理。表单支持 `observed` / `expected` / `steps` / `reject_hypothesis` / `acceptance` 等字段，以及回答 Agent 在 `rootCause.questions` 里提出的问题。
 
 `feedback_file` 支持 [反馈 JSON](feedback.example.json) 或填写后的 `feedback-form.md`，相对路径以续跑参数文件所在目录为准。JSON 中的 `defectId` 须与 `defect_id` 一致。如果提供 `attemptId`，它必须指向该票最新尝试。省略 `feedback_file` 可使用已导入的反馈，此时也可用 `revision_id` 核对所用版本。续跑会更新首轮目录里的汇总报告并保留逐轮结果。
 
@@ -86,17 +102,34 @@ Nexas 会把平台自己的说明文字（安全策略、跨设备文件传递�
 
 ### 输出
 
-`graph.py` 把结果投影成客户端会读的两个字段：
+`graph.py` 把结果投影成客户端会读的字段：
 
 | 字段 | 内容 |
 |---|---|
 | `summary` | 一行摘要（`状态：成功（stage=done）`） |
-| `outputs.result` | 多行明细：票数、仓型、每票 outcome、产物目录 |
+| `result` | 多行明细：票数、仓型、每票 outcome、产物目录 |
+| `ok` | 布尔 |
 
 产物本身（`analysis-report.json` / `code-knowledge.json` / 逐票快照）落在
 `artifact_dir`。
 
-设置 `"trace_mode": "detailed"` 后，任务日志实时显示模型可见正文、工具调用及结果预览、Agent2 补查和 Agent3 补救。宿主日志容量有限，达到上限后可在 `artifact_dir/logs/` 查看逐会话 JSONL。详细轨迹包含请求、未截断的模型可见正文和工具返回，以及结构化结果，可能含业务源码或附件数据。结果面板显示 Markdown 报告，超长时可从产物目录打开完整的 `analysis-report.md`。
+#### 进 `output_files` 的三份产物
+
+任务跑完会把下面三份（存在才发）复制到 Nexas 的数据目录并登记：
+
+| 文件 | 去向 | 用途 |
+|---|---|---|
+| `analysis-report.md` | `outputs/` + `persist` | 人读的报告，**可下载** |
+| `analysis-report.json` | `outputs/` + `persist` | 下游 Dify 节点读的结构化结果 |
+| `code-knowledge.json` | `outputs/` + `persist` | 仓型知识，可继续传给后续任务 |
+
+`outputs/` 是给下游节点消费的传递清单；`persist` 才把它登记成可下载的成果物。
+报告同时走两条，因为下游要读、人也要下载。
+
+前提是 Nexas 注入了 `NEXAS_TEMP_OUTPUT_DIR`（= `<数据目录>/outputs`）。本地直跑
+没有这个变量，发布步骤自动跳过，不影响产物落在 `artifact_dir`。
+
+设置 `"trace_mode": "detailed"` 后，任务日志实时显示模型可见正文、工具调用及结果预览、Agent2 补查和 Agent3 补救。宿主日志容量有限，达到上限后可在 `artifact_dir/logs/` 查看逐会话 JSONL。详细轨迹包含请求、未截断的模型可见正文和工具返回，以及结构化结果，可能含业务源码或附件数据。结果面板显示 Markdown 报告，超长时可从产物目录打开完整的 `analysis-report.md`。任务结束时还会打印本次的 token 用量与成本（`tok in=… out=… cache_read=… cost=$…`）。
 
 ## 模型配置
 
@@ -241,7 +274,7 @@ LangGraph 运行输入可通过 `agent3_mcp_tools` 声明本次授权的业务 M
 
 `defect_batch` 必填——`source` 字段已废弃。约束：`skip_agent2` 必须同时 `skip_agent3`。
 
-省略 `artifact_dir` 时，每次运行在 `work_dir/.bugfix-runs/` 下创建独立产物目录。工作区无法写入时使用临时目录。返回的 `artifact_dir` 包含实际路径，生产部署可显式指向持久化目录以保留报告、逐票快照和反馈表。
+省略 `artifact_dir` 时，`run` 在 `work_dir/.bugfix-runs/<时间戳>` 下创建本次产物目录，并把路径写进同目录的 `LATEST`；`resume` 省略时读 `LATEST`。工作区无法写入时使用临时目录。返回的 `artifact_dir` 包含实际路径，生产部署可显式指向持久化目录以保留报告、逐票快照和反馈表。
 
 ## 目录
 

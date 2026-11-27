@@ -128,6 +128,11 @@ def load_project_mcp(
         if not isinstance(entries, dict):
             raise ProjectMcpConfigError(f"Expected an mcpServers object in {source}")
         for name in entries if full_access else requested.intersection(entries):
+            # 内置 codegraph 由 codegraph.py 挂载并独占 .codegraph/ 的 writer lock。
+            # 业务仓 .mcp.json 里再配一份只会抢锁失败（"Connection closed"），
+            # 而 init 列表里仍显示 connected，模型要浪费两轮才发现它是坏的。
+            if full_access and name.lower() == "codegraph":
+                continue
             if not full_access and name in servers:
                 raise ProjectMcpConfigError(f"Agent 3 MCP server {name!r} is defined in more than one repository")
             config = entries[name]
@@ -138,7 +143,7 @@ def load_project_mcp(
             if kind == "stdio" and (not isinstance(args := config.get("args", []), list)
                                      or not all(isinstance(arg, str) for arg in args)):
                 raise ProjectMcpConfigError(f"Expected string arguments for Agent 3 MCP server {name!r} in {source}")
-            if full_access and (name in servers or name.lower() == "codegraph"):
+            if full_access and name in servers:
                 suffix = sha256(relative.as_posix().encode()).hexdigest()[:8]
                 alias = f"{name}-{suffix}"
                 while alias in servers or alias in entries:

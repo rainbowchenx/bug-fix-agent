@@ -95,7 +95,13 @@ class CodeGraphStatus:
         return (
             f"codeGraph: ready (cli {self.version or 'unknown'}); "
             f"projectPaths={json.dumps(bits, ensure_ascii=False)}; "
-            "pass projectPath for the ticket's repo; MUST use codegraph_explore first"
+            "pass projectPath for the ticket's repo. "
+            "ALWAYS use codegraph_explore when you need to search code — "
+            "never replace it with a series of Grep/Glob calls, which return "
+            "file lists and raw lines instead of symbol flow. "
+            "Grep/Glob are a fallback only when codegraph returns nothing useful. "
+            "Exception: if upstreamInvestigation already located the exact symbol, "
+            "read that file directly rather than re-discovering it."
         )
 
     def mcp_servers(self, work_dir: str) -> dict[str, Any]:

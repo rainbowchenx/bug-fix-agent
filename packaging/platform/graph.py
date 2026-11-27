@@ -1,27 +1,32 @@
 """Nexas OS 平台入口：zip 根级 ``graph.py``。
 
-## 设计原则：所有参数都是"路径"
+## 两种入参形态
 
-本入口只认一件事——**一个参数文件**。用户输入（``state["input"]``）写的是该文件的
-路径，其余所有参数（defect-batch 路径、工作区、产线、仓型……）都写在那个文件里。
-参数文件本身也是路径，不是 JSON 字符串。
+用户输入（``state["input"]``）可以是**参数文件的路径**，也可以**直接是 JSON**。
+判定顺序：先试内联 JSON，不成立再当路径。
 
-这样做的原因：Nexas 会把平台自己的说明文字追加到用户输入后面（安全策略、文件传递
-说明，两千多字符），任何"输入即 JSON"的假设都会被这些后缀破坏。路径模型对追加
-文字免疫——取第一行或第一个存在的路径就够了。
+    input（写法一）: '{"defect_batch": "E:/work/batch.json", "work_dir": "E:/repos/x"}'
 
-    input: "E:/work/task-params.json"
-             ↓ 读取
+    input（写法二）: "E:/work/task-params.json"
+                        ↓ 读取
     {
       "defect_batch": "E:/work/defect-batch.json",   ← 也可以是相对路径
       "work_dir":     "E:/repos/transport",
       "product_line": "PJ14PD20260423284",
       "cartography_profile": "device_web"
     }
-             ↓ run_three_agent_workflow()
+                        ↓ run_three_agent_workflow()
     analysis-report
-             ↓ 投影
-    {summary, result, ok}
+                        ↓ 投影
+    {summary, result, ok}   + 产物复制到 outputs/ 并 persist
+
+## 为什么内联 JSON 是安全的
+
+Nexas 会把平台自己的说明文字（安全策略、文件传递说明，两千多字符）追加到用户
+输入后面。按路径找文件天然免疫这些后缀；内联 JSON 则靠**括号配对截取**：从第一
+个 ``{`` 起数到深度归零为止，追加的文字根本进不了 ``json.loads``。
+
+内联 JSON 没有文件目录，相对路径按 cwd（= 业务项目根）解析。
 
 ## 参数文件字段
 
@@ -41,12 +46,12 @@ artifact_dir         否          产物目录；缺省 <work_dir>/.bugfix-runs/
 trace_mode           否          off / summary / detailed
 ===================  ==========  ==========================================
 
-所有路径字段都支持相对路径——相对于**参数文件所在目录**解析，其次相对于 cwd。
+所有路径字段都支持相对路径——相对于**参数文件所在目录**解析（内联 JSON 则按 cwd）。
 
 ## 为什么不需要 input_schema.json
 
 客户端可以用 ``{"input_field": "xxx"}`` 把用户输入映射到某个 state 字段，但值仍然
-是字符串。既然我们本来就只读一个路径，默认的 ``input`` 字段就够用。
+是字符串。我们只需要一个字符串（路径或 JSON 文本），默认的 ``input`` 就够用。
 
 ## 关于出图
 
@@ -60,10 +65,14 @@ trace_mode           否          off / summary / detailed
 """
 
 import json
+import os
 import re
+import shutil
+import subprocess
 import traceback
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, NotRequired, TypedDict
+from typing import Any, NotRequired, Optional, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
@@ -101,7 +110,8 @@ _RUN_KEYS = _COMMON_KEYS | frozenset(
         "ticket_ids",
     }
 )
-_RESUME_KEYS = _COMMON_KEYS | {"defect_id", "feedback_file", "revision_id"}
+# ``work_dir`` 对 resume 也有效：不给 artifact_dir 时靠它定位 .bugfix-runs/LATEST。
+_RESUME_KEYS = _COMMON_KEYS | {"defect_id", "feedback_file", "feedback", "revision_id", "work_dir"}
 
 
 class NexasState(TypedDict):
@@ -182,13 +192,8 @@ def _find_params_file(text: str) -> Path:
     )
 
 
-def _load_params(path: Path) -> dict[str, Any]:
-    """读参数文件。支持带 BOM、单行注释（``//``）的宽松 JSON。"""
-    try:
-        text = path.read_text(encoding="utf-8-sig")
-    except OSError as err:
-        raise ValueError(f"读取参数文件失败：{path}：{err}") from err
-
+def _parse_params_text(text: str, origin: str) -> dict[str, Any]:
+    """解析参数 JSON 文本。支持带 BOM、单行注释（``//``）的宽松 JSON。"""
     try:
         data = json.loads(text)
     except json.JSONDecodeError as err:
@@ -200,12 +205,64 @@ def _load_params(path: Path) -> dict[str, Any]:
             data = json.loads(stripped)
         except json.JSONDecodeError:
             raise ValueError(
-                f"参数文件不是合法 JSON：{path}（第 {err.lineno} 行第 {err.colno} 列）"
+                f"参数不是合法 JSON：{origin}（第 {err.lineno} 行第 {err.colno} 列）"
             ) from err
 
     if not isinstance(data, dict):
-        raise ValueError(f"参数文件顶层必须是 JSON 对象：{path}")
+        raise ValueError(f"参数顶层必须是 JSON 对象：{origin}")
     return data
+
+
+def _load_params(path: Path) -> dict[str, Any]:
+    """读参数文件。支持带 BOM、单行注释（``//``）的宽松 JSON。"""
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except OSError as err:
+        raise ValueError(f"读取参数文件失败：{path}：{err}") from err
+    return _parse_params_text(text, str(path))
+
+
+def _inline_json(text: str) -> Optional[tuple[dict[str, Any], str]]:
+    """用户输入本身就是参数 JSON 时，直接取用，不用再落一个文件。
+
+    Nexas 会在用户输入后面追加平台说明（含中文和反斜杠），所以只认**开头就是
+    JSON 对象**的输入：从第一个 ``{`` 到与之配对的 ``}`` 截断，剩余内容（平台
+    追加的说明）忽略。找不到平衡的结尾就返回 ``None``，退回路径模式。
+    """
+    start = text.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    for pos in range(start, len(text)):
+        ch = text[pos]
+        if escape:
+            escape = False
+            continue
+        if ch == "\\":
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                chunk = text[start : pos + 1]
+                try:
+                    return _parse_params_text(chunk, "用户输入里的 JSON"), _INLINE_ORIGIN
+                except ValueError:
+                    return None
+    return None
+
+
+# 内联 JSON 没有参数文件目录，相对路径按 cwd（= 业务项目根）解析。
+_INLINE_ORIGIN = "<inline-json>"
 
 
 def _resolve_paths(params: dict[str, Any], base: Path) -> dict[str, Any]:
@@ -231,6 +288,104 @@ def _default_work_dir() -> str:
     return str(Path.cwd())
 
 
+# 默认产物根。持续保留同一个位置，续跑才能找回首轮产物。
+_RUNS_DIRNAME = ".bugfix-runs"
+_LATEST_POINTER = "LATEST"
+_ARTIFACT_STAMP_FMT = "%Y%m%dT%H%M%SZ"
+
+
+def _runs_root(work_dir: str | Path) -> Path:
+    return Path(work_dir) / _RUNS_DIRNAME
+
+
+def _read_latest_pointer(work_dir: str | Path) -> Optional[Path]:
+    """读 ``<work_dir>/.bugfix-runs/LATEST``，返回它指向的产物目录。"""
+    pointer = _runs_root(work_dir) / _LATEST_POINTER
+    try:
+        raw = pointer.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    if not raw:
+        return None
+    target = Path(raw)
+    if not target.is_absolute():
+        target = _runs_root(work_dir) / target
+    return target if target.is_dir() else None
+
+
+def _write_latest_pointer(work_dir: str | Path, artifact_dir: Path) -> None:
+    """把本次产物目录记到 ``LATEST``，下次 resume 不必再让用户填路径。"""
+    root = _runs_root(work_dir)
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        target = root / _LATEST_POINTER
+        tmp = target.with_suffix(".tmp")
+        tmp.write_text(str(artifact_dir), encoding="utf-8")
+        tmp.replace(target)
+    except OSError:
+        pass  # 指针只是便利，写不了不影响本次产物
+
+
+def _resolve_artifact_dir(params: dict[str, Any], *, for_resume: bool) -> Path:
+    """确定产物目录。
+
+    - 显式给了 ``artifact_dir`` → 用它（人想固定或指向旧批次时）
+    - ``run`` 没给 → ``<work_dir>/.bugfix-runs/<时间戳>``，每次新目录，历史不覆盖
+    - ``resume`` 没给 → 读 ``LATEST``；没有就报错，让用户知道要先跑首轮
+    """
+    raw = params.get("artifact_dir")
+    if isinstance(raw, str) and raw.strip():
+        return Path(raw.strip())
+
+    work_dir = params.get("work_dir") or _default_work_dir()
+
+    if for_resume:
+        latest = _read_latest_pointer(work_dir)
+        if latest is None:
+            raise ValueError(
+                "没有找到首轮产物目录。请在「产物目录」里填首轮的路径，"
+                f"或先跑一次 run 模式（产物默认在 {_runs_root(work_dir)}）"
+            )
+        return latest
+
+    stamp = datetime.now(timezone.utc).strftime(_ARTIFACT_STAMP_FMT)
+    target = _runs_root(work_dir) / f"{stamp}-{os.getpid():x}"
+    # 同秒重复调用时加后缀，避免覆盖
+    if target.exists():
+        suffix = 1
+        while (candidate := target.with_name(f"{target.name}-{suffix}")).exists():
+            suffix += 1
+        target = candidate
+    return target
+
+
+def _find_ticket_feedback(artifact_dir: Path, defect_id: str) -> Optional[Path]:
+    """找某张票的 ``feedback-form.md``，并确认用户确实填了内容。
+
+    只看 ``ANSWER`` 标记之间的正文：空白表单不能当反馈导入，否则会生成
+    一份空 revision。
+    """
+    form = artifact_dir / "defects" / defect_id / "feedback-form.md"
+    if not form.is_file():
+        return None
+    try:
+        text = form.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    if "BUGFIX_FEEDBACK_FORM" not in text:
+        return None
+    for match in _ANSWER_BODY_RE.finditer(text.replace("\r\n", "\n")):
+        if match.group("body").strip():
+            return form
+    return None
+
+
+_ANSWER_BODY_RE = re.compile(
+    r"<!--\s*ANSWER:(?P<key>[\w-]+)\s*-->(?P<body>.*?)<!--\s*/ANSWER:\1\s*-->",
+    re.S,
+)
+
+
 def _validate(params: dict[str, Any]) -> None:
     """启动前把明显缺的东西一次性报清楚，别让下游报一堆无关的校验错。"""
     problems: list[str] = []
@@ -242,10 +397,12 @@ def _validate(params: dict[str, Any]) -> None:
     for key in _PATH_KEYS:
         if key in params and (not isinstance(params[key], str) or not params[key].strip()):
             problems.append(f"{key} 必须是非空路径")
+    # artifact_dir 可省略：run 走 <work_dir>/.bugfix-runs/<时间戳>，resume 读 LATEST。
+    # 只有显式给了才校验它存在。
+    if isinstance(raw_root := params.get("artifact_dir"), str) and raw_root.strip():
+        if action == "resume" and not Path(raw_root.strip()).is_dir():
+            problems.append(f"resume 的 artifact_dir 不是目录：{raw_root.strip()}")
     if action == "resume":
-        root = params.get("artifact_dir")
-        if not isinstance(root, str) or not root or not Path(root).is_dir():
-            problems.append("resume 的 artifact_dir 必须指向首轮产物目录")
         for key in ("defect_id", "revision_id"):
             if key == "defect_id" or key in params:
                 if not isinstance(params.get(key), str) or not params[key].strip():
@@ -253,6 +410,11 @@ def _validate(params: dict[str, Any]) -> None:
         feedback = params.get("feedback_file")
         if isinstance(feedback, str) and not Path(feedback).is_file():
             problems.append(f"feedback_file 指向的文件不存在：{feedback}")
+        inline = params.get("feedback")
+        if inline is not None and not isinstance(inline, dict):
+            problems.append("feedback 必须是 JSON 对象（内联反馈）")
+        if inline is not None and ("feedback_file" in params or "revision_id" in params):
+            problems.append("feedback 不能与 feedback_file / revision_id 同时使用")
         if "feedback_file" in params and "revision_id" in params:
             problems.append("feedback_file 与 revision_id 不能同时使用")
     else:
@@ -297,15 +459,21 @@ def run_workflow(state: NexasState) -> dict[str, Any]:
     body = state.get("input") or ""
 
     try:
-        params_path = _find_params_file(body)
-        params = _resolve_paths(_load_params(params_path), params_path.parent)
+        inline = _inline_json(body)
+        if inline is not None:
+            params, params_origin = inline
+            params = _resolve_paths(params, Path.cwd())
+        else:
+            params_path = _find_params_file(body)
+            params = _resolve_paths(_load_params(params_path), params_path.parent)
+            params_origin = str(params_path)
     except Exception as err:  # noqa: BLE001
         return _failure(f"入参解析失败：{err}")
 
     try:
         _validate(params)
     except Exception as err:  # noqa: BLE001
-        return _failure(f"参数校验失败（{params_path}）：\n{err}")
+        return _failure(f"参数校验失败（{params_origin}）：\n{err}")
 
     try:
         with trace_output(params.get("trace_mode"), nexas=True) as display:
@@ -314,7 +482,40 @@ def run_workflow(state: NexasState) -> dict[str, Any]:
         detail = f"{type(err).__name__}: {err}\n{traceback.format_exc(limit=5)}"
         return _failure(f"编排执行失败：{err}", detail)
 
+    _publish_outputs(result)
+
     return _project(result, detailed=display.mode == "detailed", resumed_ticket=params.get("defect_id"))
+
+
+def _materialize_feedback(params: dict[str, Any], root: Path) -> Optional[Path]:
+    """把内联 ``feedback`` 对象落成临时文件，供 ``resume_defect`` 读取。
+
+    Dify 的代码节点跑在 Linux 沙箱里、碰不到业务盘，所以反馈只能以 JSON 对象
+    的形式随参数传进来，再由这里落到产物目录下的受控位置。``feedback_file``
+    仍然优先——它给了调用方自己管理文件的机会。
+    """
+    raw = params.get("feedback")
+    if raw is None:
+        path = params.get("feedback_file")
+        return Path(path) if path else None
+    if not isinstance(raw, dict):
+        raise ValueError("feedback 必须是 JSON 对象")
+
+    # 缺 defectId 时用 params 里的补上：代码节点通常只回传人工填的那几项
+    payload = dict(raw)
+    payload.setdefault("defectId", params.get("defect_id"))
+    payload.setdefault(
+        "feedbackId",
+        f"{params.get('defect_id') or 'feedback'}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}",
+    )
+
+    # 落进产物目录：既随产物留档，也不污染业务仓
+    target_dir = root / "feedback"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", str(payload["defectId"] or "defect"))
+    target = target_dir / f"{safe}-{payload['feedbackId']}.json"
+    target.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return target
 
 
 def _execute(params: dict[str, Any]):
@@ -329,23 +530,28 @@ def _execute(params: dict[str, Any]):
         from bugfix_platform.workflow.resume import resume_defect
         from bugfix_platform.workflow.run import ThreeAgentWorkflowResult, WorkflowArtifacts
 
-        root = Path(params["artifact_dir"])
-        feedback = params.get("feedback_file")
+        root = _resolve_artifact_dir(params, for_resume=True)
+        feedback = _materialize_feedback(params, root)
+        if feedback is None:
+            # 没显式给反馈时，看用户是否填了该票的 feedback-form.md
+            feedback = _find_ticket_feedback(root, params["defect_id"])
         report = resume_defect(
             root,
             params["defect_id"],
             params.get("revision_id"),
             execute=True,
             apply_fix=params.get("apply_fix", False),
-            feedback_file=Path(feedback) if feedback else None,
+            feedback_file=feedback,
             **shared,
         )
         return ThreeAgentWorkflowResult(
             ok=True, stage="done", artifacts=WorkflowArtifacts(analysis_report=report), artifact_dir=str(root),
         )
 
-    return run_three_agent_workflow(
-        work_dir=params.get("work_dir") or _default_work_dir(),
+    work_dir = params.get("work_dir") or _default_work_dir()
+    root = _resolve_artifact_dir(params, for_resume=False)
+    result = run_three_agent_workflow(
+        work_dir=work_dir,
         product_line=params.get("product_line"),
         defect_batch=params["defect_batch"],
         posture=params.get("posture"),
@@ -353,9 +559,102 @@ def _execute(params: dict[str, Any]):
         cartography_mode=params.get("cartography_mode"),
         cartography_profile=params.get("cartography_profile"),
         ticket_ids=params.get("ticket_ids"),
-        artifact_dir=params.get("artifact_dir"),
+        artifact_dir=str(root),
         **shared,
     )
+    # 记下本次目录，下次 resume 不用人填路径
+    _write_latest_pointer(work_dir, Path(result.artifact_dir or root))
+    return result
+
+
+# 能进 output_files 的产物，按重要性排序；同样是这些文件会被 persist 成可下载成果物。
+_PUBLISH_FILES = (
+    ("analysis-report.md", "报告（可读）"),
+    ("analysis-report.json", "报告（机器读）"),
+    ("code-knowledge.json", "仓型知识"),
+)
+
+
+def _nexas_shim() -> tuple[Path, Optional[str]] | None:
+    """定位 Nexas 的 ``nexas-file.sh`` 及其数据目录。
+
+    Nexas 只在**有文件传递上下文的任务**里注入 ``NEXAS_TEMP_OUTPUT_DIR``
+    （= ``<数据目录>/outputs``）。没有这个变量说明是本地直跑，不需要发布。
+    """
+    raw = (os.environ.get("NEXAS_TEMP_OUTPUT_DIR") or "").strip()
+    if not raw:
+        return None
+    outputs = Path(raw)
+    data_dir = outputs.parent
+    shim = data_dir / "nexas-file.sh"
+    return (shim, str(data_dir)) if shim.is_file() else None
+
+
+def _publish_outputs(result: Any) -> None:
+    """把产物登记到 Nexas 的 ``output_files``，失败不影响主流程。
+
+    两条通道对应两种用途：
+
+    - **写进 ``outputs/``** —— 任务结束自动进传递清单，给下游 Dify 节点用
+    - **``nexas-file persist``** —— 进成果物列表且可下载（留档给人看）
+
+    报告同时走两条：下游要读，人也要下载。
+    """
+    located = _nexas_shim()
+    if located is None:
+        return
+    shim, data_dir = located
+    artifact_dir = getattr(result, "artifact_dir", None)
+    if not artifact_dir:
+        return
+    root = Path(artifact_dir)
+    if not root.is_dir():
+        return
+
+    outputs = Path(data_dir) / "outputs"
+    published: list[str] = []
+    for name, _label in _PUBLISH_FILES:
+        source = root / name
+        if not source.is_file():
+            continue
+        try:
+            outputs.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, outputs / name)
+            published.append(name)
+        except OSError:
+            continue
+
+    for name in published:
+        _persist_with_shim(shim, Path(data_dir) / "outputs" / name)
+
+
+def _persist_with_shim(shim: Path, target: Path) -> Optional[str]:
+    """调 ``nexas-file persist``；返回 file_ref，失败返回 None。
+
+    shim 是 bash 脚本（靠 ``/dev/tcp`` 回传主进程），所以必须交给 bash 跑。
+    Windows 上不能用 ``nexas-file.cmd`` —— cmd.exe 按 GBK 解析参数，中文路径会毁。
+    """
+    bash = shutil.which("bash")
+    if bash is None:
+        return None
+    try:
+        done = subprocess.run(
+            [bash, str(shim), "persist", str(target)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=180,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if done.returncode != 0:
+        return None
+    try:
+        payload = json.loads((done.stdout or "").strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return None
+    return (payload.get("result") or {}).get("fileRef")
 
 
 def _project(result: Any, *, detailed: bool = False, resumed_ticket: str | None = None) -> dict[str, Any]:

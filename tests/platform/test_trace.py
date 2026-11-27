@@ -24,7 +24,7 @@ from claude_agent_sdk import (
     UserMessage,
 )
 
-from bugfix_platform.sdk.trace import TraceRecorder, trace_output
+from bugfix_platform.sdk.trace import TraceRecorder, format_usage, trace_output
 
 
 def _result(**kw) -> ResultMessage:
@@ -213,11 +213,140 @@ def test_detailed_trace_streams_text_once_and_records_full_results(tmp_path, cap
     assert "internal" not in live.err
     events = _lines(tmp_path / "demo.jsonl")
     assert [event["kind"] for event in events] == [
-        "request", "text_delta", "text", "tool_use", "tool_result", "result",
+        "request", "text_delta", "text", "thinking", "tool_use", "tool_result", "result",
     ]
     assert events[0]["tickets"] == ["D1"]
     assert events[-2]["content"] == file_contents
     assert events[-1]["structuredOutput"] == structured
+
+
+def test_detailed_trace_keeps_thinking_in_file_but_not_on_stdout(tmp_path, capsys):
+    """detailed 模式曾把 ThinkingBlock 整个丢掉，比 summary 丢得还多。
+
+    思考正文必须落盘，但不能进实时流 —— 它最长，会挤掉工具事件。
+    """
+    body = "回想" * 3000
+    with trace_output("detailed", nexas=True):
+        rec = TraceRecorder(tmp_path, "demo", tag="[a]")
+        rec.message(AssistantMessage(
+            content=[ThinkingBlock(thinking=body, signature="s")], model="m"))
+        rec.close()
+
+    live = capsys.readouterr()
+    assert "回想" not in live.out
+
+    thinking = next(e for e in _lines(tmp_path / "demo.jsonl") if e["kind"] == "thinking")
+    assert thinking["text"] == body  # 不截断
+
+
+def test_thinking_delta_streamed_to_file_only(tmp_path, capsys):
+    """网关把思考走 thinking_delta；它必须被记录，且不进实时输出。"""
+    with trace_output("detailed", nexas=True):
+        rec = TraceRecorder(tmp_path, "demo", tag="[a]")
+        rec.message(StreamEvent(uuid="e", session_id="s", event={
+            "type": "content_block_delta", "index": 0,
+            "delta": {"type": "thinking_delta", "thinking": "先看入口"},
+        }))
+        rec.close()
+
+    live = capsys.readouterr()
+    assert "先看入口" not in live.out
+    deltas = [e for e in _lines(tmp_path / "demo.jsonl") if e["kind"] == "thinking_delta"]
+    assert [d["text"] for d in deltas] == ["先看入口"]
+
+
+def test_thinking_only_message_is_not_an_empty_turn(tmp_path):
+    """网关把思考单独发一条 AssistantMessage。
+
+    detailed 模式曾丢掉 ThinkingBlock，这类消息就成了"空轮"——Agent-3 的
+    74 个 turn 里有 23 个是这么来的，撞 24 轮上限时被当成用了 24 轮。
+    """
+    with trace_output("detailed"):
+        rec = TraceRecorder(tmp_path, "demo")
+        rec.message(AssistantMessage(
+            content=[ThinkingBlock(thinking="想一下", signature="s")], model="m"))
+        rec.message(AssistantMessage(
+            content=[ToolUseBlock(id="1", name="Read", input={})], model="m"))
+        rec.close()
+
+    assert rec._turn == 2
+    kinds = [e["kind"] for e in _lines(tmp_path / "demo.jsonl")]
+    assert "thinking" in kinds and "tool_use" in kinds
+
+
+def test_zero_usage_is_not_recorded(tmp_path):
+    """兼容网关把 AssistantMessage.usage 全填 0；这种记录是纯噪音。"""
+    zero = {"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0}
+    with trace_output("detailed"):
+        rec = TraceRecorder(tmp_path, "demo")
+        rec.message(AssistantMessage(content=[TextBlock(text="x")], model="m", usage=zero))
+        rec.close()
+
+    assert not [e for e in _lines(tmp_path / "demo.jsonl") if e["kind"] == "usage"]
+
+
+def test_result_message_carries_session_usage(tmp_path):
+    """会话级用量只在 ResultMessage 上；这是真正拿得到 token 数的地方。"""
+    usage = {"input_tokens": 31552, "output_tokens": 2}
+    rec = TraceRecorder(tmp_path, "demo")
+    rec.message(_result(usage=usage))
+    rec.close()
+
+    result = next(e for e in _lines(tmp_path / "demo.jsonl") if e["kind"] == "result")
+    assert result["usage"] == usage
+
+
+def test_totals_printed_on_close(tmp_path, capsys):
+    """一次 recorder 可能跑 analysis + salvage 多段，close() 打一行累计。"""
+    with trace_output("detailed", nexas=True):
+        rec = TraceRecorder(tmp_path, "demo", tag="[agent3]")
+        rec.message(_result(usage={"input_tokens": 90000, "output_tokens": 20000},
+                            total_cost_usd=1.0, num_turns=12))
+        rec.message(_result(usage={"input_tokens": 1000, "output_tokens": 3720},
+                            total_cost_usd=0.43, num_turns=1))
+        rec.close()
+
+    out = capsys.readouterr().out
+    assert "[2 段]" in out
+    assert "in=91.0k" in out and "out=23.7k" in out
+    assert "cost=$1.43" in out
+    # 每段末尾的 result 行也带用量，不只在总计里
+    assert out.count("tok in=") == 3
+
+
+def test_totals_report_sdk_turns_not_message_count(tmp_path, capsys):
+    """一条 AssistantMessage 只带一个块，按消息数算轮次会翻倍。
+
+    Agent-2 实测：SDK 报 13 轮，消息数 23；Agent-3：31 vs 49。
+    """
+    with trace_output("detailed", nexas=True):
+        rec = TraceRecorder(tmp_path, "demo")
+        rec.message(AssistantMessage(content=[ThinkingBlock(thinking="a", signature="s")], model="m"))
+        rec.message(AssistantMessage(content=[ToolUseBlock(id="1", name="Read", input={})], model="m"))
+        rec.message(AssistantMessage(content=[ToolUseBlock(id="2", name="Grep", input={})], model="m"))
+        rec.message(_result(num_turns=2))
+        rec.close()
+
+    out = capsys.readouterr().out
+    assert "turns=2" in out      # SDK 的数
+    assert "turns=3" not in out  # 消息条数（错误口径）
+
+
+@pytest.mark.parametrize(
+    "usage, cost, expected",
+    [
+        ({"input_tokens": 90902, "output_tokens": 23720, "cache_read_input_tokens": 693760}, 1.428595,
+         "tok in=90.9k out=23.7k cache_read=693.8k cost=$1.43"),
+        ({"prompt_tokens": 3000, "completion_tokens": 800}, None, "tok in=3.0k out=800"),
+        ({"input_tokens": 1000, "output_tokens": 10,
+          "cache_creation": {"ephemeral_5m_input_tokens": 12}}, None,
+         "tok in=1.0k out=10 cache_write=12"),
+        (None, 0.5, "cost=$0.50"),
+        ({}, None, ""),
+    ],
+)
+def test_format_usage(usage, cost, expected):
+    assert format_usage(usage, cost) == expected
 
 
 def test_nexas_display_budget_is_shared_and_does_not_limit_files(tmp_path, capsys):
