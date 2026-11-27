@@ -79,7 +79,7 @@ Nexas 追加的平台说明（跨设备文件传递、安全策略等）会被�
 | `analyze_mode` | 否 | `sdk` / `heuristic` |
 | `ticket_ids` | 否 | 字符串数组，只跑这些票 |
 | `apply_fix` | 否 | 默认关（只出方案，不改码） |
-| `artifact_dir` | 否 | 缺省 `run` 落 `<work_dir>/.bugfix-runs/<时间戳>`，并写 `LATEST` 指针；`resume` 缺省读该指针 |
+| `artifact_dir` | 否 | 缺省 `run` 落 `<work_dir>/.bugfix-runs/<时间戳>`，成功后更新 `LATEST` 指针；`resume` 缺省读该指针 |
 | `trace_mode` | 否 | `summary`（默认）、`detailed`（实时正文和工具）、`off` |
 | `repair_skill` | 否 | 本次任务的用户修复 Skill 文件，或直接含有 `SKILL.md` 的目录。使用时需要 Agent3 SDK 模式和凭据。 |
 | `project_integrations` | 否 | `true` 时启用完整项目 MCP 和已安装的 Claude Code 插件。默认 `false`。 |
@@ -90,9 +90,9 @@ Nexas 追加的平台说明（跨设备文件传递、安全策略等）会被�
 
 ### 导入反馈并续跑 Agent3
 
-复制 [resume.example.json](resume.example.json)，填写 `defect_id` 为首轮已有尝试的票号。`artifact_dir` 可以省略——`run` 跑完会在 `<work_dir>/.bugfix-runs/LATEST` 记下实际目录，`resume` 缺省读它。要续跑更早的批次才需要显式指定。续跑从首轮产物读取业务仓、缺陷批次和 Agent2 的知识，不需要再传 `defect_batch`。
+复制 [resume.example.json](resume.example.json)，填写 `defect_id` 为首轮已有尝试的票号。`artifact_dir` 可以省略，`resume` 默认读取 `<work_dir>/.bugfix-runs/LATEST` 指向的最近一次成功首跑。要续跑更早的批次可显式指定目录。续跑从首轮产物读取业务仓、缺陷批次和 Agent2 的知识，不需要再传 `defect_batch`。
 
-**票级补充信息不用写在参数里。** 首轮会在 `<artifact_dir>/defects/<票号>/feedback-form.md` 生成一份表单，用户在 `ANSWER` 标记之间填完保存即可。`resume` 时若未显式提供 `feedback` / `feedback_file`，会读取该票的表单；表单空白则按普通续跑处理。表单支持 `observed` / `expected` / `steps` / `reject_hypothesis` / `acceptance` 等字段，以及回答 Agent 在 `rootCause.questions` 里提出的问题。
+**票级补充信息可以填表。** 首轮会在 `<artifact_dir>/defects/<票号>/feedback-form.md` 生成一份表单，用户在 `ANSWER` 标记之间填完保存即可。`resume` 省略 `feedback`、`feedback_file` 和 `revision_id` 时会自动导入已填写的表单。显式指定 `revision_id` 时使用已导入的反馈版本。表单支持 `observed` / `expected` / `steps` / `reject_hypothesis` / `acceptance` 等字段，以及回答 Agent 在 `rootCause.questions` 里提出的问题。
 
 `feedback_file` 支持 [反馈 JSON](feedback.example.json) 或填写后的 `feedback-form.md`，相对路径以续跑参数文件所在目录为准。JSON 中的 `defectId` 须与 `defect_id` 一致。如果提供 `attemptId`，它必须指向该票最新尝试。省略 `feedback_file` 可使用已导入的反馈，此时也可用 `revision_id` 核对所用版本。续跑会更新首轮目录里的汇总报告并保留逐轮结果。
 
@@ -128,6 +128,7 @@ Nexas 追加的平台说明（跨设备文件传递、安全策略等）会被�
 
 前提是 Nexas 注入了 `NEXAS_TEMP_OUTPUT_DIR`（= `<数据目录>/outputs`）。本地直跑
 没有这个变量，发布步骤自动跳过，不影响产物落在 `artifact_dir`。
+Windows 上 `persist` 优先用 Git for Windows 的 Bash 执行 Nexas 文件脚本。常规安装可自动识别，自定义安装可把 `git.exe` 所在目录加入 Nexas runner 的 `PATH`。
 
 设置 `"trace_mode": "detailed"` 后，任务日志实时显示模型可见正文、工具调用及结果预览、Agent2 补查和 Agent3 补救。宿主日志容量有限，达到上限后可在 `artifact_dir/logs/` 查看逐会话 JSONL。详细轨迹包含请求、未截断的模型可见正文和工具返回，以及结构化结果，可能含业务源码或附件数据。结果面板显示 Markdown 报告，超长时可从产物目录打开完整的 `analysis-report.md`。任务结束时还会打印本次的 token 用量与成本（`tok in=… out=… cache_read=… cost=$…`）。
 
@@ -274,7 +275,7 @@ LangGraph 运行输入可通过 `agent3_mcp_tools` 声明本次授权的业务 M
 
 `defect_batch` 必填——`source` 字段已废弃。约束：`skip_agent2` 必须同时 `skip_agent3`。
 
-省略 `artifact_dir` 时，`run` 在 `work_dir/.bugfix-runs/<时间戳>` 下创建本次产物目录，并把路径写进同目录的 `LATEST`；`resume` 省略时读 `LATEST`。工作区无法写入时使用临时目录。返回的 `artifact_dir` 包含实际路径，生产部署可显式指向持久化目录以保留报告、逐票快照和反馈表。
+省略 `artifact_dir` 时，`run` 在 `work_dir/.bugfix-runs/<时间戳>` 下创建本次产物目录。成功后更新 `work_dir/.bugfix-runs/LATEST`，供省略 `artifact_dir` 的 `resume` 使用。生产部署可显式指向可写的持久化目录以保留报告、逐票快照和反馈表。
 
 ## 目录
 

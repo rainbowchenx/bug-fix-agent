@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import json
 import runpy
-import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -75,16 +75,18 @@ class _Result:
 @pytest.fixture
 def task_env(tmp_path, monkeypatch):
     """搭一个 Nexas 任务数据目录：outputs/ + 会记录调用的 nexas-file.sh。"""
-    data_dir = tmp_path / "task-abc"
+    data_dir = tmp_path / "任务 产物"
     outputs = data_dir / "outputs"
     outputs.mkdir(parents=True)
     calls = data_dir / "calls.log"
     shim = data_dir / "nexas-file.sh"
     shim.write_text(
         "#!/usr/bin/env bash\n"
-        f'echo "$@" >> "{calls.as_posix()}"\n'
-        '\'echo \'{"ok":true,"result":{"fileRef":"ref-1"}}\'\'\n',
+        '[[ "$1" == persist && -f "$2" ]] || exit 1\n'
+        'printf \'%s\\n\' "$1 ${2##*/}" >> "${0%/*}/calls.log"\n'
+        'echo \'{"ok":true,"result":{"fileRef":"ref-1"}}\'\n',
         encoding="utf-8",
+        newline="\n",
     )
     monkeypatch.setenv("NEXAS_TEMP_OUTPUT_DIR", str(outputs))
     artifacts = tmp_path / "artifacts"
@@ -96,16 +98,43 @@ def task_env(tmp_path, monkeypatch):
 
 def test_publish_copies_to_outputs_and_persists(nx, task_env):
     """报告既要进 outputs/（下游可读），也要 persist（人可下载）。"""
-    data_dir, outputs, calls, artifacts = task_env
+    if nx["_persist_bash"]() is None:
+        pytest.skip("Native Bash is required to exercise the Nexas shell shim")
+    _, outputs, calls, artifacts = task_env
     nx["_publish_outputs"](_Result(artifacts))
 
     assert sorted(p.name for p in outputs.iterdir()) == [
         "analysis-report.json", "analysis-report.md",
     ]
-    logged = calls.read_text(encoding="utf-8")
-    assert "persist" in logged
-    assert "analysis-report.md" in logged
-    assert "analysis-report.json" in logged
+    assert calls.read_text(encoding="utf-8").splitlines() == [
+        "persist analysis-report.md", "persist analysis-report.json",
+    ]
+
+
+def test_persist_shim_returns_file_reference(nx, task_env):
+    if nx["_persist_bash"]() is None:
+        pytest.skip("Native Bash is required to exercise the Nexas shell shim")
+    data_dir, _, _, artifacts = task_env
+    assert nx["_persist_with_shim"](data_dir / "nexas-file.sh", artifacts / "analysis-report.md") == "ref-1"
+
+
+@pytest.mark.parametrize("install", ["standard", "custom", None])
+def test_windows_persist_bash_avoids_wsl_launcher(nx, tmp_path, monkeypatch, install):
+    find_bash = nx["_persist_bash"]
+    program_files = tmp_path / "Program Files"
+    git_root = tmp_path / "Custom Git" if install == "custom" else program_files / "Git"
+    git_bash = git_root / "bin" / "bash.exe"
+    if install:
+        git_bash.parent.mkdir(parents=True)
+        git_bash.touch()
+    monkeypatch.setitem(find_bash.__globals__, "os", SimpleNamespace(
+        name="nt", environ={"ProgramFiles": str(program_files)},
+    ))
+    executables = {"bash": str(tmp_path / "Windows" / "System32" / "bash.exe")}
+    if install == "custom":
+        executables["git.exe"] = str(git_root / "cmd" / "git.exe")
+    monkeypatch.setattr(find_bash.__globals__["shutil"], "which", executables.get)
+    assert find_bash() == (str(git_bash) if install else None)
 
 
 def test_publish_skips_missing_files(nx, task_env):
@@ -224,6 +253,21 @@ def test_latest_pointer_roundtrip(nx, tmp_path):
     assert nx["_read_latest_pointer"](tmp_path) == target
 
 
+@pytest.mark.parametrize("ok", [True, False])
+def test_first_run_updates_latest_only_on_success(nx, tmp_path, monkeypatch, ok):
+    from bugfix_platform import workflow
+
+    previous = tmp_path / "previous"
+    previous.mkdir()
+    nx["_write_latest_pointer"](tmp_path, previous)
+    current = tmp_path / "current"
+    current.mkdir()
+    result = SimpleNamespace(ok=ok, artifact_dir=str(current))
+    monkeypatch.setattr(workflow, "run_three_agent_workflow", lambda **_: result)
+    assert nx["_execute"]({"work_dir": str(tmp_path), "defect_batch": "batch.json"}) is result
+    assert nx["_read_latest_pointer"](tmp_path) == (current if ok else previous)
+
+
 def test_resume_without_artifact_dir_reads_pointer(nx, tmp_path):
     target = tmp_path / ".bugfix-runs" / "stamp"
     target.mkdir(parents=True)
@@ -275,6 +319,30 @@ def test_find_ticket_feedback_accepts_filled_form(nx, tmp_path):
         encoding="utf-8",
     )
     assert nx["_find_ticket_feedback"](tmp_path, did) == form
+
+
+@pytest.mark.parametrize("revision_id", [None, "r1"])
+def test_resume_auto_imports_form_only_without_revision_id(nx, tmp_path, monkeypatch, revision_id):
+    from bugfix_platform.workflow import resume
+
+    form = tmp_path / "defects" / "D1" / "feedback-form.md"
+    form.parent.mkdir(parents=True)
+    form.write_text(
+        "<!-- BUGFIX_FEEDBACK_FORM -->\n"
+        "<!-- ANSWER:observed -->\n切换设备后无提示\n<!-- /ANSWER:observed -->\n",
+        encoding="utf-8",
+    )
+    calls = []
+
+    def record_resume(root, defect_id, revision, *, feedback_file, **_):
+        calls.append((root, defect_id, revision, feedback_file))
+
+    monkeypatch.setattr(resume, "resume_defect", record_resume)
+    params = {"action": "resume", "artifact_dir": str(tmp_path), "defect_id": "D1"}
+    if revision_id is not None:
+        params["revision_id"] = revision_id
+    assert nx["_execute"](params).ok
+    assert calls == [(tmp_path, "D1", revision_id, form if revision_id is None else None)]
 
 
 def test_find_ticket_feedback_requires_marker(nx, tmp_path):

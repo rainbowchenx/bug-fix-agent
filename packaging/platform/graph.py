@@ -531,14 +531,15 @@ def _execute(params: dict[str, Any]):
         from bugfix_platform.workflow.run import ThreeAgentWorkflowResult, WorkflowArtifacts
 
         root = _resolve_artifact_dir(params, for_resume=True)
+        revision_id = params.get("revision_id")
         feedback = _materialize_feedback(params, root)
-        if feedback is None:
+        if feedback is None and revision_id is None:
             # 没显式给反馈时，看用户是否填了该票的 feedback-form.md
             feedback = _find_ticket_feedback(root, params["defect_id"])
         report = resume_defect(
             root,
             params["defect_id"],
-            params.get("revision_id"),
+            revision_id,
             execute=True,
             apply_fix=params.get("apply_fix", False),
             feedback_file=feedback,
@@ -562,8 +563,9 @@ def _execute(params: dict[str, Any]):
         artifact_dir=str(root),
         **shared,
     )
-    # 记下本次目录，下次 resume 不用人填路径
-    _write_latest_pointer(work_dir, Path(result.artifact_dir or root))
+    # 失败或未落盘的首跑不能替换可续跑的批次。
+    if result.ok and result.artifact_dir and (completed_root := Path(result.artifact_dir)).is_dir():
+        _write_latest_pointer(work_dir, completed_root)
     return result
 
 
@@ -628,18 +630,43 @@ def _publish_outputs(result: Any) -> None:
         _persist_with_shim(shim, Path(data_dir) / "outputs" / name)
 
 
+def _persist_bash() -> Optional[str]:
+    if os.name != "nt":
+        return shutil.which("bash")
+
+    # 系统目录里的 bash.exe 是 WSL 启动器，无法直接用宿主的 Windows 路径执行 shim。
+    git_roots = [
+        Path(root) / "Git"
+        for key in ("ProgramW6432", "ProgramFiles", "ProgramFiles(x86)")
+        if (root := os.environ.get(key))
+    ]
+    if local_app_data := os.environ.get("LOCALAPPDATA"):
+        git_roots.append(Path(local_app_data) / "Programs" / "Git")
+    if git := shutil.which("git.exe"):
+        git_roots.append(Path(git).resolve().parent.parent)
+    for git_root in git_roots:
+        bash = git_root / "bin" / "bash.exe"
+        if bash.is_file():
+            return str(bash)
+
+    bash = shutil.which("bash")
+    if bash and Path(bash).parent.name.lower() not in {"system32", "sysnative", "syswow64", "windowsapps"}:
+        return bash
+    return None
+
+
 def _persist_with_shim(shim: Path, target: Path) -> Optional[str]:
     """调 ``nexas-file persist``；返回 file_ref，失败返回 None。
 
     shim 是 bash 脚本（靠 ``/dev/tcp`` 回传主进程），所以必须交给 bash 跑。
     Windows 上不能用 ``nexas-file.cmd`` —— cmd.exe 按 GBK 解析参数，中文路径会毁。
     """
-    bash = shutil.which("bash")
+    bash = _persist_bash()
     if bash is None:
         return None
     try:
         done = subprocess.run(
-            [bash, str(shim), "persist", str(target)],
+            [bash, shim.as_posix(), "persist", target.as_posix()],
             capture_output=True,
             text=True,
             encoding="utf-8",
